@@ -1,5 +1,6 @@
 import type { Server } from "@modelcontextprotocol/server"
 
+import { observeHttpAdmission, admissionObservationsEnabled } from "./http-admission-observations.js"
 import type { ClientBundle } from "../runtime/client-resolver.js"
 
 export interface RequestClientLease<A = ClientBundle> {
@@ -24,10 +25,22 @@ export const createRequestClientLifecycle = <A>(
   let leasePromise: Promise<RequestClientLease<A>> | undefined
   let closed = false
   let closePromise: Promise<void> | undefined
+  observeHttpAdmission("createRequestClientLifecycle", {})
 
   const resolve = async (): Promise<A> => {
-    if (closed) throw new Error("Request-scoped Huly clients are already closed")
+    if (closed) {
+      observeHttpAdmission("RequestClientLifecycle_resolve", { closed: true })
+      throw new Error("Request-scoped Huly clients are already closed")
+    }
+    observeHttpAdmission("RequestClientLifecycle_resolve", { closed: false })
+    const startsAcquisition = leasePromise === undefined
     leasePromise ??= acquire()
+    if (startsAcquisition && admissionObservationsEnabled()) {
+      void leasePromise.then(
+        () => observeHttpAdmission("RequestClientLifecycle_acquireSettles", { rejected: false }),
+        () => observeHttpAdmission("RequestClientLifecycle_acquireSettles", { rejected: true })
+      )
+    }
     const lease = await leasePromise
     if (closed) {
       await closePromise
@@ -37,15 +50,25 @@ export const createRequestClientLifecycle = <A>(
   }
 
   const close = (): Promise<void> => {
-    if (closePromise !== undefined) return closePromise
+    if (closePromise !== undefined) {
+      observeHttpAdmission("RequestClientLifecycle_close", { firstClose: false })
+      return closePromise
+    }
     closed = true
+    observeHttpAdmission("RequestClientLifecycle_close", { firstClose: true })
     const pending = leasePromise
     closePromise =
       pending === undefined
         ? Promise.resolve()
         : pending.then(
             async (lease) => {
-              await lease.close()
+              try {
+                await lease.close()
+              } catch (error) {
+                observeHttpAdmission("RequestClientLifecycle_leaseCloseSettles", { failed: true })
+                throw error
+              }
+              observeHttpAdmission("RequestClientLifecycle_leaseCloseSettles", { failed: false })
             },
             () => {
               // A failed acquisition has no acquired resource to release.
@@ -64,7 +87,8 @@ export const createRequestClientLifecycle = <A>(
 export const attachRequestClientLifecycle = <A>(
   server: Server,
   lifecycle: RequestClientLifecycle<A>,
-  onCleanupError: RequestClientCleanupErrorHandler
+  onCleanupError: RequestClientCleanupErrorHandler,
+  quiesceRequests: () => Promise<void> = () => Promise.resolve()
 ): void => {
   const previousOnClose = server.onclose
   const originalClose = server.close.bind(server)
@@ -77,14 +101,21 @@ export const attachRequestClientLifecycle = <A>(
     onCleanupError(error instanceof Error ? error : new Error(String(error)))
   }
 
+  observeHttpAdmission("attachRequestClientLifecycle", {})
+
   server.onclose = () => {
-    if (!wrapperCloseInProgress) void lifecycle.close().catch(reportCleanupError)
+    if (!wrapperCloseInProgress) {
+      void server.close().catch(reportCleanupError)
+      observeHttpAdmission("Server_onclose", {})
+    }
     previousOnClose?.()
   }
   server.close = () => {
+    observeHttpAdmission("Server_closeStarts", {})
     if (serverClosePromise !== undefined) return serverClosePromise
     wrapperCloseInProgress = true
     serverClosePromise = (async () => {
+      const draining = quiesceRequests()
       const closeOriginal = async (): Promise<void> => {
         try {
           await originalClose()
@@ -93,8 +124,13 @@ export const attachRequestClientLifecycle = <A>(
         }
       }
       const [serverResult] = await Promise.allSettled([closeOriginal()])
+      await draining
       const [lifecycleResult] = await Promise.allSettled([lifecycle.close()])
       if (lifecycleResult.status === "rejected") reportCleanupError(lifecycleResult.reason)
+      observeHttpAdmission("Server_close", {
+        underlyingFails: serverResult.status === "rejected",
+        leaseCloseFails: lifecycleResult.status === "rejected"
+      })
       if (serverResult.status === "rejected" && lifecycleResult.status === "rejected") {
         throw new AggregateError(
           [serverResult.reason, lifecycleResult.reason],

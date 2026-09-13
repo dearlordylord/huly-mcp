@@ -736,3 +736,25 @@ The controlled-red exception has ended. `pnpm check-all` is mandatory for every
 subsequent release-ready change; new compiler, diagnostic, architecture, lint,
 test, coverage, or packaging failures are ordinary blockers and must not be
 recorded as deferred migration work.
+
+## HTTP admission and shutdown release follow-up
+
+The release review following the Quint Studio work removed the unused process-client
+priming API; the earlier migration checkpoint above remains historical evidence.
+HTTP requests now retain their admission lifecycle and drain admitted tool handlers
+before releasing request-scoped Huly clients, including when the SDK aborts the
+response. Mounted MCP cleanup runs before Node's listener shutdown finalizer.
+Shutdown fences new requests, remains idempotent, and retains a timeout as its
+terminal outcome even if resource cleanup completes later.
+
+Startup rejects blank configured MCP bearer tokens. Only supported Huly config
+headers activate isolated header configuration; unrelated proxy headers preserve
+environment fallback. Cleanup failures produce static diagnostics so arbitrary
+SDK errors cannot expose credentials.
+
+Quint's generated oracle client is test tooling rather than a production import.
+The source-owned diagnostics channel carries schema-typed lifecycle observations;
+the test setup owns subscription, forwarding errors, and cleanup. Application
+coverage thresholds remain at 99%; generated tooling has a documented separate
+boundary in `quint-specs/README.md`. Formal model bounds and verification evidence
+are recorded alongside the model.

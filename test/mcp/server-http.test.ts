@@ -1,10 +1,12 @@
 import type http from "node:http"
 
+import { toFindResult } from "@hcengineering/core"
+import { Server } from "@modelcontextprotocol/server"
 import { Context, Effect, Exit, Fiber, Layer } from "effect"
 import { describe, expect, it } from "vitest"
 
 import { sanitizeHulyRuntimeConfigFromEnv, sanitizeHulyRuntimeConfigFromHeaders } from "../../src/config/config.js"
-import { HulyClient } from "../../src/huly/client.js"
+import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
 import { HttpServerFactoryService, HttpTransportError, type HttpServerFactory } from "../../src/mcp/http-transport.js"
@@ -24,8 +26,12 @@ const deferred = <A>(): { readonly promise: Promise<A>; readonly resolve: (value
   return { promise, resolve: (value) => resolvePromise?.(value) }
 }
 
-const clientBundle = async (): Promise<ClientBundle> => {
-  const layer = Layer.mergeAll(HulyClient.testLayer({}), HulyStorageClient.testLayer({}), WorkspaceClient.testLayer({}))
+const clientBundle = async (operations: Partial<HulyClientOperations> = {}): Promise<ClientBundle> => {
+  const layer = Layer.mergeAll(
+    HulyClient.testLayer(operations),
+    HulyStorageClient.testLayer({}),
+    WorkspaceClient.testLayer({})
+  )
   const context = await Effect.runPromise(Layer.build(layer).pipe(Effect.scoped))
   return {
     hulyClient: Context.get(context, HulyClient),
@@ -67,6 +73,68 @@ const runningFactory = (
 ): HttpServerFactory => makeTestHttpServerFactory(listening.resolve, (message) => writes.push(message))
 
 describe("McpServerService released HTTP integration", () => {
+  it("drains admitted HTTP tool bodies before releasing request clients", async () => {
+    const listening = deferred<http.Server>()
+    const started = deferred<void>()
+    const aborted = deferred<void>()
+    const finish = deferred<void>()
+    let released = false
+    let bodyFinishedWithOpenClients = false
+    const bundle = await clientBundle({
+      findAll: () =>
+        Effect.promise(async () => {
+          started.resolve()
+          await finish.promise
+          bodyFinishedWithOpenClients = !released
+          expect(released).toBe(false)
+          return toFindResult([])
+        })
+    })
+    const layer = McpServerService.layer({
+      transport: "http",
+      httpPort: 0,
+      httpHost: "127.0.0.1",
+      resolveClients: async () => Exit.succeed(bundle),
+      resolveClientLeaseForHttpRequest: async () => ({
+        bundle: Exit.succeed(bundle),
+        close: () => {
+          released = true
+        }
+      }),
+      createServer: () => {
+        const server = new Server(
+          { name: "drain-test", version: "1.0.0" },
+          { capabilities: { tools: {}, resources: {} } }
+        )
+        server.onclose = aborted.resolve
+        return server
+      },
+      getRuntimeConfigContext: () => sanitizeHulyRuntimeConfigFromEnv(runtimeEnv)
+    }).pipe(Layer.provide(TelemetryService.testLayer()))
+    const context = await Effect.runPromise(Layer.build(layer).pipe(Effect.scoped))
+    const operations = Context.get(context, McpServerService)
+    const fiber = Effect.runFork(
+      operations.run().pipe(Effect.provideService(HttpServerFactoryService, runningFactory(listening, [])))
+    )
+    await Effect.runPromise(operations.awaitReady())
+    const server = await listening.promise
+    const address = server.address()
+    if (address === null || typeof address === "string") throw new Error("Expected an assigned TCP port")
+    const response = fetch(
+      `http://127.0.0.1:${address.port}/mcp`,
+      modernRequest("tools/call", { name: "list_projects", arguments: {} })
+    )
+    await started.promise
+    const stopping = Effect.runPromise(operations.stop())
+    await aborted.promise
+    expect(released).toBe(false)
+    finish.resolve()
+    await stopping
+    await Effect.runPromise(Fiber.join(fiber))
+    expect(bodyFinishedWithOpenClients).toBe(true)
+    expect(released).toBe(true)
+    expect((await response).status).toBe(499)
+  })
   it("keeps HTTP running when stdin emits EOF", async () => {
     const listening = deferred<http.Server>()
     const writes: Array<string> = []
@@ -202,6 +270,45 @@ describe("McpServerService released HTTP integration", () => {
         ["token-beta", 1]
       ])
     )
+  })
+
+  it("reports request-scoped Huly client cleanup failures without exposing their cause", async () => {
+    const listening = deferred<http.Server>()
+    const cleanupReported = deferred<string>()
+    const bundle = await clientBundle()
+    const layer = McpServerService.layer({
+      transport: "http",
+      httpPort: 0,
+      httpHost: "127.0.0.1",
+      resolveClients: async () => Exit.succeed(bundle),
+      resolveClientLeaseForHttpRequest: async () => ({
+        bundle: Exit.succeed(bundle),
+        close: () => Promise.reject(new Error("tenant connection reset during close"))
+      }),
+      getRuntimeConfigContext: () => sanitizeHulyRuntimeConfigFromEnv(runtimeEnv),
+      writeError: (message) => {
+        if (message.startsWith("Request-scoped Huly client cleanup failed")) cleanupReported.resolve(message)
+      }
+    }).pipe(Layer.provide(TelemetryService.testLayer()))
+    const context = await Effect.runPromise(Layer.build(layer).pipe(Effect.scoped))
+    const operations = Context.get(context, McpServerService)
+    const fiber = Effect.runFork(
+      operations.run().pipe(Effect.provideService(HttpServerFactoryService, runningFactory(listening, [])))
+    )
+    await Effect.runPromise(operations.awaitReady())
+    const server = await listening.promise
+    const address = server.address()
+    if (address === null || typeof address === "string") throw new Error("Expected an assigned TCP port")
+
+    const response = await fetch(
+      `http://127.0.0.1:${address.port}/mcp`,
+      modernRequest("tools/call", { name: "list_projects", arguments: {} })
+    )
+    await response.text()
+
+    expect(await cleanupReported.promise).toBe("Request-scoped Huly client cleanup failed\n")
+    await Effect.runPromise(operations.stop())
+    await Effect.runPromise(Fiber.join(fiber))
   })
 
   it("falls back to shared clients and process runtime config when request callbacks are absent", async () => {

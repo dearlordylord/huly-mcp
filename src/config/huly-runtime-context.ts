@@ -222,7 +222,7 @@ const inspectHeaders = (headers: unknown): HeaderInspection => {
   const requiredComplete = REQUIRED_HULY_CONFIG_HEADERS.every((name) => isConfiguredHeaderValue(values.get(name)))
 
   return {
-    present: values.size > 0 || unsupportedHulyHeaders.length > 0,
+    present: values.size > 0,
     requiredComplete,
     hulyUrl,
     hulyWorkspace,

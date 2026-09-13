@@ -1,5 +1,13 @@
 # @firfi/huly-cli
 
+## 0.50.4
+
+### Patch Changes
+
+- Update the shared Huly client runtime to publish typed lifecycle observations without importing Quint's generated test client. Remove the unused process-client priming API.
+
+  Strengthen packed CLI integration checks with isolated HR fixtures, typed invitation cleanup, explicit CLI timeouts, and preserved subprocess diagnostics.
+
 ## 0.50.3
 
 ### Patch Changes

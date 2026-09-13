@@ -9,6 +9,7 @@ import { HttpServer } from "effect/unstable/http"
 import { afterEach, describe, expect, it } from "vitest"
 
 import { createMcpServer } from "../../src/mcp/create-mcp-server.js"
+import type { HttpAdmissionObservation } from "../../src/mcp/http-admission-observations.js"
 import {
   createMountedMcpHttpHandler,
   type HttpServerFactory,
@@ -17,9 +18,12 @@ import {
   startHttpTransport
 } from "../../src/mcp/http-transport.js"
 import { PROXY_TOOL_NAMES } from "../../src/mcp/proxy-tools.js"
+import { createRequestAdmission } from "../../src/mcp/request-admission.js"
+import { attachRequestClientLifecycle, createRequestClientLifecycle } from "../../src/mcp/request-client-lifecycle.js"
 import { toolRegistry } from "../../src/mcp/tools/index.js"
 import type { TelemetryOperations } from "../../src/telemetry/telemetry.js"
 import { failingHttpServerFactory, listenTestMcpHttpServer, makeTestHttpServerFactory } from "./http-test-support.js"
+import { subscribeHttpAdmissionObservations } from "../helpers/http-admission-observations.js"
 
 const protocolVersion = "2026-07-28"
 const legacyProtocolVersion = "2025-06-18"
@@ -736,16 +740,28 @@ describe("MCP 2026-07-28 HTTP transport with 2025 compatibility", () => {
     startedServers.delete(endpoint.server)
   })
 
-  effectIt.effect("bounds a stuck HTTP handler shutdown and reports a static fallback", () =>
+  effectIt.effect("bounds concurrent stuck HTTP shutdown callers and reports the timeout once", () =>
     Effect.gen(function* () {
       const closeStarted = deferred<void>()
+      const finishClose = deferred<void>()
+      const trackerSettled = deferred<void>()
+      const observations: HttpAdmissionObservation[] = []
+      const observationErrors: unknown[] = []
+      const unsubscribe = subscribeHttpAdmissionObservations(
+        (observation) => {
+          observations.push(observation)
+          if (observation._tag === "McpServerCloseTracker_closeSettles") trackerSettled.resolve()
+        },
+        (error) => observationErrors.push(error)
+      )
+      yield* Effect.addFinalizer(() => Effect.sync(unsubscribe))
       const writes: Array<string> = []
       const mounted = createMountedMcpHttpHandler(
         () => {
           const server = createTestServer()
           server.close = () => {
             closeStarted.resolve()
-            return new Promise<void>(() => {})
+            return finishClose.promise
           }
           return server
         },
@@ -780,12 +796,93 @@ describe("MCP 2026-07-28 HTTP transport with 2025 compatibility", () => {
       yield* Effect.promise(() => closeStarted.promise)
 
       const closeFiber = yield* mounted.close.pipe(Effect.forkScoped({ startImmediately: true }))
+      const concurrentCloseFiber = yield* mounted.close.pipe(Effect.forkScoped({ startImmediately: true }))
       yield* TestClock.adjust("1 second")
       yield* Fiber.join(closeFiber)
+      yield* Fiber.join(concurrentCloseFiber)
 
       expect(writes).toEqual(["MCP HTTP handler shutdown timed out\n"])
-    })
+      finishClose.resolve()
+      yield* Effect.promise(() => trackerSettled.promise)
+      yield* Effect.yieldNow
+      yield* mounted.close
+      expect(
+        observations.filter((observation) => observation._tag === "createMountedMcpHttpHandler_closeSettles")
+      ).toEqual([{ _tag: "createMountedMcpHttpHandler_closeSettles", timedOut: true, failed: false }])
+      expect(observationErrors).toEqual([])
+      expect(writes).toEqual(["MCP HTTP handler shutdown timed out\n"])
+    }).pipe(Effect.scoped)
   )
+
+  it("drains admitted tool bodies after request abortion before releasing their clients", async () => {
+    const callStarted = deferred<void>()
+    const releaseCall = deferred<void>()
+    let callFinished = false
+    let clientsClosed = false
+    let serversCreated = 0
+    const writes: Array<string> = []
+    const mounted = createMountedMcpHttpHandler(
+      () => {
+        serversCreated++
+        const server = createTestServer()
+        const admission = createRequestAdmission()
+        const lifecycle = createRequestClientLifecycle(async () => ({
+          bundle: Symbol("clients"),
+          close: () => {
+            clientsClosed = true
+          }
+        }))
+        attachRequestClientLifecycle(server, lifecycle, () => {}, admission.quiesce)
+        server.setRequestHandler("tools/list", async () => {
+          const lease = admission.enter()
+          if (lease === null) throw new Error("Request admission is closed")
+          try {
+            await lifecycle.resolve()
+            callStarted.resolve()
+            await releaseCall.promise
+            expect(clientsClosed).toBe(false)
+            callFinished = true
+            return { tools: [] }
+          } finally {
+            lease.release()
+          }
+        })
+        return server
+      },
+      undefined,
+      (message) => writes.push(message),
+      "127.0.0.1",
+      "5 seconds"
+    )
+    const request = mounted.fetch(
+      new Request("http://127.0.0.1/mcp", {
+        method: "POST",
+        headers: { ...modernHeaders("tools/list"), host: "127.0.0.1" },
+        body: JSON.stringify(modernBody("tools/list", {}))
+      })
+    )
+    await callStarted.promise
+
+    const closing = Effect.runPromise(mounted.close)
+    expect((await request).status).toBe(499)
+
+    expect(callFinished).toBe(false)
+    expect(clientsClosed).toBe(false)
+    const refused = await mounted.fetch(
+      new Request("http://127.0.0.1/mcp", {
+        method: "POST",
+        headers: { ...modernHeaders("tools/list"), host: "127.0.0.1" },
+        body: JSON.stringify(modernBody("tools/list", {}))
+      })
+    )
+    expect(refused.status).toBe(503)
+    expect(serversCreated).toBe(1)
+    releaseCall.resolve()
+    await closing
+    expect(callFinished).toBe(true)
+    expect(clientsClosed).toBe(true)
+    expect(writes).toEqual([])
+  })
 })
 
 describe("HTTP transport Effect lifecycle", () => {
@@ -851,6 +948,61 @@ describe("HTTP transport Effect lifecycle", () => {
       expect.stringMatching(/^MCP HTTP server listening on http:\/\/127\.0\.0\.1:\d+\/mcp\n$/u)
     )
     expect(writes.join("")).not.toContain("http://127.0.0.1:0/mcp")
+    startedServers.delete(server)
+  })
+
+  it("reports rejected MCP server cleanup when the transport scope shuts down", async () => {
+    const listening = deferred<http.Server>()
+    const transportReady = deferred<void>()
+    const closeStarted = deferred<void>()
+    const writes: Array<string> = []
+    const factory = makeTestHttpServerFactory(
+      (server) => {
+        startedServers.add(server)
+        listening.resolve(server)
+      },
+      (message) => {
+        writes.push(message)
+      }
+    )
+    const fiber = Effect.runFork(
+      startHttpTransport(
+        { port: 0, host: "127.0.0.1", onReady: () => Effect.sync(() => transportReady.resolve()) },
+        () => {
+          const server = createTestServer()
+          server.close = () => {
+            closeStarted.resolve()
+            return Promise.reject(new Error("legacy cleanup failed"))
+          }
+          return server
+        }
+      ).pipe(Effect.scoped, Effect.provideService(HttpServerFactoryService, factory))
+    )
+    const server = await listening.promise
+    await transportReady.promise
+    const address = server.address()
+    if (address === null || typeof address === "string") throw new Error("Expected an assigned TCP port")
+
+    const response = await fetch(`http://127.0.0.1:${address.port}/mcp`, {
+      method: "POST",
+      headers: { accept: "application/json, text/event-stream", "content-type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: legacyProtocolVersion,
+          capabilities: {},
+          clientInfo: { name: "legacy", version: "1" }
+        }
+      })
+    })
+    await parseResponse(response)
+    await closeStarted.promise
+    await Effect.runPromise(Fiber.interrupt(fiber))
+
+    expect(writes).toContain("MCP HTTP handler shutdown failed\n")
+    expect(writes.join("")).not.toContain("legacy cleanup failed")
     startedServers.delete(server)
   })
 

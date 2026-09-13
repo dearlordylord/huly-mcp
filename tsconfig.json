@@ -42,6 +42,12 @@
       }
     ]
   },
-  "include": ["src/**/*.ts", "packages/**/*.ts", "scripts/**/*.ts", "test/**/*.ts"],
+  "include": [
+    "src/**/*.ts",
+    "packages/**/*.ts",
+    "scripts/**/*.ts",
+    "test/**/*.ts",
+    "quint-specs/oracle-client/typescript/**/*.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }

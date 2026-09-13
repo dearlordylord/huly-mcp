@@ -147,7 +147,7 @@ const decodeHeaderRecord = (headers: unknown): Effect.Effect<HeaderRecord, Confi
 const parseUrlHeaderConfig = (headers: HeaderRecord): Effect.Effect<UrlHeaderConfig, ConfigValidationError> =>
   Effect.gen(function* () {
     const hulyHeaders = Object.entries(headers).filter(([name]) => name.toLowerCase().startsWith("x-huly-"))
-    if (hulyHeaders.length === 0) return { _tag: "NoUrlHeaders" }
+    if (!hulyHeaders.some(([name]) => isHulyConfigHeader(name.toLowerCase()))) return { _tag: "NoUrlHeaders" }
 
     const normalized = yield* Effect.forEach(
       hulyHeaders,
@@ -184,7 +184,7 @@ const parseUrlHeaderConfig = (headers: HeaderRecord): Effect.Effect<UrlHeaderCon
           if (REQUIRED_HULY_CONFIG_HEADERS.includes(headerName)) {
             return Effect.fail(
               configValidationError(
-                `Missing required Huly config header "${headerName}". When any x-huly-* header is present, ` +
+                `Missing required Huly config header "${headerName}". When any supported x-huly-* header is present, ` +
                   `${REQUIRED_HULY_CONFIG_HEADERS.join(", ")} must all be provided.`,
                 headerName
               )
@@ -213,8 +213,10 @@ const configProviderFromUrlHeaders = (
 /**
  * Build an Effect ConfigProvider from URL mode headers.
  *
- * If no x-huly-* headers are present, returns undefined so callers can use the
- * existing process environment resolver. If any x-huly-* header is present,
+ * If no supported x-huly-* config headers are present (unrelated x-huly-* headers
+ * such as proxy trace ids included), returns undefined so callers can use the
+ * existing process environment resolver. If any supported x-huly-* header is present,
+ * unsupported x-huly-* headers are rejected,
  * only token auth headers are accepted and all required fields must come from
  * headers; missing values are never filled from process env.
  */

@@ -57,20 +57,6 @@ describe("shared Huly client runtime", () => {
     expect(Exit.isFailure(await resolve())).toBe(true)
   })
 
-  it("takes ownership of a primed scoped bundle", async () => {
-    let releases = 0
-    const trackedLayer = clientLayer.pipe(Layer.tap(() => Effect.addFinalizer(() => Effect.sync(() => releases++))))
-    const scoped = await Effect.runPromise(buildScopedClientBundle(trackedLayer))
-    const { close, prime, resolve } = createClientResolver(clientLayer)
-    await prime(scoped)
-
-    const primed = await resolve()
-    expect(Exit.isSuccess(primed) && primed.value).toBe(scoped.bundle)
-
-    await close()
-    expect(releases).toBe(1)
-  })
-
   it("evicts a mixed acquisition containing unavailability so a later call can recover", async () => {
     let available = false
     const unavailable = new HulyUnavailableError({
@@ -97,23 +83,6 @@ describe("shared Huly client runtime", () => {
     } finally {
       await close()
     }
-  })
-
-  it("does not evict a newer primed bundle after an unavailable acquisition fails", async () => {
-    const unavailable = new HulyUnavailableError({
-      endpointOrigin: normalizeHulyOrigin("https://huly.app"),
-      failureKind: "refused"
-    })
-    const failingLayer = clientLayer.pipe(Layer.tap(() => Effect.fail(unavailable)))
-    const { close, prime, resolve } = createClientResolver(failingLayer)
-    const scoped = await Effect.runPromise(buildScopedClientBundle(clientLayer))
-    const failedAcquisition = resolve()
-    await prime(scoped)
-
-    expect(Exit.isFailure(await failedAcquisition)).toBe(true)
-    const primed = await resolve()
-    expect(Exit.isSuccess(primed) && primed.value).toBe(scoped.bundle)
-    await close()
   })
 
   it("keeps non-unavailable failures cached", async () => {
@@ -175,41 +144,6 @@ describe("shared Huly client runtime", () => {
 
     expect(await Effect.runPromise(Deferred.await(interrupted))).toBeUndefined()
     expect(Exit.isFailure(await pendingResolution)).toBe(true)
-  })
-
-  it("interrupts and awaits a pending owned acquisition before priming", async () => {
-    const started = await Effect.runPromise(Deferred.make<void>())
-    const interrupted = await Effect.runPromise(Deferred.make<void>())
-    const pendingLayer = clientLayer.pipe(
-      Layer.tap(() =>
-        Deferred.succeed(started, undefined).pipe(
-          Effect.andThen(Effect.never),
-          Effect.onInterrupt(() => Deferred.succeed(interrupted, undefined))
-        )
-      )
-    )
-    const scoped = await Effect.runPromise(buildScopedClientBundle(clientLayer))
-    const { close, prime, resolve } = createClientResolver(pendingLayer)
-    const pendingResolution = resolve()
-
-    await Effect.runPromise(Deferred.await(started))
-    await prime(scoped)
-
-    expect(await Effect.runPromise(Deferred.await(interrupted))).toBeUndefined()
-    expect(Exit.isFailure(await pendingResolution)).toBe(true)
-    const primed = await resolve()
-    expect(Exit.isSuccess(primed) && primed.value).toBe(scoped.bundle)
-    await close()
-  })
-
-  it("rejects priming after process-scoped clients close", async () => {
-    const scoped = await Effect.runPromise(buildScopedClientBundle(clientLayer))
-    const { close, prime } = createClientResolver(clientLayer)
-
-    await close()
-
-    await expect(prime(scoped)).rejects.toThrow("Cannot prime closed process-scoped Huly clients")
-    await scoped.close()
   })
 
   it.effect("releases an acquired scope when startup is interrupted", () =>

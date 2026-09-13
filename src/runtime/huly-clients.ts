@@ -1,5 +1,6 @@
 import { type Cause, Context, Effect, Exit, Fiber, Layer, Scope } from "effect"
 
+import { observeHttpAdmission } from "../mcp/http-admission-observations.js"
 import { HulyConfigService } from "../config/config.js"
 import { HulyClient } from "../huly/client.js"
 import { HulyUnavailableError } from "../huly/errors-base.js"
@@ -23,7 +24,6 @@ export interface ScopedClientBundle {
 
 export interface ProcessClientResolver {
   readonly resolve: ClientResolver
-  readonly prime: (scoped: ScopedClientBundle) => Promise<void>
   readonly close: () => Promise<void>
 }
 
@@ -104,15 +104,9 @@ const acquiredClients = (acquisition: ClientAcquisition): Promise<Exit.Exit<Clie
     Exit.isSuccess(exit) ? Exit.succeed(exit.value.bundle) : Exit.failCause(exit.cause)
   )
 
-const primedAcquisition = (scoped: ScopedClientBundle): ClientAcquisition => ({
-  result: Promise.resolve(Exit.succeed(scoped)),
-  close: scoped.close
-})
-
 /**
  * Create a memoized client resolver that builds layers on first call and keeps
- * the active scope alive for the process lifetime. Priming transfers ownership
- * of an already acquired scoped bundle to the resolver.
+ * the active scope alive for the process lifetime.
  */
 export const createClientResolver = (combinedClientLayer: CombinedClientLayer): ProcessClientResolver => {
   const state: {
@@ -121,37 +115,42 @@ export const createClientResolver = (combinedClientLayer: CombinedClientLayer): 
     closed: boolean
   } = { active: undefined, closePromise: undefined, closed: false }
   const acquisitions = new Set<ClientAcquisition>()
+  observeHttpAdmission("createClientResolver", {})
 
   const resolve: ClientResolver = () => {
-    if (state.closed) return Promise.resolve(Exit.die(new Error("Process-scoped Huly clients are closed")))
+    if (state.closed) {
+      observeHttpAdmission("ClientResolver_resolve", { startedAcquisition: false })
+      return Promise.resolve(Exit.die(new Error("Process-scoped Huly clients are closed")))
+    }
+    observeHttpAdmission("ClientResolver_resolve", { startedAcquisition: state.active === undefined })
     if (state.active === undefined) {
       const acquisition = startClientAcquisition(combinedClientLayer)
       const active = { acquisition, clients: acquiredClients(acquisition) }
       acquisitions.add(acquisition)
       state.active = active
       void acquisition.result.then((exit) => {
-        if (Exit.isFailure(exit) && isRecoverableClientUnavailableCause(exit.cause) && state.active === active) {
+        const recoverable = Exit.isFailure(exit) && isRecoverableClientUnavailableCause(exit.cause)
+        const evicted = recoverable && state.active === active
+        if (evicted) {
           state.active = undefined
           acquisitions.delete(acquisition)
         }
+        if (Exit.hasInterrupts(exit)) return
+        observeHttpAdmission(
+          "buildScopedClientBundle",
+          Exit.isSuccess(exit)
+            ? { outcome: "Succeeded", evicted: false }
+            : recoverable
+              ? { outcome: "FailedRecoverable", evicted }
+              : { outcome: "FailedFatal", evicted: false }
+        )
       })
     }
     return state.active.clients
   }
 
-  const prime = async (scoped: ScopedClientBundle): Promise<void> => {
-    if (state.closed) throw new Error("Cannot prime closed process-scoped Huly clients")
-    const previous = state.active?.acquisition
-    const acquisition = primedAcquisition(scoped)
-    acquisitions.add(acquisition)
-    state.active = { acquisition, clients: acquiredClients(acquisition) }
-    if (previous !== undefined) {
-      acquisitions.delete(previous)
-      await previous.close()
-    }
-  }
-
   const close = (): Promise<void> => {
+    observeHttpAdmission("ClientResolver_close", { firstClose: state.closePromise === undefined })
     state.closed = true
     if (state.closePromise === undefined) {
       const owned = [...acquisitions]
@@ -162,5 +161,5 @@ export const createClientResolver = (combinedClientLayer: CombinedClientLayer): 
     return state.closePromise
   }
 
-  return { resolve, prime, close }
+  return { resolve, close }
 }

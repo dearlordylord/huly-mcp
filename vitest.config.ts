@@ -1,10 +1,13 @@
 import { defineConfig } from 'vitest/config'
+import { ORACLE_INFRASTRUCTURE_TAG } from './test/helpers/test-tags.js'
 
 export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
     include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
+    setupFiles: ['./test/setup/quint-oracle.ts'],
+    tags: [{ name: ORACLE_INFRASTRUCTURE_TAG, description: 'Tests the observation channel itself without model forwarding.' }],
     reporters: ['dot'],
     silent: 'passed-only',
     coverage: {
@@ -14,6 +17,9 @@ export default defineConfig({
       exclude: [
         'node_modules/',
         'test/',
+        // Generated Quint Studio oracle client is test tooling, never imported by production code.
+        // Our typed diagnostic publisher and its delivery/disabled behavior stay in the coverage gate.
+        'quint-specs/oracle-client/',
         '**/*.test.ts',
         '**/*.config.ts',
         'src/globals.d.ts',

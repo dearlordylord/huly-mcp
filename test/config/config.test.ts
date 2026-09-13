@@ -501,6 +501,14 @@ describe("Config Module", () => {
       })
     )
 
+    it.effect("returns undefined when only unrecognized x-huly headers are present", () =>
+      Effect.gen(function* () {
+        const provider = yield* hulyConfigProviderFromHeaders({ "X-Huly-Trace-Id": "proxy-trace-123" })
+
+        expect(provider).toBeUndefined()
+      })
+    )
+
     it.effect("rejects multi-value Huly headers", () =>
       Effect.gen(function* () {
         const error = yield* Effect.flip(
@@ -781,6 +789,22 @@ describe("Config Module", () => {
         const serialized = JSON.stringify(context)
         expect(serialized).not.toContain("user@example.com")
         expect(serialized).not.toContain("secret-token")
+      })
+    )
+
+    it.effect("keeps env config context when only unrecognized x-huly headers are present", () =>
+      Effect.sync(function () {
+        const context = sanitizeHulyRuntimeConfigFromHeaders(
+          { "x-huly-trace-id": "proxy-trace-123" },
+          { HULY_URL: "https://env.huly.app", HULY_TOKEN: "env-token", HULY_WORKSPACE: "env-workspace" }
+        )
+
+        expect(context.auth).toMatchObject({ method: "token", source: "env" })
+        expect(context.huly.url.origin).toBe("https://env.huly.app")
+        expect(context.configSources.headers).toMatchObject({
+          present: false,
+          unsupportedHulyHeaders: ["x-huly-trace-id"]
+        })
       })
     )
   })

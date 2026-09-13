@@ -277,7 +277,7 @@ Supported v1 headers:
 | `x-huly-token` | Yes | Huly API token |
 | `x-huly-connection-timeout` | No | Connection timeout in ms |
 
-If any `x-huly-*` header is present, all required headers must be present. Missing values are not filled from environment variables. Email/password auth is not supported in hosted header configuration v1.
+If any supported `x-huly-*` header is present, all required headers must be present and unsupported `x-huly-*` headers are rejected. Requests with only unsupported `x-huly-*` headers (for example a proxy trace id) use the process environment configuration. Missing values are not filled from environment variables. Email/password auth is not supported in hosted header configuration v1.
 
 For a Smithery publish schema example, see [docs/SMITHERY_URL_PUBLISH.md](docs/SMITHERY_URL_PUBLISH.md).
 

@@ -19,9 +19,11 @@ import {
 import type { Duration, Scope } from "effect"
 import { Context, Effect, Layer, Redacted, Schema } from "effect"
 import { HttpEffect, HttpRouter, type HttpServer } from "effect/unstable/http"
+import { observeHttpAdmission, type ObservedBearer } from "./http-admission-observations.js"
 import { DEFAULT_HTTP_HOST_VALUE, DEFAULT_HTTP_PORT_NUMBER } from "./http-defaults.js"
 
 const MIN_HTTP_PORT = 0
+const HTTP_SERVICE_UNAVAILABLE = 503
 const MAX_HTTP_PORT = 65_535
 const HTTP_UNAUTHORIZED_ERROR_CODE = -32_000
 const HTTP_UNAUTHORIZED = 401
@@ -144,6 +146,10 @@ export interface MountedMcpHttpHandler {
   readonly close: Effect.Effect<void, HttpTransportError>
 }
 
+type MountedShutdownState =
+  | { readonly phase: "Serving" }
+  | { readonly phase: "Draining" | "Closed" | "TimedOut"; readonly close: Promise<void> }
+
 type McpServerProduct = Awaited<ReturnType<McpServerFactory>>
 
 interface McpServerCloseTracker {
@@ -163,10 +169,14 @@ const createMcpServerCloseTracker = (createServer: McpServerFactory): McpServerC
       closePromise = closing
       pending.add(closing)
       void closing.then(
-        () => pending.delete(closing),
+        () => {
+          pending.delete(closing)
+          observeHttpAdmission("McpServerCloseTracker_closeSettles", { failed: false })
+        },
         (error) => {
           pending.delete(closing)
           failures.push(error)
+          observeHttpAdmission("McpServerCloseTracker_closeSettles", { failed: true })
         }
       )
       return closing
@@ -193,39 +203,92 @@ export const createMountedMcpHttpHandler = (
   }
   const closeTracker = createMcpServerCloseTracker(createServer)
   const activeRequests = new Set<Promise<Response>>()
+  let shutdownState: MountedShutdownState = { phase: "Serving" }
   const mcpHandler = createMcpHandler(closeTracker.factory, { legacy: "stateless", onerror: reportError })
   const protectLocalhost = host === "127.0.0.1" || host === "localhost" || host === "::1"
+  observeHttpAdmission("createMountedMcpHttpHandler", {
+    loopback: protectLocalhost,
+    token: () => {
+      if (authToken === undefined) return "NoToken"
+      return activeAuthToken(Redacted.value(authToken)) === undefined ? "BlankToken" : "SecretToken"
+    }
+  })
+
+  const reportCloseSettlement = (failed: boolean): void => {
+    if (shutdownState.phase !== "Draining") return
+    observeHttpAdmission("createMountedMcpHttpHandler_closeSettles", { timedOut: false, failed })
+    shutdownState = { phase: "Closed", close: shutdownState.close }
+  }
+  const closeHandler = (): Promise<void> => {
+    if (shutdownState.phase === "TimedOut") return Promise.resolve()
+    if (shutdownState.phase !== "Serving") return shutdownState.close
+    const closing = Promise.resolve().then(async () => {
+      observeHttpAdmission("createMountedMcpHttpHandler_close", {})
+      await mcpHandler.close()
+      while (activeRequests.size > 0) await Promise.allSettled([...activeRequests])
+      await closeTracker.drain()
+      reportCloseSettlement(false)
+    })
+    shutdownState = { phase: "Draining", close: closing }
+    return closing
+  }
 
   return {
     fetch: async (request) => {
+      const observed = {
+        hostOk: () => hostHeaderValidationResponse(request, localhostAllowedHostnames()) === undefined,
+        originOk: () => originValidationResponse(request, localhostAllowedOrigins()) === undefined,
+        bearer: (): ObservedBearer => {
+          const authorization = request.headers.get("authorization")
+          const received = extractBearerToken(authorization)
+          if (received === undefined) return authorization === null ? "NoBearer" : "MalformedAuthorization"
+          const expected = activeAuthToken(authToken === undefined ? undefined : Redacted.value(authToken))
+          return expected !== undefined && tokenMatches(received, expected) ? "MatchingBearer" : "WrongBearer"
+        }
+      }
       const rejected = protectLocalhost
         ? (hostHeaderValidationResponse(request, localhostAllowedHostnames()) ??
           originValidationResponse(request, localhostAllowedOrigins()))
         : undefined
-      if (rejected !== undefined) return rejected
+      if (rejected !== undefined) {
+        observeHttpAdmission("createMountedMcpHttpHandler_fetch", { ...observed, dispatched: false })
+        return rejected
+      }
       if (!isAuthorizedMcpRequest(request, authToken === undefined ? undefined : Redacted.value(authToken))) {
+        observeHttpAdmission("createMountedMcpHttpHandler_fetch", { ...observed, dispatched: false })
         return unauthorizedResponse()
       }
+      if (shutdownState.phase !== "Serving") {
+        observeHttpAdmission("createMountedMcpHttpHandler_fetchRejectedDuringShutdown", {})
+        return new Response(null, { status: HTTP_SERVICE_UNAVAILABLE })
+      }
 
+      observeHttpAdmission("createMountedMcpHttpHandler_fetch", { ...observed, dispatched: true })
       const response = mcpHandler.fetch(request)
       activeRequests.add(response)
       try {
         return await response
       } finally {
         activeRequests.delete(response)
+        observeHttpAdmission("createMountedMcpHttpHandler_fetchSettles", {})
       }
     },
     close: Effect.tryPromise({
-      try: async () => {
-        await mcpHandler.close()
-        while (activeRequests.size > 0) await Promise.allSettled([...activeRequests])
-        await closeTracker.drain()
-      },
-      catch: (cause) => new HttpTransportError({ message: "MCP HTTP handler shutdown failed", cause })
+      try: closeHandler,
+      catch: (cause) => {
+        reportCloseSettlement(true)
+        return new HttpTransportError({ message: "MCP HTTP handler shutdown failed", cause })
+      }
     }).pipe(
       Effect.timeoutOrElse({
         duration: shutdownGracePeriod,
-        orElse: () => Effect.sync(() => writeError("MCP HTTP handler shutdown timed out\n"))
+        orElse: () =>
+          Effect.sync(() => {
+            if (shutdownState.phase !== "Draining") return
+            shutdownState = { phase: "TimedOut", close: shutdownState.close }
+            observeHttpAdmission("createMountedMcpHttpHandler_closeSettles", { timedOut: true, failed: false })
+            writeError("MCP HTTP handler shutdown timed out\n")
+          })
       })
     )
   }
@@ -256,11 +319,18 @@ export const startHttpTransport = (
       config.shutdownGracePeriod
     )
 
-    yield* Effect.addFinalizer(() => Effect.ignore(mounted.close))
+    const closeMounted = mounted.close.pipe(
+      Effect.catch(() => Effect.sync(() => writeError("MCP HTTP handler shutdown failed\n")))
+    )
 
-    const server = yield* factory.make(config.port, config.host)
+    const server = yield* factory.make(config.port, config.host).pipe(
+      Effect.tapError(() => Effect.sync(() => observeHttpAdmission("startHttpTransport", { bindOk: false }))),
+      Effect.onError(() => closeMounted)
+    )
+    yield* Effect.sync(() => observeHttpAdmission("startHttpTransport", { bindOk: true }))
     const app = yield* createMcpHttpApp(mounted)
-    yield* server.serve(app)
+    yield* server.serve(app).pipe(Effect.onError(() => closeMounted))
+    yield* Effect.addFinalizer(() => closeMounted)
     yield* config.onReady?.() ?? Effect.void
 
     yield* Effect.sync(() => {

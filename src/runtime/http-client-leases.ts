@@ -1,5 +1,6 @@
 import { ConfigProvider, Effect, Exit } from "effect"
 
+import { observeHttpAdmission } from "../mcp/http-admission-observations.js"
 import { hulyConfigProviderFromHeaders } from "../config/config.js"
 import type { RequestClientLease } from "../mcp/request-client-lifecycle.js"
 import { buildScopedClientBundle, type CombinedClientLayer } from "./huly-clients.js"
@@ -15,12 +16,19 @@ export const createHttpClientLeaseResolver =
   async (request) => {
     const providerExit = await Effect.runPromiseExit(hulyConfigProviderFromHeaders(webHeadersRecord(request.headers)))
     if (Exit.isFailure(providerExit)) {
+      observeHttpAdmission("createHttpClientLeaseResolver", { headers: "InvalidHulyHeaders", succeeded: false })
       return { bundle: Exit.failCause(providerExit.cause), close: () => {} }
     }
 
     const configProvider = providerExit.value
     if (configProvider === undefined) {
-      return resolveEnvClients().then((bundle) => ({ bundle, close: () => {} }))
+      return resolveEnvClients().then((bundle) => {
+        observeHttpAdmission("createHttpClientLeaseResolver", {
+          headers: "NoHulyHeaders",
+          succeeded: Exit.isSuccess(bundle)
+        })
+        return { bundle, close: () => {} }
+      })
     }
 
     const clientExit = await Effect.runPromiseExit(
@@ -28,6 +36,12 @@ export const createHttpClientLeaseResolver =
         Effect.provideService(ConfigProvider.ConfigProvider, configProvider),
         Effect.map(({ bundle, close }) => ({ bundle: Exit.succeed(bundle), close }))
       )
+    )
+    observeHttpAdmission(
+      "createHttpClientLeaseResolver",
+      Exit.isSuccess(clientExit)
+        ? { headers: "ValidHulyHeaders", buildOk: true, succeeded: true }
+        : { headers: "ValidHulyHeaders", buildOk: false, succeeded: false }
     )
     return Exit.isSuccess(clientExit) ? clientExit.value : { bundle: Exit.failCause(clientExit.cause), close: () => {} }
   }

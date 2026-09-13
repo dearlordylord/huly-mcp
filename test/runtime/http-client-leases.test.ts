@@ -62,7 +62,67 @@ describe("HTTP client lease resolution", () => {
     expect(releases).toBe(2)
   })
 
-  it("delegates requests without Huly headers to the process resolver", async () => {
+  it("builds and releases an own bundle for every request carrying identical headers", async () => {
+    let acquisitions = 0
+    let releases = 0
+    const trackedLayer = baseClientLayer.pipe(
+      Layer.tap(() =>
+        Effect.gen(function* () {
+          yield* HulyConfigService
+          acquisitions++
+          yield* Effect.addFinalizer(() => Effect.sync(() => releases++))
+        })
+      ),
+      Layer.provide(HulyConfigService.layer)
+    )
+    const resolveLease = createHttpClientLeaseResolver(trackedLayer, async () =>
+      Exit.die(new Error("env resolver must not serve header-configured requests"))
+    )
+
+    const first = await resolveLease(requestWithConfig("workspace-a", "token-a"))
+    expect(acquisitions).toBe(1)
+    await first.close()
+    expect(releases).toBe(1)
+
+    const second = await resolveLease(requestWithConfig("workspace-a", "token-a"))
+    expect(acquisitions).toBe(2)
+    await second.close()
+    expect(releases).toBe(2)
+
+    expect(Exit.isSuccess(first.bundle)).toBe(true)
+    expect(Exit.isSuccess(second.bundle)).toBe(true)
+  })
+
+  it("reuses the shared process bundle for header-less requests and never releases it", async () => {
+    let sharedReleases = 0
+    const sharedLayer = baseClientLayer.pipe(
+      Layer.tap(() => Effect.addFinalizer(() => Effect.sync(() => sharedReleases++)))
+    )
+    const scoped = await Effect.runPromise(buildScopedClientBundle(sharedLayer))
+    const resolveEnvClients = async () => Exit.succeed(scoped.bundle)
+    const resolveLease = createHttpClientLeaseResolver(sharedLayer, resolveEnvClients)
+
+    try {
+      const first = await resolveLease(new Request("http://localhost/mcp"))
+      const second = await resolveLease(new Request("http://localhost/mcp"))
+
+      expect(Exit.isSuccess(first.bundle) && first.bundle.value).toBe(scoped.bundle)
+      expect(Exit.isSuccess(second.bundle) && second.bundle.value).toBe(scoped.bundle)
+
+      await first.close()
+      await second.close()
+      // The env lease close is a no-op: a request holds no claim on the shared client.
+      expect(sharedReleases).toBe(0)
+    } finally {
+      await scoped.close()
+    }
+    expect(sharedReleases).toBe(1)
+  })
+
+  it.each([
+    { label: "without Huly headers", headers: {} },
+    { label: "carrying only unrecognized x-huly headers", headers: { "x-huly-trace-id": "proxy-trace-123" } }
+  ])("delegates requests $label to the process resolver", async ({ headers }) => {
     const scoped = await Effect.runPromise(buildScopedClientBundle(baseClientLayer))
     let envResolutions = 0
     const resolveLease = createHttpClientLeaseResolver(baseClientLayer, async () => {
@@ -71,7 +131,7 @@ describe("HTTP client lease resolution", () => {
     })
 
     try {
-      const lease = await resolveLease(new Request("http://localhost/mcp"))
+      const lease = await resolveLease(new Request("http://localhost/mcp", { headers }))
 
       expect(Exit.isSuccess(lease.bundle) && lease.bundle.value).toBe(scoped.bundle)
       expect(envResolutions).toBe(1)

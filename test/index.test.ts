@@ -173,6 +173,14 @@ describe("Main Entry Point", () => {
       })
     )
 
+    it.effect("rejects a whitespace-only MCP_AUTH_TOKEN instead of disabling HTTP auth", () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(getMcpAuthToken.pipe(provideConfig({ MCP_AUTH_TOKEN: " \t " })))
+
+        expect(Inspectable.toStringUnknown(error)).toContain("must not be empty or whitespace-only")
+      })
+    )
+
     it.effect("wires MCP_AUTH_TOKEN from bootstrap config through the server HTTP boundary", () =>
       Effect.gen(function* () {
         const configuredToken = yield* getMcpAuthToken.pipe(

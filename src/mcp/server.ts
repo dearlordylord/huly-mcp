@@ -282,7 +282,7 @@ export class McpServerService extends Context.Service<McpServerService, McpServe
                       }
                       return config.resolveClientLeaseForHttpRequest(requestInfo)
                     })
-                    const [server] = createMcpServer(
+                    const [server, admissionLifecycle] = createMcpServer(
                       lifecycle.resolve,
                       telemetry,
                       registries,
@@ -295,9 +295,12 @@ export class McpServerService extends Context.Service<McpServerService, McpServe
                       }),
                       hostedHulyMigrationInstructionsForOrigin(requestRuntimeConfig.huly.url.origin)
                     )
-                    attachRequestClientLifecycle(server, lifecycle, () => {
-                      writeError("Request-scoped Huly client cleanup failed")
-                    })
+                    attachRequestClientLifecycle(
+                      server,
+                      lifecycle,
+                      () => writeError("Request-scoped Huly client cleanup failed\n"),
+                      admissionLifecycle.quiesce
+                    )
                     return server
                   }
 

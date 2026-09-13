@@ -7,6 +7,7 @@ import {
   type RequestClientLifecycle,
   type RequestClientLease
 } from "../../src/mcp/request-client-lifecycle.js"
+import { createRequestAdmission } from "../../src/mcp/request-admission.js"
 
 const protocolVersion = "2026-07-28"
 const placeholderBundle = Symbol("request-client-bundle")
@@ -122,17 +123,55 @@ const createLifecycleServer = (
   onCleanupError: (error: Error) => void = () => {}
 ): Server => {
   const lifecycle = createRequestClientLifecycle(probe.acquire)
+  const admission = createRequestAdmission()
   const server = new Server({ name: "lifecycle-test", version: "1.0.0" }, { capabilities: { tools: {} } })
-  attachRequestClientLifecycle(server, lifecycle, onCleanupError)
+  attachRequestClientLifecycle(server, lifecycle, onCleanupError, admission.quiesce)
   server.setRequestHandler("tools/list", async () => ({ tools: [] }))
   server.setRequestHandler("tools/call", async (_request, context) => {
-    await callTool(lifecycle, context)
-    return { content: [{ type: "text", text: "done" }] }
+    const lease = admission.enter()
+    if (lease === null) throw new Error("Request admission is closed")
+    try {
+      await callTool(lifecycle, context)
+      return { content: [{ type: "text", text: "done" }] }
+    } finally {
+      lease.release()
+    }
   })
   return server
 }
 
 describe("request-scoped Huly client lifecycle", () => {
+  it.each(["abort", "shutdown"])("keeps clients open while an %s tool body finishes", async (trigger) => {
+    const released = deferred<void>()
+    const probe = createLifecycleProbe(() => released.resolve())
+    const started = deferred<void>()
+    const finish = deferred<void>()
+    const controller = new AbortController()
+    const handler = createMcpHandler(
+      () =>
+        createLifecycleServer(probe, async (lifecycle) => {
+          await lifecycle.resolve()
+          started.resolve()
+          await finish.promise
+          expect(probe.closeCount()).toBe(0)
+          await lifecycle.resolve()
+        }),
+      { legacy: "reject" }
+    )
+    const response = handler.fetch(
+      modernRequest("tools/call", { name: "work", arguments: {} }, { name: "work", signal: controller.signal })
+    )
+    await started.promise
+    if (trigger === "abort") controller.abort()
+    const closing = trigger === "abort" ? Promise.resolve() : handler.close()
+    expect((await response).status).toBe(499)
+    expect(probe.closeCount()).toBe(0)
+    finish.resolve()
+    await closing
+    await handler.close()
+    await released.promise
+    expect(probe.closeCount()).toBe(1)
+  })
   it("releases an acquired lease exactly once after a successful tool call", async () => {
     const probe = createLifecycleProbe()
     const handler = createMcpHandler(

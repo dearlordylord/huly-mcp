@@ -1,5 +1,16 @@
 # @firfi/huly-mcp
 
+## 0.52.4
+
+### Patch Changes
+
+- Harden HTTP authentication and shutdown: reject blank configured bearer tokens, preserve environment configuration for unrelated proxy headers, stop accepting new requests during shutdown, and drain admitted tool handlers before releasing their Huly clients. Report shutdown failures without logging raw cleanup errors.
+
+  Keep Quint's generated oracle client in test tooling and expose shared lifecycle observations through a typed diagnostics channel. Remove the unused process-client priming API and retain formal-model regression coverage for admission and resource ownership.
+
+- c8c738c: Make the error classification on MCP error responses mandatory and closed. `createErrorResponse` and `createInvalidParamsError` now require an `McpErrorTag` — the union of domain error `_tag`s plus the protocol-level outcomes — instead of accepting an optional bare `string`. Interrupted operations report `Interrupted` rather than going out unclassified.
+- 58db2e2: Tag schema parse failures and parse-path defects in error telemetry. `mapParseErrorToMcp` now reports `ParseError` and `mapParseCauseToMcp` reports `UnexpectedError` for defects, matching the classification `mapDomainCauseToMcp` already applied.
+
 ## 0.52.3
 
 ### Patch Changes

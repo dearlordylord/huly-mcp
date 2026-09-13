@@ -1,0 +1,1330 @@
+version = 1
+
+[survey]
+date = "2026-09-11T15:17:11Z"
+schema = 1
+
+[system]
+systemId = "huly-mcp"
+
+[[system.composition]]
+name = "Process client ownership"
+shape = "two-party"
+
+[[system.composition.roleGroups]]
+role = "process-owner"
+componentKey = "stdio-lifecycle"
+cardinality = 1
+
+[[system.composition.roleGroups]]
+role = "resolver"
+componentKey = "http-transport-admission"
+cardinality = 1
+
+[[system.composition.groupProperties]]
+name = "Single close"
+statement = "The process-scoped client resolver created by the entrypoint is closed exactly once, after which no request receives a live client."
+
+[[system.composition.bridgeChecks]]
+assumer = "stdio-lifecycle"
+provider = "http-transport-admission"
+requirement = "`ClientResolver.close()` is idempotent and closes every tracked acquisition, including one still acquiring"
+status = "unchecked"
+
+[behaviorTests]
+format = "quint-studio-behavior-tests"
+version = 1
+createdAt = 1789143458306
+complete = true
+
+[[behaviorTests.rows]]
+behaviorId = "unavailable-env-failure-doesn-t-poison-shared-client"
+component = "http-transport-admission"
+headline = "Unavailable env failure doesn't poison shared client"
+kind = "hazard"
+recordedAt = 1789144983223
+status = "enforced"
+
+[[behaviorTests.rows.tests]]
+hash = "fnv1a64:896fbcf56100a919"
+line = 74
+name = "evicts a mixed acquisition containing unavailability so a later call can recover"
+path = "test/runtime/huly-clients.test.ts"
+
+[[behaviorTests.rows.tests]]
+hash = "fnv1a64:896fbcf56100a919"
+line = 102
+name = "does not evict a newer primed bundle after an unavailable acquisition fails"
+path = "test/runtime/huly-clients.test.ts"
+
+[[behaviorTests.rows.tests]]
+hash = "fnv1a64:5edc2a684827bb68"
+line = 65
+name = "delegates requests without Huly headers to the process resolver"
+path = "test/runtime/http-client-leases.test.ts"
+
+[[behaviorTests.rows]]
+behaviorId = "whitespace-mcp-auth-token-never-disables-auth"
+component = "http-transport-admission"
+headline = "Whitespace MCP_AUTH_TOKEN never disables auth"
+kind = "hazard"
+note = "getMcpAuthToken now fails at startup on a blank token; test verified red against the old Config.redacted reader."
+recordedAt = 1789148788180
+status = "enforced"
+
+[[behaviorTests.rows.tests]]
+hash = "fnv1a64:e18ddfa5a4a86416"
+line = 176
+name = "rejects a whitespace-only MCP_AUTH_TOKEN instead of disabling HTTP auth"
+path = "test/index.test.ts"
+
+[[behaviorTests.rows]]
+behaviorId = "unrelated-x-huly-header-doesn-t-break-env-fallback"
+component = "http-transport-admission"
+headline = "Unrelated x-huly header doesn't break env fallback"
+kind = "hazard"
+note = "Header mode now triggers only on supported x-huly-* headers; all three tests verified red against the old trigger."
+recordedAt = 1789148790627
+status = "enforced"
+
+[[behaviorTests.rows.tests]]
+hash = "fnv1a64:82d7ca8f1a8e7ac7"
+line = 68
+name = "delegates requests carrying only unrecognized x-huly headers to the process resolver"
+path = "test/runtime/http-client-leases.test.ts"
+
+[[behaviorTests.rows.tests]]
+hash = "fnv1a64:b88511d8cf186f4c"
+line = 504
+name = "returns undefined when only unrecognized x-huly headers are present"
+path = "test/config/config.test.ts"
+
+[[behaviorTests.rows.tests]]
+hash = "fnv1a64:b88511d8cf186f4c"
+line = 795
+name = "keeps env config context when only unrecognized x-huly headers are present"
+path = "test/config/config.test.ts"
+
+[[behaviorTests.rows]]
+behaviorId = "http-shutdown-failures-are-logged-not-silently-dropped"
+component = "http-transport-admission"
+headline = "HTTP shutdown failures are logged, not silently dropped"
+kind = "hazard"
+note = "startHttpTransport finalizer now logs a static failure line; new test verified red against Effect.ignore."
+recordedAt = 1789148793961
+status = "enforced"
+
+[[behaviorTests.rows.tests]]
+hash = "fnv1a64:400d5870406ce604"
+line = 857
+name = "reports rejected MCP server cleanup when the transport scope shuts down"
+path = "test/mcp/http-transport.test.ts"
+
+[[behaviorTests.rows.tests]]
+hash = "fnv1a64:400d5870406ce604"
+line = 739
+name = "bounds a stuck HTTP handler shutdown and reports a static fallback"
+path = "test/mcp/http-transport.test.ts"
+
+[[behaviorTests.rows]]
+behaviorId = "request-client-cleanup-failure-log-keeps-its-cause"
+component = "http-transport-admission"
+headline = "Request-client cleanup failure log keeps its cause"
+kind = "hazard"
+note = "HTTP wiring now appends String(error) to the cleanup log; new test verified red against the fixed message."
+recordedAt = 1789148795561
+status = "enforced"
+
+[[behaviorTests.rows.tests]]
+hash = "fnv1a64:69a4663978de69f5"
+line = 207
+name = "logs the cause when request-scoped Huly client cleanup fails"
+path = "test/mcp/server-http.test.ts"
+
+[[behaviorTests.rows.tests]]
+hash = "fnv1a64:21e14fc2427ecc22"
+line = 259
+name = "reports lease cleanup rejection from the SDK handler close trigger"
+path = "test/mcp/request-client-lifecycle.test.ts"
+
+[[behaviorTests.rows]]
+behaviorId = "repeat-header-scoped-calls-don-t-reconnect-to-huly-each-time"
+component = "http-transport-admission"
+headline = "Repeat header-scoped calls don't reconnect to Huly each time"
+kind = "hazard"
+note = "Tests pin the accepted no-pooling design: identical-header requests each build and release their own scoped bundle, header-less requests reuse the shared env bundle. Adding a pool makes them red; they do not prevent the reconnect cost."
+recordedAt = 1789184675741
+status = "enforced"
+
+[[behaviorTests.rows.tests]]
+hash = "fnv1a64:cd01ee8c14e6b27a"
+line = 65
+name = "builds and releases an own bundle for every request carrying identical headers"
+path = "test/runtime/http-client-leases.test.ts"
+
+[[behaviorTests.rows.tests]]
+hash = "fnv1a64:cd01ee8c14e6b27a"
+line = 93
+name = "reuses the shared process bundle for header-less requests and never releases it"
+path = "test/runtime/http-client-leases.test.ts"
+
+[[behaviorTests.rows]]
+behaviorId = "shared-client-outlives-in-flight-http-tool-calls-at-shutdown"
+component = "http-transport-admission"
+headline = "Shared client outlives in-flight HTTP tool calls at shutdown"
+kind = "hazard"
+note = "Covered: shutdown returns with a tool-call body still running, the grace-period fallback only logs, and the env lease close releases nothing. Uncovered: runConfiguredServer's ordering (closeProcessClients right after the HTTP scope ends) has no test seam — the resolver and HTTP factory are built inside index.ts; asked whether to add one and got no answer, so no production change was made."
+recordedAt = 1789185396751
+status = "partial"
+
+[[behaviorTests.rows.tests]]
+hash = "fnv1a64:b2fa77ec1cd4bcc6"
+line = 790
+name = "completes mounted-handler shutdown while a tool call body is still running"
+path = "test/mcp/http-transport.test.ts"
+
+[[behaviorTests.rows.tests]]
+hash = "fnv1a64:b2fa77ec1cd4bcc6"
+line = 739
+name = "bounds a stuck HTTP handler shutdown and reports a static fallback"
+path = "test/mcp/http-transport.test.ts"
+
+[[behaviorTests.rows.tests]]
+hash = "fnv1a64:d4385fed2834e474"
+line = 93
+name = "reuses the shared process bundle for header-less requests and never releases it"
+path = "test/runtime/http-client-leases.test.ts"
+
+[[behaviorTests.rows.tests]]
+hash = "fnv1a64:e18ddfa5a4a86416"
+line = 293
+name = "bounds a stuck client close with the Effect clock"
+path = "test/index.test.ts"
+
+[[behaviorTests.picks]]
+behaviorId = "whitespace-mcp-auth-token-never-disables-auth"
+component = "http-transport-admission"
+kind = "hazard"
+requestedAt = 1789148023707
+settled = true
+
+[[behaviorTests.picks]]
+behaviorId = "unrelated-x-huly-header-doesn-t-break-env-fallback"
+component = "http-transport-admission"
+kind = "hazard"
+requestedAt = 1789148023707
+settled = true
+
+[[behaviorTests.picks]]
+behaviorId = "http-shutdown-failures-are-logged-not-silently-dropped"
+component = "http-transport-admission"
+kind = "hazard"
+requestedAt = 1789148023707
+settled = true
+
+[[behaviorTests.picks]]
+behaviorId = "request-client-cleanup-failure-log-keeps-its-cause"
+component = "http-transport-admission"
+kind = "hazard"
+requestedAt = 1789148023707
+settled = true
+
+[[behaviorTests.picks]]
+behaviorId = "repeat-header-scoped-calls-don-t-reconnect-to-huly-each-time"
+component = "http-transport-admission"
+kind = "hazard"
+requestedAt = 1789184502687
+settled = true
+
+[[behaviorTests.picks]]
+behaviorId = "shared-client-outlives-in-flight-http-tool-calls-at-shutdown"
+component = "http-transport-admission"
+kind = "hazard"
+requestedAt = 1789184502687
+settled = true
+
+[components.http-transport-admission]
+name = "HTTP Transport, Admission & Client Leases"
+description = "HTTP `/mcp` serving with bearer/localhost guards, request admission + quiesce drain, per-request Huly client leases, and the process-wide client resolver"
+role = "central"
+rank = 1
+paths = [
+    "src/mcp/http-defaults.ts",
+    "src/mcp/http-transport.ts",
+    "src/mcp/request-admission.ts",
+    "src/mcp/request-client-lifecycle.ts",
+    "src/runtime/cause-exit.ts",
+    "src/runtime/client-resolver.ts",
+    "src/runtime/http-client-leases.ts",
+    "src/runtime/huly-clients.ts",
+]
+tests = [
+    "test/mcp/http-transport.test.ts",
+    "test/mcp/request-admission.test.ts",
+    "test/mcp/request-client-lifecycle.test.ts",
+    "test/runtime/cause-exit.test.ts",
+    "test/runtime/http-client-leases.test.ts",
+    "test/runtime/huly-clients.test.ts",
+    "test/runtime/scoped-client.test.ts",
+]
+dependencies = [
+    "config",
+    "huly-client-connection",
+    "tool-response-errors",
+]
+operations = [
+    "`createRequestAdmission()` — mutates (constructor of `{accepting, active}` state, `src/mcp/request-admission.ts:11`)",
+    "`RequestAdmission.enter()` — mutates: returns `null` when `!accepting`, else `active++` and a lease (`request-admission.ts:20-21`)",
+    "`RequestLease.release()` — mutates, idempotent via `released` flag (`request-admission.ts:26`)",
+    "`RequestAdmission.quiesce()` — mutates: `accepting=false`, resolves when `active===0` (`request-admission.ts:34-38`)",
+    "`createRequestClientLifecycle(acquire)` — mutates (constructor, `src/mcp/request-client-lifecycle.ts:24`)",
+    "`RequestClientLifecycle.resolve()` — mutates: memoized `leasePromise ??= acquire()`; throws if closed before or during acquisition (`request-client-lifecycle.ts:28-34`)",
+    "`RequestClientLifecycle.close()` — mutates, idempotent; no-op if never resolved (`request-client-lifecycle.ts:39-55`)",
+    "`attachRequestClientLifecycle(server, lifecycle, onCleanupError)` — mutates: wraps `server.onclose`/`server.close`, `Promise.allSettled` both closes, `AggregateError` on double failure (`request-client-lifecycle.ts:64-109`)",
+    "`createHttpClientLeaseResolver(layer, resolveEnvClients)(request)` — mutates: header-scoped bundle or shared env bundle with no-op close (`src/runtime/http-client-leases.ts:10-33`)",
+    "`buildScopedClientBundle(layer)` — mutates: scope creation under `Effect.uninterruptibleMask` (`src/runtime/huly-clients.ts:63-81`)",
+    "`createClientResolver(layer).resolve()` — mutates: memoized acquisition; dies if closed; clears cache only on recoverable `HulyUnavailableError` (`huly-clients.ts:117-140`)",
+    "`createClientResolver(layer).prime(scoped)` — mutates: swaps active acquisition and closes the previous; throws if closed (`huly-clients.ts:141-151`)",
+    "`createClientResolver(layer).close()` — mutates, idempotent via `closePromise`; closes every tracked acquisition (`huly-clients.ts:154-163`)",
+    "`startHttpTransport(config, createServer, writeError)` — mutates: binds server, auth + host/origin guards, `Effect.never` (`src/mcp/http-transport.ts:243-271`)",
+    "`createMountedMcpHttpHandler(...).fetch(request)` — mutates: host/origin reject, constant-time bearer check, dispatch (`http-transport.ts:197-215`)",
+    "`createMountedMcpHttpHandler(...).close()` — mutates: close handler, drain `activeRequests` and tracked server closes, 5s grace then log-only (`http-transport.ts:218-231`)",
+    "`McpServerCloseTracker.track/drain` — mutates (`http-transport.ts:154-182`)",
+    "`isAuthorizedMcpRequest`, `extractBearerToken`, `tokenMatches`, `formatHttpAddress`, `httpServeError` — query (pure helpers, `http-transport.ts:113-134`)",
+    "`http-defaults.ts` constants (grace period, host/port defaults) — query",
+    "`causeExit` helpers (`src/runtime/cause-exit.ts`) — query; `client-resolver.ts` types — query",
+]
+headlineProperties = [
+    "Every per-request client bundle that was acquired is closed exactly once on every exit path (success, failure, client disconnect, server shutdown)",
+    "After `quiesce()` no new request is admitted, and `quiesce()` resolves only when `active` reaches 0",
+    "`RequestLease.release()` never drives `active` below 0 (double release is a no-op)",
+    "A request carrying supported `x-huly-*` override headers never receives the shared env-scoped bundle; requests with no supported override headers use env config, and no request receives another request's header-scoped bundle",
+    "After `resolver.close()` no `resolve()`/`prime()` hands out a live client; a non-recoverable acquisition failure stays cached, a `HulyUnavailableError` is retried on the next call",
+]
+adversarySurface = [
+    "Client disconnects while `resolve()` is still acquiring — lifecycle closed mid-acquisition must close the late bundle (`request-client-lifecycle.ts:33-34`)",
+    "`prime()` races an in-flight `resolve()`; the `state.active === active` guard decides whether a failure clears the newer acquisition (`huly-clients.ts:132-137`)",
+    "Concurrent header-less HTTP requests share one process-scoped Huly client (`http-client-leases.ts:22-23`) — cross-tenant state sharing when env credentials exist",
+    "Partial or malformed supported `x-huly-*` headers: provider failure returns a failed bundle; unsupported-only headers return `undefined` and fall back to env — header parsing decides tenant isolation",
+    "Server shutdown while requests are in flight: drain exceeds `shutdownGracePeriod` (5s) and is only logged (`http-transport.ts:225-230`) — leaked connections",
+    "Both SDK server close and lifecycle close fail: `AggregateError` delivered once via `cleanupErrorReported` (`request-client-lifecycle.ts:95-105`)",
+    "Missing/incorrect bearer token, Host/Origin spoofing on localhost binding (`http-transport.ts:123-134,197-205`)",
+    "Interrupt during scoped bundle build must still close the scope (`huly-clients.ts:69-70`)",
+    "Error-payload fidelity: client-resolution failures must not surface raw tokens from header-scoped config",
+]
+specHints = "State: `RequestAdmission {accepting: bool, active: int}` + drain waiters (`src/mcp/request-admission.ts:11-38`); `RequestClientLifecycle {leasePromise?, closed, closePromise?}` (`src/mcp/request-client-lifecycle.ts:24-57`); `ClientResolver {active?: acquisition, closed, closePromise?}` + `acquisitions` set (`src/runtime/huly-clients.ts:117-166`). Model actors: N HTTP requests (enter/resolve/release/disconnect), one shutdown actor (quiesce/close), an environment that makes acquisition succeed, fail recoverably (`HulyUnavailableError`) or fail fatally. `resolve` is memoized; recoverable failure clears `state.active` only if it is still the same acquisition (`huly-clients.ts:132-137`). Header routing: `hulyConfigProviderFromHeaders` returns `undefined` when no supported configuration headers are present, including unsupported-only `x-huly-*` metadata; that uses the shared env bundle with no-op close (`src/runtime/http-client-leases.ts:16-24`), while a supported configuration value uses a fresh scoped bundle whose `close` must run. Server close composition: `attachRequestClientLifecycle` wraps `onclose` and `close` and runs both via `Promise.allSettled` (`request-client-lifecycle.ts:64-109`). Shutdown: handler close → drain `activeRequests` → drain tracked server closes → `timeoutOrElse(shutdownGracePeriod)` logs (`src/mcp/http-transport.ts:218-231`). Wiring: `src/index.ts:132-176` owns the resolver via `acquireUseRelease`; eager stdio init primes it (`index.ts:146-153`)."
+cardRead = false
+connectionsRead = false
+spec = "quint-specs/http-transport-admission.qnt"
+version = 4
+observationsConfirmed = false
+propertiesConfirmed = false
+confirmedObservations = []
+confirmedProperties = []
+retiredObservations = []
+retiredProperties = []
+wireConfirmed = true
+setupCompleted = true
+cardsDone = true
+
+[[components.http-transport-admission.productIntent.hazards]]
+claim = "It should be impossible to reach a state where MCP_AUTH_TOKEN is set but the HTTP server accepts requests with no bearer token because the configured value was whitespace."
+decidedAt = 1789143333369
+decision = "confirmed"
+expectations = [
+    "`activeAuthToken` trims the token and treats an empty result as no token configured",
+    "`isAuthorizedMcpRequest` returns true when the expected token is undefined",
+    "startup does not reject or warn about a blank `MCP_AUTH_TOKEN`",
+]
+headline = "Whitespace MCP_AUTH_TOKEN never disables auth"
+id = "whitespace-mcp-auth-token-never-disables-auth"
+quint = [
+    "pure def activeToken(t) = if (trim(t) == \"\") None else Some(trim(t))",
+    "action fetch(req) = response' = if (activeToken(env) == None or req.bearer == activeToken(env)) Dispatched else Unauthorized",
+    "val tokenConfiguredMeansEnforced = envSet implies (response == Dispatched implies req.bearer == activeToken(env))",
+]
+recordedAt = 1789140962782
+why = "An operator who believes the endpoint is token-protected would be exposing Huly tools, with the server's env credentials, to anyone who can reach the port."
+
+[[components.http-transport-admission.productIntent.hazards.instead]]
+action = "POST /mcp without Authorization"
+actor = "user"
+facts = []
+
+[[components.http-transport-admission.productIntent.hazards.instead.effects]]
+field = "request.response"
+from = "Pending"
+to = "Unauthorized401"
+
+[[components.http-transport-admission.productIntent.hazards.run]]
+action = "server starts with authToken Some"
+actor = "system"
+facts = []
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "handler.expectedToken"
+from = "Unset"
+note = "activeAuthToken trims to undefined"
+to = "Disabled"
+
+[[components.http-transport-admission.productIntent.hazards.run]]
+action = "POST /mcp without Authorization"
+actor = "user"
+facts = []
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "request.response"
+from = "Pending"
+to = "Dispatched"
+
+[[components.http-transport-admission.productIntent.hazards.sources]]
+hash = "fnv1a64:ab93c16aedd0799b"
+path = "src/mcp/http-transport.ts"
+
+[[components.http-transport-admission.productIntent.hazards.sources]]
+hash = "fnv1a64:642d2152a5c1de3f"
+path = "src/index.ts"
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+field = "env.MCP_AUTH_TOKEN"
+note = "Config.redacted accepts it as Some"
+value = "\"  \""
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+field = "server.host"
+value = "127.0.0.1"
+
+[[components.http-transport-admission.productIntent.hazards]]
+claim = "It should be impossible to reach a state where a header-less HTTP request that merely carries an unrecognized x-huly-* header (e.g. a proxy trace id) gets a failed client bundle instead of the shared env bundle."
+decidedAt = 1789143575025
+decision = "confirmed"
+expectations = [
+    "only supported x-huly configuration headers switch the request into header-config mode",
+    "an invalid or mixed supported configuration fails with `ConfigValidationError`",
+    "unsupported-only x-huly headers return `undefined` and fall back to `resolveEnvClients`",
+]
+headline = "Unrelated x-huly header doesn't break env fallback"
+id = "unrelated-x-huly-header-doesn-t-break-env-fallback"
+quint = [
+    "type HeaderClass = NoHulyHeaders | ValidHulyHeaders | InvalidHulyHeaders",
+    "pure def leaseBundle(rid, headers, buildOk, succeeded, p) = match headers { NoHulyHeaders => envBundle(p, succeeded); InvalidHulyHeaders => FailedBundle; ValidHulyHeaders => if (buildOk) HeaderScoped(rid) else FailedBundle }",
+    "action createHttpClientLeaseResolver(rid, headers, buildOk, succeeded)",
+]
+recordedAt = 1789140994432
+why = "Supported configuration remains strict for tenant isolation, while unrelated x-huly-* metadata must not turn an otherwise valid env-configured request into a failed request."
+
+[[components.http-transport-admission.productIntent.hazards.instead]]
+action = "callTool list_issues"
+actor = "agent"
+facts = []
+
+[[components.http-transport-admission.productIntent.hazards.instead.effects]]
+field = "request.bundle"
+from = "None"
+to = "SharedEnvBundle"
+
+[[components.http-transport-admission.productIntent.hazards.run]]
+action = "parseUrlHeaderConfig(request.headers)"
+actor = "system"
+facts = []
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "request.headerConfig"
+from = "Unparsed"
+note = "Unsupported Huly config header"
+to = "Fail(ConfigValidation)"
+
+[[components.http-transport-admission.productIntent.hazards.run]]
+action = "callTool list_issues"
+actor = "agent"
+facts = []
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "request.bundle"
+from = "None"
+to = "Fail(ConfigValidation)"
+
+[[components.http-transport-admission.productIntent.hazards.sources]]
+hash = "fnv1a64:446b6ca0dbfc6e17"
+path = "src/runtime/http-client-leases.ts"
+
+[[components.http-transport-admission.productIntent.hazards.sources]]
+hash = "fnv1a64:6c2970254cbe38d2"
+path = "src/config/config.ts"
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+field = "env.HULY_TOKEN"
+value = "Set"
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+fact = "\"x-huly-trace-id\" in request.headers"
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+fact = "not(\"x-huly-url\" in request.headers)"
+
+[[components.http-transport-admission.productIntent.hazards]]
+claim = "It should be impossible to reach a state where the HTTP server bound to a non-loopback host with no MCP_AUTH_TOKEN hands an unauthenticated, foreign-Origin caller the process env-credentialed Huly client."
+decidedAt = 1789143827546
+decision = "rejected"
+expectations = [
+    "Host and Origin validation runs only when `host` is literally `127.0.0.1`, `localhost` or `::1`",
+    "with no `MCP_AUTH_TOKEN`, `isAuthorizedMcpRequest` authorizes every request",
+    "a header-less request resolves the process-scoped env bundle via `resolveEnvClients`",
+]
+headline = "Non-loopback bind never serves env credentials unauthenticated"
+id = "non-loopback-bind-never-serves-env-credentials-unauthenticated"
+quint = [
+    "pure def protectLocalhost(h) = h.in(Set(\"127.0.0.1\", \"localhost\", \"::1\"))",
+    "action fetch(req) = response' = if (protectLocalhost(host) and not(req.origin.isLocal)) Rejected else if (token == None) Dispatched else checkBearer(req)",
+    "val noOpenEnvExposure = (bundle == SharedEnvBundle) implies (token != None or protectLocalhost(host))",
+]
+recordedAt = 1789141013333
+why = "Anyone reaching the port, or a browser page via DNS rebinding, could read and mutate the Huly workspace with the operator's credentials."
+
+[[components.http-transport-admission.productIntent.hazards.instead]]
+action = "fetch(POST /mcp, request)"
+actor = "user"
+facts = []
+
+[[components.http-transport-admission.productIntent.hazards.instead.effects]]
+field = "request.response"
+from = "Pending"
+to = "Rejected"
+
+[[components.http-transport-admission.productIntent.hazards.instead.effects]]
+field = "request.bundle"
+from = "None"
+to = "None"
+
+[[components.http-transport-admission.productIntent.hazards.run]]
+action = "mountHandler(host)"
+actor = "system"
+facts = []
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "handler.protectLocalhost"
+from = "Unset"
+note = "only exact 127.0.0.1, localhost, ::1"
+to = "Off"
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "handler.expectedToken"
+from = "Unset"
+to = "Disabled"
+
+[[components.http-transport-admission.productIntent.hazards.run]]
+action = "fetch(POST /mcp, request)"
+actor = "user"
+facts = []
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "request.response"
+from = "Pending"
+to = "Dispatched"
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "request.bundle"
+from = "None"
+to = "SharedEnvBundle"
+
+[[components.http-transport-admission.productIntent.hazards.sources]]
+hash = "fnv1a64:ab93c16aedd0799b"
+path = "src/mcp/http-transport.ts"
+
+[[components.http-transport-admission.productIntent.hazards.sources]]
+hash = "fnv1a64:642d2152a5c1de3f"
+path = "src/index.ts"
+
+[[components.http-transport-admission.productIntent.hazards.sources]]
+hash = "fnv1a64:446b6ca0dbfc6e17"
+path = "src/runtime/http-client-leases.ts"
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+field = "server.host"
+value = "0.0.0.0"
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+field = "env.MCP_AUTH_TOKEN"
+value = "None"
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+field = "env.HULY_TOKEN"
+value = "Set"
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+field = "request.origin"
+value = "evil.example"
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+fact = "not(\"x-huly-url\" in request.headers)"
+
+[[components.http-transport-admission.productIntent.hazards]]
+claim = "It should be impossible to reach a state where HTTP shutdown fails (handler close or tracked MCP server close rejects) and the failure leaves no trace in stderr."
+decidedAt = 1789144028101
+decision = "confirmed"
+expectations = [
+    "`createMcpServerCloseTracker` accumulates every close rejection in `failures` for the handler lifetime",
+    "`drain` throws them as one error or an `AggregateError` at shutdown",
+    "`startHttpTransport` registers `Effect.ignore(mounted.close)`, so only the timeout branch writes to stderr",
+]
+headline = "HTTP shutdown failures are logged, not silently dropped"
+id = "http-shutdown-failures-are-logged-not-silently-dropped"
+quint = [
+    "action serverCloseFails(e) = failures' = failures.append(e)",
+    "action shutdown = all { closeResult' = if (failures.length() > 0) Fail else Ok, stderr' = stderr }",
+    "val failureVisible = closeResult == Fail implies stderr.length() > 0",
+]
+recordedAt = 1789141020110
+why = "Leaked Huly connections or broken server closes during shutdown would be invisible, making resource-leak incidents undiagnosable."
+
+[[components.http-transport-admission.productIntent.hazards.instead]]
+action = "SIGTERM runs HTTP scope finalizer"
+actor = "system"
+facts = []
+
+[[components.http-transport-admission.productIntent.hazards.instead.effects]]
+field = "mounted.close"
+from = "Idle"
+to = "Fail(HttpTransportError)"
+
+[[components.http-transport-admission.productIntent.hazards.instead.effects]]
+field = "stderr"
+from = "[]"
+to = "[shutdown failed]"
+
+[[components.http-transport-admission.productIntent.hazards.run]]
+action = "per-request server.close rejects"
+actor = "system"
+facts = []
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "tracker.failures"
+from = "[]"
+note = "kept until shutdown"
+to = "[closeError]"
+
+[[components.http-transport-admission.productIntent.hazards.run]]
+action = "SIGTERM runs HTTP scope finalizer"
+actor = "system"
+facts = []
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "mounted.close"
+from = "Idle"
+note = "drain rethrows failures"
+to = "Fail(HttpTransportError)"
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "stderr"
+from = "[]"
+note = "Effect.ignore swallows it"
+to = "[]"
+
+[[components.http-transport-admission.productIntent.hazards.sources]]
+hash = "fnv1a64:ab93c16aedd0799b"
+path = "src/mcp/http-transport.ts"
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+field = "tracker.failures"
+value = "[]"
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+field = "stderr"
+value = "[]"
+
+[[components.http-transport-admission.productIntent.hazards]]
+claim = "It should be impossible to reach a state where closing a request's header-scoped Huly bundle fails and the only diagnostic is a fixed message with the error discarded."
+decidedAt = 1789144198111
+decision = "confirmed"
+expectations = [
+    "`attachRequestClientLifecycle` reports at most one cleanup error per server via `cleanupErrorReported`",
+    "the HTTP wiring passes `() => writeError(\"Request-scoped Huly client cleanup failed\")`, ignoring the `Error` argument",
+    "`server.close` still rejects with the error (or an `AggregateError`) to its caller",
+]
+headline = "Request-client cleanup failure log keeps its cause"
+id = "request-client-cleanup-failure-log-keeps-its-cause"
+quint = [
+    "action cleanupFails(e) = all { not(reported), reported' = true, stderr' = stderr.append(CleanupFailed) }",
+    "val causeVisible = reported implies stderr.exists(line => line.cause != None)",
+]
+recordedAt = 1789141038744
+why = "Dropping the cause likely avoids leaking header tokens, but leaves repeated connection leaks per tenant with nothing to diagnose them by."
+
+[[components.http-transport-admission.productIntent.hazards.instead]]
+action = "scope close rejects with error e"
+actor = "system"
+facts = []
+
+[[components.http-transport-admission.productIntent.hazards.instead.effects]]
+field = "wrapper.cleanupErrorReported"
+from = "No"
+to = "Yes"
+
+[[components.http-transport-admission.productIntent.hazards.instead.effects]]
+field = "stderr"
+from = "[]"
+to = "[cleanup failed: tag(e)]"
+
+[[components.http-transport-admission.productIntent.hazards.run]]
+action = "server.close for request r1"
+actor = "system"
+facts = []
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "r1.lifecycle"
+from = "Open"
+to = "Closing"
+
+[[components.http-transport-admission.productIntent.hazards.run]]
+action = "scope close rejects with error e"
+actor = "system"
+facts = []
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "wrapper.cleanupErrorReported"
+from = "No"
+to = "Yes"
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "stderr"
+from = "[]"
+note = "e is not written"
+to = "[cleanup failed]"
+
+[[components.http-transport-admission.productIntent.hazards.sources]]
+hash = "fnv1a64:b81ea0b85ac6d45a"
+path = "src/mcp/request-client-lifecycle.ts"
+
+[[components.http-transport-admission.productIntent.hazards.sources]]
+hash = "fnv1a64:76b64fc49efc4c2b"
+path = "src/mcp/server.ts"
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+field = "r1.lease"
+value = "Scoped(tenantA)"
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+field = "wrapper.cleanupErrorReported"
+value = "No"
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+field = "stderr"
+value = "[]"
+
+[[components.http-transport-admission.productIntent.hazards]]
+claim = "It should be impossible to reach a state where two consecutive HTTP tool calls with identical x-huly-* headers each build and tear down their own Huly connection."
+decidedAt = 1789144245583
+decision = "confirmed"
+expectations = [
+    "`createHttpClientLeaseResolver` runs `buildScopedClientBundle` for every request that carries config headers",
+    "the lease `close` is the scope close, run once when the per-request server closes",
+    "only header-less requests reuse a connection (the shared env bundle)",
+]
+headline = "Repeat header-scoped calls don't reconnect to Huly each time"
+id = "repeat-header-scoped-calls-don-t-reconnect-to-huly-each-time"
+quint = [
+    "action callTool(c) = if (c.headerMode) all { bundles' = bundles.put(c, fresh()), connects' = connects + 1 } else bundles' = bundles.put(c, shared)",
+    "action serverClose(c) = closed' = closed.union(Set(bundles.get(c)))",
+    "val reuseSameTenant = (c1.headers == c2.headers) implies bundles.get(c1) == bundles.get(c2)",
+]
+recordedAt = 1789141049665
+why = "Per-request isolation is simple and leak-free, but every hosted-tenant tool call pays a full Huly connect and auth round trip."
+
+[[components.http-transport-admission.productIntent.hazards.instead]]
+action = "callTool call2"
+actor = "agent"
+facts = []
+
+[[components.http-transport-admission.productIntent.hazards.instead.effects]]
+field = "call2.bundle"
+from = "None"
+to = "Scoped(c1)"
+
+[[components.http-transport-admission.productIntent.hazards.instead.effects]]
+field = "tenant.connections"
+from = "0"
+note = "pooled per header set"
+to = "0"
+
+[[components.http-transport-admission.productIntent.hazards.run]]
+action = "callTool call1"
+actor = "agent"
+facts = []
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "call1.bundle"
+from = "None"
+to = "Scoped(c1)"
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "tenant.connections"
+from = "0"
+to = "1"
+
+[[components.http-transport-admission.productIntent.hazards.run]]
+action = "stateless server.close after call1"
+actor = "system"
+facts = []
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "tenant.connections"
+from = "1"
+to = "0"
+
+[[components.http-transport-admission.productIntent.hazards.run]]
+action = "callTool call2"
+actor = "agent"
+facts = []
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "call2.bundle"
+from = "None"
+note = "full layer build and auth again"
+to = "Scoped(c2)"
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "tenant.connections"
+from = "0"
+to = "1"
+
+[[components.http-transport-admission.productIntent.hazards.sources]]
+hash = "fnv1a64:446b6ca0dbfc6e17"
+path = "src/runtime/http-client-leases.ts"
+
+[[components.http-transport-admission.productIntent.hazards.sources]]
+hash = "fnv1a64:76b64fc49efc4c2b"
+path = "src/mcp/server.ts"
+
+[[components.http-transport-admission.productIntent.hazards.sources]]
+hash = "fnv1a64:b81ea0b85ac6d45a"
+path = "src/mcp/request-client-lifecycle.ts"
+
+[[components.http-transport-admission.productIntent.hazards.sources]]
+hash = "fnv1a64:cb2837303e9a9f0c"
+path = "src/runtime/huly-clients.ts"
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+fact = "call1.headers == call2.headers"
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+fact = "\"x-huly-token\" in call1.headers"
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+field = "tenant.connections"
+value = "0"
+
+[[components.http-transport-admission.productIntent.hazards]]
+claim = "It should be impossible to reach a state where HTTP shutdown closes the process-scoped Huly client while a header-less tool call admitted before shutdown is still using it."
+decidedAt = 1789144270883
+decision = "confirmed"
+expectations = [
+    "`mounted.close` wraps the `activeRequests` drain in `timeoutOrElse(shutdownGracePeriod)` whose fallback only writes a log line",
+    "the env bundle lease close is a no-op, so the request holds no claim on the shared client",
+    "`runConfiguredServer` releases the resolver via `closeProcessClients` right after the HTTP scope ends",
+]
+headline = "Shared client outlives in-flight HTTP tool calls at shutdown"
+id = "shared-client-outlives-in-flight-http-tool-calls-at-shutdown"
+quint = [
+    "action graceElapsed = all { closeState == Draining, closeState' = TimedOut }",
+    "action closeProcessClients = all { closeState == TimedOut, active' = Closed }",
+    "val noCloseUnderUse = active == Closed implies requests.forall(r => r.bundle != SharedEnv or r.status != Running)",
+]
+recordedAt = 1789141061872
+why = "A slow mutation interrupted mid-way by a closed connection can leave Huly partially updated with the caller seeing a transport error."
+
+[[components.http-transport-admission.productIntent.hazards.instead]]
+action = "closeProcessClients(resolver.close)"
+actor = "system"
+facts = []
+
+[[components.http-transport-admission.productIntent.hazards.instead.effects]]
+field = "resolver.active"
+from = "Ready(a1)"
+note = "deferred until r1 settles"
+to = "Ready(a1)"
+
+[[components.http-transport-admission.productIntent.hazards.instead.effects]]
+field = "r1.status"
+from = "Running(update_issue)"
+to = "Completed"
+
+[[components.http-transport-admission.productIntent.hazards.run]]
+action = "SIGTERM"
+actor = "system"
+facts = []
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "mounted.close"
+from = "Idle"
+note = "waits on activeRequests"
+to = "Draining"
+
+[[components.http-transport-admission.productIntent.hazards.run]]
+action = "grace period elapses"
+actor = "system"
+facts = []
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "mounted.close"
+from = "Draining"
+note = "logs, then scope completes"
+to = "TimedOut"
+
+[[components.http-transport-admission.productIntent.hazards.run]]
+action = "closeProcessClients(resolver.close)"
+actor = "system"
+facts = []
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "resolver.active"
+from = "Ready(a1)"
+to = "Closed"
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "r1.status"
+from = "Running(update_issue)"
+to = "Failed(ConnClosed)"
+
+[[components.http-transport-admission.productIntent.hazards.sources]]
+hash = "fnv1a64:ab93c16aedd0799b"
+path = "src/mcp/http-transport.ts"
+
+[[components.http-transport-admission.productIntent.hazards.sources]]
+hash = "fnv1a64:76b64fc49efc4c2b"
+path = "src/mcp/server.ts"
+
+[[components.http-transport-admission.productIntent.hazards.sources]]
+hash = "fnv1a64:642d2152a5c1de3f"
+path = "src/index.ts"
+
+[[components.http-transport-admission.productIntent.hazards.sources]]
+hash = "fnv1a64:cb2837303e9a9f0c"
+path = "src/runtime/huly-clients.ts"
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+field = "r1.status"
+value = "Running(update_issue)"
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+field = "r1.bundle"
+value = "SharedEnvBundle"
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+field = "resolver.active"
+value = "Ready(a1)"
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+field = "shutdownGracePeriod"
+value = "5 seconds"
+
+[[components.http-transport-admission.productIntent.hazards]]
+claim = "It should always be possible for a later header-less request to start a fresh env-scoped Huly client acquisition after an earlier acquisition failed only with HulyUnavailableError, without restarting the process."
+decidedAt = 1789144300458
+decision = "confirmed"
+expectations = [
+    "a failure whose cause is only `HulyUnavailableError` clears `state.active`, so `r2` starts acquisition `a2`",
+    "an unavailable failure combined with a defect or interrupt stays cached",
+    "`HulyAuthError`, `HulyConnectionError` and config failures stay cached for the process lifetime; only `HulyUnavailableError` is evicted",
+    "eviction only clears `state.active` if it still holds the failed acquisition",
+]
+headline = "Unavailable env failure doesn't poison shared client"
+id = "unavailable-env-failure-doesn-t-poison-shared-client"
+quint = [
+    "type Failure = Unavailable | Auth | Connection | Config",
+    "var active: Acquisition  // None | Acquiring(id) | Failed(e) | Ready(id)",
+    "action acquisitionFails(e) = active' = if (e == Unavailable) None else Failed(e)",
+    "action resolve(r) = all { active == None, active' = Acquiring(nextId) }",
+    "val unavailableNeverCached = active != Failed(Unavailable)",
+]
+recordedAt = 1789143230649
+source = "refined"
+why = "A Huly outage would otherwise take every env-credentialed HTTP and stdio tool call down until someone restarts the server."
+
+[[components.http-transport-admission.productIntent.hazards.run]]
+action = "connection a1 fails as unreachable"
+actor = "system"
+facts = []
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "a1.result"
+from = "Pending"
+note = "no defect or interrupt in cause"
+to = "Fail(Unavailable)"
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "resolver.active"
+from = "Acquiring(a1)"
+to = "None"
+
+[[components.http-transport-admission.productIntent.hazards.run]]
+action = "Huly recovers, request r2 calls resolve"
+actor = "system"
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "huly.reachable"
+from = "Unreachable"
+to = "Reachable"
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "resolver.active"
+from = "None"
+to = "Acquiring(a2)"
+
+[[components.http-transport-admission.productIntent.hazards.run.effects]]
+field = "r2.clients"
+from = "None"
+to = "Ok(bundle)"
+
+[[components.http-transport-admission.productIntent.hazards.run.facts]]
+fact = "a2 != a1"
+
+[[components.http-transport-admission.productIntent.hazards.sources]]
+hash = "fnv1a64:cb2837303e9a9f0c"
+path = "src/runtime/huly-clients.ts"
+
+[[components.http-transport-admission.productIntent.hazards.sources]]
+hash = "fnv1a64:394e764d51067a20"
+path = "src/runtime/cause-exit.ts"
+
+[[components.http-transport-admission.productIntent.hazards.sources]]
+hash = "fnv1a64:64698263a702f9de"
+path = "src/huly/client.ts"
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+field = "resolver.closed"
+value = "Open"
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+field = "resolver.active"
+value = "Acquiring(a1)"
+
+[[components.http-transport-admission.productIntent.hazards.start]]
+field = "huly.reachable"
+value = "Unreachable"
+
+[components.http-transport-admission.oracle]
+format = "quint-oracle-config"
+version = 1
+spec = "quint-specs/http-transport-admission.qnt"
+main = "http_transport_admission"
+eventScope = "http-transport-admission"
+observations = [
+    "request_admitted",
+    "request_refused_while_quiescing",
+    "double_release_ignored",
+    "quiesce_drained_immediately",
+    "quiesce_drained_after_last_release",
+    "bundle_handed_to_caller",
+    "resolve_rejected_after_close",
+    "acquisition_rejection_rethrown",
+    "unused_lifecycle_closed",
+    "close_won_pending_acquisition",
+    "lease_close_failed",
+    "header_scoped_bundle_acquired",
+    "header_scoped_build_failed",
+    "invalid_headers_failed_bundle",
+    "env_shared_bundle_served",
+    "env_bundle_died_after_resolver_close",
+    "env_failure_served_to_request",
+    "server_close_repeated",
+    "transport_close_reported_cleanup_error",
+    "underlying_server_close_failed",
+    "underlying_close_failed_lease_released",
+    "both_closes_failed_aggregate",
+    "resolver_acquisition_succeeded",
+    "recoverable_failure_evicted",
+    "fatal_failure_served_from_cache",
+    "resolve_died_after_close",
+    "resolver_close_interrupted_pending",
+    "resolver_close_repeated",
+    "host_header_rejected",
+    "origin_rejected",
+    "unauthorized_rejected",
+    "authorized_request_dispatched",
+    "blank_token_served_unauthenticated",
+    "public_binding_skipped_host_origin_checks",
+    "http_bind_failed",
+    "fetch_rejected_during_shutdown",
+    "shutdown_completed_cleanly",
+    "shutdown_surfaced_close_failures",
+    "shutdown_timed_out",
+]
+testCommand = [
+    "pnpm",
+    "vitest",
+    "run",
+    "test/mcp/request-admission.test.ts",
+    "test/mcp/request-client-lifecycle.test.ts",
+    "test/runtime/http-client-leases.test.ts",
+    "test/runtime/huly-clients.test.ts",
+    "test/mcp/http-transport.test.ts",
+]
+unguidedStepBudget = 10
+stepReplayBudget = 50
+guardScenarios = true
+
+[components.http-transport-admission.oracle.studio]
+system = "HTTP Transport, Admission & Client Leases"
+model = "quint-specs/http-transport-admission.qnt"
+invariants = [
+    "admission_active_matches_unreleased_leases",
+    "admission_active_never_negative",
+    "drain_resolves_only_when_idle",
+    "no_lease_issued_after_quiesce",
+    "lease_released_at_most_once",
+    "closed_lifecycle_released_owned_lease",
+    "closed_server_released_its_lease",
+    "cleanup_error_reported_at_most_once",
+    "tenant_bundles_stay_isolated",
+    "active_acquisition_is_tracked",
+    "active_acquisition_never_recoverable_failure",
+    "active_client_scope_is_open",
+    "closed_resolver_owns_no_open_scope",
+    "failed_acquisition_holds_no_scope",
+    "live_request_env_bundle_stays_open",
+    "dispatched_requests_passed_guards",
+    "shutdown_success_waits_for_drain",
+]
+
+[[components.http-transport-admission.oracle.studio.adversaryDispositions]]
+row = "Client disconnects while `resolve()` is still acquiring — lifecycle closed mid-acquisition must close the late bundle (`request-client-lifecycle.ts:33-34`)"
+disposition = "modeled"
+
+[components.http-transport-admission.oracle.studio.adversaryDispositions.groundedBy]
+actions = [
+    "RequestClientLifecycle_close",
+    "RequestClientLifecycle_resolve",
+    "createHttpClientLeaseResolver",
+    "RequestClientLifecycle_acquireSettles",
+    "RequestClientLifecycle_leaseCloseSettles",
+]
+observations = ["close_won_pending_acquisition"]
+properties = [
+    "closed_lifecycle_released_owned_lease",
+    "lease_released_at_most_once",
+]
+
+[[components.http-transport-admission.oracle.studio.adversaryDispositions]]
+row = "`prime()` races an in-flight `resolve()`; the `state.active === active` guard decides whether a failure clears the newer acquisition (`huly-clients.ts:132-137`)"
+disposition = "declined"
+category = "not-exposed"
+reason = "`prime()` was removed from ProcessClientResolver after the model showed it could close a client bundle an in-flight request still held, so the race it describes has no remaining code path."
+
+[[components.http-transport-admission.oracle.studio.adversaryDispositions]]
+row = "Concurrent header-less HTTP requests share one process-scoped Huly client (`http-client-leases.ts:22-23`) — cross-tenant state sharing when env credentials exist"
+disposition = "modeled"
+
+[components.http-transport-admission.oracle.studio.adversaryDispositions.groundedBy]
+actions = [
+    "createHttpClientLeaseResolver",
+    "ClientResolver_resolve",
+]
+observations = ["env_shared_bundle_served"]
+properties = [
+    "tenant_bundles_stay_isolated",
+    "live_request_env_bundle_stays_open",
+]
+
+[[components.http-transport-admission.oracle.studio.adversaryDispositions]]
+row = "Partial or malformed `x-huly-*` headers: provider failure returns a failed bundle, `undefined` falls back to env — header parsing decides tenant isolation"
+disposition = "modeled"
+
+[components.http-transport-admission.oracle.studio.adversaryDispositions.groundedBy]
+actions = ["createHttpClientLeaseResolver"]
+observations = [
+    "invalid_headers_failed_bundle",
+    "header_scoped_build_failed",
+]
+properties = ["tenant_bundles_stay_isolated"]
+
+[[components.http-transport-admission.oracle.studio.adversaryDispositions]]
+row = "Server shutdown while requests are in flight: drain exceeds `shutdownGracePeriod` (5s) and is only logged (`http-transport.ts:225-230`) — leaked connections"
+disposition = "modeled"
+
+[components.http-transport-admission.oracle.studio.adversaryDispositions.groundedBy]
+actions = [
+    "createMountedMcpHttpHandler_close",
+    "createMountedMcpHttpHandler_closeSettles",
+    "createMountedMcpHttpHandler_fetchSettles",
+]
+observations = [
+    "shutdown_timed_out",
+    "shutdown_completed_cleanly",
+]
+properties = ["closed_server_released_its_lease"]
+
+[[components.http-transport-admission.oracle.studio.adversaryDispositions]]
+row = "Both SDK server close and lifecycle close fail: `AggregateError` delivered once via `cleanupErrorReported` (`request-client-lifecycle.ts:95-105`)"
+disposition = "modeled"
+
+[components.http-transport-admission.oracle.studio.adversaryDispositions.groundedBy]
+actions = [
+    "Server_closeStarts",
+    "Server_close",
+    "Server_onclose",
+    "Server_cleanupSettles",
+]
+observations = [
+    "both_closes_failed_aggregate",
+    "transport_close_reported_cleanup_error",
+    "underlying_close_failed_lease_released",
+]
+properties = [
+    "cleanup_error_reported_at_most_once",
+    "closed_server_released_its_lease",
+]
+
+[[components.http-transport-admission.oracle.studio.adversaryDispositions]]
+row = "Missing/incorrect bearer token, Host/Origin spoofing on localhost binding (`http-transport.ts:123-134,197-205`)"
+disposition = "modeled"
+
+[components.http-transport-admission.oracle.studio.adversaryDispositions.groundedBy]
+actions = ["createMountedMcpHttpHandler_fetch"]
+observations = [
+    "host_header_rejected",
+    "origin_rejected",
+    "unauthorized_rejected",
+    "blank_token_served_unauthenticated",
+]
+properties = ["dispatched_requests_passed_guards"]
+
+[[components.http-transport-admission.oracle.studio.adversaryDispositions]]
+row = "Interrupt during scoped bundle build must still close the scope (`huly-clients.ts:69-70`)"
+disposition = "modeled"
+
+[components.http-transport-admission.oracle.studio.adversaryDispositions.groundedBy]
+actions = [
+    "ClientResolver_close",
+    "buildScopedClientBundle",
+]
+observations = ["resolver_close_interrupted_pending"]
+properties = [
+    "failed_acquisition_holds_no_scope",
+    "closed_resolver_owns_no_open_scope",
+]
+
+[[components.http-transport-admission.oracle.studio.adversaryDispositions]]
+row = "Error-payload fidelity: client-resolution failures must not surface raw tokens from header-scoped config"
+disposition = "declined"
+category = "not-exposed"
+reason = "In this component's code a client-resolution failure travels only as an opaque Exit inside the lease bundle; no code under these paths renders it into a response payload, so token redaction cannot be exercised through these operations."
+
+[components.http-transport-admission.fingerprints]
+spec = "fnv1a64:454f49741b77df13"
+oracle = "fnv1a64:b10e43908ad621db"
+coverage = "fnv1a64:fae5dac40f6f0d5b"
+
+[components.http-transport-admission.fingerprints.code]
+"src/mcp/http-defaults.ts" = "fnv1a64:3ca254aae0258774"
+"src/mcp/http-transport.ts" = "fnv1a64:6299ca9e0795d0fc"
+"src/mcp/request-admission.ts" = "fnv1a64:6592533008a63a33"
+"src/mcp/request-client-lifecycle.ts" = "fnv1a64:5cc578ca7a03f39f"
+"src/runtime/cause-exit.ts" = "fnv1a64:394e764d51067a20"
+"src/runtime/client-resolver.ts" = "fnv1a64:ee282fb3699bd7d5"
+"src/runtime/http-client-leases.ts" = "fnv1a64:575a8a9f07094f30"
+"src/runtime/huly-clients.ts" = "fnv1a64:2f7358185c8a4598"
+
+[components.http-transport-admission.fingerprints.instrumented]
+"quint-specs/oracle-client/typescript/index.ts" = "fnv1a64:298bafed1bf610fa"
+"quint-specs/oracle-client/typescript/itf.ts" = "fnv1a64:021ce26edff722a4"
+"quint-specs/oracle-client/typescript/jest-adapter.ts" = "fnv1a64:6b7dcf7ec8b11480"
+"quint-specs/oracle-client/typescript/jest-env.ts" = "fnv1a64:f856b6adca27f23b"
+"quint-specs/oracle-client/typescript/registry.ts" = "fnv1a64:e1b0c069079e26ea"
+"quint-specs/oracle-client/typescript/transport.ts" = "fnv1a64:f60fae6ea981899b"
+"quint-specs/oracle-client/typescript/vitest.ts" = "fnv1a64:914758810823e00b"
+"src/mcp/http-transport.ts" = "fnv1a64:6299ca9e0795d0fc"
+"src/mcp/request-admission.ts" = "fnv1a64:6592533008a63a33"
+"src/mcp/request-client-lifecycle.ts" = "fnv1a64:5cc578ca7a03f39f"
+"src/runtime/http-client-leases.ts" = "fnv1a64:575a8a9f07094f30"
+"src/runtime/huly-clients.ts" = "fnv1a64:2f7358185c8a4598"
+"tsconfig.json" = "fnv1a64:0f773b5a4572bddf"
+"vitest.config.ts" = "fnv1a64:af623cce4723b4cc"
+
+[[components.http-transport-admission.findingVerdicts]]
+subject = "property:closed_server_released_its_lease"
+decision = "rejected"
+by = "user"
+at = 1789185741
+
+[components.stdio-lifecycle]
+name = "Process Entry & Stdio Shutdown"
+description = "Process entrypoint, unsupported-Node fallback, console-to-stderr redirection, and the bounded graceful/forced stdio shutdown state machine"
+role = "central"
+rank = 2
+paths = [
+    "src/index.ts",
+    "src/launcher.ts",
+    "src/mcp/stdio-output.ts",
+    "src/mcp/stdio-shutdown.ts",
+    "src/polyfills.ts",
+    "src/unsupported-node-mcp-stdio.ts",
+    "src/unsupported-node-mcp.ts",
+    "src/version.ts",
+]
+tests = [
+    "src/unsupported-node-mcp.test.ts",
+    "test/mcp/server-stdio-lifecycle.test.ts",
+    "test/mcp/stdio-output.property.test.ts",
+    "test/mcp/stdio-output.test.ts",
+    "test/mcp/stdio-process-lifecycle.test.ts",
+    "test/mcp/stdio-shutdown.property.test.ts",
+    "test/mcp/stdio-shutdown.test.ts",
+    "test/mcp/stdio-transport.test.ts",
+]
+dependencies = [
+    "mcp-protocol-server",
+    "http-transport-admission",
+    "config",
+    "telemetry",
+    "huly-client-connection",
+    "tool-registry-exposure",
+]
+operations = [
+    "`makeStdioShutdownCoordinator(onQuiesce?)` — mutates (constructor, `src/mcp/stdio-shutdown.ts:69-104`)",
+    "`coordinator.request(reason)` — mutates: `Running→Quiescing(reason)` only; returns `false` if already requested (`stdio-shutdown.ts:79-80`)",
+    "`coordinator.awaitRequest()` / `awaitComplete()` / `state` — query",
+    "`coordinator.execute(resources)` = `executeBoundedStdioShutdown` — mutates: claim once, race graceful vs forced, interrupt loser (`stdio-shutdown.ts:134-163`)",
+    "`runGracefulShutdown` — mutates: drain (5s `STDIO_DRAIN_ALLOWANCE`, ignore timeout), close wire/telemetry/clients concurrently ignoring failures, `Complete(graceful)` (`stdio-shutdown.ts:108-121`)",
+    "`forceShutdown` — mutates: sleep `STDIO_SHUTDOWN_DEADLINE` (10s), diagnostic, `forceExit(1)`, `Complete(forced)` (`stdio-shutdown.ts:123-132`)",
+    "`liveStdioProcessPort.listen(handlers)` — mutates: stdin end/close, SIGINT, SIGTERM listeners; returns unsubscribe (`stdio-shutdown.ts:53-65`)",
+    "`redirectConsoleToStderr(target?)` — mutates global `console`, returns restore handle (`src/mcp/stdio-output.ts:19-36`)",
+    "`main` — mutates: resolve transport, redirect console for stdio, `runConfiguredServer`, always restore (`src/index.ts:178-183`)",
+    "`runConfiguredServer(transport)` — mutates: `acquireUseRelease` of the client resolver, eager stdio init tolerating `HulyUnavailableError` (`src/index.ts:132-176`)",
+    "`closeProcessClients(closeClients, gracePeriod?, writeError?)` — mutates: interruptible, 5s timeout, log-and-swallow (`src/index.ts:71-83`)",
+    "`getLazyEnvs(env)` — query (`GLAMA_VERSION` heuristic, `src/index.ts:89-92`)",
+    "`launcher.ts` entry — mutates: picks real server vs unsupported-Node fallback",
+    "`isUnsupportedNodeRuntime(detected, required)` / `parseUnsupportedNodeMcpConfig(...)` — query (`src/unsupported-node-mcp.ts`)",
+    "`startUnsupportedNodeMcp(config)` — mutates: minimal JSON-RPC server answering with an unsupported-runtime error (`src/unsupported-node-mcp-stdio.ts`)",
+    "`polyfills.ts` — mutates globals at import (entrypoint-only); `version.ts` — query",
+]
+headlineProperties = [
+    "Shutdown state is monotonic `Running → Quiescing → Closing → Complete` and the first shutdown reason wins",
+    "The shutdown body executes at most once even when several callers invoke `execute`",
+    "Process clients, telemetry and the stdio wire are each closed at most once and are attempted on every shutdown path",
+    "Shutdown completes within the forced deadline (10s): either graceful completion or `forceExit(1)`",
+    "stdout carries only JSON-RPC frames once stdio mode starts (console redirected to stderr) and the redirect is restored on exit",
+]
+adversarySurface = [
+    "SIGINT, SIGTERM and stdin EOF arrive together or repeatedly — only the first `request()` wins (`stdio-shutdown.ts:79-80`)",
+    "Forced deadline fires while graceful shutdown is mid-close — graceful fiber interrupted before `closeClients` finishes (`stdio-shutdown.ts:134-144`)",
+    "A close step hangs or fails — graceful path ignores individual failures, drain timeout ignored (`stdio-shutdown.ts:108-121`)",
+    "`forceShutdown` calls `forceExit(1)` before `complete(...)` — `Complete(forced)` observable only with a non-exiting port (`stdio-shutdown.ts:129-131`)",
+    "`redirectConsoleToStderr` called twice captures already-redirected methods as originals (`stdio-output.ts:19-36`)",
+    "Eager stdio client init fails with a non-`HulyUnavailableError` — process must fail hard, unavailable must defer (`index.ts:146-153`)",
+    "Telemetry `shutdown` invoked from both stdio and HTTP shutdown paths has no once-guard (`src/telemetry/posthog.ts:146-153`)",
+    "Unsupported Node version: fallback server must answer every request with an error rather than crash or hang",
+]
+specHints = "State: `StdioShutdownState` tagged union held in a `Ref` (`src/mcp/stdio-shutdown.ts:12-16`) plus `executionClaimed: Ref<boolean>` (`:76`). Actors: process signals (sigint/sigterm/stdin-eof, any order, repeats), N callers of `execute`, a clock (drain allowance 5s, deadline 10s), close steps that succeed/fail/hang. `request` transitions only from `Running` (`:79-80`); `execute` waits for a request, `claimExecution` once (`:88,153`), otherwise awaits `awaitComplete`; `raceDetachedShutdowns` interrupts the loser (`:134-144`). Graceful: drain with timeout+ignore, then `Effect.all([wire, telemetry, clients], {concurrency: 'unbounded'})` ignoring failures (`:108-121`). Forced: sleep deadline, diagnostic, `forceExit(1)`, `complete` (`:123-132`) — model `forceExit` as absorbing. Process wiring: `src/index.ts:132-176` (`acquireUseRelease` → `closeProcessClients` with 5s timeout, `:71-83`); stdio run loop races lifecycle events vs `stop` and always runs bounded shutdown in `ensuring` (`src/mcp/server.ts:264-270`). `StdioProcessPort` is injectable (`server.ts:67`)."
+cardRead = false
+connectionsRead = false
+spec = ""
+version = 0
+observationsConfirmed = false
+propertiesConfirmed = false
+confirmedObservations = []
+confirmedProperties = []
+retiredObservations = []
+retiredProperties = []
+wireConfirmed = false
+setupCompleted = false
+cardsDone = false

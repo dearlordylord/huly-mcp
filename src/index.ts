@@ -8,7 +8,7 @@
 import "./polyfills.js"
 
 import { NodeRuntime } from "@effect/platform-node"
-import { Config, type Duration, Effect, Exit, Layer, Option, type Redacted } from "effect"
+import { Config, type Duration, Effect, Exit, Layer, Option, type Redacted, Schema } from "effect"
 
 import {
   type ConfigValidationError,
@@ -64,7 +64,14 @@ const getHttpHost: Effect.Effect<HttpHost, Config.ConfigError> = Config.schema(H
   Config.withDefault(DEFAULT_HTTP_HOST)
 )
 
-export const getMcpAuthToken = Config.redacted("MCP_AUTH_TOKEN").pipe(Config.option)
+const McpAuthToken = Schema.RedactedFromValue(
+  Schema.String.check(
+    Schema.makeFilter((token) => token.trim().length > 0, { message: "must not be empty or whitespace-only" })
+  )
+)
+
+// A blank token is a startup error rather than "auth disabled": setting MCP_AUTH_TOKEN must never open the endpoint.
+export const getMcpAuthToken = Config.schema(McpAuthToken, "MCP_AUTH_TOKEN").pipe(Config.option)
 
 const DEFAULT_PROCESS_CLOSE_GRACE_PERIOD = "5 seconds"
 
