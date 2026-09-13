@@ -204,7 +204,13 @@ FAILED=0
 SKIPPED=0
 ERRORS=""
 
-TOOL_TIMEOUT="${TOOL_TIMEOUT:-30}"
+# The mirror starts both an adapter and a fresh packed CLI for every call. On
+# shared local Huly, valid calls can exceed 30 seconds before producing output.
+if [ "$INTEGRATION_SURFACE" = "cli" ]; then
+  TOOL_TIMEOUT="${TOOL_TIMEOUT:-60}"
+else
+  TOOL_TIMEOUT="${TOOL_TIMEOUT:-30}"
+fi
 readonly LIST_PROJECTS_REQUEST='{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_projects","arguments":{}},"id":2}'
 
 cleanup_http_transport() {
@@ -1701,6 +1707,12 @@ call_tool_cli() {
     "$payload" \
     "$HULY_CLI_MIRROR_IMAGE_PATH" \
     | select_tool_response
+  local statuses=("${PIPESTATUS[@]}")
+  if [ "${statuses[0]}" -ne 0 ]; then
+    echo "DIAGNOSTIC: CLI adapter exited with status ${statuses[0]} (124 means the ${TOOL_TIMEOUT}s tool deadline expired)" >&2
+    return "${statuses[0]}"
+  fi
+  return "${statuses[1]}"
 }
 
 call_tool() {
@@ -6665,14 +6677,14 @@ CALENDAR_MEETING_CLEANUP_SCHEDULE_TITLE="MCP Meeting Schedule $RUN_ID"
 CALENDAR_MEETING_LOCATION="Physical location $RUN_ID"
 
 if CALENDAR_MEETING_FIXTURE=$(timeout 45 pnpm exec tsx scripts/integration-calendar-meeting-rooms.ts \
-  --mode setup --fixture "$RUN_ID" 2>/dev/null); then
+  --mode setup --fixture "$RUN_ID"); then
   CALENDAR_MEETING_CLEANUP_FLOOR_ID=$(printf '%s\n' "$CALENDAR_MEETING_FIXTURE" | jq -r '.floorId // empty')
   CALENDAR_MEETING_CLEANUP_ROOM_ONE_ID=$(printf '%s\n' "$CALENDAR_MEETING_FIXTURE" | jq -r '.roomOneId // empty')
   CALENDAR_MEETING_CLEANUP_ROOM_TWO_ID=$(printf '%s\n' "$CALENDAR_MEETING_FIXTURE" | jq -r '.roomTwoId // empty')
   echo "PASS: calendar meeting-room fixture setup and fresh readback"
   PASSED=$((PASSED + 1))
 else
-  fail_test "calendar meeting-room fixture setup" "SDK fixture setup/readback failed"
+  fail_test "calendar meeting-room fixture setup" "readback failed with helper exit $? (124 means the 45s deadline expired)"
 fi
 
 if [ -n "$CALENDAR_MEETING_CLEANUP_ROOM_ONE_ID" ] && [ -n "$CALENDAR_MEETING_CLEANUP_ROOM_TWO_ID" ]; then
@@ -6715,7 +6727,7 @@ if [ -n "$CALENDAR_MEETING_CLEANUP_ROOM_ONE_ID" ] && [ -n "$CALENDAR_MEETING_CLE
       CALENDAR_MEETING_EVENT_INSPECT_ARGS+=(--expectSibling)
     fi
     if CALENDAR_MEETING_EVENT_STATE=$(timeout 45 pnpm exec tsx \
-      scripts/integration-calendar-meeting-rooms.ts "${CALENDAR_MEETING_EVENT_INSPECT_ARGS[@]}" 2>/dev/null); then
+      scripts/integration-calendar-meeting-rooms.ts "${CALENDAR_MEETING_EVENT_INSPECT_ARGS[@]}"); then
       echo "PASS: create_event creates native Meeting on every eventId sibling and preserves location"
       PASSED=$((PASSED + 1))
       assert_json_field_equals "native Event Meetings cover every sibling" "$CALENDAR_MEETING_EVENT_STATE" \
@@ -6727,7 +6739,7 @@ if [ -n "$CALENDAR_MEETING_CLEANUP_ROOM_ONE_ID" ] && [ -n "$CALENDAR_MEETING_CLE
           "$CALENDAR_MEETING_EVENT_STATE" '.siblingCount >= 2' "true"
       fi
     else
-      fail_test "create_event native Meeting composition" "sibling mixin readback did not converge"
+      fail_test "create_event native Meeting composition" "readback failed with helper exit $? (124 means the 45s deadline expired)"
     fi
 
     run_capture_to_var_fresh CALENDAR_MEETING_EVENT_READ_TEXT \
@@ -6756,13 +6768,13 @@ if [ -n "$CALENDAR_MEETING_CLEANUP_ROOM_ONE_ID" ] && [ -n "$CALENDAR_MEETING_CLE
       fi
       if CALENDAR_MEETING_EVENT_UPDATED_STATE=$(timeout 45 pnpm exec tsx \
         scripts/integration-calendar-meeting-rooms.ts \
-        "${CALENDAR_MEETING_EVENT_UPDATED_INSPECT_ARGS[@]}" 2>/dev/null); then
+        "${CALENDAR_MEETING_EVENT_UPDATED_INSPECT_ARGS[@]}"); then
         echo "PASS: update_event changes every sibling Meeting and preserves location"
         PASSED=$((PASSED + 1))
         assert_json_field_equals "updated native Event Meetings cover every sibling" \
           "$CALENDAR_MEETING_EVENT_UPDATED_STATE" '.meetingCount == .siblingCount' "true"
       else
-        fail_test "update_event native Meeting composition" "all-sibling room update readback did not converge"
+        fail_test "update_event native Meeting composition" "readback failed with helper exit $? (124 means the 45s deadline expired)"
       fi
     fi
   else
@@ -6794,11 +6806,11 @@ if [ -n "$CALENDAR_MEETING_CLEANUP_ROOM_ONE_ID" ] && [ -n "$CALENDAR_MEETING_CLE
       --mode inspect-schedule \
       --scheduleId "$CALENDAR_MEETING_CLEANUP_SCHEDULE_ID" \
       --scheduleTitle "$CALENDAR_MEETING_CLEANUP_SCHEDULE_TITLE" \
-      --roomId "$CALENDAR_MEETING_CLEANUP_ROOM_ONE_ID" 2>/dev/null); then
+      --roomId "$CALENDAR_MEETING_CLEANUP_ROOM_ONE_ID"); then
       echo "PASS: create_schedule creates native MeetingSchedule composition"
       PASSED=$((PASSED + 1))
     else
-      fail_test "create_schedule native MeetingSchedule composition" "native mixin readback did not converge"
+      fail_test "create_schedule native MeetingSchedule composition" "readback failed with helper exit $? (124 means the 45s deadline expired)"
     fi
     run_capture_to_var_fresh CALENDAR_MEETING_SCHEDULE_READ_TEXT \
       "get_schedule(native MeetingSchedule:$CALENDAR_MEETING_CLEANUP_SCHEDULE_ID)" \
@@ -6817,11 +6829,11 @@ if [ -n "$CALENDAR_MEETING_CLEANUP_ROOM_ONE_ID" ] && [ -n "$CALENDAR_MEETING_CLE
         --mode inspect-schedule \
         --scheduleId "$CALENDAR_MEETING_CLEANUP_SCHEDULE_ID" \
         --scheduleTitle "$CALENDAR_MEETING_CLEANUP_SCHEDULE_TITLE" \
-        --roomId "$CALENDAR_MEETING_CLEANUP_ROOM_TWO_ID" 2>/dev/null); then
+        --roomId "$CALENDAR_MEETING_CLEANUP_ROOM_TWO_ID"); then
         echo "PASS: update_schedule changes native MeetingSchedule room"
         PASSED=$((PASSED + 1))
       else
-        fail_test "update_schedule native MeetingSchedule composition" "room update readback did not converge"
+        fail_test "update_schedule native MeetingSchedule composition" "readback failed with helper exit $? (124 means the 45s deadline expired)"
       fi
     fi
   else

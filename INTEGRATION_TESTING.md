@@ -328,6 +328,8 @@ HULY_URL="${HULY_URL/localhost/host.docker.internal}" pnpm integration:cli:full
 
 Both CLI suites build, pack, and install `@firfi/huly-cli` into a temporary project before invoking it; they do not exercise the source tree as a substitute for the published artifact.
 
+The full CLI mirror allows 60 seconds per call because each case starts both an adapter and a fresh packed CLI, and valid calls against shared local Huly can exceed 30 seconds. Native MCP integration retains its 30-second default. Set `TOOL_TIMEOUT` to override either deadline. A failed CLI adapter reports its exit status; status 124 means the tool deadline expired. Mutations are not retried automatically.
+
 `scripts/integration_test_cli.sh` is the focused CLI adapter and safety suite. It verifies native argument parsing, output conventions, confirmation boundaries, representative risks, and self-cleaning lifecycles.
 
 `scripts/integration_test_cli_full.sh` runs the same lifecycle program, fixtures, tool payloads, result assertions, and cleanup as `scripts/integration_test_full.sh`, but routes every `tools/call` through the installed CLI command catalog. The adapter normalizes CLI JSON, warnings, errors, and image files into the MCP result envelope consumed by the shared assertions. This makes a passing MCP run and a passing full CLI run direct behavioral evidence for the same tested operations, rather than two independently maintained approximations.

@@ -89,6 +89,34 @@ describe("full CLI integration adapter", () => {
     )
   })
 
+  it.each(["", "launcher diagnostic\n"])(
+    "unwraps CLI JSON failures after %j for exact invitation cleanup",
+    async (prefix) => {
+      const personId = "employee-fixture-id"
+      const message = `Employee '${personId}' was prepared for 'fixture@example.test', but sendInvite failed after: employee activation.`
+      const failure = { code: "INTEGRATION_FAILED", message, retryable: false }
+      await withExecutableStub(
+        `#!/usr/bin/env node\nprocess.stderr.write(${JSON.stringify(prefix + JSON.stringify(failure))});\nprocess.exitCode = 1;\n`,
+        (executable, imagePath) => {
+          const payload = JSON.stringify({
+            jsonrpc: "2.0",
+            method: "tools/call",
+            params: {
+              name: "invite_employee",
+              arguments: { mode: "create-or-promote", name: "Fixture", email: "fixture@example.test" }
+            },
+            id: 3
+          })
+          const result = errorResult(runAdapter(executable, payload, imagePath))
+
+          expect(result.isError).toBe(true)
+          expect(result.content[0]?.text).toBe(message)
+          expect(result.content[0]?.text.match(/^Employee '([^']+)' was prepared/)?.[1]).toBe(personId)
+        }
+      )
+    }
+  )
+
   it("preserves agent-visible warnings in structured content", async () => {
     const warning = { code: "status_metadata_unresolved", message: "One status label could not be resolved." }
     await withExecutableStub(

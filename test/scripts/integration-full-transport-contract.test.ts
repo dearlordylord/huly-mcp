@@ -260,6 +260,21 @@ printf 'status=%s\n' "$status"`
     expect(functionBody("call_tool_cli")).toContain('timeout "$TOOL_TIMEOUT"')
   })
 
+  it.each([
+    ["mcp", "", "30"],
+    ["cli", "", "60"],
+    ["mcp", "7", "7"],
+    ["cli", "7", "7"]
+  ])("sets the %s deadline with override %j to %s", (surface, override, expected) => {
+    const setup = script.slice(script.indexOf("# The mirror starts"), script.indexOf("readonly LIST_PROJECTS_REQUEST="))
+    const output = execFileSync("bash", ["-c", `${setup}\nprintf '%s' "$TOOL_TIMEOUT"`], {
+      encoding: "utf8",
+      env: { ...cleanShellEnv, INTEGRATION_SURFACE: surface, TOOL_TIMEOUT: override }
+    })
+
+    expect(output).toBe(expected)
+  })
+
   it("reduces noisy transports to one parseable JSON-RPC tool response", () => {
     const responseSelector = functionBody("select_tool_response")
     expect(responseSelector).toContain("fromjson?")

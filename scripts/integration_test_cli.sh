@@ -536,7 +536,13 @@ if [[ -z "$HR_REQUEST_ID" ]]; then
   echo "create_hr_request did not return a request ID." >&2
   exit 1
 fi
-cover_cli_json "list_hr_requests" "HR request list" hr requests list --employee "$HR_STAFF_EMPLOYEE" --limit 1
+capture_cli_json "list_hr_requests" "HR request list" HR_REQUEST_LIST_JSON \
+  hr requests list --employee "$HR_STAFF_EMPLOYEE" --department "hr:ids:Head" \
+  --request-type "$HR_REQUEST_TYPE_ID" --start-on-or-after 2026-09-04 --end-on-or-before 2026-09-04 --limit 200
+if ! jq -e --arg id "$HR_REQUEST_ID" '.requests | any(.id == $id)' >/dev/null <<<"$HR_REQUEST_LIST_JSON"; then
+  echo "HR request list did not return the created fixture." >&2
+  exit 1
+fi
 cover_cli_json "get_hr_request" "HR request get" hr requests get "$HR_REQUEST_ID"
 cover_cli_json "update_hr_request" "HR request update" hr requests update "$HR_REQUEST_ID" \
   --input-json '{"description":"Updated CLI HR request"}'

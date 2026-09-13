@@ -7,6 +7,7 @@ import { McpImageContentSchema } from "../src/domain/schemas/attachments.js"
 import { cliCommandCatalog, isCliToolName } from "../packages/huly-cli/src/catalog.js"
 import type { CliCommandSpec } from "../packages/huly-cli/src/catalog-types.js"
 import { CliJsonWrappedResultSchema } from "../packages/huly-cli/src/render.js"
+import { CliFailureSchema } from "../packages/huly-cli/src/failures.js"
 import { createImageSuccessResponse, createSuccessResponse, toMcpResponse } from "../src/mcp/tool-responses.js"
 import {
   type FullIntegrationAdapterResponse,
@@ -28,6 +29,7 @@ const ToolCallRequestSchema = Schema.Struct({
   id: Schema.Number
 })
 const UnknownFromJsonSchema = Schema.String.pipe(Schema.decodeTo(Schema.Unknown, SchemaTransformation.fromJsonString()))
+const CliFailureFromJsonSchema = Schema.fromJsonString(CliFailureSchema)
 
 const NODE_ARGUMENT_OFFSET = 2
 const [executable, payload, imagePath] = Schema.decodeUnknownSync(AdapterArgumentsSchema)(
@@ -66,6 +68,10 @@ const execution = spawnSync(executable, commandArguments, { encoding: "utf8" })
 const errorText = (): string => {
   if (execution.error !== undefined) return execution.error.message
   const stderr = Schema.decodeUnknownSync(Schema.String)(execution.stderr).trim()
+  for (const line of stderr.split("\n").reverse()) {
+    const failure = Schema.decodeUnknownResult(CliFailureFromJsonSchema)(line)
+    if (Result.isSuccess(failure)) return failure.success.message
+  }
   return stderr.length === 0 ? `CLI exited with status ${String(execution.status)}.` : stderr
 }
 
