@@ -127,13 +127,13 @@ describe("McpServerService released HTTP integration", () => {
     await started.promise
     const stopping = Effect.runPromise(operations.stop())
     await aborted.promise
+    expect((await response).status).toBe(499)
     expect(released).toBe(false)
     finish.resolve()
     await stopping
     await Effect.runPromise(Fiber.join(fiber))
     expect(bodyFinishedWithOpenClients).toBe(true)
     expect(released).toBe(true)
-    expect((await response).status).toBe(499)
   })
   it("keeps HTTP running when stdin emits EOF", async () => {
     const listening = deferred<http.Server>()
