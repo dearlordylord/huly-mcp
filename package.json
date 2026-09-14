@@ -39,6 +39,7 @@
     "circular": "dpdm --no-warning --no-tree --no-progress --exit-code circular:1 --transform 'src/**/*.ts' 'packages/huly-cli/src/**/*.ts'",
     "complexity": "oxlint -c oxlint.complexity.json src packages/huly-cli/src",
     "integration:mcp:full": "bash scripts/integration_test_full.sh",
+    "integration:compatibility": "bash scripts/integration_test_compatibility_matrix.sh",
     "certify:api-token": "node scripts/run-bundled.mjs scripts/api-token-certification.ts",
     "integration:cli": "bash scripts/integration_test_cli.sh",
     "integration:cli:full": "bash scripts/integration_test_cli_full.sh",

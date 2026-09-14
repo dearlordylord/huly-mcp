@@ -187,6 +187,29 @@ The matrix exercises stdio discovery with multiple representative clients and en
 
 The full integration suite below exercises direct native Huly tools. `scripts/integration_test_full.sh` therefore exports `HULY_TOOL_MODE=native` when the variable is unset and exits early if it is explicitly set to `auto` or `proxy`. Keep proxy exposure assertions in this dedicated tool-scope matrix.
 
+### Rechecking Huly and Intabia together
+
+Use the compatibility matrix to build once and run the same full native-tool suite against original Huly and Intabia in sequence. It runs Intabia even when Huly fails, writes separate private logs, prints each final assertion summary, and exits nonzero when either target fails.
+
+Run it from a checkout with Linux-local dependencies. The shared macOS/container `node_modules` tree can contain native binaries for the wrong platform; use the isolated-checkout procedure in this document when needed.
+
+Prerequisites:
+
+- Original Huly is reachable from this container and `.env.local` contains its private connection settings.
+- The disposable Intabia fixture is running at the URL recorded in `.env.intabia.local`. The validated fixture is Intabia `0.8.33` / model `0.8.4`, workspace `mcp-compat`.
+- Both env files are ignored and contain `HULY_URL`, `HULY_WORKSPACE`, and either a token or email/password credentials. Keep the actor/reviewer variables in the corresponding env file.
+- The Intabia workspace retains the native fixtures listed in [the compatibility report](docs/research/intabia-broad-integration.md#native-ui-fixture-follow-up), including its Test Management project. The original Huly workspace currently has no Test Management project, so that section will be reported as skipped there until one is created through the Huly UI.
+- If Intabia upstream containers were recreated, follow the fixture checkout's `INTABIA-COMPAT.local.md`: reload its nginx so it resolves the new container addresses. If `setup.sh` was rerun, restore the documented HTTP branding protocol override first.
+
+```bash
+HULY_ENV_FILE="$PWD/.env.local" \
+INTABIA_ENV_FILE="$PWD/.env.intabia.local" \
+COMPAT_LOG_DIR="/tmp/hulymcp-compatibility-$(date +%Y%m%d-%H%M%S)" \
+pnpm integration:compatibility
+```
+
+Do not treat the assertion pass ratio as a support percentage. Review every failure and skip in both logs. The runner covers 521 of the 601 registered tools statically; [the 601-tool Intabia index](docs/research/intabia-compatibility-index.md) also includes focused probes that are not yet one-command automation. Repeating a release-level compatibility certification therefore consists of the matrix run plus reconciling that index for newly exercised, changed, skipped, and unverified tools. Preserve the previous report rather than silently changing a failure into a pass when a fixture is absent.
+
 ### Running the full suite over HTTP
 
 The same full integration suite can exercise the HTTP MCP transport instead of stdio:

@@ -10,7 +10,7 @@
 
 **Huly MCP** is a feature-complete MCP server for [Huly](https://huly.io/) integration. Published on npm as [`@firfi/huly-mcp`](https://www.npmjs.com/package/@firfi/huly-mcp).
 
-It connects to any Huly Platform deployment, so it should also work with the [Platform Collective](https://github.com/Platform-Collective/platform) fork, [TraceX](https://tracex.co), and [Intabia](https://platform.intabia.ru/) — unofficial for now.
+It connects to Huly Platform deployments and should also work with the [Platform Collective](https://github.com/Platform-Collective/platform) and [TraceX](https://tracex.co) forks. [Intabia](https://platform.intabia.ru/) `0.8.33` / model `0.8.4` has been compatibility-tested; [known gaps are tracked in issue #279](https://github.com/dearlordylord/huly-mcp/issues/279). Fork support remains unofficial.
 
 ## Huly CLI Alternative
 
