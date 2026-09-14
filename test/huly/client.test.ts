@@ -743,6 +743,97 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
   })
 
   describe("connection", () => {
+    it.effect("connects using workspace collaborator discovery when the global field is absent", () =>
+      Effect.gen(function* () {
+        const getCollaboratorClient = mockFn().mockReturnValue(mockCollaboratorClient)
+        const sdk: HulySdkDependencies = {
+          ...testSdk,
+          loadServerConfig: mockFn().mockResolvedValue({ ACCOUNTS_URL: "http://localhost:8083" }),
+          getWorkspaceToken: mockFn().mockResolvedValue({
+            endpoint: "http://localhost:9090",
+            token: "test-token",
+            workspaceId: "ws-123",
+            info: { workspaceUrl: "ws-slug", collaboratorEndpoint: "ws://localhost:3078/_collaborator" }
+          }),
+          getCollaboratorClient
+        }
+        const layer = HulyClient.layerWithDependencies.pipe(
+          Layer.provide(Layer.merge(testConfigLayer, Layer.succeed(HulySdk, sdk)))
+        )
+        const client = yield* HulyClient.pipe(Effect.provide(layer))
+        yield* client.findAll(toClassRef("test:class:Doc"), {})
+        expect(getCollaboratorClient.mock.calls).toEqual([
+          ["ws-123", "test-token", "ws://localhost:3078/_collaborator"]
+        ])
+      })
+    )
+
+    it.effect("refreshes workspace discovery when the selected transactor fails", () =>
+      Effect.gen(function* () {
+        const failedEndpoint = "http://retired-transactor.test"
+        const replacementEndpoint = "http://replacement-transactor.test"
+        const getWorkspaceToken = mockFn<HulySdkDependencies["getWorkspaceToken"]>()
+          .mockImplementationOnce(async (...args) => ({
+            ...(await testSdk.getWorkspaceToken(...args)),
+            endpoint: failedEndpoint
+          }))
+          .mockImplementation(async (...args) => {
+            const selected = await testSdk.getWorkspaceToken(...args)
+            return {
+              ...selected,
+              endpoint: replacementEndpoint,
+              token: "replacement-token",
+              info: { ...selected.info, collaboratorEndpoint: "ws://replacement-collaborator.test/content" }
+            }
+          })
+        const createRestTxOperations = mockFn<HulySdkDependencies["createRestTxOperations"]>().mockImplementation(
+          (endpoint, ...args) =>
+            endpoint === failedEndpoint
+              ? Promise.reject(new Error("selected transactor is unavailable"))
+              : testSdk.createRestTxOperations(endpoint, ...args)
+        )
+        const getCollaboratorClient = mockFn().mockReturnValue(mockCollaboratorClient)
+        const sdk: HulySdkDependencies = {
+          ...testSdk,
+          getWorkspaceToken,
+          createRestTxOperations,
+          getCollaboratorClient
+        }
+        const layer = HulyClient.layerWithDependencies.pipe(
+          Layer.provide(Layer.merge(testConfigLayer, Layer.succeed(HulySdk, sdk)))
+        )
+        const fiber = yield* HulyClient.pipe(Effect.provide(layer), Effect.forkScoped)
+        yield* TestClock.adjust("500 millis")
+        const client = yield* Fiber.join(fiber)
+        yield* client.findAll(toClassRef("test:class:Doc"), {})
+
+        expect(getWorkspaceToken.mock.calls).toHaveLength(2)
+        expect(mockLoadServerConfig.mock.calls).toHaveLength(2)
+        expect(createRestTxOperations.mock.calls).toEqual([
+          [failedEndpoint, "ws-123", "test-token", true],
+          [replacementEndpoint, "ws-123", "replacement-token", true]
+        ])
+        expect(getCollaboratorClient.mock.calls).toEqual([
+          ["ws-123", "replacement-token", "ws://replacement-collaborator.test/content"]
+        ])
+      })
+    )
+
+    it.effect("fails malformed discovery before opening a workspace client", () =>
+      Effect.gen(function* () {
+        const loadServerConfig = mockFn().mockResolvedValue({ ACCOUNTS_URL: "http://localhost:8083" })
+        const sdk: HulySdkDependencies = { ...testSdk, loadServerConfig }
+        const layer = HulyClient.layerWithDependencies.pipe(
+          Layer.provide(Layer.merge(testConfigLayer, Layer.succeed(HulySdk, sdk)))
+        )
+        const error = yield* HulyClient.pipe(Effect.provide(layer), Effect.flip)
+        expect(error._tag).toBe("HulyConnectionError")
+        expect(error.message).toContain("Invalid collaborator endpoint")
+        expect(loadServerConfig.mock.calls).toHaveLength(1)
+        expect(mockCreateRestTxOperations.mock.calls).toHaveLength(0)
+      })
+    )
+
     it.effect("connects with the full model needed by authoritative metadata operations", () =>
       Effect.gen(function* () {
         const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))

@@ -77,6 +77,7 @@ import {
 } from "./operations/person-administration-shared.js"
 import { toAccountUuid, toCorePersonId } from "./operations/sdk-boundary.js"
 import { HulySdk, type HulySdkDependencies } from "./sdk-deps.js"
+import { parseCollaboratorEndpoint } from "./collaborator-endpoint.js"
 import { acquireClosableClient } from "./scoped-client.js"
 import { classifyHulyUnavailableFailure, normalizeHulyOrigin } from "./unavailable-diagnostics.js"
 import { testWorkbenchUrlConfig, type WorkbenchUrlConfig } from "./url-builders.js"
@@ -131,31 +132,34 @@ const connectionRetrySchedule = Schedule.exponential("100 millis")
 
 const withConnectionRetry = <A>(attempt: Effect.Effect<A, ConnectionError>): Effect.Effect<A, ConnectionError> =>
   attempt.pipe(
-    Effect.retry({ schedule: connectionRetrySchedule, times: MAX_RETRIES, while: (e) => !(e instanceof HulyAuthError) })
+    Effect.retry({
+      schedule: connectionRetrySchedule,
+      times: MAX_RETRIES,
+      while: (e) => e instanceof HulyUnavailableError
+    })
   )
 
-/**
- * Connect with retry: wraps a Promise-returning function in Effect.tryPromise,
- * maps errors to HulyAuthError/HulyConnectionError, and applies connection retry.
- */
+const connectionAttempt = <A>(
+  connect: () => Promise<A>,
+  endpointUrl: string
+): Effect.Effect<A, HulyAuthError | HulyUnavailableError> =>
+  Effect.tryPromise({
+    try: connect,
+    catch: (e) => {
+      if (isAuthError(e)) {
+        return new HulyAuthError({ message: "Credentials or workspace authorization failed" })
+      }
+      const [failureKind, detailCode] = classifyHulyUnavailableFailure(e)
+      const endpointOrigin = normalizeHulyOrigin(endpointUrl)
+      const diagnostic = { endpointOrigin, failureKind, ...(detailCode === undefined ? {} : { detailCode }) }
+      return new HulyUnavailableError(diagnostic)
+    }
+  })
+
 export const connectWithRetry = <A>(
   connect: () => Promise<A>,
   endpointUrl: string
-): Effect.Effect<A, ConnectionError> =>
-  withConnectionRetry(
-    Effect.tryPromise({
-      try: connect,
-      catch: (e) => {
-        if (isAuthError(e)) {
-          return new HulyAuthError({ message: "Credentials or workspace authorization failed" })
-        }
-        const [failureKind, detailCode] = classifyHulyUnavailableFailure(e)
-        const endpointOrigin = normalizeHulyOrigin(endpointUrl)
-        const diagnostic = { endpointOrigin, failureKind, ...(detailCode === undefined ? {} : { detailCode }) }
-        return new HulyUnavailableError(diagnostic)
-      }
-    })
-  )
+): Effect.Effect<A, ConnectionError> => withConnectionRetry(connectionAttempt(connect, endpointUrl))
 
 type MarkupConvertOptions = MarkupUrlConfig
 
@@ -707,43 +711,50 @@ function createMarkupOps(
   }
 }
 
-const connectRest = async (config: ConnectionConfig, sdk: HulySdkDependencies): Promise<RestConnection> => {
-  const serverConfig = await sdk.loadServerConfig(config.url)
-
-  const authOptions = authToOptions(config.auth, config.workspace)
-
-  const { endpoint, info, token, workspaceId } = await sdk.getWorkspaceToken(config.url, authOptions, serverConfig)
-
-  // createRestTxOperations also calls getAccount() internally but doesn't expose it.
-  // Extra call here is one-time at connection startup; acceptable to avoid reimplementing SDK internals.
-  const restClient = sdk.createRestClient(endpoint, workspaceId, token)
-  const account = await restClient.getAccount()
-
-  const client = await sdk.createRestTxOperations(
-    endpoint,
-    workspaceId,
-    token,
-    LOAD_FULL_MODEL_FOR_AUTHORITATIVE_METADATA
-  )
-  const {
-    imageUrl,
-    ops: markupOps,
-    refUrl
-  } = createMarkupOps(config.url, workspaceId, token, serverConfig.COLLABORATOR_URL, sdk)
-
-  return {
-    client,
-    accountUuid: account.uuid,
-    primarySocialId: account.primarySocialId,
-    socialIds: account.socialIds,
-    workspaceUrlSlug: WorkspaceUrlSlug.make(info.workspaceUrl),
-    markupOps,
-    refUrl,
-    imageUrl
-  }
-}
-
 const connectRestWithRetry = (
   config: ConnectionConfig,
   sdk: HulySdkDependencies
-): Effect.Effect<RestConnection, ConnectionError> => connectWithRetry(() => connectRest(config, sdk), config.url)
+): Effect.Effect<RestConnection, ConnectionError> =>
+  Effect.gen(function* () {
+    const discovery = yield* connectionAttempt(async () => {
+      const serverConfig = await sdk.loadServerConfig(config.url)
+      const selected = await sdk.getWorkspaceToken(
+        config.url,
+        authToOptions(config.auth, config.workspace),
+        serverConfig
+      )
+      return { serverConfig, ...selected }
+    }, config.url)
+    const { endpoint, info, token, workspaceId } = discovery
+    const collaboratorEndpoint = yield* parseCollaboratorEndpoint(discovery.serverConfig, info)
+
+    return yield* connectionAttempt(async () => {
+      // createRestTxOperations also calls getAccount() internally but doesn't expose it.
+      // Extra call here is one-time at connection startup; acceptable to avoid reimplementing SDK internals.
+      const restClient = sdk.createRestClient(endpoint, workspaceId, token)
+      const account = await restClient.getAccount()
+
+      const client = await sdk.createRestTxOperations(
+        endpoint,
+        workspaceId,
+        token,
+        LOAD_FULL_MODEL_FOR_AUTHORITATIVE_METADATA
+      )
+      const {
+        imageUrl,
+        ops: markupOps,
+        refUrl
+      } = createMarkupOps(config.url, workspaceId, token, collaboratorEndpoint.href, sdk)
+
+      return {
+        client,
+        accountUuid: account.uuid,
+        primarySocialId: account.primarySocialId,
+        socialIds: account.socialIds,
+        workspaceUrlSlug: WorkspaceUrlSlug.make(info.workspaceUrl),
+        markupOps,
+        refUrl,
+        imageUrl
+      }
+    }, config.url)
+  }).pipe(withConnectionRetry)

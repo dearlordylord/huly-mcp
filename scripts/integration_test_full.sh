@@ -9082,7 +9082,7 @@ run_test "list_test_projects" \
 
 TM_PROJ=$(run_capture_only \
   '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_test_projects","arguments":{}},"id":2}')
-TM_PROJ_ID=$(echo "$TM_PROJ" | jq -r '.projects[0].identifier // empty' 2>/dev/null)
+TM_PROJ_ID=$(echo "$TM_PROJ" | jq -r '.projects[0].id // empty' 2>/dev/null)
 
 if [ -n "$TM_PROJ_ID" ]; then
   echo "  Using TM project: $TM_PROJ_ID"
@@ -9096,13 +9096,13 @@ if [ -n "$TM_PROJ_ID" ]; then
     run_test "list_test_suites" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_test_suites\",\"arguments\":{\"project\":\"$TM_PROJ_ID\"}},\"id\":2}"
     run_test "get_test_suite($TSID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_test_suite\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testSuite\":\"$TSID\"}},\"id\":2}"
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_test_suite\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"suite\":\"$TSID\"}},\"id\":2}"
     run_test "update_test_suite($TSID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_test_suite\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testSuite\":\"$TSID\",\"name\":\"Updated Suite\"}},\"id\":2}"
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_test_suite\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"suite\":\"$TSID\",\"name\":\"Updated Suite\"}},\"id\":2}"
 
     # Test Case
     run_capture_to_var TC_TEXT "create_test_case" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_test_case\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"name\":\"IntTest Case\",\"testSuite\":\"$TSID\"}},\"id\":2}"
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_test_case\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"name\":\"IntTest Case\",\"suite\":\"$TSID\"}},\"id\":2}"
     if [ $? -eq 0 ]; then
       TCID=$(echo "$TC_TEXT" | jq -r '.id' 2>/dev/null)
       echo "  => case: $TCID"
@@ -9122,63 +9122,82 @@ if [ -n "$TM_PROJ_ID" ]; then
         run_test "list_test_plans" \
           "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_test_plans\",\"arguments\":{\"project\":\"$TM_PROJ_ID\"}},\"id\":2}"
         run_test "get_test_plan($TPID)" \
-          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_test_plan\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testPlan\":\"$TPID\"}},\"id\":2}"
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_test_plan\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"plan\":\"$TPID\"}},\"id\":2}"
         run_test "update_test_plan($TPID)" \
-          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_test_plan\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testPlan\":\"$TPID\",\"name\":\"Updated Plan\"}},\"id\":2}"
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_test_plan\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"plan\":\"$TPID\",\"name\":\"Updated Plan\"}},\"id\":2}"
 
         # add_test_plan_item
-        run_test "add_test_plan_item($TPID,$TCID)" \
-          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_test_plan_item\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testPlan\":\"$TPID\",\"testCase\":\"$TCID\"}},\"id\":2}"
-        run_test "remove_test_plan_item($TPID,$TCID)" \
-          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"remove_test_plan_item\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testPlan\":\"$TPID\",\"testCase\":\"$TCID\"}},\"id\":2}"
+        TPIID=""
+        run_capture_to_var TPI_TEXT "add_test_plan_item($TPID,$TCID)" \
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"add_test_plan_item\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"plan\":\"$TPID\",\"testCase\":\"$TCID\"}},\"id\":2}"
+        TPIID=$(echo "$TPI_TEXT" | jq -r '.id // empty' 2>/dev/null)
 
         # Test Run
         run_capture_to_var TR_TEXT "create_test_run" \
-          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_test_run\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"name\":\"IntTest Run\",\"testPlan\":\"$TPID\"}},\"id\":2}"
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_test_run\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"name\":\"IntTest Run\"}},\"id\":2}"
         if [ $? -eq 0 ]; then
           TRID=$(echo "$TR_TEXT" | jq -r '.id' 2>/dev/null)
           echo "  => run: $TRID"
           run_test "list_test_runs" \
             "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_test_runs\",\"arguments\":{\"project\":\"$TM_PROJ_ID\"}},\"id\":2}"
           run_test "get_test_run($TRID)" \
-            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_test_run\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testRun\":\"$TRID\"}},\"id\":2}"
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_test_run\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"run\":\"$TRID\"}},\"id\":2}"
           run_test "update_test_run($TRID)" \
-            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_test_run\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testRun\":\"$TRID\",\"name\":\"Updated Run\"}},\"id\":2}"
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_test_run\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"run\":\"$TRID\",\"name\":\"Updated Run\"}},\"id\":2}"
 
           # Test Result
           run_capture_to_var RESULT_TEXT "create_test_result" \
-            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_test_result\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testRun\":\"$TRID\",\"testCase\":\"$TCID\",\"status\":\"passed\"}},\"id\":2}"
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_test_result\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"run\":\"$TRID\",\"testCase\":\"$TCID\",\"status\":\"passed\"}},\"id\":2}"
           if [ $? -eq 0 ]; then
             RESID=$(echo "$RESULT_TEXT" | jq -r '.id' 2>/dev/null)
             echo "  => result: $RESID"
             run_test "list_test_results" \
-              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_test_results\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testRun\":\"$TRID\"}},\"id\":2}"
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_test_results\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"run\":\"$TRID\"}},\"id\":2}"
             run_test "get_test_result($RESID)" \
-              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_test_result\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testResult\":\"$RESID\"}},\"id\":2}"
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_test_result\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"result\":\"$RESID\"}},\"id\":2}"
             run_test "update_test_result($RESID)" \
-              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_test_result\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testResult\":\"$RESID\",\"status\":\"failed\"}},\"id\":2}"
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_test_result\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"result\":\"$RESID\",\"status\":\"failed\"}},\"id\":2}"
             run_test "delete_test_result($RESID)" \
-              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_test_result\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testResult\":\"$RESID\"}},\"id\":2}"
+              "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_test_result\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"result\":\"$RESID\"}},\"id\":2}"
           fi
 
           # run_test_plan — creates a new test run; capture and clean up
           run_capture_to_var RTP_TEXT "run_test_plan($TPID)" \
-            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"run_test_plan\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testPlan\":\"$TPID\"}},\"id\":2}"
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"run_test_plan\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"plan\":\"$TPID\"}},\"id\":2}"
           if [ $? -eq 0 ]; then
+            assert_json_field_equals "run_test_plan creates one result" "$RTP_TEXT" ".resultsCreated" "1"
             RTP_RUN_ID=$(echo "$RTP_TEXT" | jq -r '.runId // empty' 2>/dev/null)
             if [ -n "$RTP_RUN_ID" ]; then
               echo "  => run_test_plan run: $RTP_RUN_ID"
+              run_capture_to_var RTP_RUN_TEXT "get_test_run(from_plan:$RTP_RUN_ID)" \
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_test_run\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"run\":\"$RTP_RUN_ID\"}},\"id\":2}"
+              mapfile -t RTP_RESULT_IDS < <(echo "$RTP_RUN_TEXT" | jq -r '.results[].id // empty' 2>/dev/null)
+              if [ "${#RTP_RESULT_IDS[@]}" -gt 0 ]; then
+                for RTP_RESULT_ID in "${RTP_RESULT_IDS[@]}"; do
+                  run_test "delete_test_result(from_plan:$RTP_RESULT_ID)" \
+                    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_test_result\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"result\":\"$RTP_RESULT_ID\"}},\"id\":2}"
+                done
+              else
+                fail_test "run_test_plan result cleanup" "generated run did not expose its result id"
+              fi
               run_test "delete_test_run(from_plan:$RTP_RUN_ID)" \
-                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_test_run\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testRun\":\"$RTP_RUN_ID\"}},\"id\":2}"
+                "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_test_run\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"run\":\"$RTP_RUN_ID\"}},\"id\":2}"
             fi
           fi
 
           run_test "delete_test_run($TRID)" \
-            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_test_run\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testRun\":\"$TRID\"}},\"id\":2}"
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_test_run\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"run\":\"$TRID\"}},\"id\":2}"
+        fi
+
+        if [ -n "$TPIID" ]; then
+          run_test "remove_test_plan_item($TPID,$TPIID)" \
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"remove_test_plan_item\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"plan\":\"$TPID\",\"item\":\"$TPIID\"}},\"id\":2}"
+        else
+          skip_test "remove_test_plan_item" "add_test_plan_item did not return an item id"
         fi
 
         run_test "delete_test_plan($TPID)" \
-          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_test_plan\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testPlan\":\"$TPID\"}},\"id\":2}"
+          "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_test_plan\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"plan\":\"$TPID\"}},\"id\":2}"
       fi
 
       run_test "delete_test_case($TCID)" \
@@ -9186,7 +9205,7 @@ if [ -n "$TM_PROJ_ID" ]; then
     fi
 
     run_test "delete_test_suite($TSID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_test_suite\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"testSuite\":\"$TSID\"}},\"id\":2}"
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_test_suite\",\"arguments\":{\"project\":\"$TM_PROJ_ID\",\"suite\":\"$TSID\"}},\"id\":2}"
   fi
 else
   skip_test "test_management" "no TM project found — create one in Huly UI"

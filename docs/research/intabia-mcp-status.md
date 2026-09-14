@@ -1,0 +1,15 @@
+# Intabia MCP status
+
+Checked: 2026-09-13.
+
+No public Intabia MCP server or MCP connection instructions were found in the sources checked. This is a bounded negative finding; it does not establish that no private or unpublished implementation exists.
+
+- The [official product site](https://platform.intabia.ru/) advertises an API, external AI-agent integrations, and a built-in AI assistant. Its developer link leads to [platform-examples](https://github.com/intabia-fusion/platform-examples), whose README describes REST and WebSocket API examples using `@intabia-fusion/api`. These are general platform APIs, not evidence of an MCP server.
+- The [public Intabia Fusion organization](https://github.com/intabia-fusion) exposes five repositories: `platform`, `platform-docs`, `platform-examples`, `platform-selfhost`, and `.github`; no dedicated MCP repository appeared in the [repository API listing](https://api.github.com/orgs/intabia-fusion/repos?per_page=100).
+- Complete recursive trees for [`platform` at be9f942e](https://github.com/intabia-fusion/platform/tree/be9f942e4ea285e38a4faad49a02211d95b76bdb), [`platform-docs` at c547d013](https://github.com/intabia-fusion/platform-docs/tree/c547d013cc74bb1115ef1257591fc1d36594978a), and [`platform-examples` at d1a75d66](https://github.com/intabia-fusion/platform-examples/tree/d1a75d66df297247c48270850d6252c06832a369) contained no paths mentioning MCP. A scan of accessible Markdown, AI configuration, and lockfiles found no product MCP setup; the sole MCP mention was a browser-testing diagnostic in `docs/memory/ui-component-tests-vitest.md`. Example fixture Markdown paths containing spaces were skipped by that scan.
+- Their [AI assistant documentation](https://github.com/intabia-fusion/platform/blob/be9f942e4ea285e38a4faad49a02211d95b76bdb/docs/aibot.md) describes the built-in “Юля ИИ” assistant, provider routing, and task/document tools. That supports the existence of an internal assistant, but does not document an MCP server or MCP client integration.
+- A further scan of all `platform` package manifests and text files under [`services/ai-bot`](https://github.com/intabia-fusion/platform/tree/be9f942e4ea285e38a4faad49a02211d95b76bdb/services/ai-bot) found no `MCP`, `modelcontextprotocol`, or `Model Context Protocol` references. Five binary assets were excluded after decoding failed.
+- The related [`haiodo/foundation` fork](https://github.com/haiodo/foundation/tree/56a5037fa8db043ef60290e61c05c75203862564) also had no MCP paths in its complete recursive tree. This supplementary check covered paths, not every source file.
+- The [npm registry search for Intabia](https://registry.npmjs.org/-/v1/search?text=intabia&size=100) returned `@intabia-fusion/api` and `@intabia/angular-ui`; neither result identified itself as an MCP server. English and Russian web searches likewise produced no first-party MCP announcement.
+
+Practical conclusion: Intabia has its own API and AI assistant, but a publicly available first-party MCP remains unconfirmed. Compatibility of this repository's MCP with Intabia still requires deployment testing.
