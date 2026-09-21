@@ -157,6 +157,11 @@ export const coreMutationCliCommandCatalog = {
     description: "Delete Issue",
     behavior: { confirmation: { type: "requires-yes", message: "issues delete requires --yes." } }
   },
+  publish_issue_to_external_tracker: {
+    path: ["issues", "external-publication", "publish"],
+    positional: ["project", "identifier"],
+    description: "Request Issue External Publication"
+  },
   delete_issue_template: {
     path: ["issues", "templates", "delete"],
     positional: ["project", "template"],

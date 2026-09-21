@@ -1880,6 +1880,20 @@ describe("Huly Errors", () => {
               return `public-holiday:${error.holiday}`
             case "PublicHolidayConflictError":
               return `public-holiday-conflict:${error.department}:${error.date}`
+            case "ExternalTrackerModelUnavailableError":
+              return `external-model:${error.provider}:${error.capabilities.length}`
+            case "ExternalTrackerNoEnabledTargetError":
+              return `external-no-target:${error.project}:${error.provider}`
+            case "ExternalTrackerTargetNotFoundError":
+              return `external-target-not-found:${error.project}:${error.target}`
+            case "ExternalTrackerTargetAmbiguousError":
+              return `external-target-ambiguous:${error.project}:${error.candidates.length}`
+            case "ExternalTrackerTargetDisabledError":
+              return `external-target-disabled:${error.project}:${error.targetId}`
+            case "ExternalTrackerTargetCrossProjectError":
+              return `external-target-cross-project:${error.project}:${error.actualProject}`
+            case "ExternalTrackerPublicationConflictError":
+              return `external-publication-conflict:${error.project}:${error.existingTargetId}`
             default: {
               const _exhaustive: never = error
               return _exhaustive

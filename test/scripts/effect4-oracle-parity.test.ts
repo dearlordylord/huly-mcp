@@ -251,12 +251,21 @@ describe("Effect 4 oracle structural parity", () => {
 
     const review = createOracleDeltaReview("baseline", "current", deltas, candidateToolIdentities)
     expect(review.categories.map(({ category, issues }) => ({ category, issues }))).toEqual([
-      { category: "draft07-structure", issues: ["#97", "#225", "#264", "#265", "#266", "#267", "#268"] },
-      { category: "schema-metadata", issues: ["#97", "#225", "#245", "#264", "#265", "#266", "#267", "#268"] },
+      {
+        category: "draft07-structure",
+        issues: ["#97", "#225", "#264", "#265", "#266", "#267", "#268", "#282"]
+      },
+      {
+        category: "schema-metadata",
+        issues: ["#97", "#225", "#245", "#264", "#265", "#266", "#267", "#268", "#282"]
+      },
       { category: "authored-constraints", issues: ["#225", "#245"] },
       { category: "issue-assignee-description", issues: ["#245"] },
       { category: "cli-json-diagnostic", issues: ["#228"] },
-      { category: "cli-help", issues: ["#97", "#228", "#245", "#264", "#265", "#266", "#267", "#268"] }
+      {
+        category: "cli-help",
+        issues: ["#97", "#228", "#245", "#264", "#265", "#266", "#267", "#268", "#282"]
+      }
     ])
     expect(() =>
       createOracleDeltaReview("baseline", "current", [{ _tag: "Added", path: "/unclassified", after: true }])
@@ -409,7 +418,7 @@ describe("Effect 4 oracle structural parity", () => {
     expect(
       report.certificate.categories.find(({ category }) => category === "post-baseline-operation-expansion")
     ).toMatchObject({
-      issues: ["#97", "#264", "#265", "#266", "#267", "#268"],
+      issues: ["#97", "#264", "#265", "#266", "#267", "#268", "#282"],
       rationale: expect.stringContaining("operation expansion")
     })
   })
@@ -678,7 +687,7 @@ describe("Effect 4 oracle Draft-07 validation", () => {
   const RuntimeFixtureJsonSchema = toDraft07JsonSchema(RuntimeFixture)
 
   it("compiles the complete current native and proxy corpora without CLI imports", () => {
-    expect(validateCurrentDraft07Corpora()).toEqual({ native: 603, proxy: 6 })
+    expect(validateCurrentDraft07Corpora()).toEqual({ native: 606, proxy: 6 })
   }, 60_000)
 
   it("compiles complete tool documents and rejects duplicate names or dialect leaks", () => {

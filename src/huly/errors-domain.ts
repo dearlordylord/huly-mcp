@@ -215,6 +215,7 @@ import {
   TemplateChildNotFoundError
 } from "./errors-tracker.js"
 import { WorkflowStatusDomainError } from "./errors-workflow-statuses.js"
+import { ExternalTrackerDomainError } from "./errors-external-publication.js"
 
 export const HulyDomainError = Schema.Union([
   HulyDomainBaseError,
@@ -407,7 +408,8 @@ export const HulyDomainError = Schema.Union([
   MessageTemplateIdentifierAmbiguousError,
   TemplateFieldCategoryNotFoundError,
   TemplateFieldCategoryIdentifierAmbiguousError,
-  WorkflowStatusDomainError
+  WorkflowStatusDomainError,
+  ExternalTrackerDomainError
 ])
 
 export type HulyDomainError = Schema.Schema.Type<typeof HulyDomainError>

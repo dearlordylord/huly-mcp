@@ -98,10 +98,17 @@ export const ISSUE_267_OPERATION_TOOL_NAMES: ReadonlySet<ToolNameType> = new Set
   ToolName.make("update_office_room")
 ])
 
+export const ISSUE_282_OPERATION_TOOL_NAMES: ReadonlySet<ToolNameType> = new Set([
+  ToolName.make("list_external_tracker_targets"),
+  ToolName.make("publish_issue_to_external_tracker"),
+  ToolName.make("get_issue_publication_status")
+])
+
 export const POST_BASELINE_FEATURE_OPERATION_TOOL_NAMES: ReadonlySet<ToolNameType> = new Set([
   ...ISSUE_264_OPERATION_TOOL_NAMES,
   ...ISSUE_266_OPERATION_TOOL_NAMES,
-  ...ISSUE_267_OPERATION_TOOL_NAMES
+  ...ISSUE_267_OPERATION_TOOL_NAMES,
+  ...ISSUE_282_OPERATION_TOOL_NAMES
 ])
 
 export const ISSUE_265_EXISTING_TOOL_CHANGE_NAMES: ReadonlySet<ToolNameType> = new Set([

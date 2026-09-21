@@ -3,8 +3,8 @@
   "categories": [
     {
       "category": "draft07-structure",
-      "count": 16010,
-      "deltaSetSha256": "0f410cca51c85c4cd7cabdec48e09e0c8b7f4e111f72a4fa83142f9aca6b9219",
+      "count": 15647,
+      "deltaSetSha256": "52542030eae14c93d46ece3af2ce17018aabbb3b7a182e14e3349a45572b5033",
       "issues": [
         "#97",
         "#225",
@@ -12,14 +12,15 @@
         "#265",
         "#266",
         "#267",
-        "#268"
+        "#268",
+        "#282"
       ],
-      "rationale": "Reviewed Effect 4 Draft-07 structural dialect plus the post-baseline administration, Recruiting Candidate custom-field, Planner document-ToDo, Calendar-settings, virtual-office, and meeting-room schemas."
+      "rationale": "Reviewed Effect 4 Draft-07 structural dialect plus the post-baseline administration, Recruiting Candidate custom-field, Planner document-ToDo, Calendar-settings, virtual-office, meeting-room, and external-publication schemas."
     },
     {
       "category": "schema-metadata",
-      "count": 2328,
-      "deltaSetSha256": "7087f7cacefe42f4e381da64b54ae977506fe98c6642157022deb1a891c747d6",
+      "count": 1885,
+      "deltaSetSha256": "8d55d473eea640a2ed59aaaeb72902ade31852d4b840790d20c0fd4cb56c90f0",
       "issues": [
         "#97",
         "#225",
@@ -28,14 +29,15 @@
         "#265",
         "#266",
         "#267",
-        "#268"
+        "#268",
+        "#282"
       ],
-      "rationale": "Reviewed schema metadata migration and authored descriptions for issue-assignee resolution (#245) and the post-baseline #97 and #264-#268 feature contracts."
+      "rationale": "Reviewed schema metadata migration and authored descriptions for issue-assignee resolution (#245) and the post-baseline #97, #264-#268, and #282 feature contracts."
     },
     {
       "category": "authored-constraints",
-      "count": 968,
-      "deltaSetSha256": "18bc6a9922c67248cccb84cc9c40aa8d1fefa375aec158656129feca9d009699",
+      "count": 290,
+      "deltaSetSha256": "22fc6df4435e48d58ad696008bcc8e3bac250893a9a0e15c0d551312addc01ea",
       "issues": [
         "#225",
         "#245"
@@ -53,17 +55,18 @@
     },
     {
       "category": "post-baseline-operation-expansion",
-      "count": 10109,
-      "deltaSetSha256": "7c0e248dd082a47698dbebf8349d639fdfe8ae0b786a68bf78d57db139a67767",
+      "count": 11336,
+      "deltaSetSha256": "f5033cc331ab4c3e49ce27e81f9138e2e39c6ad32c37dc1aa8db122b4ef0b63a",
       "issues": [
         "#97",
         "#264",
         "#265",
         "#266",
         "#267",
-        "#268"
+        "#268",
+        "#282"
       ],
-      "rationale": "Reviewed the ordered operation expansion and shifted registry/CLI surfaces from #97 and #264-#267, together with post-baseline Planner (#265) and meeting-room (#268) contract changes in the affected ordered region."
+      "rationale": "Reviewed the ordered operation expansion and shifted registry/CLI surfaces from #97 and #264-#267, together with post-baseline Planner (#265), meeting-room (#268), and external-publication (#282) contract changes in the affected ordered region."
     },
     {
       "category": "cli-json-diagnostic",
@@ -76,8 +79,8 @@
     },
     {
       "category": "cli-help",
-      "count": 4,
-      "deltaSetSha256": "84e370505ba28d3eb974f52fc24e97a27041ce8a844c689763716c1ecad1de00",
+      "count": 6,
+      "deltaSetSha256": "0a78243b2a123c0e6556919f0885beae535a90b4d0706f0e57a89c1a5fa62302",
       "issues": [
         "#97",
         "#228",
@@ -86,11 +89,12 @@
         "#265",
         "#266",
         "#267",
-        "#268"
+        "#268",
+        "#282"
       ],
-      "rationale": "Reviewed concise Effect 4 CLI help rendering, including the #245 assignee guidance and the #97 and #264-#268 operation and contract updates represented in the complete help output."
+      "rationale": "Reviewed concise Effect 4 CLI help rendering, including the #245 assignee guidance and the #97, #264-#268, and #282 operation and contract updates represented in the complete help output."
     }
   ],
   "formatVersion": 2,
-  "reviewedCurrentSha256": "13cf2b85c17ac11e4e3bd70866537d21b11c7f34b605c97c7d4a45d0db5f5b15"
+  "reviewedCurrentSha256": "483a4586950fb62b5f48dc6a8d7dc15001fecb4ce1149c745574ecf4fbfc237e"
 }

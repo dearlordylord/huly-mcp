@@ -1062,6 +1062,41 @@ export {
 } from "./related-issue-targets.js"
 
 export {
+  type ExternalIssuePublicationStatus,
+  ExternalIssuePublicationStatusSchema,
+  type ExternalTrackerPublicationResult,
+  ExternalTrackerPublicationResultSchema,
+  type ExternalTrackerPublicationStatus,
+  ExternalTrackerPublicationStatusSchema,
+  type GetIssuePublicationStatusResult,
+  GetIssuePublicationStatusResultSchema,
+  type ExternalTrackerProvider,
+  ExternalTrackerProviderSchema,
+  type ExternalTrackerTarget,
+  ExternalTrackerTargetId,
+  type ExternalTrackerTargetKind,
+  ExternalTrackerTargetKindSchema,
+  ExternalTrackerTargetSchema,
+  type GetIssuePublicationStatusParams,
+  getIssuePublicationStatusParamsJsonSchema,
+  GetIssuePublicationStatusParamsSchema,
+  type ListExternalTrackerTargetsParams,
+  listExternalTrackerTargetsParamsJsonSchema,
+  ListExternalTrackerTargetsParamsSchema,
+  type ListExternalTrackerTargetsResult,
+  ListExternalTrackerTargetsResultSchema,
+  Iso8601Timestamp,
+  parseGetIssuePublicationStatusParams,
+  parseListExternalTrackerTargetsParams,
+  parsePublishIssueToExternalTrackerParams,
+  type PublishIssueToExternalTrackerParams,
+  type PublishIssueToExternalTrackerResult,
+  publishIssueToExternalTrackerParamsJsonSchema,
+  PublishIssueToExternalTrackerParamsSchema,
+  PublishIssueToExternalTrackerResultSchema
+} from "./external-tracker-publication.js"
+
+export {
   type Component,
   ComponentSchema,
   type ComponentSummary,

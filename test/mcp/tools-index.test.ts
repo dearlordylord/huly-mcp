@@ -49,12 +49,12 @@ const noopStorageClient: HulyStorageOperations = {
 }
 
 describe("CATEGORY_NAMES", () => {
-  it("preserves the certified 601-operation registry cardinality", () => {
-    expect(toolRegistry.definitions).toHaveLength(601)
-    expect(toolRegistry.tools.size).toBe(601)
-    expect(operationRegistry.definitions).toHaveLength(601)
-    expect(operationRegistry.operations.size).toBe(601)
-    expect(new Set(toolRegistry.definitions.map((tool) => tool.name)).size).toBe(601)
+  it("preserves the certified 604-operation registry cardinality", () => {
+    expect(toolRegistry.definitions).toHaveLength(604)
+    expect(toolRegistry.tools.size).toBe(604)
+    expect(operationRegistry.definitions).toHaveLength(604)
+    expect(operationRegistry.operations.size).toBe(604)
+    expect(new Set(toolRegistry.definitions.map((tool) => tool.name)).size).toBe(604)
   })
 
   it.effect("contains expected categories", () =>
@@ -179,6 +179,54 @@ describe("CATEGORY_NAMES", () => {
       expect(toolDefinition("approve_approval_request").category).toBe("approvals")
       expect(toolDefinition("reject_approval_request").category).toBe("approvals")
       expect(toolDefinition("cancel_approval_request").category).toBe("approvals")
+    })
+  )
+
+  it.effect("registers external issue publication tools in the issues category", () =>
+    Effect.sync(function () {
+      const discovery = toolDefinition("list_external_tracker_targets")
+      const publish = toolDefinition("publish_issue_to_external_tracker")
+      const status = toolDefinition("get_issue_publication_status")
+
+      expect(discovery.category).toBe("issues")
+      expect(publish.category).toBe("issues")
+      expect(status.category).toBe("issues")
+      expect(discovery.description).toContain("does not call the external provider")
+      expect(publish.description).toContain("pending means Huly accepted the request")
+      expect(status.description).toContain("not_requested, pending, published, or failed")
+      expect(resolveAnnotations(discovery)).toMatchObject({
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false
+      })
+      expect(resolveAnnotations(publish)).toMatchObject({
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false
+      })
+      expect(resolveAnnotations(status)).toMatchObject({
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false
+      })
+      expect(new Set([discovery.name, publish.name, status.name])).toHaveLength(3)
+
+      const publishInput = JSON.stringify(publish.inputSchema)
+      const discoveryInput = JSON.stringify(discovery.inputSchema)
+      const publicationOutput = JSON.stringify(publish.outputSchema)
+      expect(publishInput).toContain('"provider"')
+      expect(publishInput).toContain('"target"')
+      expect(discoveryInput).toContain('"provider"')
+      expect(publicationOutput).toContain('"not_requested"')
+      expect(publicationOutput).toContain('"pending"')
+      expect(publicationOutput).toContain('"published"')
+      expect(publicationOutput).toContain('"failed"')
+      expect(publicationOutput).toContain('"stateChangedAt"')
+      expect(publicationOutput).toContain('"externalIssueNumber"')
+      expect(JSON.stringify(toolDefinition("create_issue").inputSchema)).not.toContain('"provider"')
     })
   )
 })

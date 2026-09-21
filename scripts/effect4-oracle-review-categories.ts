@@ -46,15 +46,15 @@ export const reviewCategoryMetadata = (
   switch (category) {
     case "draft07-structure":
       return {
-        issues: ["#97", "#225", "#264", "#265", "#266", "#267", "#268"],
+        issues: ["#97", "#225", "#264", "#265", "#266", "#267", "#268", "#282"],
         rationale:
-          "Reviewed Effect 4 Draft-07 structural dialect plus the post-baseline administration, Recruiting Candidate custom-field, Planner document-ToDo, Calendar-settings, virtual-office, and meeting-room schemas."
+          "Reviewed Effect 4 Draft-07 structural dialect plus the post-baseline administration, Recruiting Candidate custom-field, Planner document-ToDo, Calendar-settings, virtual-office, meeting-room, and external-publication schemas."
       }
     case "schema-metadata":
       return {
-        issues: ["#97", "#225", "#245", "#264", "#265", "#266", "#267", "#268"],
+        issues: ["#97", "#225", "#245", "#264", "#265", "#266", "#267", "#268", "#282"],
         rationale:
-          "Reviewed schema metadata migration and authored descriptions for issue-assignee resolution (#245) and the post-baseline #97 and #264-#268 feature contracts."
+          "Reviewed schema metadata migration and authored descriptions for issue-assignee resolution (#245) and the post-baseline #97, #264-#268, and #282 feature contracts."
       }
     case "authored-constraints":
       return {
@@ -70,9 +70,9 @@ export const reviewCategoryMetadata = (
       }
     case "post-baseline-operation-expansion":
       return {
-        issues: ["#97", "#264", "#265", "#266", "#267", "#268"],
+        issues: ["#97", "#264", "#265", "#266", "#267", "#268", "#282"],
         rationale:
-          "Reviewed the ordered operation expansion and shifted registry/CLI surfaces from #97 and #264-#267, together with post-baseline Planner (#265) and meeting-room (#268) contract changes in the affected ordered region."
+          "Reviewed the ordered operation expansion and shifted registry/CLI surfaces from #97 and #264-#267, together with post-baseline Planner (#265), meeting-room (#268), and external-publication (#282) contract changes in the affected ordered region."
       }
     case "cli-json-diagnostic":
       return {
@@ -82,9 +82,9 @@ export const reviewCategoryMetadata = (
       }
     case "cli-help":
       return {
-        issues: ["#97", "#228", "#245", "#264", "#265", "#266", "#267", "#268"],
+        issues: ["#97", "#228", "#245", "#264", "#265", "#266", "#267", "#268", "#282"],
         rationale:
-          "Reviewed concise Effect 4 CLI help rendering, including the #245 assignee guidance and the #97 and #264-#268 operation and contract updates represented in the complete help output."
+          "Reviewed concise Effect 4 CLI help rendering, including the #245 assignee guidance and the #97, #264-#268, and #282 operation and contract updates represented in the complete help output."
       }
   }
 }

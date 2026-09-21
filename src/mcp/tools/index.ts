@@ -18,6 +18,7 @@ import { deletionTools } from "./deletion.js"
 import { documentSnapshotTools } from "./document-snapshots.js"
 import { documentTools } from "./documents.js"
 import { driveTools } from "./drive.js"
+import { externalIssuePublicationTools } from "./external-issue-publication.js"
 import { genericAssociationTools } from "./generic-associations.js"
 import { hrDepartmentTools } from "./hr-departments.js"
 import { hrRequestTools } from "./hr-requests.js"
@@ -74,6 +75,7 @@ export const allTools = [
   ...projectTools,
   ...projectTargetPreferenceTools,
   ...issueTools,
+  ...externalIssuePublicationTools,
   ...relatedIssueTargetTools,
   ...labelTools,
   ...tagTools,

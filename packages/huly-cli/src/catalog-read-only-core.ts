@@ -39,6 +39,11 @@ export const coreReadOnlyCliCommandCatalog = {
     positional: ["teamspace", "document"],
     description: "List Document Snapshots"
   },
+  list_external_tracker_targets: {
+    path: ["issues", "external-targets", "list"],
+    positional: ["project"],
+    description: "List External Tracker Targets"
+  },
   list_drawings: { path: ["drawings", "list"], positional: ["parentId", "parentClass"], description: "List Drawings" },
   list_issue_templates: {
     path: ["issues", "templates", "list"],
@@ -60,6 +65,11 @@ export const coreReadOnlyCliCommandCatalog = {
     path: ["issues", "related-targets", "list"],
     positional: [],
     description: "List Related Issue Targets"
+  },
+  get_issue_publication_status: {
+    path: ["issues", "external-publication", "status"],
+    positional: ["project", "identifier"],
+    description: "Get Issue External Publication Status"
   },
   list_saved_attachments: {
     path: ["attachments", "saved", "list"],
