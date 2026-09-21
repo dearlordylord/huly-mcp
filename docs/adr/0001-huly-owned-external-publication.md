@@ -1,0 +1,3 @@
+# Keep external issue publication separate and Huly-owned
+
+External publication uses dedicated discovery, publication, and status tools with a provider-extensible contract; GitHub is the only initial provider. Keeping publication separate from issue creation avoids ambiguous partial success, while Huly's ownership of credentials, target mappings, asynchronous creation, and subsequent synchronization avoids a competing external writer. Generic issue tools retain their existing contracts and Huly's native synchronization effects; the settled contract and supporting evidence live in the [viability report](../research/github-integration-issue-281-viability.md).
