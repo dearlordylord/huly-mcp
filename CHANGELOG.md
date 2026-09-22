@@ -1,5 +1,12 @@
 # @firfi/huly-mcp
 
+## 0.52.5
+
+### Patch Changes
+
+- 6b3c563: Resolve collaborative-content endpoints from workspace selection when provided, retaining the global Huly configuration fallback. This enables connection and document operations on Intabia deployments that omit COLLABORATOR_URL and returns a typed error for invalid endpoint discovery.
+- b2f23e8: Remove the retired hosted-service announcement from MCP initialization, tool results, connection diagnostics, and documentation. Use deployment-neutral example URLs and connection guidance.
+
 ## 0.52.4
 
 ### Patch Changes
