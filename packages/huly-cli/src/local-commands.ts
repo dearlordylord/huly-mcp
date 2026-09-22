@@ -161,19 +161,22 @@ const profileForLogin = (
     return { name, profile }
   })
 
-const optionalText = (name: string) => Flag.string(name).pipe(Flag.optional)
-const jsonOption = Flag.boolean("json").pipe(Flag.withDescription("Print JSON output."))
+const optionalText = (name: string) => Flag.String(name).pipe(Flag.optional)
+const jsonOption = Flag.Boolean("json").pipe(Flag.withDefault(false), Flag.withDescription("Print JSON output."))
 
-const positionalArgument = (name: string) => ({ param: Argument.string(name), syntax: `<${name}>` })
+const positionalArgument = (name: string) => ({ param: Argument.String(name), syntax: `<${name}>` })
 const requiredTextFlag = (name: string, valueName = name) => ({
-  param: Flag.string(name),
+  param: Flag.String(name),
   syntax: `--${name} <${valueName}>`
 })
 const optionalTextFlag = (name: string, valueName = name) => ({
   param: optionalText(name),
   syntax: `[--${name} <${valueName}>]`
 })
-const optionalBooleanFlag = (name: string, param = Flag.boolean(name)) => ({ param, syntax: `[--${name}]` })
+const optionalBooleanFlag = (name: string, param = Flag.Boolean(name).pipe(Flag.withDefault(false))) => ({
+  param,
+  syntax: `[--${name}]`
+})
 
 const nameArgument = positionalArgument("name")
 const profileFlag = optionalTextFlag("profile", "name")

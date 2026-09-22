@@ -80,7 +80,7 @@ Hand-written interfaces are reserved for internal-only ports, services, and impl
 
 With `exactOptionalPropertyTypes`, handwritten `field?: T | undefined` usually means the code is modeling Effect Schema's default `Schema.optional(T)` behavior manually.
 
-For schema-owned payloads, let the schema derive that type. Mappers should usually omit absent output fields rather than materialize explicit `undefined` values. When explicit `undefined` is not part of the accepted contract, prefer an exact optional schema such as `Schema.optionalWith(T, { exact: true })`.
+For schema-owned payloads, let the schema derive that type. Mappers should usually omit absent output fields rather than materialize explicit `undefined` values. When explicit `undefined` is not part of the accepted contract, use `Schema.optionalKey(T)` for an exact optional field.
 
 ### Parse, Don't Validate
 
@@ -111,7 +111,7 @@ Avoid top-level side effects except in true entrypoint/bootstrap files. Modules 
 
 ## No Test Mocks
 
-Test mocks are banned. Do not use `vi.mock`, `vi.doMock`, `vi.hoisted`, `vi.spyOn`, `vi.stubGlobal`, Jest-style `jest.mock`, or any module-level monkey-patching. If a test needs to substitute behavior, the subject must expose a dependency-injection seam — an Effect `Context.Tag` / `Effect.Service` provided via `Layer`, or a plain ports argument. Tests then provide a real stub implementation through that seam.
+Test mocks are banned. Do not use `vi.mock`, `vi.doMock`, `vi.hoisted`, `vi.spyOn`, `vi.stubGlobal`, Jest-style `jest.mock`, or any module-level monkey-patching. If a test needs to substitute behavior, the subject must expose a dependency-injection seam — an Effect `Context.Service` provided via `Layer`, or a plain ports argument. Tests then provide a real stub implementation through that seam.
 
 This applies to every side effect, including time. Code that reads the clock must depend on `Effect.Clock` (or a `Clock`-like service) rather than calling `Date.now()`, `performance.now()`, or `new Date()` directly. Tests supply a deterministic `TestClock` or equivalent stub via `Layer.provide`.
 
@@ -129,13 +129,13 @@ Code review agents must consult `.claude/review-rules.md` for project-specific q
 2. Run `effect-solutions show <topic>...` for relevant patterns (supports multiple topics)
 3. Read `docs/mcps/effect.md` for the authoritative lookup order
 4. Read `node_modules/effect/AGENTS.md` for guidance shipped with the exact installed package
-5. Search `.reference/effect-v4.0.0-rc.108/` for exact target implementations and declarations
+5. Search `.reference/effect-v4.0.0-rc.117/` for exact target implementations and declarations
 
 In secondary worktrees, `.reference` may exist only in the master checkout at `/workspace/typescript/hulymcp/.reference`. After creating a worktree, run `bash scripts/bootstrap-worktree.sh` to link ignored local resources (`node_modules`, `.reference`, `.env.local`, `CLAUDE.local.md`) from the master checkout when available. If `effect-solutions` is not on PATH, use the pinned references directly. Exact installed package declarations and pinned source override generic or globally installed skill guidance.
 
 Topics: quick-start, project-setup, tsconfig, basics, services-and-layers, data-modeling, error-handling, config, testing, cli.
 
-Use the installed rc.108 declarations and the smallest relevant pinned source region. Never guess at Effect patterns.
+Use the installed rc.117 declarations and the smallest relevant pinned source region. Never guess at Effect patterns.
 <!-- effect-solutions:end -->
 
 ## Huly API Reference

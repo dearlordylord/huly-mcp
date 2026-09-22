@@ -1,5 +1,7 @@
 # PRD: Lazy Tool Loading via Meta-Tools
 
+> This records the product decision behind the current native/proxy exposure model. The current transport and registry implementation is summarized in [MCP transport architecture and certification](MCP_TRANSPORT_CERTIFICATION.md); historical SDK API notes below are retained only as decision context.
+
 ## Problem
 
 This MCP server exposes 470 tools across 39 categories. When a client (Claude Desktop, Cursor, etc.) connects, it receives all 470 tool definitions — names, descriptions, and full JSON schemas — in a single `tools/list` response. The generated `tools/list` payload is about 435KB of JSON. Measured with Claude's tokenizer (via `/context` against the published `@firfi/huly-mcp` server), the tool surface is roughly **170K tokens** before any conversation begins. The common 4-chars-per-token heuristic understates this at ~109K, because JSON schemas tokenize more densely than prose.
@@ -54,9 +56,9 @@ Several ecosystems solve large MCP/API surfaces by exposing a small model-facing
 - **Anthropic "Code execution with MCP"**: presents MCP servers as a generated filesystem of code modules (one file per tool) that the agent explores on demand, instead of loading tool definitions into context. Anthropic reports a workflow dropping from ~150K to ~2K tokens (98.7%). The pattern also keeps large intermediate tool *results* out of context — a dimension the meta-tool proxy approaches here do not address — at the cost of requiring a code sandbox.
 - **Notion MCP (hosted, 18 tools)**: ships exactly the recommended shape — tool scoping plus `search_tools` / `execute_tool` meta-tools for runtime discovery.
 
-### SDK Support (v1.25.3)
+### Historical SDK support considered during design
 
-The installed `@modelcontextprotocol/sdk` v1.25.3 has **full support** for dynamic tool management:
+The official MCP SDK evaluated when this decision was made had dynamic tool-management support:
 - `server.sendToolListChanged()` — sends notification to client
 - `McpServer.registerTool()` / `RegisteredTool.remove()` — add/remove tools at runtime
 - `RegisteredTool.enable()` / `.disable()` — show/hide tools from `tools/list`
@@ -78,9 +80,9 @@ The installed `@modelcontextprotocol/sdk` v1.25.3 has **full support** for dynam
 The codebase is well-positioned for this change:
 
 - **Every tool already has a `category` field** — `ToolDefinition` includes `readonly category: string`, and each tool file defines a stable category such as `issues`, `documents`, or `channels`. 39 categories currently exist.
-- **Tool registry** (`src/mcp/tools/index.ts`) aggregates all tools into a `Map<string, RegisteredTool>` with a `handleToolCall` dispatcher.
+- **Tool registry** (`src/mcp/tools/index.ts`) aggregates all operations and definitions; the Effect AI registry applies request-profile visibility and dispatches calls through the shared operation layer.
 - **JSON schemas** are pre-generated at import time via `makeJsonSchema()` from Effect Schema.
-- **`tools/list` handler** (`src/mcp/server.ts:72-82`) maps over `toolRegistry.definitions` to produce the response.
+- **Transport-independent registration** (`src/mcp/effect-ai-registry.ts`) registers built-in, proxy, and native definitions once and applies deterministic visibility rules for `tools/list`.
 
 ## Approaches Evaluated
 

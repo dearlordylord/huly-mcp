@@ -32,14 +32,7 @@ const expected =
     ? {
         binName: "huly-mcp",
         expectedEntries: ["package/LICENSE", "package/README.md", "package/dist/index.cjs", "package/package.json"],
-        expectedExternalModules: [
-          "ajv-formats/dist/formats",
-          "ajv/dist/runtime/equal",
-          "ajv/dist/runtime/ucs2length",
-          "ajv/dist/runtime/uri",
-          "ajv/dist/runtime/validation_error",
-          "ws"
-        ],
+        expectedExternalModules: ["@opentelemetry/api", "ws"],
         name: "@firfi/huly-mcp",
         version
       }
@@ -62,7 +55,7 @@ const expected =
 const main = async (): Promise<void> => {
   const certification = await certifyPackedArtifact(archivePath, expected)
   if (kind === "mcp") {
-    const evidencePath = "docs/migrations/effect-4/mcp-artifact-certification.json"
+    const evidencePath = "docs/certification/mcp-artifact-certification.json"
     const parseEvidence = Schema.decodeUnknownSync(Schema.fromJsonString(PackedArtifactCertificationSchema))
     if (writeFlag === "--write") {
       writeFileSync(evidencePath, `${JSON.stringify(certification, undefined, jsonIndent)}\n`)

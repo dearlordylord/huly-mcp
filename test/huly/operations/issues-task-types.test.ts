@@ -639,4 +639,20 @@ describe("issue write task type support", () => {
       expect(issueUpdate?.operations).toEqual({ kind: bugTaskTypeId, status: bugOpenStatusId })
     })
   )
+
+  it.effect("treats selecting the current task type and status as an idempotent update", () =>
+    Effect.gen(function* () {
+      const captures: Captures = { addCollections: [], updates: [] }
+      const issue = makeIssue({ kind: bugTaskTypeId, status: bugOpenStatusId })
+
+      const result = yield* updateIssue({
+        project: projectIdentifier("TEST"),
+        identifier: issueIdentifier("TEST-1"),
+        taskType: TaskTypeRefSchema.make("Bug")
+      }).pipe(Effect.provide(createLayer({ captures, issues: [issue] })), withDiagnostics)
+
+      expect(result).toEqual({ identifier: "TEST-1", updated: false })
+      expect(captures.updates).toEqual([])
+    })
+  )
 })

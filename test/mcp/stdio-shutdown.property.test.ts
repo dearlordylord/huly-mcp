@@ -1,4 +1,5 @@
-import { Effect } from "effect"
+import { Effect, Fiber } from "effect"
+import { TestClock } from "effect/testing"
 import * as fc from "fast-check"
 import { describe, expect, it } from "vitest"
 
@@ -43,17 +44,20 @@ describe("stdio shutdown coordinator properties", () => {
           Effect.gen(function* () {
             const coordinator = yield* makeStdioShutdownCoordinator()
             for (const reason of reasons) yield* coordinator.request(reason)
-            yield* Effect.all(
+            const shutdownFiber = yield* Effect.all(
               [
                 executeBoundedStdioShutdown(coordinator, resources),
                 executeBoundedStdioShutdown(coordinator, resources),
                 executeBoundedStdioShutdown(coordinator, resources)
               ],
               { concurrency: "unbounded", discard: true }
-            )
+            ).pipe(Effect.forkChild)
+            yield* Effect.yieldNow
+            yield* TestClock.adjust("250 millis")
+            yield* Fiber.join(shutdownFiber)
             yield* executeBoundedStdioShutdown(coordinator, resources)
             return yield* coordinator.state
-          })
+          }).pipe(Effect.provide(TestClock.layer()))
         )
 
         expect(state).toEqual({ _tag: "Complete", outcome: "graceful", reason: reasons[0] })

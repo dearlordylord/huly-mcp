@@ -72,7 +72,7 @@ export const KnownStatusCategoryValueSchema = Schema.String.annotate({
 })
   .pipe(
     Schema.decodeTo(KnownStatusCategoryValueLiteral, {
-      decode: SchemaGetter.transformOrFail((input, options) => {
+      decode: SchemaGetter.transformEffect((input, options) => {
         const match = normalizedStatusCategoryLookup.get(input.toLowerCase())
         return match !== undefined
           ? Effect.succeed(match)

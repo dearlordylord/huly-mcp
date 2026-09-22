@@ -1,0 +1,1222 @@
+diff --git a/dist/unstable/ai/McpSchema.d.ts b/dist/unstable/ai/McpSchema.d.ts
+index a2153a23de6ff72783b8593c197841083dc8d3e5..65f7a1ecc3147084ad82b5c71c85ea933fff51ab 100644
+--- a/dist/unstable/ai/McpSchema.d.ts
++++ b/dist/unstable/ai/McpSchema.d.ts
+@@ -3580,7 +3580,7 @@ declare const McpServerClient_base: Context.ServiceClass<McpServerClient, "effec
+     readonly clientId: number;
+     readonly protocolVersion: StatefulProtocolVersion;
+     readonly clientCapabilities: ClientCapabilities;
+-    readonly clientInfo: Implementation;
++    readonly clientInfo?: Implementation | undefined;
+     readonly initializePayload: typeof Initialize.payloadSchema["Type"];
+     readonly requestMetadata?: Schema.JsonObject | undefined;
+     readonly getClient: Effect.Effect<McpReverseClient, never, Scope.Scope>;
+diff --git a/dist/unstable/ai/McpServer.d.ts b/dist/unstable/ai/McpServer.d.ts
+index f34c45ee627aa4143249e559319f264529477f50..f3a2f8469708fea41f2dc676b4601673ae67ab7c 100644
+--- a/dist/unstable/ai/McpServer.d.ts
++++ b/dist/unstable/ai/McpServer.d.ts
+@@ -44,8 +44,10 @@ declare const McpServer_base: Context.ServiceClass<McpServer, "effect/ai/McpServ
+     readonly addTool: (options: {
+         readonly tool: McpTool;
+         readonly annotations: Context.Context<never>;
++        readonly callableWhen?: McpSchema.EnabledWhen["Service"] | undefined;
+         readonly handle: (payload: any) => Effect.Effect<CallToolResult | McpSchema.InputRequired, InternalError | InvalidParams, McpRequestContext>;
+     }) => Effect.Effect<void>;
++    readonly setUnknownToolHandler: (handler: (call: typeof CallTool.payloadSchema.Type) => Effect.Effect<CallToolResult, InternalError | InvalidParams, McpRequestContext>) => Effect.Effect<void>;
+     readonly callTool: (requests: typeof CallTool.payloadSchema.Type) => Effect.Effect<CallToolResult, InternalError | InvalidParams, McpServerClient>;
+     readonly resources: ReadonlyArray<{
+         readonly resource: Resource;
+@@ -54,8 +56,9 @@ declare const McpServer_base: Context.ServiceClass<McpServer, "effect/ai/McpServ
+     readonly addResource: (options: {
+         readonly resource: Resource;
+         readonly annotations: Context.Context<never>;
+-        readonly handle: Effect.Effect<ReadResourceResult, InternalError, McpRequestContext>;
++        readonly handle: Effect.Effect<ReadResourceResult, InvalidParams | InternalError, McpRequestContext>;
+     }) => Effect.Effect<void>;
++    readonly addResourceListProvider: (provider: (profile: Parameters<McpSchema.EnabledWhen["Service"]>[0]) => Effect.Effect<ReadonlyArray<Resource>, InternalError, McpRequestContext>) => Effect.Effect<void>;
+     readonly resourceTemplates: ReadonlyArray<{
+         readonly template: ResourceTemplate;
+         readonly annotations: Context.Context<never>;
+@@ -112,8 +115,10 @@ export declare class McpServer extends McpServer_base {
+         readonly addTool: (options: {
+             readonly tool: McpTool;
+             readonly annotations: Context.Context<never>;
++            readonly callableWhen?: McpSchema.EnabledWhen["Service"] | undefined;
+             readonly handle: (payload: any) => Effect.Effect<CallToolResult | McpSchema.InputRequired, InternalError | InvalidParams, McpRequestContext>;
+         }) => Effect.Effect<void>;
++        readonly setUnknownToolHandler: (handler: (call: typeof CallTool.payloadSchema.Type) => Effect.Effect<CallToolResult, InternalError | InvalidParams, McpRequestContext>) => Effect.Effect<void>;
+         readonly callTool: (requests: typeof CallTool.payloadSchema.Type) => Effect.Effect<CallToolResult, InternalError | InvalidParams, McpServerClient>;
+         readonly resources: ReadonlyArray<{
+             readonly resource: Resource;
+@@ -122,8 +127,9 @@ export declare class McpServer extends McpServer_base {
+         readonly addResource: (options: {
+             readonly resource: Resource;
+             readonly annotations: Context.Context<never>;
+-            readonly handle: Effect.Effect<ReadResourceResult, InternalError, McpRequestContext>;
++            readonly handle: Effect.Effect<ReadResourceResult, InvalidParams | InternalError, McpRequestContext>;
+         }) => Effect.Effect<void>;
++        readonly addResourceListProvider: (provider: (profile: Parameters<McpSchema.EnabledWhen["Service"]>[0]) => Effect.Effect<ReadonlyArray<Resource>, InternalError, McpRequestContext>) => Effect.Effect<void>;
+         readonly resourceTemplates: ReadonlyArray<{
+             readonly template: ResourceTemplate;
+             readonly annotations: Context.Context<never>;
+@@ -288,6 +294,7 @@ export declare const layerHttp: (options: {
+     readonly icons?: ReadonlyArray<McpSchema.Icon> | undefined;
+     readonly path: HttpRouter.PathInput;
+     readonly protocols: Arr.NonEmptyReadonlyArray<McpProtocol.ProtocolAdapter>;
++    readonly legacyStatelessProtocolVersion?: McpProtocol.StatefulProtocolVersion | undefined;
+     readonly extensions?: ServerExtensions | undefined;
+     readonly allowedOrigins?: ReadonlyArray<string> | undefined;
+ }) => Layer.Layer<McpServer | McpServerClient, Cause.IllegalArgumentError, HttpRouter.HttpRouter>;
+diff --git a/dist/unstable/ai/McpServer.js b/dist/unstable/ai/McpServer.js
+index 023f33a102cbc0ccaa6e2c5de080fb8b44558d1c..b88ad3ec6856e38028af0f246dc944d9e3f79739 100644
+--- a/dist/unstable/ai/McpServer.js
++++ b/dist/unstable/ai/McpServer.js
+@@ -206,6 +206,7 @@ export class McpServer extends /*#__PURE__*/Context.Service()("effect/ai/McpServ
+           tools[existingIndex] = options;
+         }
+         const enabledWhen = Context.getOrUndefined(options.annotations, EnabledWhen);
++        const callableWhen = options.callableWhen ?? enabledWhen;
+         yield* internalCore.tools.register({
+           descriptor: new McpTool({
+             ...options.tool,
+@@ -216,6 +217,11 @@ export class McpServer extends /*#__PURE__*/Context.Service()("effect/ai/McpServ
+             capabilities: profile.clientCapabilities,
+             clientInfo: profile.clientInfo
+           }),
++          isCallable: profile => callableWhen === undefined || callableWhen({
++            protocolVersion: profile.protocolVersion,
++            capabilities: profile.clientCapabilities,
++            clientInfo: profile.clientInfo
++          }),
+           handle: (call, invocation) => provideInvocationContext(options.handle(call.arguments), invocation).pipe(Effect.catchTags({
+             InternalError: error => Effect.fail(new McpCore.ToolExecutionError({
+               name: options.tool.name,
+@@ -227,8 +233,18 @@ export class McpServer extends /*#__PURE__*/Context.Service()("effect/ai/McpServ
+             }))
+           }), Effect.map(result => Predicate.isTagged(result, "InputRequired") ? McpCore.OperationOutcome.InputRequired(result) : McpCore.OperationOutcome.Complete(result)))
+         });
+-        yield* notifications.client["notifications/tools/list_changed"]({});
+-      }),
++          yield* notifications.client["notifications/tools/list_changed"]({});
++        }),
++      setUnknownToolHandler: handler => internalCore.tools.registerUnknownHandler((call, invocation) => provideInvocationContext(handler(call), invocation).pipe(Effect.map(McpCore.OperationOutcome.Complete), Effect.catchTags({
++        InternalError: error => Effect.fail(new McpCore.ToolExecutionError({
++          name: call.name,
++          message: error.message
++        })),
++        InvalidParams: error => Effect.fail(new McpCore.InvalidToolInput({
++          name: call.name,
++          message: error.message
++        }))
++      }))),
+       callTool: request => Effect.gen(function* () {
+         const client = yield* McpServerClient;
+         const result = yield* internalCore.tools.call(request, McpProtocolInternal.invocationFromClient(client)).pipe(Effect.mapError(error => new InvalidParams({
+@@ -270,6 +286,11 @@ export class McpServer extends /*#__PURE__*/Context.Service()("effect/ai/McpServ
+         });
+         yield* notifications.client["notifications/resources/list_changed"]({});
+       }),
++      addResourceListProvider: provider => Effect.andThen(internalCore.resources.registerListProvider(profile => provider({
++        protocolVersion: profile.protocolVersion,
++        capabilities: profile.clientCapabilities,
++        clientInfo: profile.clientInfo
++      })), notifications.client["notifications/resources/list_changed"]({})),
+       addResourceTemplate: ({
+         annotations,
+         completions,
+@@ -612,7 +633,7 @@ const runWithRuntime = /*#__PURE__*/Effect.fnUntraced(function* (options, runtim
+     });
+     return Effect.provideService(Effect.provideService(Effect.provideService(effect, McpServerClient, McpServerClient.of({
+       clientId: client.id,
+-      protocolVersion: profile.protocolVersion,
++      protocolVersion: selectedProtocol.protocolVersion,
+       clientCapabilities: profile.clientCapabilities,
+       clientInfo: profile.clientInfo,
+       initializePayload,
+@@ -631,7 +652,8 @@ const runWithRuntime = /*#__PURE__*/Effect.fnUntraced(function* (options, runtim
+       if (response._tag === "Exit") {
+         const requests = activeRequests.get(clientId);
+         const key = requestKey(response.requestId);
+-        const cancelled = requests?.get(key)?.cancelled;
++        const activeRequest = requests?.get(key);
++        const cancelled = activeRequest?.cancelled;
+         if (requests !== undefined && requests.delete(key) && requests.size === 0) {
+           activeRequests.delete(clientId);
+         }
+@@ -679,7 +701,22 @@ const runWithRuntime = /*#__PURE__*/Effect.fnUntraced(function* (options, runtim
+               const clientState = clientStates.get(clientId);
+               if (isHttp && clientState === undefined) {
+                 // HTTP EOF only ends the request body; handlers and streamed replies may still be running.
+-                yield* Scope.addFinalizer(Context.getUnsafe(fiber.context, Scope.Scope), Effect.sync(() => disconnectClient(clientId)));
++                yield* Scope.addFinalizer(Context.getUnsafe(fiber.context, Scope.Scope), Effect.gen(function* () {
++                  const requests = Array.from(activeRequests.get(clientId)?.values() ?? []);
++                  yield* Effect.forEach(requests, ({
++                    requestId
++                  }) => {
++                    cancelRequest(clientId, requestId);
++                    return f(clientId, {
++                      _tag: "Interrupt",
++                      requestId
++                    });
++                  }, {
++                    concurrency: "unbounded",
++                    discard: true
++                  });
++                  disconnectClient(clientId);
++                }));
+               }
+               const session = prepared.binding;
+               const selectedProtocol = prepared.protocol;
+@@ -766,6 +803,7 @@ const runWithRuntime = /*#__PURE__*/Effect.fnUntraced(function* (options, runtim
+                 const requests = activeRequests.get(clientId) ?? new Map();
+                 requests.set(requestKey(request.id), {
+                   prepared,
++                  requestId: RpcMessage.RequestId(request.id),
+                   cancelled: false
+                 });
+                 activeRequests.set(clientId, requests);
+@@ -929,7 +967,8 @@ const runWithRuntime = /*#__PURE__*/Effect.fnUntraced(function* (options, runtim
+   })), Effect.ignoreCause, Effect.forever, Effect.forkScoped);
+   return yield* RpcServer.make(runtime.clientRpcs, {
+     spanPrefix: "McpServer",
+-    disableFatalDefects: true
++    disableFatalDefects: true,
++    gracefulShutdown: transport === "stdio"
+   }).pipe(Effect.provideService(RpcServer.Protocol, patchedProtocol), Effect.provideService(McpServerClientMiddleware, clientMiddleware), Effect.provide(handlers));
+ }, Effect.scoped);
+ /**
+@@ -1075,7 +1114,7 @@ const mcpStdioSerialization = protocols => {
+  * @since 4.0.0
+  */
+ export const layerHttp = options => {
+-  const runtime = McpRuntime.layer(options.protocols);
++  const runtime = McpRuntime.layer(options.protocols, options.legacyStatelessProtocolVersion);
+   const methodNotAllowedResponse = HttpServerResponse.empty({
+     status: 405,
+     headers: {
+@@ -1381,6 +1420,19 @@ const toolJsonSchema = (schema, strict) => {
+  * @since 4.0.0
+  */
+ export const toolkit = toolkit => Layer.effectDiscard(registerToolkit(toolkit)).pipe(Layer.provide(McpServer.layer));
++const handleResourceCause = cause => {
++  const failure = Cause.findFail(cause);
++  if (Result.isSuccess(failure)) {
++    const error = failure.success.error;
++    if (error instanceof InvalidParams || error instanceof InternalError) {
++      return Effect.fail(error);
++    }
++  }
++  const prettyError = Cause.prettyErrors(cause)[0];
++  return Effect.fail(new InternalError({
++    message: prettyError.message
++  }));
++};
+ /**
+  * Registers an MCP resource or resource template from an Effect program.
+  *
+@@ -1406,12 +1458,7 @@ export const registerResource = function () {
+           ...options,
+           annotations: options
+         }),
+-        handle: options.content.pipe(Effect.provideContext(services), Effect.map(content => resolveResourceContent(options.uri, content)), Effect.catchCause(cause => {
+-          const prettyError = Cause.prettyErrors(cause)[0];
+-          return Effect.fail(new InternalError({
+-            message: prettyError.message
+-          }));
+-        })),
++        handle: options.content.pipe(Effect.provideContext(services), Effect.map(content => resolveResourceContent(options.uri, content)), Effect.catchCause(handleResourceCause)),
+         annotations: options.annotations ?? Context.empty()
+       });
+     });
+@@ -1455,12 +1502,7 @@ export const registerResource = function () {
+       annotations: options.annotations ?? Context.empty(),
+       handle: (uri, params) => decode(params).pipe(Effect.mapError(error => new InvalidParams({
+         message: error.message
+-      })), Effect.flatMap(params => options.content(uri, ...params).pipe(Effect.map(content => resolveResourceContent(uri, content)), Effect.catchCause(cause => {
+-        const prettyError = Cause.prettyErrors(cause)[0];
+-        return Effect.fail(new InternalError({
+-          message: prettyError.message
+-        }));
+-      }))), Effect.provideContext(services))
++      })), Effect.flatMap(params => options.content(uri, ...params).pipe(Effect.map(content => resolveResourceContent(uri, content)), Effect.catchCause(handleResourceCause))), Effect.provideContext(services))
+     });
+   });
+ };
+diff --git a/dist/unstable/ai/internal/mcpCore.js b/dist/unstable/ai/internal/mcpCore.js
+index 2d0ebc24610cdbe6ac071d165104041b50930a7f..9ae9404ac6da7151d176f518ae7ddbc5e2e372ff 100644
+--- a/dist/unstable/ai/internal/mcpCore.js
++++ b/dist/unstable/ai/internal/mcpCore.js
+@@ -43,14 +43,19 @@ export const ServerNotification = /*#__PURE__*/Data.taggedEnum();
+ /** @internal */
+ export const make = /*#__PURE__*/Effect.sync(() => {
+   const registrations = new Map();
++  let unknownToolHandler;
+   const resourceRegistrations = [];
+   const resourceTemplateRegistrations = [];
++  const resourceListProviders = [];
+   const promptRegistrations = new Map();
+   const completionRegistrations = new Map();
+   const tools = {
+     register: registration => Effect.sync(() => {
+       registrations.set(registration.descriptor.name, registration);
+     }),
++    registerUnknownHandler: handler => Effect.sync(() => {
++      unknownToolHandler = handler;
++    }),
+     list: profile => Effect.sync(() => {
+       const descriptors = [];
+       for (const registration of registrations.values()) {
+@@ -63,11 +68,11 @@ export const make = /*#__PURE__*/Effect.sync(() => {
+     call: (call, invocation) => Effect.suspend(() => {
+       const registration = registrations.get(call.name);
+       if (registration === undefined) {
+-        return new ToolNotFound({
++        return unknownToolHandler?.(call, invocation) ?? new ToolNotFound({
+           name: call.name
+         });
+       }
+-      if (!registration.isVisible(invocation.protocol)) {
++      if (!registration.isCallable(invocation.protocol)) {
+         return new ToolNotFound({
+           name: call.name
+         });
+@@ -92,7 +97,22 @@ export const make = /*#__PURE__*/Effect.sync(() => {
+         resourceTemplateRegistrations[index] = registration;
+       }
+     }),
+-    list: profile => Effect.sync(() => resourceRegistrations.filter(entry => entry.isVisible(profile)).map(entry => entry.descriptor)),
++    registerListProvider: provider => Effect.sync(() => {
++      resourceListProviders.push(provider);
++    }),
++    list: Effect.fnUntraced(function* (profile) {
++      const descriptors = resourceRegistrations.filter(entry => entry.isVisible(profile)).map(entry => entry.descriptor);
++      const dynamic = yield* Effect.forEach(resourceListProviders, provider => provider(profile), {
++        concurrency: 1
++      });
++      const byUri = new Map(descriptors.map(resource => [resource.uri, resource]));
++      for (const resources of dynamic) {
++        for (const resource of resources) {
++          if (!byUri.has(resource.uri)) byUri.set(resource.uri, resource);
++        }
++      }
++      return Array.from(byUri.values());
++    }),
+     listTemplates: profile => Effect.sync(() => resourceTemplateRegistrations.filter(entry => entry.isVisible(profile)).map(entry => entry.descriptor)),
+     read: Effect.fnUntraced(function* (uri, invocation) {
+       const resource = resourceRegistrations.find(entry => entry.descriptor.uri === uri);
+@@ -148,7 +168,7 @@ export const make = /*#__PURE__*/Effect.sync(() => {
+   };
+   const registrationPresence = Effect.sync(() => ({
+     tools: registrations.size > 0,
+-    resources: resourceRegistrations.length > 0 || resourceTemplateRegistrations.length > 0,
++    resources: resourceRegistrations.length > 0 || resourceTemplateRegistrations.length > 0 || resourceListProviders.length > 0,
+     prompts: promptRegistrations.size > 0
+   }));
+   return {
+diff --git a/dist/unstable/ai/internal/mcpRuntime.js b/dist/unstable/ai/internal/mcpRuntime.js
+index ea40ae7336a26bad983f459790269476d7ee3841..99255abd3e76b648a16dd46be2c699ffb6bdf7ed 100644
+--- a/dist/unstable/ai/internal/mcpRuntime.js
++++ b/dist/unstable/ai/internal/mcpRuntime.js
+@@ -62,10 +62,15 @@ export class ServerRuntime extends /*#__PURE__*/Context.Service()("effect/ai/Mcp
+ /** @internal */
+ export const selectStatefulProtocol = (protocols, offeredVersion) => protocols.find(protocol => protocol.runtime._tag === "Stateful" && protocol.protocolVersion === offeredVersion) ?? protocols.find(protocol => protocol.runtime._tag === "Stateful");
+ /** @internal */
+-export const make = /*#__PURE__*/Effect.fnUntraced(function* (protocols) {
++export const make = /*#__PURE__*/Effect.fnUntraced(function* (protocols, legacyStatelessProtocolVersion) {
+   const statefulProtocol = protocols.find(protocol => protocol.runtime._tag === "Stateful");
+   const stateful = statefulProtocol === undefined ? undefined : McpStatefulRuntime.make();
+   const protocolVersions = protocols.map(protocol => protocol.protocolVersion);
++  const legacyStatelessProtocol = legacyStatelessProtocolVersion === undefined ? undefined : protocols.find(protocol => protocol.runtime._tag === "Stateful" && protocol.protocolVersion === legacyStatelessProtocolVersion);
++  if (legacyStatelessProtocolVersion !== undefined && legacyStatelessProtocol === undefined) {
++    return yield* new Cause.IllegalArgumentError(`Legacy stateless MCP protocol '${legacyStatelessProtocolVersion}' is not configured`);
++  }
++  let runtimeDefaultLogLevel = "Info";
+   let statelessDescriptor;
+   let statelessProtocol;
+   for (const protocol of protocols) {
+@@ -155,6 +160,13 @@ export const make = /*#__PURE__*/Effect.fnUntraced(function* (protocols) {
+         status: 404
+       };
+     }
++    if (!isInitialize && binding === undefined && legacyStatelessProtocol !== undefined && (protocolVersion === undefined || protocolVersion === legacyStatelessProtocol.protocolVersion)) {
++      return {
++        _tag: "Accepted",
++        binding: undefined,
++        protocol: legacyStatelessProtocol
++      };
++    }
+     if (!isInitialize && protocolVersion !== undefined && !registry.protocols.some(protocol => protocol.protocolVersion === protocolVersion)) {
+       return {
+         _tag: "Rejected",
+@@ -183,7 +195,7 @@ export const make = /*#__PURE__*/Effect.fnUntraced(function* (protocols) {
+       const metadata = asRecord(request.payload)?._meta;
+       const claim = protocolVersionClaim(metadata);
+       const requestedVersion = typeof claim.value === "string" ? claim.value : undefined;
+-      const binding = claim.present ? undefined : stateful?.resolve(clientId, headers);
++      let binding = claim.present ? undefined : stateful?.resolve(clientId, headers);
+       let protocol;
+       if (claim.present) {
+         protocol = registry.protocols.find(protocol => protocol.protocolVersion === requestedVersion) ?? statelessProtocol ?? registry.protocols[0];
+@@ -199,10 +211,33 @@ export const make = /*#__PURE__*/Effect.fnUntraced(function* (protocols) {
+           });
+         }
+         protocol = selected;
++      } else if (legacyStatelessProtocol !== undefined && (headers[MCP_PROTOCOL_VERSION_HEADER] === undefined || headers[MCP_PROTOCOL_VERSION_HEADER] === legacyStatelessProtocol.protocolVersion)) {
++        protocol = legacyStatelessProtocol;
+       } else {
+         protocol = registry.protocols[0];
+       }
+       if (protocol.runtime._tag === "Stateful") {
++        if (binding === undefined && stateful !== undefined && request.tag !== "initialize" && protocol === legacyStatelessProtocol) {
++          const profile = {
++            protocolVersion: protocol.protocolVersion,
++            clientCapabilities: {},
++            clientInfo: undefined
++          };
++          binding = stateful.registerConnection(clientId, {
++            initializePayload: PublicMcpSchema.Initialize.payloadSchema.make({
++              protocolVersion: protocol.protocolVersion,
++              capabilities: {},
++              clientInfo: {
++                name: "legacy-stateless-http",
++                version: "0"
++              }
++            }),
++            negotiatedProfile: profile,
++            protocol,
++            supportsResourceSubscriptions: false,
++            logLevel: runtimeDefaultLogLevel
++          });
++        }
+         return {
+           protocol,
+           binding
+@@ -266,7 +301,7 @@ export const make = /*#__PURE__*/Effect.fnUntraced(function* (protocols) {
+           return reject(400);
+         }
+         const admission = selectHttpProtocol(headers, undefined);
+-        return admission._tag === "Rejected" && admission.error === undefined ? reject(admission.status) : reject(200, new PublicMcpSchema.ParseError({
++        return admission._tag === "Rejected" && admission.error === undefined ? reject(admission.status) : reject(400, new PublicMcpSchema.ParseError({
+           message: "Parse error"
+         }));
+       }
+@@ -278,7 +313,7 @@ export const make = /*#__PURE__*/Effect.fnUntraced(function* (protocols) {
+           }));
+         }
+         const admission = selectHttpProtocol(headers, input);
+-        if (admission._tag === "Rejected" || input.some(hasRequestProtocolVersion) || input.some(message => Predicate.hasProperty(message, "method") && message.method === "initialize") || admission.binding?.protocol.runtime.transport.jsonRpc.acceptsBatches !== true) {
++        if (admission._tag === "Rejected" || input.some(hasRequestProtocolVersion) || input.some(message => Predicate.hasProperty(message, "method") && message.method === "initialize") || (admission.binding?.protocol ?? admission.protocol)?.runtime.transport.jsonRpc.acceptsBatches !== true) {
+           return reject(400);
+         }
+         return {
+@@ -307,7 +342,7 @@ export const make = /*#__PURE__*/Effect.fnUntraced(function* (protocols) {
+       }
+       const isInitialize = Predicate.hasProperty(input, "method") && input.method === "initialize";
+       const hasSession = headers[MCP_SESSION_ID_HEADER] !== undefined;
+-      if (isInitialize ? hasSession : !hasSession && admission.protocol?.runtime._tag !== "Stateless") {
++      if (isInitialize ? hasSession : !hasSession && admission.protocol?.runtime._tag !== "Stateless" && admission.protocol !== legacyStatelessProtocol) {
+         return reject(400);
+       }
+       if (isRequest && admission.protocol?.runtime._tag === "Stateless" && !(admission.protocol.handlerRpcs?.requests.has(input.method) ?? admission.protocol.clientRpcs.requests.has(input.method))) {
+@@ -326,6 +361,7 @@ export const make = /*#__PURE__*/Effect.fnUntraced(function* (protocols) {
+     deliveryClientIds: () => stateful?.initializedClientIds() ?? [],
+     canDeliver: (clientId, headers, notification, fallback) => stateful?.canDeliver(clientId, headers, notification, fallback) ?? true,
+     installHandlers: Effect.fnUntraced(function* (options) {
++      runtimeDefaultLogLevel = options.defaultLogLevel;
+       const contextMap = new Map();
+       const installationContext = {
+         subscribeServerNotifications: options.subscribeServerNotifications,
+@@ -434,5 +470,5 @@ export const make = /*#__PURE__*/Effect.fnUntraced(function* (protocols) {
+   });
+ });
+ /** @internal */
+-export const layer = protocols => Layer.effect(ServerRuntime)(make(protocols));
++export const layer = (protocols, legacyStatelessProtocolVersion) => Layer.effect(ServerRuntime)(make(protocols, legacyStatelessProtocolVersion));
+ //# sourceMappingURL=mcpRuntime.js.map
+\ No newline at end of file
+diff --git a/dist/unstable/rpc/RpcServer.d.ts b/dist/unstable/rpc/RpcServer.d.ts
+index e2a4ca712549745d719b273d2afbc06963d3bf13..e6132a62117bbd555bc8000ec01b2ad46a3dcf13 100644
+--- a/dist/unstable/rpc/RpcServer.d.ts
++++ b/dist/unstable/rpc/RpcServer.d.ts
+@@ -45,6 +45,7 @@ export declare const makeNoSerialization: <Rpcs extends Rpc.Any>(group: RpcGroup
+     readonly disableClientAcks?: boolean | undefined;
+     readonly concurrency?: number | "unbounded" | undefined;
+     readonly disableFatalDefects?: boolean | undefined;
++    readonly gracefulShutdown?: boolean | undefined;
+ }) => Effect.Effect<RpcServer<Rpcs>, never, Rpc.ToHandler<Rpcs> | Rpc.Middleware<Rpcs> | Scope.Scope>;
+ /**
+  * Runs an RPC server for a group using the current server `Protocol`, decoding
+@@ -60,6 +61,7 @@ export declare const make: <Rpcs extends Rpc.Any>(group: RpcGroup.RpcGroup<Rpcs>
+     readonly spanAttributes?: Record<string, unknown> | undefined;
+     readonly concurrency?: number | "unbounded" | undefined;
+     readonly disableFatalDefects?: boolean | undefined;
++    readonly gracefulShutdown?: boolean | undefined;
+ } | undefined) => Effect.Effect<never, never, Protocol | Rpc.ToHandler<Rpcs> | Rpc.Middleware<Rpcs> | Rpc.ServicesServer<Rpcs>>;
+ /**
+  * Provides a scoped layer that starts an RPC server for a group using the
+@@ -74,6 +76,7 @@ export declare const layer: <Rpcs extends Rpc.Any>(group: RpcGroup.RpcGroup<Rpcs
+     readonly spanAttributes?: Record<string, unknown> | undefined;
+     readonly concurrency?: number | "unbounded" | undefined;
+     readonly disableFatalDefects?: boolean | undefined;
++    readonly gracefulShutdown?: boolean | undefined;
+ }) => Layer.Layer<never, never, Protocol | Rpc.ToHandler<Rpcs> | Rpc.Middleware<Rpcs> | Rpc.ServicesServer<Rpcs>>;
+ /**
+  * Creates a RPC server that registers a HTTP route with a `HttpRouter`.
+diff --git a/dist/unstable/rpc/RpcServer.js b/dist/unstable/rpc/RpcServer.js
+index b840b944c181eea8584df5257d161c382def4fc6..a25d94c580b2046287f4d90af267d27d0d284b94 100644
+--- a/dist/unstable/rpc/RpcServer.js
++++ b/dist/unstable/rpc/RpcServer.js
+@@ -48,6 +48,7 @@ export const makeNoSerialization = /*#__PURE__*/Effect.fnUntraced(function* (gro
+   const spanPrefix = options.spanPrefix ?? "RpcServer";
+   const concurrency = options.concurrency ?? "unbounded";
+   const disableFatalDefects = options.disableFatalDefects ?? false;
++  const gracefulShutdown = options.gracefulShutdown === true;
+   const services = yield* Effect.context();
+   const scope = Context.get(services, Scope.Scope);
+   const trackFiber = Fiber.runIn(Scope.forkUnsafe(scope, "parallel"));
+@@ -63,8 +64,10 @@ export const makeNoSerialization = /*#__PURE__*/Effect.fnUntraced(function* (gro
+         trackFiber(Effect.runForkWith(services)(endClient(client)));
+         continue;
+       }
+-      for (const fiber of client.fibers.values()) {
+-        fiber.interruptUnsafe(parent.id);
++      if (!gracefulShutdown) {
++        for (const fiber of client.fibers.values()) {
++          fiber.interruptUnsafe(parent.id);
++        }
+       }
+     }
+     if (clients.size === 0) {
+@@ -739,15 +742,21 @@ export const makeProtocolWithHttpEffect = /*#__PURE__*/Effect.fnUntraced(functio
+       yield* client.write(ResponseDefectEncoded(encodeDefectUnsafe(cause)));
+     }
+     yield* writeRequest(id, constEof);
++    const interruptRequests = Effect.forEach(requestIds, requestId => writeRequest(id, {
++      _tag: "Interrupt",
++      requestId
++    }), {
++      discard: true
++    });
+     if (!includesFraming) {
+-      const responses = yield* Queue.collect(queue);
++      const responses = yield* Queue.collect(queue).pipe(Effect.onInterrupt(() => interruptRequests));
+       // Notification-only batches encode without a response body.
+       const encoded = parser.encode(responses);
+       return HttpServerResponse.text(encoded === undefined ? "" : encoded, {
+         contentType: serialization.contentType
+       });
+     }
+-    const initialChunk = yield* Queue.takeAll(queue);
++    const initialChunk = yield* Queue.takeAll(queue).pipe(Effect.onInterrupt(() => interruptRequests));
+     if (queue.state._tag === "Done") {
+       return HttpServerResponse.uint8Array(mergeUint8Arrays(initialChunk), {
+         contentType: serialization.contentType
+@@ -881,7 +890,8 @@ export const makeProtocolStdio = /*#__PURE__*/Effect.gen(function* () {
+     }), Effect.sandbox, Effect.tapError(Effect.logError), Effect.retry(Schedule.spaced(500)), Effect.ensuring(Effect.forkDetach(Fiber.interrupt(fiber), {
+       startImmediately: true
+     })), Effect.forkScoped);
+-    yield* Stream.fromQueue(queue).pipe(Stream.run(stdio.stdout()), Effect.retry(Schedule.spaced(500)), Effect.forkScoped);
++    const outputFiber = yield* Stream.fromQueue(queue).pipe(Stream.run(stdio.stdout()), Effect.retry(Schedule.spaced(500)), Effect.forkScoped);
++    yield* Effect.addFinalizer(() => Queue.end(queue).pipe(Effect.andThen(Fiber.await(outputFiber)), Effect.asVoid));
+     return {
+       disconnects: yield* Queue.make(),
+       send(_clientId, response) {
+diff --git a/src/unstable/ai/McpSchema.ts b/src/unstable/ai/McpSchema.ts
+index 66c949525678cd7cd041a009451507176ea29ec9..a6547af2cf9b023836d765882596479f6ddc4e4c 100644
+--- a/src/unstable/ai/McpSchema.ts
++++ b/src/unstable/ai/McpSchema.ts
+@@ -2851,7 +2851,7 @@ export class McpServerClient extends Context.Service<McpServerClient, {
+   readonly clientId: number
+   readonly protocolVersion: StatefulProtocolVersion
+   readonly clientCapabilities: ClientCapabilities
+-  readonly clientInfo: Implementation
++  readonly clientInfo?: Implementation | undefined
+   readonly initializePayload: typeof Initialize.payloadSchema["Type"]
+   readonly requestMetadata?: Schema.JsonObject | undefined
+   readonly getClient: Effect.Effect<
+diff --git a/src/unstable/ai/McpServer.ts b/src/unstable/ai/McpServer.ts
+index 426b6897523ac4415d8a250d1ccd933dc56db0ae..183964482b9a65c8c0d6e28b67019a347491e27d 100644
+--- a/src/unstable/ai/McpServer.ts
++++ b/src/unstable/ai/McpServer.ts
+@@ -211,6 +211,7 @@ export class McpServer extends Context.Service<McpServer, {
+   readonly addTool: (options: {
+     readonly tool: McpTool
+     readonly annotations: Context.Context<never>
++    readonly callableWhen?: EnabledWhen["Service"] | undefined
+     readonly handle: (
+       payload: any
+     ) => Effect.Effect<
+@@ -219,6 +220,11 @@ export class McpServer extends Context.Service<McpServer, {
+       McpRequestContext
+     >
+   }) => Effect.Effect<void>
++  readonly setUnknownToolHandler: (
++    handler: (
++      call: typeof CallTool.payloadSchema.Type
++    ) => Effect.Effect<CallToolResult, InternalError | InvalidParams, McpRequestContext>
++  ) => Effect.Effect<void>
+   readonly callTool: (
+     requests: typeof CallTool.payloadSchema.Type
+   ) => Effect.Effect<CallToolResult, InternalError | InvalidParams, McpServerClient>
+@@ -232,11 +238,17 @@ export class McpServer extends Context.Service<McpServer, {
+     readonly annotations: Context.Context<never>
+     readonly handle: Effect.Effect<
+       ReadResourceResult,
+-      InternalError,
++      InvalidParams | InternalError,
+       McpRequestContext
+     >
+   }) => Effect.Effect<void>
+
++  readonly addResourceListProvider: (
++    provider: (
++      profile: Parameters<EnabledWhen["Service"]>[0]
++    ) => Effect.Effect<ReadonlyArray<Resource>, InternalError, McpRequestContext>
++  ) => Effect.Effect<void>
++
+   readonly resourceTemplates: ReadonlyArray<{
+     readonly template: ResourceTemplate
+     readonly annotations: Context.Context<never>
+@@ -399,6 +411,7 @@ export class McpServer extends Context.Service<McpServer, {
+             tools[existingIndex] = options
+           }
+           const enabledWhen = Context.getOrUndefined(options.annotations, EnabledWhen)
++          const callableWhen = options.callableWhen ?? enabledWhen
+           yield* internalCore.tools.register({
+             descriptor: new McpTool({
+               ...options.tool,
+@@ -412,6 +425,14 @@ export class McpServer extends Context.Service<McpServer, {
+                   clientInfo: profile.clientInfo
+                 }
+               ),
++            isCallable: (profile) =>
++              callableWhen === undefined || callableWhen(
++                {
++                  protocolVersion: profile.protocolVersion,
++                  capabilities: profile.clientCapabilities,
++                  clientInfo: profile.clientInfo
++                }
++              ),
+             handle: (call, invocation) =>
+               provideInvocationContext(options.handle(call.arguments), invocation).pipe(
+                 Effect.catchTags({
+@@ -442,6 +463,28 @@ export class McpServer extends Context.Service<McpServer, {
+           })
+           yield* notifications.client["notifications/tools/list_changed"]({})
+         }),
++      setUnknownToolHandler: (handler) =>
++        internalCore.tools.registerUnknownHandler((call, invocation) =>
++          provideInvocationContext(handler(call), invocation).pipe(
++            Effect.map(McpCore.OperationOutcome.Complete),
++            Effect.catchTags({
++              InternalError: (error) =>
++                Effect.fail(
++                  new McpCore.ToolExecutionError({
++                    name: call.name,
++                    message: error.message
++                  })
++                ),
++              InvalidParams: (error) =>
++                Effect.fail(
++                  new McpCore.InvalidToolInput({
++                    name: call.name,
++                    message: error.message
++                  })
++                )
++            })
++          )
++        ),
+       callTool: (request) =>
+         Effect.gen(function*() {
+           const client = yield* McpServerClient
+@@ -490,6 +533,17 @@ export class McpServer extends Context.Service<McpServer, {
+           })
+           yield* notifications.client["notifications/resources/list_changed"]({})
+         }),
++      addResourceListProvider: (provider) =>
++        Effect.andThen(
++          internalCore.resources.registerListProvider((profile) =>
++            provider({
++              protocolVersion: profile.protocolVersion,
++              capabilities: profile.clientCapabilities,
++              clientInfo: profile.clientInfo
++            })
++          ),
++          notifications.client["notifications/resources/list_changed"]({})
++        ),
+       addResourceTemplate: ({ annotations, completions, handle, routerPath, template }) =>
+         Effect.gen(function*() {
+           const existingIndex = resourceTemplates.findIndex(({ template: current }) =>
+@@ -651,6 +705,7 @@ const requestKey = (requestId: string | number): string => `${typeof requestId}:
+
+ interface ActiveRequest {
+   readonly prepared: McpRuntime.PreparedRequest
++  readonly requestId: RpcMessage.RequestId
+   readonly cancelled: boolean
+ }
+
+@@ -891,7 +946,7 @@ const runWithRuntime = Effect.fnUntraced(function*(
+     if (!isProtocolVersion(selectedProtocol.protocolVersion) || selectedProtocol.protocolVersion === "2026-07-28") {
+       return Effect.die(`Unsupported selected MCP protocol version: ${selectedProtocol.protocolVersion}`)
+     }
+-    const profile: McpCore.NegotiatedProtocolProfile = session?.negotiatedProfile ?? {
++    const profile: McpCore.NegotiatedProtocolProfile<string> = session?.negotiatedProfile ?? {
+       protocolVersion: selectedProtocol.protocolVersion,
+       clientCapabilities: initializePayload.capabilities,
+       clientInfo: initializePayload.clientInfo
+@@ -911,7 +966,7 @@ const runWithRuntime = Effect.fnUntraced(function*(
+           McpServerClient,
+           McpServerClient.of({
+             clientId: client.id,
+-            protocolVersion: profile.protocolVersion,
++            protocolVersion: selectedProtocol.protocolVersion,
+             clientCapabilities: profile.clientCapabilities,
+             clientInfo: profile.clientInfo,
+             initializePayload,
+@@ -943,7 +998,8 @@ const runWithRuntime = Effect.fnUntraced(function*(
+       if (response._tag === "Exit") {
+         const requests = activeRequests.get(clientId)
+         const key = requestKey(response.requestId)
+-        const cancelled = requests?.get(key)?.cancelled
++        const activeRequest = requests?.get(key)
++        const cancelled = activeRequest?.cancelled
+         if (requests !== undefined && requests.delete(key) && requests.size === 0) {
+           activeRequests.delete(clientId)
+         }
+@@ -1016,7 +1072,18 @@ const runWithRuntime = Effect.fnUntraced(function*(
+                 // HTTP EOF only ends the request body; handlers and streamed replies may still be running.
+                 yield* Scope.addFinalizer(
+                   Context.getUnsafe(fiber.context, Scope.Scope),
+-                  Effect.sync(() => disconnectClient(clientId))
++                  Effect.gen(function*() {
++                    const requests = Array.from(activeRequests.get(clientId)?.values() ?? [])
++                    yield* Effect.forEach(
++                      requests,
++                      ({ requestId }) => {
++                        cancelRequest(clientId, requestId)
++                        return f(clientId, { _tag: "Interrupt", requestId })
++                      },
++                      { concurrency: "unbounded", discard: true }
++                    )
++                    disconnectClient(clientId)
++                  })
+                 )
+               }
+               const session = prepared.binding
+@@ -1125,7 +1192,11 @@ const runWithRuntime = Effect.fnUntraced(function*(
+               }
+               if (request.isNotification !== true) {
+                 const requests = activeRequests.get(clientId) ?? new Map<string, ActiveRequest>()
+-                requests.set(requestKey(request.id), { prepared, cancelled: false })
++                requests.set(requestKey(request.id), {
++                  prepared,
++                  requestId: RpcMessage.RequestId(request.id),
++                  cancelled: false
++                })
+                 activeRequests.set(clientId, requests)
+               }
+               const handled = f(clientId, routedRequest)
+@@ -1332,7 +1403,8 @@ const runWithRuntime = Effect.fnUntraced(function*(
+
+   return yield* RpcServer.make(runtime.clientRpcs, {
+     spanPrefix: "McpServer",
+-    disableFatalDefects: true
++    disableFatalDefects: true,
++    gracefulShutdown: transport === "stdio"
+   }).pipe(
+     Effect.provideService(RpcServer.Protocol, patchedProtocol),
+     Effect.provideService(McpServerClientMiddleware, clientMiddleware),
+@@ -1548,10 +1620,11 @@ export const layerHttp = (options: {
+   readonly icons?: ReadonlyArray<McpSchema.Icon> | undefined
+   readonly path: HttpRouter.PathInput
+   readonly protocols: Arr.NonEmptyReadonlyArray<McpProtocol.ProtocolAdapter>
++  readonly legacyStatelessProtocolVersion?: McpProtocol.StatefulProtocolVersion | undefined
+   readonly extensions?: ServerExtensions | undefined
+   readonly allowedOrigins?: ReadonlyArray<string> | undefined
+ }): Layer.Layer<McpServer | McpServerClient, Cause.IllegalArgumentError, HttpRouter.HttpRouter> => {
+-  const runtime = McpRuntime.layer(options.protocols)
++  const runtime = McpRuntime.layer(options.protocols, options.legacyStatelessProtocolVersion)
+   const methodNotAllowedResponse = HttpServerResponse.empty({
+     status: 405,
+     headers: { allow: "POST" }
+@@ -1986,6 +2059,20 @@ export type ResourceCompletions<Schemas extends ReadonlyArray<Schema.Constraint>
+   ) => Effect.Effect<Array<Schemas[K]["Type"]>, any, any>
+ }
+
++const handleResourceCause = (
++  cause: Cause.Cause<unknown>
++): Effect.Effect<never, InvalidParams | InternalError> => {
++  const failure = Cause.findFail(cause)
++  if (Result.isSuccess(failure)) {
++    const error = failure.success.error
++    if (error instanceof InvalidParams || error instanceof InternalError) {
++      return Effect.fail(error)
++    }
++  }
++  const prettyError = Cause.prettyErrors(cause)[0]
++  return Effect.fail(new InternalError({ message: prettyError.message }))
++}
++
+ /**
+  * Registers an MCP resource or resource template from an Effect program.
+  *
+@@ -2099,10 +2186,7 @@ export const registerResource: {
+         handle: options.content.pipe(
+           Effect.provideContext(services),
+           Effect.map((content) => resolveResourceContent(options.uri, content)),
+-          Effect.catchCause((cause) => {
+-            const prettyError = Cause.prettyErrors(cause)[0]
+-            return Effect.fail(new InternalError({ message: prettyError.message }))
+-          })
++          Effect.catchCause(handleResourceCause)
+         ),
+         annotations: options.annotations ?? Context.empty()
+       })
+@@ -2185,10 +2269,7 @@ export const registerResource: {
+           Effect.flatMap((params: any) =>
+             options.content(uri, ...params).pipe(
+               Effect.map((content) => resolveResourceContent(uri, content)),
+-              Effect.catchCause((cause) => {
+-                const prettyError = Cause.prettyErrors(cause)[0]
+-                return Effect.fail(new InternalError({ message: prettyError.message }))
+-              })
++              Effect.catchCause(handleResourceCause)
+             )
+           ),
+           Effect.provideContext(services)
+diff --git a/src/unstable/ai/internal/mcpCore.ts b/src/unstable/ai/internal/mcpCore.ts
+index c863ce8cb148ca9bc8d233a491172a9a66e2914a..4de2e14ba74959f56c225f60f445c1362ef6ed1e 100644
+--- a/src/unstable/ai/internal/mcpCore.ts
++++ b/src/unstable/ai/internal/mcpCore.ts
+@@ -42,8 +42,7 @@ export interface NegotiatedProtocolProfile<out Version extends string = McpProto
+   // Core decisions receive negotiated facts rather than dated wire requests.
+   readonly protocolVersion: Version
+   readonly clientCapabilities: McpSchema.ClientCapabilities
+-  readonly clientInfo: Version extends McpProtocol.StatefulProtocolVersion ? McpSchema.Implementation
+-    : McpSchema.Implementation | undefined
++  readonly clientInfo: McpSchema.Implementation | undefined
+   readonly requestMetadata?:
+     | (Version extends McpProtocol.StatefulProtocolVersion ? CanonicalRequestMetadata
+       : CanonicalRequestMetadata | Schema.JsonObject)
+@@ -135,6 +134,7 @@ export interface ToolRegistration {
+   // `tool.title ?? tool.annotations?.title` at the public boundary.
+   readonly descriptor: McpSchema.Tool
+   readonly isVisible: (profile: NegotiatedProtocolProfile<string>) => boolean
++  readonly isCallable: (profile: NegotiatedProtocolProfile<string>) => boolean
+   readonly handle: (
+     call: typeof McpSchema.CallTool.payloadSchema.Type,
+     invocation: McpInvocation
+@@ -150,6 +150,15 @@ export interface Tools {
+   readonly register: (
+     registration: ToolRegistration
+   ) => Effect.Effect<void>
++  readonly registerUnknownHandler: (
++    handler: (
++      call: typeof McpSchema.CallTool.payloadSchema.Type,
++      invocation: McpInvocation
++    ) => Effect.Effect<
++      OperationOutcome<McpSchema.CallToolResult>,
++      InvalidToolInput | InvalidToolContinuation | ToolExecutionError
++    >
++  ) => Effect.Effect<void>
+   readonly list: (
+     profile: NegotiatedProtocolProfile<string>
+   ) => Effect.Effect<ReadonlyArray<McpSchema.Tool>>
+@@ -165,7 +174,7 @@ export interface ResourceRegistration {
+   readonly isVisible: (profile: NegotiatedProtocolProfile<string>) => boolean
+   readonly read: (
+     invocation: McpInvocation
+-  ) => Effect.Effect<McpSchema.ReadResourceResult, McpSchema.InternalError>
++  ) => Effect.Effect<McpSchema.ReadResourceResult, McpSchema.InvalidParams | McpSchema.InternalError>
+ }
+
+ /** @internal */
+@@ -184,9 +193,18 @@ export interface ResourceTemplateRegistration {
+ export interface Resources {
+   readonly register: (registration: ResourceRegistration) => Effect.Effect<void>
+   readonly registerTemplate: (registration: ResourceTemplateRegistration) => Effect.Effect<void>
++  readonly registerListProvider: (
++    provider: (
++      profile: NegotiatedProtocolProfile<string>
++    ) => Effect.Effect<ReadonlyArray<McpSchema.Resource>, McpSchema.InternalError, McpSchema.McpRequestContext>
++  ) => Effect.Effect<void>
+   readonly list: (
+     profile: NegotiatedProtocolProfile<string>
+-  ) => Effect.Effect<ReadonlyArray<McpSchema.Resource>>
++  ) => Effect.Effect<
++    ReadonlyArray<McpSchema.Resource>,
++    McpSchema.InternalError,
++    McpSchema.McpRequestContext
++  >
+   readonly listTemplates: (
+     profile: NegotiatedProtocolProfile<string>
+   ) => Effect.Effect<ReadonlyArray<McpSchema.ResourceTemplate>>
+@@ -338,8 +356,12 @@ export interface McpCore {
+ /** @internal */
+ export const make: Effect.Effect<McpCore> = Effect.sync(() => {
+   const registrations = new Map<string, ToolRegistration>()
++  let unknownToolHandler: Parameters<Tools["registerUnknownHandler"]>[0] | undefined
+   const resourceRegistrations: Array<ResourceRegistration> = []
+   const resourceTemplateRegistrations: Array<ResourceTemplateRegistration> = []
++  const resourceListProviders: Array<(
++    profile: NegotiatedProtocolProfile<string>
++  ) => Effect.Effect<ReadonlyArray<McpSchema.Resource>, McpSchema.InternalError, McpSchema.McpRequestContext>> = []
+   const promptRegistrations = new Map<string, PromptRegistration>()
+   const completionRegistrations = new Map<
+     string,
+@@ -354,6 +376,10 @@ export const make: Effect.Effect<McpCore> = Effect.sync(() => {
+       Effect.sync(() => {
+         registrations.set(registration.descriptor.name, registration)
+       }),
++    registerUnknownHandler: (handler) =>
++      Effect.sync(() => {
++        unknownToolHandler = handler
++      }),
+     list: (profile) =>
+       Effect.sync(() => {
+         const descriptors: Array<McpSchema.Tool> = []
+@@ -368,9 +394,9 @@ export const make: Effect.Effect<McpCore> = Effect.sync(() => {
+       Effect.suspend((): Effect.Effect<OperationOutcome<McpSchema.CallToolResult>, ToolError> => {
+         const registration = registrations.get(call.name)
+         if (registration === undefined) {
+-          return new ToolNotFound({ name: call.name })
++          return unknownToolHandler?.(call, invocation) ?? new ToolNotFound({ name: call.name })
+         }
+-        if (!registration.isVisible(invocation.protocol)) {
++        if (!registration.isCallable(invocation.protocol)) {
+           return new ToolNotFound({ name: call.name })
+         }
+         return registration.handle(call, invocation)
+@@ -398,12 +424,25 @@ export const make: Effect.Effect<McpCore> = Effect.sync(() => {
+           resourceTemplateRegistrations[index] = registration
+         }
+       }),
+-    list: (profile) =>
+-      Effect.sync(() =>
+-        resourceRegistrations
+-          .filter((entry) => entry.isVisible(profile))
+-          .map((entry) => entry.descriptor)
+-      ),
++    registerListProvider: (provider) =>
++      Effect.sync(() => {
++        resourceListProviders.push(provider)
++      }),
++    list: Effect.fnUntraced(function*(profile) {
++      const descriptors = resourceRegistrations
++        .filter((entry) => entry.isVisible(profile))
++        .map((entry) => entry.descriptor)
++      const dynamic = yield* Effect.forEach(resourceListProviders, (provider) => provider(profile), {
++        concurrency: 1
++      })
++      const byUri = new Map(descriptors.map((resource) => [resource.uri, resource]))
++      for (const resources of dynamic) {
++        for (const resource of resources) {
++          if (!byUri.has(resource.uri)) byUri.set(resource.uri, resource)
++        }
++      }
++      return Array.from(byUri.values())
++    }),
+     listTemplates: (profile) =>
+       Effect.sync(() =>
+         resourceTemplateRegistrations
+@@ -470,7 +509,8 @@ export const make: Effect.Effect<McpCore> = Effect.sync(() => {
+
+   const registrationPresence = Effect.sync(() => ({
+     tools: registrations.size > 0,
+-    resources: resourceRegistrations.length > 0 || resourceTemplateRegistrations.length > 0,
++    resources: resourceRegistrations.length > 0 || resourceTemplateRegistrations.length > 0 ||
++      resourceListProviders.length > 0,
+     prompts: promptRegistrations.size > 0
+   }))
+
+diff --git a/src/unstable/ai/internal/mcpProtocol.ts b/src/unstable/ai/internal/mcpProtocol.ts
+index dc0aeeb911925670d134d735b114e70bda2d1851..c0da08cff7281704ecb52d8c089d94f025ec8c84 100644
+--- a/src/unstable/ai/internal/mcpProtocol.ts
++++ b/src/unstable/ai/internal/mcpProtocol.ts
+@@ -62,7 +62,7 @@ export const decodeRoutingHeader = (value: string): string | undefined => {
+ /** @internal */
+ export const profileFromClient = (
+   request: PublicMcpSchema.McpServerClient["Service"]
+-): McpCore.NegotiatedProtocolProfile => ({
++): McpCore.NegotiatedProtocolProfile<string> => ({
+   protocolVersion: request.protocolVersion,
+   clientCapabilities: request.clientCapabilities,
+   clientInfo: request.clientInfo,
+diff --git a/src/unstable/ai/internal/mcpRuntime.ts b/src/unstable/ai/internal/mcpRuntime.ts
+index 39a19e1ed71986c7c488fca2ed6afd8af714297a..65ad2b58ccf0955bc21b16e7ec8e969992d0d988 100644
+--- a/src/unstable/ai/internal/mcpRuntime.ts
++++ b/src/unstable/ai/internal/mcpRuntime.ts
+@@ -69,7 +69,7 @@ const PingRpcs = RpcGroup.make(PublicMcpSchema.Ping).middleware(PublicMcpSchema.
+ /** @internal */
+ export interface RequestBinding {
+   readonly initializePayload: typeof PublicMcpSchema.Initialize.payloadSchema.Type
+-  readonly negotiatedProfile: McpCore.NegotiatedProtocolProfile
++  readonly negotiatedProfile: McpCore.NegotiatedProtocolProfile<string>
+   readonly protocol: PublicMcpProtocol.AnyProtocolAdapter
+ }
+
+@@ -188,11 +188,23 @@ export const selectStatefulProtocol = <Protocol extends PublicMcpProtocol.AnyPro
+
+ /** @internal */
+ export const make = Effect.fnUntraced(function*(
+-  protocols: NonEmptyReadonlyArray<PublicMcpProtocol.AnyProtocolAdapter>
++  protocols: NonEmptyReadonlyArray<PublicMcpProtocol.AnyProtocolAdapter>,
++  legacyStatelessProtocolVersion?: PublicMcpProtocol.StatefulProtocolVersion
+ ) {
+   const statefulProtocol = protocols.find((protocol) => protocol.runtime._tag === "Stateful")
+   const stateful = statefulProtocol === undefined ? undefined : McpStatefulRuntime.make()
+   const protocolVersions = protocols.map((protocol) => protocol.protocolVersion)
++  const legacyStatelessProtocol = legacyStatelessProtocolVersion === undefined
++    ? undefined
++    : protocols.find((protocol) =>
++      protocol.runtime._tag === "Stateful" && protocol.protocolVersion === legacyStatelessProtocolVersion
++    )
++  if (legacyStatelessProtocolVersion !== undefined && legacyStatelessProtocol === undefined) {
++    return yield* new Cause.IllegalArgumentError(
++      `Legacy stateless MCP protocol '${legacyStatelessProtocolVersion}' is not configured`
++    )
++  }
++  let runtimeDefaultLogLevel: LogLevel.LogLevel = "Info"
+   let statelessDescriptor: PublicMcpProtocol.StatelessRuntimeDescriptor | undefined
+   let statelessProtocol: PublicMcpProtocol.AnyProtocolAdapter | undefined
+   for (const protocol of protocols) {
+@@ -283,6 +295,14 @@ export const make = Effect.fnUntraced(function*(
+     if (sessionId !== undefined && binding === undefined) {
+       return { _tag: "Rejected", status: 404 }
+     }
++    if (
++      !isInitialize &&
++      binding === undefined &&
++      legacyStatelessProtocol !== undefined &&
++      (protocolVersion === undefined || protocolVersion === legacyStatelessProtocol.protocolVersion)
++    ) {
++      return { _tag: "Accepted", binding: undefined, protocol: legacyStatelessProtocol }
++    }
+     if (
+       !isInitialize &&
+       protocolVersion !== undefined &&
+@@ -309,7 +329,7 @@ export const make = Effect.fnUntraced(function*(
+       const metadata = asRecord(request.payload)?._meta
+       const claim = protocolVersionClaim(metadata)
+       const requestedVersion = typeof claim.value === "string" ? claim.value : undefined
+-      const binding = claim.present ? undefined : stateful?.resolve(clientId, headers)
++      let binding = claim.present ? undefined : stateful?.resolve(clientId, headers)
+       let protocol: PublicMcpProtocol.AnyProtocolAdapter
+       if (claim.present) {
+         protocol = registry.protocols.find((protocol) => protocol.protocolVersion === requestedVersion) ??
+@@ -326,10 +346,39 @@ export const make = Effect.fnUntraced(function*(
+           })
+         }
+         protocol = selected
++      } else if (
++        legacyStatelessProtocol !== undefined &&
++        (headers[MCP_PROTOCOL_VERSION_HEADER] === undefined ||
++          headers[MCP_PROTOCOL_VERSION_HEADER] === legacyStatelessProtocol.protocolVersion)
++      ) {
++        protocol = legacyStatelessProtocol
+       } else {
+         protocol = registry.protocols[0]
+       }
+       if (protocol.runtime._tag === "Stateful") {
++        if (
++          binding === undefined &&
++          stateful !== undefined &&
++          request.tag !== "initialize" &&
++          protocol === legacyStatelessProtocol
++        ) {
++          const profile: McpCore.NegotiatedProtocolProfile<string> = {
++            protocolVersion: protocol.protocolVersion,
++            clientCapabilities: {},
++            clientInfo: undefined
++          }
++          binding = stateful.registerConnection(clientId, {
++            initializePayload: PublicMcpSchema.Initialize.payloadSchema.make({
++              protocolVersion: protocol.protocolVersion,
++              capabilities: {},
++              clientInfo: { name: "legacy-stateless-http", version: "0" }
++            }),
++            negotiatedProfile: profile,
++            protocol: protocol as PublicMcpProtocol.ProtocolAdapter,
++            supportsResourceSubscriptions: false,
++            logLevel: runtimeDefaultLogLevel
++          })
++        }
+         return { protocol, binding }
+       }
+       if (request.isNotification && request.tag === "notifications/cancelled") {
+@@ -377,7 +426,7 @@ export const make = Effect.fnUntraced(function*(
+         const admission = selectHttpProtocol(headers, undefined)
+         return admission._tag === "Rejected" && admission.error === undefined
+           ? reject(admission.status)
+-          : reject(200, new PublicMcpSchema.ParseError({ message: "Parse error" }))
++          : reject(400, new PublicMcpSchema.ParseError({ message: "Parse error" }))
+       }
+       const input = parsed.success
+       if (Array.isArray(input)) {
+@@ -389,7 +438,7 @@ export const make = Effect.fnUntraced(function*(
+           admission._tag === "Rejected" ||
+           input.some(hasRequestProtocolVersion) ||
+           input.some((message) => Predicate.hasProperty(message, "method") && message.method === "initialize") ||
+-          admission.binding?.protocol.runtime.transport.jsonRpc.acceptsBatches !== true
++          (admission.binding?.protocol ?? admission.protocol)?.runtime.transport.jsonRpc.acceptsBatches !== true
+         ) {
+           return reject(400)
+         }
+@@ -421,7 +470,12 @@ export const make = Effect.fnUntraced(function*(
+       }
+       const isInitialize = Predicate.hasProperty(input, "method") && input.method === "initialize"
+       const hasSession = headers[MCP_SESSION_ID_HEADER] !== undefined
+-      if (isInitialize ? hasSession : !hasSession && admission.protocol?.runtime._tag !== "Stateless") {
++      if (
++        isInitialize
++          ? hasSession
++          : !hasSession && admission.protocol?.runtime._tag !== "Stateless" &&
++            admission.protocol !== legacyStatelessProtocol
++      ) {
+         return reject(400)
+       }
+       if (
+@@ -445,6 +499,7 @@ export const make = Effect.fnUntraced(function*(
+     canDeliver: (clientId, headers, notification, fallback) =>
+       stateful?.canDeliver(clientId, headers, notification, fallback) ?? true,
+     installHandlers: Effect.fnUntraced(function*(options) {
++      runtimeDefaultLogLevel = options.defaultLogLevel
+       const contextMap = new Map<string, unknown>()
+       const installationContext: McpProtocol.HandlerInstallationContext = {
+         subscribeServerNotifications: options.subscribeServerNotifications,
+@@ -543,5 +598,7 @@ export const make = Effect.fnUntraced(function*(
+
+ /** @internal */
+ export const layer = (
+-  protocols: NonEmptyReadonlyArray<PublicMcpProtocol.AnyProtocolAdapter>
+-): Layer.Layer<ServerRuntime, Cause.IllegalArgumentError> => Layer.effect(ServerRuntime)(make(protocols))
++  protocols: NonEmptyReadonlyArray<PublicMcpProtocol.AnyProtocolAdapter>,
++  legacyStatelessProtocolVersion?: PublicMcpProtocol.StatefulProtocolVersion
++): Layer.Layer<ServerRuntime, Cause.IllegalArgumentError> =>
++  Layer.effect(ServerRuntime)(make(protocols, legacyStatelessProtocolVersion))
+diff --git a/src/unstable/ai/internal/mcpStatefulRuntime.ts b/src/unstable/ai/internal/mcpStatefulRuntime.ts
+index be78dc0f0d994624893b490004a922512b78bd7a..29a1d2b08ab832ea4b3749bf313b0812f915684d 100644
+--- a/src/unstable/ai/internal/mcpStatefulRuntime.ts
++++ b/src/unstable/ai/internal/mcpStatefulRuntime.ts
+@@ -20,7 +20,7 @@ type SessionLogLevel =
+ /** @internal */
+ export interface Binding {
+   readonly initializePayload: typeof PublicMcpSchema.Initialize.payloadSchema.Type
+-  readonly negotiatedProfile: McpCore.NegotiatedProtocolProfile
++  readonly negotiatedProfile: McpCore.NegotiatedProtocolProfile<string>
+   readonly protocol: PublicMcpProtocol.ProtocolAdapter
+ }
+
+diff --git a/src/unstable/rpc/RpcServer.ts b/src/unstable/rpc/RpcServer.ts
+index edc3e8a4861d5adde790e7cfb6f509ec6e52cdd6..75337b87d361e4104bc7ac20c5fa87df65e6ae96 100644
+--- a/src/unstable/rpc/RpcServer.ts
++++ b/src/unstable/rpc/RpcServer.ts
+@@ -93,6 +93,7 @@ export const makeNoSerialization: <Rpcs extends Rpc.Any>(
+     readonly disableClientAcks?: boolean | undefined
+     readonly concurrency?: number | "unbounded" | undefined
+     readonly disableFatalDefects?: boolean | undefined
++    readonly gracefulShutdown?: boolean | undefined
+   }
+ ) => Effect.Effect<
+   RpcServer<Rpcs>,
+@@ -109,6 +110,7 @@ export const makeNoSerialization: <Rpcs extends Rpc.Any>(
+     readonly disableClientAcks?: boolean | undefined
+     readonly concurrency?: number | "unbounded" | undefined
+     readonly disableFatalDefects?: boolean | undefined
++    readonly gracefulShutdown?: boolean | undefined
+   }
+ ) {
+   const enableTracing = options.disableTracing !== true
+@@ -117,6 +119,7 @@ export const makeNoSerialization: <Rpcs extends Rpc.Any>(
+   const spanPrefix = options.spanPrefix ?? "RpcServer"
+   const concurrency = options.concurrency ?? "unbounded"
+   const disableFatalDefects = options.disableFatalDefects ?? false
++  const gracefulShutdown = options.gracefulShutdown === true
+   const services = yield* Effect.context<Rpc.ToHandler<Rpcs> | Scope.Scope>()
+   const scope = Context.get(services, Scope.Scope)
+   const trackFiber = Fiber.runIn(Scope.forkUnsafe(scope, "parallel"))
+@@ -146,8 +149,10 @@ export const makeNoSerialization: <Rpcs extends Rpc.Any>(
+           trackFiber(Effect.runForkWith(services)(endClient(client)))
+           continue
+         }
+-        for (const fiber of client.fibers.values()) {
+-          fiber.interruptUnsafe(parent.id)
++        if (!gracefulShutdown) {
++          for (const fiber of client.fibers.values()) {
++            fiber.interruptUnsafe(parent.id)
++          }
+         }
+       }
+       if (clients.size === 0) {
+@@ -530,6 +535,7 @@ export const make: <Rpcs extends Rpc.Any>(
+       readonly spanAttributes?: Record<string, unknown> | undefined
+       readonly concurrency?: number | "unbounded" | undefined
+       readonly disableFatalDefects?: boolean | undefined
++      readonly gracefulShutdown?: boolean | undefined
+     }
+     | undefined
+ ) => Effect.Effect<
+@@ -547,6 +553,7 @@ export const make: <Rpcs extends Rpc.Any>(
+     readonly spanAttributes?: Record<string, unknown> | undefined
+     readonly concurrency?: number | "unbounded" | undefined
+     readonly disableFatalDefects?: boolean | undefined
++    readonly gracefulShutdown?: boolean | undefined
+   }
+ ) {
+   const {
+@@ -842,6 +849,7 @@ export const layer = <Rpcs extends Rpc.Any>(
+     readonly spanAttributes?: Record<string, unknown> | undefined
+     readonly concurrency?: number | "unbounded" | undefined
+     readonly disableFatalDefects?: boolean | undefined
++    readonly gracefulShutdown?: boolean | undefined
+   }
+ ): Layer.Layer<
+   never,
+@@ -1158,8 +1166,16 @@ export const makeProtocolWithHttpEffect: (
+
+     yield* writeRequest(id, constEof)
+
++    const interruptRequests = Effect.forEach(
++      requestIds,
++      (requestId) => writeRequest(id, { _tag: "Interrupt", requestId }),
++      { discard: true }
++    )
++
+     if (!includesFraming) {
+-      const responses = yield* Queue.collect(queue)
++      const responses = yield* Queue.collect(queue).pipe(
++        Effect.onInterrupt(() => interruptRequests)
++      )
+       // Notification-only batches encode without a response body.
+       const encoded = parser.encode(responses)
+       return HttpServerResponse.text(encoded === undefined ? "" : encoded as string, {
+@@ -1167,7 +1183,9 @@ export const makeProtocolWithHttpEffect: (
+       })
+     }
+
+-    const initialChunk = yield* Queue.takeAll(queue) as any as Effect.Effect<NonEmptyReadonlyArray<Uint8Array>>
++    const initialChunk = yield* Queue.takeAll(queue).pipe(
++      Effect.onInterrupt(() => interruptRequests)
++    ) as any as Effect.Effect<NonEmptyReadonlyArray<Uint8Array>>
+     if (queue.state._tag === "Done") {
+       return HttpServerResponse.uint8Array(mergeUint8Arrays(initialChunk), {
+         contentType: serialization.contentType
+@@ -1377,11 +1395,17 @@ export const makeProtocolStdio = Effect.gen(function*() {
+       Effect.forkScoped
+     )
+
+-    yield* Stream.fromQueue(queue).pipe(
++    const outputFiber = yield* Stream.fromQueue(queue).pipe(
+       Stream.run(stdio.stdout()),
+       Effect.retry(Schedule.spaced(500)),
+       Effect.forkScoped
+     )
++    yield* Effect.addFinalizer(() =>
++      Queue.end(queue).pipe(
++        Effect.andThen(Fiber.await(outputFiber)),
++        Effect.asVoid
++      )
++    )
+
+     return {
+       disconnects: yield* Queue.make<number>(),

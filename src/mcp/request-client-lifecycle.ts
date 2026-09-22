@@ -1,6 +1,3 @@
-import type { Server } from "@modelcontextprotocol/server"
-
-import { observeHttpAdmission, admissionObservationsEnabled } from "./http-admission-observations.js"
 import type { ClientBundle } from "../runtime/client-resolver.js"
 
 export interface RequestClientLease<A = ClientBundle> {
@@ -10,136 +7,71 @@ export interface RequestClientLease<A = ClientBundle> {
 
 export interface RequestClientLifecycle<A = ClientBundle> {
   readonly resolve: () => Promise<A>
+  readonly retain: () => () => void
   readonly close: () => Promise<void>
 }
-
-export type RequestClientCleanupErrorHandler = (error: Error) => void
 
 /**
  * Lazily acquires at most one request-scoped Huly client bundle and releases it
  * exactly once. Closing an unused lifecycle is intentionally a no-op.
  */
 export const createRequestClientLifecycle = <A>(
-  acquire: () => Promise<RequestClientLease<A>>
+  acquire: (signal: AbortSignal) => Promise<RequestClientLease<A>>
 ): RequestClientLifecycle<A> => {
+  const acquisitionAbort = new AbortController()
   let leasePromise: Promise<RequestClientLease<A>> | undefined
   let closed = false
   let closePromise: Promise<void> | undefined
-  observeHttpAdmission("createRequestClientLifecycle", {})
+  let activeUsers = 0
+  let resolveIdle: (() => void) | undefined
+
+  const retain = (): (() => void) => {
+    if (closed) throw new Error("Request-scoped Huly clients are already closed")
+    activeUsers++
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      activeUsers--
+      if (activeUsers === 0) resolveIdle?.()
+    }
+  }
 
   const resolve = async (): Promise<A> => {
-    if (closed) {
-      observeHttpAdmission("RequestClientLifecycle_resolve", { closed: true })
-      throw new Error("Request-scoped Huly clients are already closed")
-    }
-    observeHttpAdmission("RequestClientLifecycle_resolve", { closed: false })
-    const startsAcquisition = leasePromise === undefined
-    leasePromise ??= acquire()
-    if (startsAcquisition && admissionObservationsEnabled()) {
-      void leasePromise.then(
-        () => observeHttpAdmission("RequestClientLifecycle_acquireSettles", { rejected: false }),
-        () => observeHttpAdmission("RequestClientLifecycle_acquireSettles", { rejected: true })
-      )
-    }
+    if (closed) throw new Error("Request-scoped Huly clients are already closed")
+    leasePromise ??= acquire(acquisitionAbort.signal)
     const lease = await leasePromise
     if (closed) {
-      await closePromise
       throw new Error("Request-scoped Huly clients were closed during acquisition")
     }
     return lease.bundle
   }
 
   const close = (): Promise<void> => {
-    if (closePromise !== undefined) {
-      observeHttpAdmission("RequestClientLifecycle_close", { firstClose: false })
-      return closePromise
-    }
+    if (closePromise !== undefined) return closePromise
     closed = true
-    observeHttpAdmission("RequestClientLifecycle_close", { firstClose: true })
+    acquisitionAbort.abort()
     const pending = leasePromise
-    closePromise =
-      pending === undefined
+    const idle =
+      activeUsers === 0
         ? Promise.resolve()
+        : new Promise<void>((resolve) => {
+            resolveIdle = resolve
+          })
+    closePromise = idle.then(() =>
+      pending === undefined
+        ? undefined
         : pending.then(
             async (lease) => {
-              try {
-                await lease.close()
-              } catch (error) {
-                observeHttpAdmission("RequestClientLifecycle_leaseCloseSettles", { failed: true })
-                throw error
-              }
-              observeHttpAdmission("RequestClientLifecycle_leaseCloseSettles", { failed: false })
+              await lease.close()
             },
             () => {
               // A failed acquisition has no acquired resource to release.
             }
           )
+    )
     return closePromise
   }
 
-  return { resolve, close }
-}
-
-/**
- * Binds request-client cleanup to the SDK-owned server lifecycle while
- * preserving any pre-existing close observer.
- */
-export const attachRequestClientLifecycle = <A>(
-  server: Server,
-  lifecycle: RequestClientLifecycle<A>,
-  onCleanupError: RequestClientCleanupErrorHandler,
-  quiesceRequests: () => Promise<void> = () => Promise.resolve()
-): void => {
-  const previousOnClose = server.onclose
-  const originalClose = server.close.bind(server)
-  let serverClosePromise: Promise<void> | undefined
-  let wrapperCloseInProgress = false
-  let cleanupErrorReported = false
-  const reportCleanupError = (error: unknown): void => {
-    if (cleanupErrorReported) return
-    cleanupErrorReported = true
-    onCleanupError(error instanceof Error ? error : new Error(String(error)))
-  }
-
-  observeHttpAdmission("attachRequestClientLifecycle", {})
-
-  server.onclose = () => {
-    if (!wrapperCloseInProgress) {
-      void server.close().catch(reportCleanupError)
-      observeHttpAdmission("Server_onclose", {})
-    }
-    previousOnClose?.()
-  }
-  server.close = () => {
-    observeHttpAdmission("Server_closeStarts", {})
-    if (serverClosePromise !== undefined) return serverClosePromise
-    wrapperCloseInProgress = true
-    serverClosePromise = (async () => {
-      const draining = quiesceRequests()
-      const closeOriginal = async (): Promise<void> => {
-        try {
-          await originalClose()
-        } finally {
-          wrapperCloseInProgress = false
-        }
-      }
-      const [serverResult] = await Promise.allSettled([closeOriginal()])
-      await draining
-      const [lifecycleResult] = await Promise.allSettled([lifecycle.close()])
-      if (lifecycleResult.status === "rejected") reportCleanupError(lifecycleResult.reason)
-      observeHttpAdmission("Server_close", {
-        underlyingFails: serverResult.status === "rejected",
-        leaseCloseFails: lifecycleResult.status === "rejected"
-      })
-      if (serverResult.status === "rejected" && lifecycleResult.status === "rejected") {
-        throw new AggregateError(
-          [serverResult.reason, lifecycleResult.reason],
-          "MCP server and request-client cleanup both failed"
-        )
-      }
-      if (serverResult.status === "rejected") throw serverResult.reason
-      if (lifecycleResult.status === "rejected") throw lifecycleResult.reason
-    })()
-    return serverClosePromise
-  }
+  return { resolve, retain, close }
 }

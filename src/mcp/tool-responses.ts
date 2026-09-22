@@ -69,6 +69,8 @@ const encodeJsonText = (value: unknown): string => {
   return typeof text === "string" ? text : "null"
 }
 
+const decodeJsonText = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Json))
+
 export const createErrorResponse = (
   text: string,
   errorCode: McpErrorCode,
@@ -83,16 +85,17 @@ export const createErrorResponse = (
   _meta: { errorCode, errorTag }
 })
 
-const createSuccessResponseBase = <T>(
-  result: T,
-  warnings: ReadonlyArray<ToolWarning> = []
-): McpToolSuccessResponse => ({
-  content: [
-    { type: "text", text: encodeJsonText(result) },
-    ...(warnings.length > 0 ? [{ type: "text" as const, text: encodeJsonText({ warnings }) }] : [])
-  ],
-  structuredContent: warnings.length > 0 ? { result, warnings } : { result }
-})
+const createSuccessResponseBase = <T>(result: T, warnings: ReadonlyArray<ToolWarning> = []): McpToolSuccessResponse => {
+  const resultText = encodeJsonText(result)
+  const wireResult = decodeJsonText(resultText)
+  return {
+    content: [
+      { type: "text", text: resultText },
+      ...(warnings.length > 0 ? [{ type: "text" as const, text: encodeJsonText({ warnings }) }] : [])
+    ],
+    structuredContent: warnings.length > 0 ? { result: wireResult, warnings } : { result: wireResult }
+  }
+}
 
 export const createSuccessResponse = <T>(result: T, warnings: ReadonlyArray<ToolWarning> = []): McpToolResponse =>
   createSuccessResponseBase(result, warnings)

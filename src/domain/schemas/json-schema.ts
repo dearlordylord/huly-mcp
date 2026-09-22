@@ -193,7 +193,7 @@ const restoreAstPropertyDescriptions = (ast: SchemaAST.AST, jsonSchema: Schema.J
  * the existing MCP `$defs` packaging after Draft-07 conversion.
  */
 export const toDraft07JsonSchema = (schema: Schema.Constraint): JsonSchema.JsonSchema => {
-  const draft07 = JsonSchema.toDocumentDraft07(Schema.toJsonSchemaDocument(schema))
+  const draft07 = JsonSchema.toDocumentDraft07(Schema.toJsonSchemaDocument(schema, { onExcessProperty: "error" }))
   const definitions = Object.fromEntries(
     Object.entries(draft07.definitions).map(([name, definition]) => [name, restoreMcpDefinitionRefs(definition)])
   )

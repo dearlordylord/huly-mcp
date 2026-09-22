@@ -13,11 +13,9 @@ import { core, templates } from "../../src/huly/huly-plugins.js"
 import { markdownToMarkupString, testMarkupUrlConfig } from "../../src/huly/operations/markup.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
 import { McpErrorCode } from "../../src/mcp/error-mapping.js"
-import { createMcpProtocolHandlers } from "../../src/mcp/protocol-handlers.js"
+import { toListedHulyTool } from "../../src/mcp/protocol-tool-exposure.js"
 import { toolRegistry } from "../../src/mcp/tools/index.js"
 import { makeToolName } from "../../src/mcp/tools/registry.js"
-import { createNoopTelemetry } from "../../src/telemetry/noop.js"
-import type { TelemetryOperations } from "../../src/telemetry/telemetry.js"
 
 const person = "person-1" as PersonId
 const workspace = core.space.Workspace
@@ -91,8 +89,6 @@ const buildClients = (
     return { hulyClient: Context.get(context, HulyClient), storageClient: Context.get(context, HulyStorageClient) }
   })
 
-const telemetry: TelemetryOperations = createNoopTelemetry()
-
 describe("message template MCP tools", () => {
   it("registers tools near tag/template-adjacent tools", () => {
     const names = toolRegistry.definitions.map((tool) => tool.name)
@@ -107,18 +103,8 @@ describe("message template MCP tools", () => {
     ])
   })
 
-  it("exposes message template tools through tools/list", async () => {
-    const handlers = createMcpProtocolHandlers(
-      () => Promise.reject(new Error("resolveClients not used by tools/list")),
-      telemetry,
-      toolRegistry,
-      () => {
-        throw new Error("getHulyContext not used by tools/list")
-      }
-    )
-
-    const result = await handlers.listTools()
-    const names = result.tools.map((tool) => tool.name)
+  it("exposes message template tools through the protocol registry", () => {
+    const names = toolRegistry.definitions.map(toListedHulyTool).map((tool) => tool.name)
 
     expect(names).toContain("list_message_template_categories")
     expect(names).toContain("list_message_templates")

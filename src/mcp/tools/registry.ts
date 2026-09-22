@@ -1,5 +1,5 @@
 import { Effect, Exit, Result, Schema } from "effect"
-import type { ToolAnnotations } from "@modelcontextprotocol/server"
+import type { ToolAnnotations } from "./tool-annotations.js"
 import type { ToolWarning } from "../../domain/schemas/tool-warnings.js"
 import { HulyClient } from "../../huly/client.js"
 import { Diagnostics, makeDiagnosticsScope } from "../../huly/diagnostics.js"
@@ -141,11 +141,13 @@ export const isEmptyArgumentsObject = (args: unknown): boolean =>
   (typeof args === "object" && args !== null && !Array.isArray(args) && Object.keys(args).length === 0)
 
 interface ToolInputSchema {
+  readonly $schema?: unknown
   readonly properties?: Record<string, unknown>
   readonly required?: ReadonlyArray<string>
   readonly anyOf?: ReadonlyArray<ToolInputSchemaVariant>
   readonly oneOf?: ReadonlyArray<ToolInputSchemaVariant>
   readonly additionalProperties?: unknown
+  readonly not?: ToolInputSchemaVariant
 }
 
 interface ToolInputSchemaVariant {
@@ -172,14 +174,13 @@ const isEmptySchemaVariant = (schema: ToolInputSchemaVariant): boolean =>
   !hasRequiredFields(schema) && !hasDeclaredProperties(schema)
 
 /**
- * Effect encodes a no-argument tool's empty `Schema.Struct({})` as a two-variant
- * union — an empty `object` and an empty `array`, neither carrying properties or
- * required fields. We detect that exact shape so such tools count as no-argument
- * (callable with no input) instead of demanding an arguments object.
+ * Earlier Effect releases encoded an empty `Schema.Struct({})` as a two-variant
+ * union: an empty `object` and an empty `array`. Retain support for that exact
+ * shape while current releases use a root `not: { type: "null" }` schema.
  *
  * This is coupled to Effect's JSON Schema output: if a future Effect version
- * changes how it encodes empty structs, the "classifies empty Effect Struct union
- * schemas" property in `test/mcp/registry.property.test.ts` fails loudly rather
+ * changes how it encodes empty structs, the "classifies supported empty Effect
+ * Struct schemas" property in `test/mcp/registry.property.test.ts` fails loudly rather
  * than this silently misclassifying tools.
  */
 const isEmptyStructUnionSchema = (schema: ToolInputSchema): boolean => {
@@ -195,6 +196,9 @@ const isEmptyStructUnionSchema = (schema: ToolInputSchema): boolean => {
   )
 }
 
+const isEmptyStructNotNullSchema = (schema: ToolInputSchema): boolean =>
+  Object.keys(schema).every((key) => key === "$schema" || key === "not") && schema.not?.type === "null"
+
 export const requiresArgumentsObject = (tool: ToolDefinition): boolean =>
   isToolInputSchema(tool.inputSchema) &&
   (hasRequiredFields(tool.inputSchema) || unionVariants(tool.inputSchema).some(hasRequiredFields))
@@ -203,7 +207,8 @@ export const isNoArgumentTool = (tool: ToolDefinition): boolean =>
   isToolInputSchema(tool.inputSchema) &&
   !requiresArgumentsObject(tool) &&
   ((!hasDeclaredProperties(tool.inputSchema) && tool.inputSchema.additionalProperties === false) ||
-    isEmptyStructUnionSchema(tool.inputSchema))
+    isEmptyStructUnionSchema(tool.inputSchema) ||
+    isEmptyStructNotNullSchema(tool.inputSchema))
 
 const encodeOutput = (schema: Schema.ConstraintEncoder<unknown>, result: unknown): unknown =>
   Schema.encodeUnknownSync(schema)(result)
@@ -317,7 +322,7 @@ const createOperationExecutor =
         : { result: output, warnings, image: presentation.image }
     })
 
-const operationFailureToMcp = (failure: ToolOperationFailure): McpToolResponse => {
+export const operationFailureToMcp = (failure: ToolOperationFailure): McpToolResponse => {
   switch (failure._tag) {
     case "ToolDomainFailure":
       return mapDomainCauseToMcp(failure.cause, failure.warnings)
@@ -333,7 +338,7 @@ const operationFailureToMcp = (failure: ToolOperationFailure): McpToolResponse =
   }
 }
 
-const operationSuccessToMcp = (success: ToolOperationSuccess): McpToolResponse =>
+export const operationSuccessToMcp = (success: ToolOperationSuccess): McpToolResponse =>
   success.image === undefined
     ? createSuccessResponse(success.result, success.warnings)
     : createImageSuccessResponse(success.result, success.image, success.warnings)
@@ -347,6 +352,18 @@ const createHandler =
         .pipe(Effect.match({ onFailure: operationFailureToMcp, onSuccess: operationSuccessToMcp }))
     )
   }
+
+/** Executes a registered operation at the Effect MCP boundary. */
+export const executeRegisteredOperation = (
+  operation: RegisteredOperation,
+  args: unknown,
+  hulyClient: HulyClient["Service"],
+  storageClient: HulyStorageClient["Service"],
+  workspaceClient?: WorkspaceClientOperations
+): Effect.Effect<McpToolResponse, never> =>
+  operation
+    .execute(args, hulyClient, storageClient, workspaceClient)
+    .pipe(Effect.match({ onFailure: operationFailureToMcp, onSuccess: operationSuccessToMcp }))
 
 const defineProvidedTool = <const Name extends string, P, Svc, S extends ResultSchema>(
   spec: ToolSpec<Name, S>,

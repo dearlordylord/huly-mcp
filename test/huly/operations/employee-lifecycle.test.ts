@@ -289,6 +289,19 @@ const workspaceLayer = (fixture: WorkspaceFixture): Layer.Layer<WorkspaceClient>
 const layer = (huly: Fixture, workspace: WorkspaceFixture, accountUuid = ACTOR_UUID) =>
   Layer.merge(clientLayer(huly, accountUuid), workspaceLayer(workspace))
 
+const layerWithoutPreparationCommit = (huly: Fixture, workspace: WorkspaceFixture) => {
+  const client = Layer.effect(
+    HulyClient,
+    HulyClient.pipe(
+      Effect.map((service) => {
+        const { commitEmployeePreparation: _commitEmployeePreparation, ...withoutPreparationCommit } = service
+        return withoutPreparationCommit
+      })
+    )
+  ).pipe(Layer.provide(clientLayer(huly)))
+  return Layer.merge(client, workspaceLayer(workspace))
+}
+
 describe("employee lifecycle operations", () => {
   it.effect("projects the native nested Employee mixin returned for newly promoted People", () =>
     Effect.gen(function* () {
@@ -365,6 +378,21 @@ describe("employee lifecycle operations", () => {
       expect(sent).toEqual([])
     })
   })
+
+  it.effect("rejects preparation when the connected adapter lacks an atomic commit", () =>
+    Effect.gen(function* () {
+      const error = yield* Effect.flip(
+        inviteEmployee({
+          mode: "create-or-promote",
+          name: PersonName.make("Person,Unsupported"),
+          email: Email.make("unsupported@example.test")
+        })
+      )
+
+      expect(error).toBeInstanceOf(EmployeeLifecycleStateError)
+      expect(error.message).toContain("does not support checked atomic Employee preparation")
+    }).pipe(Effect.provide(layerWithoutPreparationCommit({}, { member: false })))
+  )
 
   it.effect("rejects conflicting exact name/email targets before invitation", () => {
     const sent: Array<string> = []
@@ -657,6 +685,55 @@ describe("employee lifecycle operations", () => {
       expect(unchanged).toMatchObject({ changes: { employeeTransition: "unchanged" } })
     })
   )
+
+  it.effect("does not invent a previous role when reconciling role-less Employee records", () => {
+    const promotedPreparations: Array<EmployeePreparationPlan> = []
+    const reinvitedPreparations: Array<EmployeePreparationPlan> = []
+    return Effect.gen(function* () {
+      const promoted = yield* inviteEmployee({
+        mode: "create-or-promote",
+        name: PersonName.make("Lovelace,Ada"),
+        email: Email.make("ada@example.test"),
+        role: "USER"
+      }).pipe(
+        Effect.provide(
+          layer(
+            {
+              people: [person("person-1", "Lovelace,Ada")],
+              employees: [employeeWithoutRole()],
+              identities: [emailIdentity()],
+              preparations: promotedPreparations
+            },
+            {}
+          )
+        )
+      )
+      const reinvited = yield* inviteEmployee({
+        mode: "invite-existing",
+        employee: { email: Email.make("ada@example.test") },
+        role: "GUEST"
+      }).pipe(
+        Effect.provide(
+          layer(
+            {
+              people: [person("person-1", "Lovelace,Ada")],
+              employees: [employeeWithoutRole()],
+              channels: [emailChannel()],
+              preparations: reinvitedPreparations
+            },
+            {}
+          )
+        )
+      )
+
+      expect(promoted).toMatchObject({ changes: { employeeTransition: "reactivated-and-role-updated" } })
+      expect(promotedPreparations).toMatchObject([{ kind: "prepare-existing", employee: { state: "update" } }])
+      expect(promotedPreparations[0]).not.toHaveProperty("employee.previousRole")
+      expect(reinvited).toMatchObject({ outcome: "invitation-resent", role: "GUEST" })
+      expect(reinvitedPreparations).toMatchObject([{ kind: "reconcile-role", employee: { state: "update" } }])
+      expect(reinvitedPreparations[0]).not.toHaveProperty("employee.previousRole")
+    })
+  })
 
   it.effect("rejects active, non-employee, missing-name, and email-less reinvite states", () => {
     const activeLayer = layer(

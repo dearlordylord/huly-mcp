@@ -1,9 +1,9 @@
-import type { ToolAnnotations } from "@modelcontextprotocol/server"
 import { Schema } from "effect"
 import * as fc from "fast-check"
 import { describe, expect, it } from "vitest"
 
 import { createToolOutputSchema } from "../../src/mcp/tool-output-schema.js"
+import type { ToolAnnotations } from "../../src/mcp/tools/tool-annotations.js"
 import {
   CATEGORY_NAMES,
   createFilteredRegistry,
@@ -96,6 +96,27 @@ const prefixDefaults = [
 const prefixCaseArbitrary = fc.constantFrom(
   ...prefixDefaults.flatMap(({ defaults, prefixes }) => prefixes.map((prefix) => ({ defaults, prefix })))
 )
+
+const annotationsArbitrary = fc
+  .record(
+    {
+      destructiveHint: fc.boolean(),
+      idempotentHint: fc.boolean(),
+      openWorldHint: fc.boolean(),
+      readOnlyHint: fc.boolean(),
+      title: fc.string({ maxLength: 32 })
+    },
+    { requiredKeys: [] }
+  )
+  .map(
+    (annotations): ToolAnnotations => ({
+      ...(annotations.destructiveHint === undefined ? {} : { destructiveHint: annotations.destructiveHint }),
+      ...(annotations.idempotentHint === undefined ? {} : { idempotentHint: annotations.idempotentHint }),
+      ...(annotations.openWorldHint === undefined ? {} : { openWorldHint: annotations.openWorldHint }),
+      ...(annotations.readOnlyHint === undefined ? {} : { readOnlyHint: annotations.readOnlyHint }),
+      ...(annotations.title === undefined ? {} : { title: annotations.title })
+    })
+  )
 
 const toolDefinition = (name: string, inputSchema: object, annotations?: ToolAnnotations): ToolDefinition => ({
   ...createToolDefinition({
@@ -230,7 +251,7 @@ describe("tool argument schema properties", () => {
     )
   })
 
-  it("classifies empty Effect Struct union schemas and actual registry no-arg tools", () => {
+  it("classifies supported empty Effect Struct schemas and actual registry no-arg tools", () => {
     fc.assert(
       fc.property(fc.boolean(), (useOneOf) => {
         const inputSchema = { [useOneOf ? "oneOf" : "anyOf"]: [{ type: "object" }, { type: "array" }] }
@@ -240,6 +261,15 @@ describe("tool argument schema properties", () => {
       }),
       propertyTestParameters
     )
+
+    expect(
+      isNoArgumentTool(
+        toolDefinition("generated_rc117_empty_struct", {
+          $schema: "http://json-schema.org/draft-07/schema#",
+          not: { type: "null" }
+        })
+      )
+    ).toBe(true)
 
     const listProjectTypes = toolRegistry.tools.get(makeToolName("list_project_types"))
 
@@ -301,16 +331,7 @@ describe("resolveAnnotations properties", () => {
       fc.property(
         prefixCaseArbitrary,
         toolNameArbitrary,
-        fc.record(
-          {
-            destructiveHint: fc.boolean(),
-            idempotentHint: fc.boolean(),
-            openWorldHint: fc.boolean(),
-            readOnlyHint: fc.boolean(),
-            title: fc.string({ maxLength: 32 })
-          },
-          { requiredKeys: [] }
-        ),
+        annotationsArbitrary,
         ({ defaults, prefix }, suffix, annotations) => {
           const tool = toolDefinition(`${prefix}${suffix}`, {}, annotations)
           const resolved = resolveAnnotations(tool)

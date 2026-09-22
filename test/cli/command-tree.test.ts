@@ -205,6 +205,16 @@ describe("CLI command tree", () => {
     expect(errorMessage(error)).toContain("Received unknown argument")
   })
 
+  it("maps an unknown command without JSON mode to an actionable input error", async () => {
+    const error = await rejected(runCommand(["not-a-command"]))
+
+    expect(errorMessage(error)).toContain("not-a-command")
+  })
+
+  it("accepts the root version request", async () => {
+    await expect(runCommand(["--version"])).resolves.toBeUndefined()
+  })
+
   it("renders nested command help without duplicate path segments", async () => {
     await expect(runCommand(["issues", "--help"])).resolves.toBeUndefined()
   })

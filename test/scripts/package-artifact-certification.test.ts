@@ -58,6 +58,9 @@ const expectedArtifact = {
   version: "1.2.3"
 }
 
+const validEffectCohortMarker =
+  "effect@4.0.0-rc.117_patch_hash=48dd300ad8ca97ea41839a226dc716242015feab66fd050c1032725451ea8a06/node_modules/effect/dist/Effect.js"
+
 describe("packed artifact certification", () => {
   it("reports both expected and actual certificates when evidence is stale", () => {
     const parseCertification = Schema.decodeUnknownSync(PackedArtifactCertificationSchema)
@@ -85,11 +88,7 @@ describe("packed artifact certification", () => {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), "packed-artifact-certification-"))
     const archive = path.join(directory, "package.tgz")
     try {
-      await writeArchive(
-        archive,
-        0o755,
-        'require("ws"); const cohort = "effect@4.0.0-rc.108/node_modules/effect/dist/Effect.js"'
-      )
+      await writeArchive(archive, 0o755, `require("ws"); const cohort = "${validEffectCohortMarker}"`)
       await expect(certifyPackedArtifact(archive, expectedArtifact)).resolves.toMatchObject({
         executableMode: 0o755,
         externalModules: ["ws"],
@@ -100,12 +99,12 @@ describe("packed artifact certification", () => {
     }
   })
 
-  it("rejects an unresolved Effect 3 composition", async () => {
+  it("rejects an unresolved or unexpected Effect composition", async () => {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), "packed-artifact-certification-"))
     const archive = path.join(directory, "package.tgz")
     try {
       await writeArchive(archive, 0o755, 'require("effect/Effect"); const cohort = "effect@3.19.13"')
-      await expect(certifyPackedArtifact(archive, expectedArtifact)).rejects.toThrow(/certified Effect/u)
+      await expect(certifyPackedArtifact(archive, expectedArtifact)).rejects.toThrow(/certified patched Effect/u)
     } finally {
       await fs.rm(directory, { force: true, recursive: true })
     }
@@ -115,11 +114,7 @@ describe("packed artifact certification", () => {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), "packed-artifact-certification-"))
     const archive = path.join(directory, "package.tgz")
     try {
-      await writeArchive(
-        archive,
-        0o644,
-        'require("ws"); const cohort = "effect@4.0.0-rc.108/node_modules/effect/dist/Effect.js"'
-      )
+      await writeArchive(archive, 0o644, `require("ws"); const cohort = "${validEffectCohortMarker}"`)
       await expect(certifyPackedArtifact(archive, expectedArtifact)).rejects.toThrow(/exact mode/u)
     } finally {
       await fs.rm(directory, { force: true, recursive: true })
@@ -135,7 +130,7 @@ describe("packed artifact certification", () => {
 
       await writeArchiveEntries(archive, [
         {
-          body: 'require("ws"); const cohort = "effect@4.0.0-rc.108/node_modules/effect/dist/Effect.js"',
+          body: `require("ws"); const cohort = "${validEffectCohortMarker}"`,
           mode: 0o755,
           name: "package/dist/index.cjs"
         },
@@ -151,7 +146,7 @@ describe("packed artifact certification", () => {
   it("rejects manifest identity, cohort-prefix, and external-module drift independently", async () => {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), "packed-artifact-certification-"))
     const archive = path.join(directory, "package.tgz")
-    const validMarker = 'const cohort = "effect@4.0.0-rc.108/node_modules/effect/dist/Effect.js";'
+    const validMarker = `const cohort = "${validEffectCohortMarker}";`
     try {
       await writeArchiveEntries(archive, [
         { body: `${validMarker} require("ws");`, mode: 0o755, name: "package/dist/index.cjs" },
@@ -162,9 +157,9 @@ describe("packed artifact certification", () => {
       await writeArchive(
         archive,
         0o755,
-        `${validMarker} const other = "effect@4.0.0-rc.1080/node_modules/effect/dist/Effect.js"; require("ws");`
+        `${validMarker} const other = "effect@4.0.0-rc.1170/node_modules/effect/dist/Effect.js"; require("ws");`
       )
-      await expect(certifyPackedArtifact(archive, expectedArtifact)).rejects.toThrow(/Effect 3 dependency/u)
+      await expect(certifyPackedArtifact(archive, expectedArtifact)).rejects.toThrow(/unexpected Effect dependency/u)
 
       await writeArchive(archive, 0o755, `${validMarker} require("ws"); require("unexpected-runtime");`)
       await expect(certifyPackedArtifact(archive, expectedArtifact)).rejects.toThrow(/external modules/u)
@@ -177,7 +172,7 @@ describe("packed artifact certification", () => {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), "packed-artifact-certification-"))
     const archive = path.join(directory, "package.tgz")
     try {
-      await writeArchive(archive, 0o755, 'const cohort = "effect@4.0.0-rc.108/node_modules/effect/dist/Effect.js";')
+      await writeArchive(archive, 0o755, `const cohort = "${validEffectCohortMarker}";`)
       await expect(
         certifyPackedArtifact(archive, { ...expectedArtifact, expectedExternalModules: [] })
       ).resolves.toMatchObject({ externalModules: [] })

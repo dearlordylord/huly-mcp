@@ -48,7 +48,7 @@ const normalizedPriorityLookup = new Map(IssuePriorityValues.map((v) => [normali
 
 export const IssuePrioritySchema = Schema.String.pipe(
   Schema.decodeTo(IssuePriorityLiteral, {
-    decode: SchemaGetter.transformOrFail((input, options) => {
+    decode: SchemaGetter.transformEffect((input, options) => {
       const match = normalizedPriorityLookup.get(normalizeForComparison(input))
       return match !== undefined
         ? Effect.succeed(match)

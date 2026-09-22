@@ -128,4 +128,16 @@ describe("CLI failure process boundary", { timeout: PROCESS_TEST_TIMEOUT_MILLISE
     expect(result.stderr).not.toContain("secret")
     expect(result.stderr).not.toContain("FiberFailure")
   })
+
+  it("terminates and reaps a subprocess after its deadline", async () => {
+    await expect(
+      runCapturedProcess(
+        process.execPath,
+        ["-e", 'process.on("SIGTERM", () => {}); setInterval(() => {}, 1_000)'],
+        {},
+        "",
+        50
+      )
+    ).rejects.toThrow("timed out and was terminated")
+  })
 })

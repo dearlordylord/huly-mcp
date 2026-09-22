@@ -87,13 +87,16 @@ const optionalTextOption = (
   name: string,
   makeOption: (value: string) => ParsedCliOption
 ): Flag.Flag<ReadonlyArray<ParsedCliOption>> =>
-  Flag.string(name).pipe(
+  Flag.String(name).pipe(
     Flag.optional,
     Flag.map((value) => Option.match(value, { onNone: () => emptyOptions, onSome: (text) => [makeOption(text)] }))
   )
 
 const booleanOption = (name: "json" | "yes"): Flag.Flag<ReadonlyArray<ParsedCliOption>> =>
-  Flag.boolean(name).pipe(Flag.map((value) => [{ _tag: "GlobalBooleanOption", name, value }]))
+  Flag.Boolean(name).pipe(
+    Flag.withDefault(false),
+    Flag.map((value) => [{ _tag: "GlobalBooleanOption", name, value }])
+  )
 
 const fieldHelp = (spec: CliCommandSpec, rootSchema: object, field: FieldSpec, required: boolean): string => {
   const description = cliFieldOptionDescription(spec, rootSchema, field)
@@ -126,7 +129,8 @@ const fieldBooleanOption = (
   field: FieldSpec,
   required: boolean
 ): Flag.Flag<ReadonlyArray<ParsedCliOption>> =>
-  Flag.boolean(optionName).pipe(
+  Flag.Boolean(optionName).pipe(
+    Flag.withDefault(false),
     Flag.map(
       (value): ReadonlyArray<ParsedCliOption> => [
         { _tag: "BooleanFieldOption", fieldName: field.fieldName, optionName, value }
@@ -274,7 +278,7 @@ const behaviorFieldSets = (fields: ReadonlyMap<CliOptionName, FieldSpec>, spec: 
   return { text: fileInputFields, base64: base64FileInputFields }
 }
 
-const positionals = Argument.string("arguments").pipe(Argument.variadic())
+const positionals = Argument.String("arguments").pipe(Argument.variadic())
 
 const optionRecord = (
   options: ReadonlyArray<Flag.Flag<ReadonlyArray<ParsedCliOption>>>

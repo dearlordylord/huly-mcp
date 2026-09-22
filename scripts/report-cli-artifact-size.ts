@@ -15,7 +15,7 @@ import {
 import { parsePnpmPackMetadata, tarArchiveUnpackedSize } from "./cli-package-artifact.js"
 
 const JSON_INDENT = 2
-const evidencePath = "docs/migrations/effect-4/cli-artifact-size.json"
+const evidencePath = "docs/certification/cli-artifact-size.json"
 const write = process.argv.includes("--write")
 const parseEvidence = Schema.decodeUnknownSync(Schema.fromJsonString(CliArtifactSizeReportSchema))
 

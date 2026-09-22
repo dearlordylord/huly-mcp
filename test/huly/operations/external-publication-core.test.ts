@@ -113,6 +113,22 @@ describe("external publication core", () => {
       ])
     )
     expect(Exit.isFailure(crossProject)).toBe(true)
+
+    const crossProjectWithMetadata = Effect.runSyncExit(
+      resolveExternalTrackerTarget(ProjectIdentifier.make("ENG"), "github", locator("other/repo"), [
+        candidate(target("repo-3", "other/repo"), false, "OTHER")
+      ])
+    )
+    expect(Exit.isFailure(crossProjectWithMetadata)).toBe(true)
+
+    const crossProjectWithoutMetadata = Effect.runSync(
+      Effect.flip(
+        resolveExternalTrackerTarget(ProjectIdentifier.make("ENG"), "github", locator("owner/unmapped"), [
+          candidate(target("repo-unmapped", "owner/unmapped"), false)
+        ])
+      )
+    )
+    expect(crossProjectWithoutMetadata.message).toContain("another Huly project")
   })
 
   it("covers automatic and exact-name resolution outcomes", () => {

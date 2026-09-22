@@ -1,0 +1,14 @@
+{
+  "archiveBytes": 1737840,
+  "bundleBytes": 9993916,
+  "bundleGzipBytes": 1693299,
+  "entryCount": 4,
+  "executableMode": 493,
+  "externalModules": [
+    "@opentelemetry/api",
+    "ws"
+  ],
+  "name": "@firfi/huly-mcp",
+  "unpackedBytes": 10174165,
+  "version": "0.52.4"
+}

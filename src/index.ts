@@ -39,7 +39,7 @@ import { writeStderrLine } from "./utils/stderr.js"
 
 type AppError = ConfigValidationError | HulyClientError | StorageClientError | McpServerError | Config.ConfigError
 
-const getTransportType = Config.string("MCP_TRANSPORT").pipe(
+const getTransportType = Config.String("MCP_TRANSPORT").pipe(
   Config.withDefault("stdio"),
   Effect.map((t): McpTransportType => {
     if (t === "http") return "http"
@@ -93,7 +93,7 @@ const isGlamaRegistryInspection = (): boolean => process.env["GLAMA_VERSION"] !=
 
 const parseBooleanEnvFlag = (value: string): boolean => value.toLowerCase() === "true"
 
-export const getLazyEnvs = Config.string("LAZY_ENVS").pipe(
+export const getLazyEnvs = Config.String("LAZY_ENVS").pipe(
   Config.option,
   Effect.map((value) => Option.match(value, { onNone: isGlamaRegistryInspection, onSome: parseBooleanEnvFlag }))
 )
@@ -113,7 +113,8 @@ export const buildAppLayer = (
   authMethod: "token" | "password",
   resolveClients: ClientResolver,
   resolveClientLeaseForHttpRequest: (
-    req: Request
+    req: Request,
+    signal: AbortSignal
   ) => Promise<RequestClientLease<Exit.Exit<ClientBundle, HulyClientBundleError>>>,
   httpServerFactoryLayer: Layer.Layer<HttpServerFactoryService> = HttpServerFactoryService.defaultLayer,
   closeClients?: () => Promise<void>

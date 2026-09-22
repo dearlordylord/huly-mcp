@@ -2223,6 +2223,113 @@ describe("generic-associations either-orientation and discovery edge cases", () 
   )
 })
 
+describe("generic-associations mutation lookup and cardinality boundaries", () => {
+  it.effect("creates a relation when the association is selected by its role name", () =>
+    Effect.gen(function* () {
+      const result = yield* createRelation({
+        association: relatesAssociation,
+        source: { kind: "raw", id: docId("issue-1"), class: issueClass },
+        target: { kind: "raw", id: docId("issue-2"), class: issueClass }
+      }).pipe(
+        Effect.provide(
+          testLayer({
+            associations: [association({ _id: "assoc-by-role" as Ref<HulyAssociation> })],
+            issues: [issue("issue-1", "HULY-1"), issue("issue-2", "HULY-2")]
+          })
+        )
+      )
+
+      expect(result).toMatchObject({ associationId: "assoc-by-role", created: true })
+    })
+  )
+
+  it.effect("selects a system association by role name before rejecting the unsupported mutation", () =>
+    Effect.gen(function* () {
+      const error = yield* Effect.flip(
+        createRelation({
+          association: relatesAssociation,
+          source: { kind: "raw", id: docId("issue-1"), class: issueClass },
+          target: { kind: "raw", id: docId("issue-2"), class: issueClass }
+        }).pipe(
+          Effect.provide(
+            testLayer({
+              associations: [association({ classA: core.class.Doc, classB: core.class.Doc })],
+              issues: [issue("issue-1", "HULY-1"), issue("issue-2", "HULY-2")]
+            })
+          )
+        )
+      )
+
+      expect(error).toBeInstanceOf(AssociationSystemClassUnsupportedError)
+    })
+  )
+
+  it.effect("resolves a unique document title while creating a relation", () =>
+    Effect.gen(function* () {
+      const result = yield* createRelation({
+        association: assocId,
+        source: { kind: "document", document: documentIdentifier("Unique title") },
+        target: { kind: "raw", id: docId("issue-1"), class: issueClass }
+      }).pipe(
+        Effect.provide(
+          testLayer({
+            associations: [
+              association({
+                classA: documentPlugin.class.Document,
+                classB: tracker.class.Issue,
+                nameA: "document",
+                nameB: "issue"
+              })
+            ],
+            documents: [documentDoc("doc-1", "Unique title")],
+            issues: [issue("issue-1", "HULY-1")]
+          })
+        )
+      )
+
+      expect(result).toMatchObject({ associationId: "assoc-1", created: true })
+    })
+  )
+
+  it.effect("creates a relation when a one-to-many association has no target conflict", () =>
+    Effect.gen(function* () {
+      const result = yield* createRelation({
+        association: assocId,
+        source: { kind: "raw", id: docId("issue-1"), class: issueClass },
+        target: { kind: "raw", id: docId("issue-2"), class: issueClass }
+      }).pipe(
+        Effect.provide(
+          testLayer({
+            associations: [association({ type: "1:N" })],
+            issues: [issue("issue-1", "HULY-1"), issue("issue-2", "HULY-2")]
+          })
+        )
+      )
+
+      expect(result.created).toBe(true)
+    })
+  )
+
+  it.effect("creates the first relation for a one-to-one association", () =>
+    Effect.gen(function* () {
+      const result = yield* createRelation({
+        association: assocId,
+        source: { kind: "raw", id: docId("issue-1"), class: issueClass },
+        target: { kind: "raw", id: docId("issue-2"), class: issueClass }
+      }).pipe(
+        Effect.provide(
+          testLayer({
+            associations: [association({ type: "1:1" })],
+            issues: [issue("issue-1", "HULY-1"), issue("issue-2", "HULY-2")]
+          })
+        )
+      )
+
+      expect(result.created).toBe(true)
+    })
+  )
+})
+
 describe("generic-associations display fallback", () => {
   it.effect("falls back to the document id when no display field is present", () =>
     Effect.gen(function* () {

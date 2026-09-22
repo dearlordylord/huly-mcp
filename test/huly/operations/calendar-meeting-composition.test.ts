@@ -60,11 +60,32 @@ import {
   snapshotPriorMarkup
 } from "../../../src/huly/operations/calendar-meeting-composition.js"
 import { readStableEventSiblings } from "../../../src/huly/operations/calendar-meeting-event-read.js"
-import { failMeetingComposition } from "../../../src/huly/operations/calendar-meeting-saga-failure.js"
+import {
+  captureCompensationProgram,
+  failMeetingComposition
+} from "../../../src/huly/operations/calendar-meeting-saga-failure.js"
 import { snapshotEventUpdate, snapshotScheduleUpdate } from "../../../src/huly/operations/calendar-meeting-snapshots.js"
 import { createEvent, createSchedule, updateEvent, updateSchedule } from "../../../src/huly/operations/calendar.js"
 
 type FixtureOverrides<T> = { readonly [K in keyof T]?: T[K] | undefined }
+
+it.effect("captures a failed compensation program as a residual cleanup failure", () =>
+  Effect.gen(function* () {
+    const residual = {
+      _tag: "RecordPresence" as const,
+      target: "event" as const,
+      documentId: DocId.make("event-1"),
+      expected: "absent" as const
+    }
+    const issues = yield* captureCompensationProgram(
+      () => Effect.fail(new HulyConnectionError({ message: "cleanup failed", cause: "test" })),
+      [residual]
+    )
+
+    expect(issues).toHaveLength(1)
+    expect(issues[0]).toMatchObject({ _tag: "Failed", residuals: [residual] })
+  })
+)
 
 const makeFloor = (id: string, name: string): Floor =>
   sdkFixture<Floor>({

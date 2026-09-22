@@ -1,4 +1,12 @@
-import type { ToolAnnotations } from "@modelcontextprotocol/server"
+export interface ToolAnnotations {
+  readonly title?: string
+  readonly readOnlyHint?: boolean
+  readonly destructiveHint?: boolean
+  readonly idempotentHint?: boolean
+  readonly openWorldHint?: boolean
+}
+
+export type ResolvedToolAnnotations = Required<ToolAnnotations>
 
 interface AnnotatedTool {
   readonly name: string
@@ -36,7 +44,7 @@ const DELETE_PREFIXES = ["delete_"]
 const matchesPrefix = (name: string, prefixes: ReadonlyArray<string>): boolean =>
   prefixes.some((prefix) => name.startsWith(prefix))
 
-const deriveAnnotations = (name: string): ToolAnnotations => {
+const deriveAnnotations = (name: string): ResolvedToolAnnotations => {
   const title = deriveTitle(name)
 
   if (matchesPrefix(name, READ_PREFIXES)) {
@@ -54,7 +62,7 @@ const deriveAnnotations = (name: string): ToolAnnotations => {
   return { title, readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false }
 }
 
-export const resolveAnnotations = (tool: AnnotatedTool): ToolAnnotations => ({
+export const resolveAnnotations = (tool: AnnotatedTool): ResolvedToolAnnotations => ({
   ...deriveAnnotations(tool.name),
   ...tool.annotations
 })

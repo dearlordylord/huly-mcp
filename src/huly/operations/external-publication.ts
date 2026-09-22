@@ -404,7 +404,7 @@ export const publishIssueToExternalTracker = (
     const [candidates, mixin, now] = yield* Effect.all([
       loadTargetCandidates(client, project),
       loadIssueMixin(client, issue),
-      Clock.currentTimeMillis.pipe(Effect.map((value) => Timestamp.make(value)))
+      Clock.currentTimeMillis.pipe(Effect.map((millis) => Timestamp.make(millis)))
     ])
     const target = yield* resolveExternalTrackerTarget(project.identifier, params.provider, params.target, candidates)
 

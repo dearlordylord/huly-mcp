@@ -40,6 +40,12 @@ describe("Schema error formatting", () => {
     expect(formatParseError(error)).toBe(": Expected string, actual 123")
   })
 
+  it("omits actual input when schema decoding did not retain it", async () => {
+    const error = await Effect.runPromise(Schema.decodeUnknownEffect(Schema.String)(123).pipe(Effect.flip))
+
+    expect(formatParseError(error)).toBe(": Expected string")
+  })
+
   it("delegates non-type leaf issues to Effect's formatter", async () => {
     const error = new Schema.SchemaError(new SchemaIssue.InvalidValue({ message: "Expected a refined value" }))
 

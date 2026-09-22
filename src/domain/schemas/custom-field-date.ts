@@ -34,7 +34,7 @@ const parseDocumentedDateInput = (input: string): number | undefined => {
 
 export const CustomFieldDateValueSchema = Schema.String.pipe(
   Schema.decodeTo(CustomFieldDateTimestamp, {
-    decode: SchemaGetter.transformOrFail((input, options) => {
+    decode: SchemaGetter.transformEffect((input, options) => {
       const timestamp = parseDocumentedDateInput(input)
       return timestamp === undefined
         ? Effect.fail(
