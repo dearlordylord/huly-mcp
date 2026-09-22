@@ -3,13 +3,21 @@ import { Effect, Exit, Schema } from "effect"
 import { expect } from "vitest"
 
 import {
+  ExternalIssueNumber,
   ExternalTrackerPublicationStatusSchema,
   ExternalTrackerProviderSchema,
   ExternalTrackerTargetId,
+  ExternalTrackerTargetLocator,
+  ExternalTrackerTargetName,
   ExternalTrackerTargetSchema,
   type ExternalTrackerTarget
 } from "../../../src/domain/schemas/external-tracker-publication.js"
-import { IssueIdentifier, ProjectIdentifier } from "../../../src/domain/schemas/shared.js"
+import { IssueIdentifier, ProjectIdentifier, Timestamp, UrlString } from "../../../src/domain/schemas/shared.js"
+import { DocId } from "../../../src/domain/schemas/shared-refs.js"
+import {
+  DocSyncInfoRecordSchema,
+  GithubIssueMixinRecordSchema
+} from "../../../src/huly/github-plugin.js"
 import {
   EXTERNAL_PUBLICATION_MAX_PENDING_MS,
   pendingPublicationState,
@@ -23,7 +31,7 @@ const target = (id: string, name: string, enabled = true): ExternalTrackerTarget
     provider: ExternalTrackerProviderSchema.make("github"),
     kind: "repository",
     targetId: ExternalTrackerTargetId.make(id),
-    name,
+    name: ExternalTrackerTargetName.make(name),
     enabled
   })
 
@@ -34,8 +42,14 @@ const candidate = (
 ): ExternalTrackerTargetCandidate => ({
   target: value,
   mapped,
-  ...(actualProject === undefined ? {} : { actualProject })
+  ...(actualProject === undefined ? {} : { actualProject: DocId.make(actualProject) })
 })
+
+const locator = ExternalTrackerTargetLocator.make
+const timestamp = Timestamp.make
+const targetId = ExternalTrackerTargetId.make
+const mixin = (value: Readonly<Record<string, unknown>>) => Schema.decodeUnknownSync(GithubIssueMixinRecordSchema)(value)
+const syncInfo = (value: Readonly<Record<string, unknown>>) => Schema.decodeUnknownSync(DocSyncInfoRecordSchema)(value)
 
 describe("external publication core", () => {
   it("selects the sole enabled target and projects pending state", () => {
@@ -49,7 +63,7 @@ describe("external publication core", () => {
       project: ProjectIdentifier.make("ENG"),
       identifier: IssueIdentifier.make("ENG-1"),
       target: repository,
-      now: 1_000
+      now: timestamp(1_000)
     })
     expect(pending.state).toBe("pending")
     if (pending.state === "pending") expect(pending.elapsedMs).toBe(0)
@@ -61,14 +75,18 @@ describe("external publication core", () => {
     const base = {
       project: ProjectIdentifier.make("ENG"),
       identifier: IssueIdentifier.make("ENG-1"),
-      issueModifiedOn: 10_000,
-      now: 10_000
+      issueModifiedOn: timestamp(10_000),
+      now: timestamp(10_000)
     }
     expect(projectExternalPublicationState(base).state).toBe("not_requested")
 
     const published = projectExternalPublicationState({
       ...base,
-      mixin: { repository: "repo-1", url: "https://github.com/owner/repo/issues/1", githubNumber: 1 },
+      mixin: mixin({
+        repository: targetId("repo-1"),
+        url: UrlString.make("https://github.com/owner/repo/issues/1"),
+        githubNumber: ExternalIssueNumber.make(1)
+      }),
       target: repository
     })
     expect(published.state).toBe("published")
@@ -76,8 +94,8 @@ describe("external publication core", () => {
 
     const stale = projectExternalPublicationState({
       ...base,
-      now: base.issueModifiedOn + EXTERNAL_PUBLICATION_MAX_PENDING_MS,
-      mixin: { repository: "repo-1", url: "", githubNumber: 0 },
+      now: timestamp(base.issueModifiedOn + EXTERNAL_PUBLICATION_MAX_PENDING_MS),
+      mixin: mixin({ repository: targetId("repo-1"), url: "", githubNumber: 0 }),
       target: repository
     })
     expect(stale.state).toBe("failed")
@@ -87,12 +105,12 @@ describe("external publication core", () => {
     const first = candidate(target("repo-1", "owner/repo"))
     const second = candidate(target("repo-2", "owner/repo"))
     const ambiguous = Effect.runSyncExit(
-      resolveExternalTrackerTarget(ProjectIdentifier.make("ENG"), "github", "owner/repo", [first, second])
+      resolveExternalTrackerTarget(ProjectIdentifier.make("ENG"), "github", locator("owner/repo"), [first, second])
     )
     expect(Exit.isFailure(ambiguous)).toBe(true)
 
     const crossProject = Effect.runSyncExit(
-      resolveExternalTrackerTarget(ProjectIdentifier.make("ENG"), "github", "repo-3", [
+      resolveExternalTrackerTarget(ProjectIdentifier.make("ENG"), "github", locator("repo-3"), [
         candidate(target("repo-3", "other/repo"), false, "OTHER")
       ])
     )
@@ -117,26 +135,32 @@ describe("external publication core", () => {
       )
     ).toBe(true)
     expect(
-      Effect.runSync(resolveExternalTrackerTarget(ProjectIdentifier.make("ENG"), "github", "owner/one", [first])).name
+      Effect.runSync(
+        resolveExternalTrackerTarget(ProjectIdentifier.make("ENG"), "github", locator("owner/one"), [first])
+      ).name
     ).toBe("owner/one")
 
     const disabledByName = candidate(target("repo-disabled", "owner/disabled", false))
     expect(
       Exit.isFailure(
         Effect.runSyncExit(
-          resolveExternalTrackerTarget(ProjectIdentifier.make("ENG"), "github", "owner/disabled", [disabledByName])
+          resolveExternalTrackerTarget(ProjectIdentifier.make("ENG"), "github", locator("owner/disabled"), [
+            disabledByName
+          ])
         )
       )
     ).toBe(true)
     expect(
       Exit.isFailure(
-        Effect.runSyncExit(resolveExternalTrackerTarget(ProjectIdentifier.make("ENG"), "github", "missing", [first]))
+        Effect.runSyncExit(
+          resolveExternalTrackerTarget(ProjectIdentifier.make("ENG"), "github", locator("missing"), [first])
+        )
       )
     ).toBe(true)
     expect(
       Exit.isFailure(
         Effect.runSyncExit(
-          resolveExternalTrackerTarget(ProjectIdentifier.make("ENG"), "github", "owner/other", [
+          resolveExternalTrackerTarget(ProjectIdentifier.make("ENG"), "github", locator("owner/other"), [
             candidate(target("repo-other", "owner/other"), false)
           ])
         )
@@ -145,7 +169,7 @@ describe("external publication core", () => {
     expect(
       Exit.isFailure(
         Effect.runSyncExit(
-          resolveExternalTrackerTarget(ProjectIdentifier.make("ENG"), "github", "repo-other", [
+          resolveExternalTrackerTarget(ProjectIdentifier.make("ENG"), "github", locator("repo-other"), [
             candidate(target("repo-other", "owner/other"), false)
           ])
         )
@@ -158,30 +182,47 @@ describe("external publication core", () => {
     const base = {
       project: ProjectIdentifier.make("ENG"),
       identifier: IssueIdentifier.make("ENG-1"),
-      issueModifiedOn: 10_000,
-      now: 10_001,
-      mixin: { repository: "repo-1", url: "", githubNumber: 0, modifiedOn: 10_000 },
+      issueModifiedOn: timestamp(10_000),
+      now: timestamp(10_001),
+      mixin: mixin({ repository: targetId("repo-1"), url: "", githubNumber: 0, modifiedOn: timestamp(10_000) }),
       target: repository
     }
     const pending = projectExternalPublicationState(base)
     expect(pending.state).toBe("pending")
     const persistedFailure = projectExternalPublicationState({
       ...base,
-      syncInfo: { repository: "repo-1", url: "", githubNumber: 0, modifiedOn: 10_000, error: "failed" }
+      syncInfo: syncInfo({
+        repository: targetId("repo-1"),
+        url: "",
+        githubNumber: 0,
+        modifiedOn: timestamp(10_000),
+        error: "failed"
+      })
     })
     expect(persistedFailure.state).toBe("failed")
     const nullFailure = projectExternalPublicationState({
       ...base,
-      syncInfo: { repository: "repo-1", url: "", githubNumber: 0, modifiedOn: 10_000, error: null }
+      syncInfo: syncInfo({
+        repository: targetId("repo-1"),
+        url: "",
+        githubNumber: 0,
+        modifiedOn: timestamp(10_000),
+        error: null
+      })
     })
     expect(nullFailure.state).toBe("pending")
-    const invalidTimestamp = projectExternalPublicationState({
+    const outOfDateRange = projectExternalPublicationState({
       ...base,
-      mixin: { ...base.mixin, modifiedOn: Number.NaN },
-      issueModifiedOn: Number.NaN,
-      now: Number.POSITIVE_INFINITY
+      issueModifiedOn: timestamp(Number.MAX_SAFE_INTEGER),
+      now: timestamp(Number.MAX_SAFE_INTEGER),
+      mixin: mixin({
+        repository: targetId("repo-1"),
+        url: "",
+        githubNumber: 0,
+        modifiedOn: timestamp(Number.MAX_SAFE_INTEGER)
+      })
     })
-    expect(invalidTimestamp.state).toBe("pending")
+    expect(outOfDateRange.state).toBe("pending")
     const { target: omittedTarget, ...withoutTarget } = base
     void omittedTarget
     const fallbackTarget = projectExternalPublicationState(withoutTarget)

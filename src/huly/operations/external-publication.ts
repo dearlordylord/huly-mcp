@@ -9,12 +9,19 @@ import {
   type PublishIssueToExternalTrackerParams,
   type ExternalTrackerPublicationStatus,
   type ExternalTrackerTarget,
-  ExternalTrackerTargetId,
   ExternalTrackerProviderSchema,
-  ExternalTrackerTargetKindSchema
+  ExternalTrackerTargetKindSchema,
+  ExternalTrackerTargetName,
+  ExternalTrackerUnavailableReason,
+  type ExternalTrackerTargetId as ExternalTrackerTargetIdType,
+  GithubCompatibilityCapabilitySchema,
+  githubCompatibilityCapabilities
 } from "../../domain/schemas/external-tracker-publication.js"
-import { IssueIdentifier, NonEmptyString, NonNegativeInteger, ProjectIdentifier } from "../../domain/schemas/shared.js"
+import { IssueIdentifier, ProjectIdentifier, Timestamp } from "../../domain/schemas/shared.js"
+import { DocId, IssueId, SpaceId } from "../../domain/schemas/shared-refs.js"
+import { ExternalPublicationTargetMetadataDegradedWarningCode } from "../../domain/schemas/tool-warnings.js"
 import { HulyClient, type HulyClientError } from "../client.js"
+import { Diagnostics } from "../diagnostics.js"
 import {
   ExternalTrackerModelUnavailableError,
   ExternalTrackerPublicationConflictError
@@ -30,7 +37,6 @@ import type { HulyDataInvalidError } from "../errors-base.js"
 import {
   DocSyncInfoRecordSchema,
   github,
-  githubCompatibilityCapabilities,
   GithubIntegrationRepositoryRecordSchema,
   GithubProjectMixinRecordSchema,
   GithubIssueMixinRecordSchema,
@@ -56,17 +62,17 @@ import type { MetadataClassDoc } from "./sdk-discovery-mappers.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../errors-tracker.js"
 
 const IssuePublicationDocumentSchema = Schema.Struct({
-  _id: NonEmptyString,
+  _id: IssueId,
   identifier: IssueIdentifier,
-  modifiedOn: NonNegativeInteger,
-  space: NonEmptyString
+  modifiedOn: Timestamp,
+  space: SpaceId
 })
 type IssuePublicationDocument = Schema.Schema.Type<typeof IssuePublicationDocumentSchema>
 
-const ProjectPublicationDocumentSchema = Schema.Struct({ _id: NonEmptyString, identifier: ProjectIdentifier })
+const ProjectPublicationDocumentSchema = Schema.Struct({ _id: DocId, identifier: ProjectIdentifier })
 type ProjectPublicationDocument = Schema.Schema.Type<typeof ProjectPublicationDocumentSchema>
 
-const ModelCapabilityRecordSchema = Schema.Struct({ _id: NonEmptyString })
+const ModelCapabilityRecordSchema = Schema.Struct({ _id: GithubCompatibilityCapabilitySchema })
 
 const modelClassRef = toClassRef<MetadataClassDoc>(core.class.Class)
 const modelMixinRef = toClassRef<MetadataClassDoc>(core.class.Mixin)
@@ -96,12 +102,12 @@ const ensureGithubModelCapabilities = Effect.fn("ExternalPublication.ensureGithu
     "externalPublication",
     "Huly model capability"
   )
-  const present = new Set(classes.map((entry) => String(entry._id)))
+  const present = new Set(classes.map((entry) => entry._id))
   const missing = githubCompatibilityCapabilities.filter((capability) => !present.has(capability))
   if (missing.length > 0) {
     return yield* new ExternalTrackerModelUnavailableError({
       provider: "github",
-      capabilities: missing.map((capability) => NonEmptyString.make(capability))
+      capabilities: missing
     })
   }
   return undefined
@@ -116,7 +122,7 @@ const parseIssue = (issue: unknown): Effect.Effect<IssuePublicationDocument, Hul
 const loadProjectMixinRepositoryIds = (
   client: HulyClient["Service"],
   project: ProjectPublicationDocument
-): Effect.Effect<ReadonlySet<string>, HulyClientError | HulyDataInvalidError> =>
+): Effect.Effect<ReadonlySet<ExternalTrackerTargetIdType>, HulyClientError | HulyDataInvalidError> =>
   Effect.gen(function* () {
     const raw = yield* client.findOne<Doc>(
       toClassRef<Doc>(String(github.mixin.GithubProject)),
@@ -157,7 +163,7 @@ const loadTargetCandidates = (
       loadRepositories(client),
       loadProjectMixinRepositoryIds(client, project)
     ])
-    const projectId = String(project._id)
+    const projectId = project._id
     return repositories.map((repository): ExternalTrackerTargetCandidate => {
       const target = externalTrackerTargetFromRepository(repository)
       const directlyMapped = repository.githubProject === projectId
@@ -174,8 +180,8 @@ const loadTargetCandidates = (
 
 const loadRawIssueAndProject = (
   client: HulyClient["Service"],
-  projectIdentifier: string,
-  issueIdentifier: string
+  projectIdentifier: ProjectIdentifier,
+  issueIdentifier: IssueIdentifier
 ): Effect.Effect<
   { readonly project: ProjectPublicationDocument; readonly issue: IssuePublicationDocument },
   HulyClientError | HulyDataInvalidError | ProjectNotFoundError | IssueNotFoundError,
@@ -221,34 +227,41 @@ const loadSyncInfo = (
 
 const targetCandidateById = (
   candidates: ReadonlyArray<ExternalTrackerTargetCandidate>,
-  id: string
+  id: ExternalTrackerTargetIdType
 ): ExternalTrackerTargetCandidate | undefined =>
-  candidates.find((candidate) => String(candidate.target.targetId) === id)
+  candidates.find((candidate) => candidate.target.targetId === id)
 
 const targetForExistingMixin = (
   candidates: ReadonlyArray<ExternalTrackerTargetCandidate>,
   mixin: GithubIssueMixinRecord
-): ExternalTrackerTarget => {
-  const candidate = targetCandidateById(candidates, mixin.repository)
-  return (
-    candidate?.target ?? {
+): Effect.Effect<ExternalTrackerTarget, never, Diagnostics> =>
+  Effect.gen(function* () {
+    const candidate = targetCandidateById(candidates, mixin.repository)
+    if (candidate !== undefined) return candidate.target
+    const diagnostics = yield* Diagnostics
+    yield* diagnostics.warnAgent({
+      code: ExternalPublicationTargetMetadataDegradedWarningCode,
+      message: `Huly did not return repository metadata for external publication target '${mixin.repository}'. The status uses the stable target ID as its name and marks the target unavailable.`
+    })
+    return {
       provider: ExternalTrackerProviderSchema.make("github"),
       kind: ExternalTrackerTargetKindSchema.make("repository"),
-      targetId: ExternalTrackerTargetId.make(mixin.repository),
-      name: NonEmptyString.make(mixin.repository),
+      targetId: mixin.repository,
+      name: ExternalTrackerTargetName.make(mixin.repository),
       enabled: false,
-      unavailableReason: NonEmptyString.make("The mapped Huly GitHub repository record is unavailable.")
+      unavailableReason: ExternalTrackerUnavailableReason.make(
+        "The mapped Huly GitHub repository record is unavailable."
+      )
     }
-  )
-}
+  })
 
 const statusForIssue = (
   client: HulyClient["Service"],
   project: ProjectPublicationDocument,
   issue: IssuePublicationDocument,
   candidates: ReadonlyArray<ExternalTrackerTargetCandidate>,
-  now: number
-): Effect.Effect<ExternalTrackerPublicationStatus, HulyClientError | HulyDataInvalidError> =>
+  now: Timestamp
+): Effect.Effect<ExternalTrackerPublicationStatus, HulyClientError | HulyDataInvalidError, Diagnostics> =>
   Effect.gen(function* () {
     const mixin = yield* loadIssueMixin(client, issue)
     if (mixin === undefined) {
@@ -260,7 +273,7 @@ const statusForIssue = (
       })
     }
     const syncInfo = yield* loadSyncInfo(client, issue)
-    const target = targetForExistingMixin(candidates, mixin)
+    const target = yield* targetForExistingMixin(candidates, mixin)
     return syncInfo === undefined
       ? projectExternalPublicationState({
           project: project.identifier,
@@ -313,19 +326,19 @@ export const getIssuePublicationStatus = (
   | ExternalTrackerModelUnavailableError
   | ProjectNotFoundError
   | IssueNotFoundError,
-  HulyClient
+  HulyClient | Diagnostics
 > =>
   Effect.gen(function* () {
     const client = yield* HulyClient
     yield* ensureGithubModelCapabilities(client)
     const { issue, project } = yield* loadRawIssueAndProject(client, params.project, params.identifier)
     const candidates = yield* loadTargetCandidates(client, project)
-    const now = yield* Clock.currentTimeMillis
+    const now = Timestamp.make(yield* Clock.currentTimeMillis)
     return yield* statusForIssue(client, project, issue, candidates, now)
   })
 
 const nativeMixinAttributes = (target: ExternalTrackerTarget): MixinData<HulyIssue, GithubIssue> => ({
-  repository: toRef<GithubIntegrationRepository>(String(target.targetId)),
+  repository: toRef<GithubIntegrationRepository>(target.targetId),
   url: "",
   githubNumber: 0
 })
@@ -336,7 +349,7 @@ const publishExistingMixin = (
   issue: IssuePublicationDocument,
   mixin: GithubIssueMixinRecord,
   target: ExternalTrackerTarget,
-  now: number
+  now: Timestamp
 ): Effect.Effect<ExternalTrackerPublicationStatus, HulyClientError | HulyDataInvalidError> =>
   Effect.gen(function* () {
     const syncInfo = yield* loadSyncInfo(client, issue)
@@ -395,16 +408,16 @@ export const publishIssueToExternalTracker = (
     const [candidates, mixin, now] = yield* Effect.all([
       loadTargetCandidates(client, project),
       loadIssueMixin(client, issue),
-      Clock.currentTimeMillis
+      Clock.currentTimeMillis.pipe(Effect.map(Timestamp.make))
     ])
     const target = yield* resolveExternalTrackerTarget(project.identifier, params.provider, params.target, candidates)
 
-    if (mixin !== undefined && mixin.repository !== String(target.targetId)) {
+    if (mixin !== undefined && mixin.repository !== target.targetId) {
       return yield* new ExternalTrackerPublicationConflictError({
         project: project.identifier,
         identifier: issue.identifier,
-        requestedTargetId: NonEmptyString.make(String(target.targetId)),
-        existingTargetId: NonEmptyString.make(mixin.repository)
+        requestedTargetId: target.targetId,
+        existingTargetId: mixin.repository
       })
     }
 

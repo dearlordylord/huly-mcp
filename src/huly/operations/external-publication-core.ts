@@ -1,15 +1,24 @@
 import { DateTime, Effect, Option, Schema } from "effect"
 
 import {
+  ExternalPublicationElapsedMilliseconds,
+  ExternalTrackerFailureSummary,
   ExternalTrackerPublicationStatusSchema,
   ExternalTrackerProviderSchema,
-  ExternalTrackerTargetId,
   ExternalTrackerTargetKindSchema,
+  ExternalTrackerTargetLocator,
+  ExternalTrackerTargetName,
   ExternalTrackerTargetSchema,
+  ExternalTrackerUnavailableReason,
+  type ExternalIssueNumber as ExternalIssueNumberType,
+  type ExternalPublicationElapsedMilliseconds as ExternalPublicationElapsedMillisecondsType,
+  type ExternalTrackerFailureSummary as ExternalTrackerFailureSummaryType,
   Iso8601Timestamp,
   type ExternalTrackerPublicationStatus,
   type ExternalTrackerProvider,
-  type ExternalTrackerTarget
+  type ExternalTrackerTarget,
+  type ExternalTrackerTargetLocator as ExternalTrackerTargetLocatorType,
+  type ExternalTrackerUnavailableReason as ExternalTrackerUnavailableReasonType
 } from "../../domain/schemas/external-tracker-publication.js"
 import {
   ExternalTrackerNoEnabledTargetError,
@@ -24,12 +33,13 @@ import {
   type GithubIssueMixinRecord
 } from "../github-plugin.js"
 import {
-  NonEmptyString,
-  PositiveInteger,
   type ProjectIdentifier,
+  type Timestamp as TimestampType,
   UrlString,
+  type UrlString as UrlStringType,
   type IssueIdentifier
 } from "../../domain/schemas/shared.js"
+import type { DocId } from "../../domain/schemas/shared-refs.js"
 
 /**
  * A pending request is projected as failed after this bounded wait when Huly
@@ -39,22 +49,29 @@ import {
 const PENDING_WAIT_MINUTES = 15
 const SECONDS_PER_MINUTE = 60
 const MILLISECONDS_PER_SECOND = 1000
-export const EXTERNAL_PUBLICATION_MAX_PENDING_MS = PENDING_WAIT_MINUTES * SECONDS_PER_MINUTE * MILLISECONDS_PER_SECOND
+export const EXTERNAL_PUBLICATION_MAX_PENDING_MS = ExternalPublicationElapsedMilliseconds.make(
+  PENDING_WAIT_MINUTES * SECONDS_PER_MINUTE * MILLISECONDS_PER_SECOND
+)
 
-export const EXTERNAL_PUBLICATION_FAILURE_SUMMARY =
-  "Huly's external tracker worker reported a publication failure; inspect Huly integration configuration and logs."
+export const EXTERNAL_PUBLICATION_FAILURE_SUMMARY: ExternalTrackerFailureSummaryType =
+  ExternalTrackerFailureSummary.make(
+    "Huly's external tracker worker reported a publication failure; inspect Huly integration configuration and logs."
+  )
+const EXTERNAL_PUBLICATION_TIMEOUT_FAILURE_SUMMARY = ExternalTrackerFailureSummary.make(
+  "Huly did not complete external publication within the bounded wait; retry the same target to requeue it."
+)
 
 export interface ExternalTrackerTargetCandidate {
   readonly target: ExternalTrackerTarget
   readonly mapped: boolean
-  readonly actualProject?: string
+  readonly actualProject?: DocId
 }
 
 export interface PublicationProjectionInput {
   readonly project: ProjectIdentifier
   readonly identifier: IssueIdentifier
-  readonly issueModifiedOn: number
-  readonly now: number
+  readonly issueModifiedOn: TimestampType
+  readonly now: TimestampType
   readonly mixin?: GithubIssueMixinRecord
   readonly syncInfo?: DocSyncInfoRecord
   readonly target?: ExternalTrackerTarget
@@ -63,9 +80,13 @@ export interface PublicationProjectionInput {
 const externalProvider: ExternalTrackerProvider = ExternalTrackerProviderSchema.make("github")
 const repositoryKind = ExternalTrackerTargetKindSchema.make("repository")
 
-const repositoryUnavailableReason = (repository: GithubIntegrationRepositoryRecord): string | undefined => {
-  if (repository.deleted === true) return "This Huly GitHub repository mapping is deleted."
-  if (!repository.enabled) return "This Huly GitHub repository mapping is disabled."
+const repositoryUnavailableReason = (
+  repository: GithubIntegrationRepositoryRecord
+): ExternalTrackerUnavailableReasonType | undefined => {
+  if (repository.deleted === true)
+    return ExternalTrackerUnavailableReason.make("This Huly GitHub repository mapping is deleted.")
+  if (!repository.enabled)
+    return ExternalTrackerUnavailableReason.make("This Huly GitHub repository mapping is disabled.")
   return undefined
 }
 
@@ -74,14 +95,15 @@ export const externalTrackerTargetFromRepository = (
   repository: GithubIntegrationRepositoryRecord
 ): ExternalTrackerTarget => {
   const unavailableReason = repositoryUnavailableReason(repository)
-  return ExternalTrackerTargetSchema.make({
+  const identity = {
     provider: externalProvider,
     kind: repositoryKind,
-    targetId: ExternalTrackerTargetId.make(repository._id),
-    name: NonEmptyString.make(repository.name),
-    enabled: repository.enabled && repository.deleted !== true,
-    ...(unavailableReason === undefined ? {} : { unavailableReason: NonEmptyString.make(unavailableReason) })
-  })
+    targetId: repository._id,
+    name: repository.name
+  }
+  return unavailableReason === undefined
+    ? ExternalTrackerTargetSchema.make({ ...identity, enabled: true })
+    : ExternalTrackerTargetSchema.make({ ...identity, enabled: false, unavailableReason })
 }
 
 const candidateSummary = (candidate: ExternalTrackerTargetCandidate) => ({
@@ -91,13 +113,13 @@ const candidateSummary = (candidate: ExternalTrackerTargetCandidate) => ({
 
 const candidatesForName = (
   candidates: ReadonlyArray<ExternalTrackerTargetCandidate>,
-  name: string
+  name: ExternalTrackerTargetLocatorType
 ): ReadonlyArray<ExternalTrackerTargetCandidate> =>
-  candidates.filter((candidate) => candidate.target.name === name && candidate.mapped)
+  candidates.filter((candidate) => String(candidate.target.name) === name && candidate.mapped)
 
 const matchingTargetById = (
   candidates: ReadonlyArray<ExternalTrackerTargetCandidate>,
-  target: string
+  target: ExternalTrackerTargetLocatorType
 ): ExternalTrackerTargetCandidate | undefined =>
   candidates.find((candidate) => String(candidate.target.targetId) === target)
 
@@ -140,8 +162,8 @@ const resolveTargetById = (
       new ExternalTrackerTargetCrossProjectError({
         project,
         provider,
-        target: NonEmptyString.make(String(match.target.targetId)),
-        actualProject: NonEmptyString.make(match.actualProject ?? "another Huly project")
+        target: ExternalTrackerTargetLocator.make(match.target.targetId),
+        ...(match.actualProject === undefined ? {} : { actualProject: match.actualProject })
       })
     )
   }
@@ -161,7 +183,7 @@ const resolveTargetById = (
 const resolveTargetByName = (
   project: ProjectIdentifier,
   provider: ExternalTrackerProvider,
-  target: string,
+  target: ExternalTrackerTargetLocatorType,
   candidates: ReadonlyArray<ExternalTrackerTargetCandidate>
 ): TargetResolutionEffect => {
   const matches = candidatesForName(candidates, target)
@@ -170,7 +192,7 @@ const resolveTargetByName = (
       new ExternalTrackerTargetAmbiguousError({
         project,
         provider,
-        target: NonEmptyString.make(target),
+        target,
         candidates: matches.map(candidateSummary)
       })
     )
@@ -187,17 +209,17 @@ const resolveTargetByName = (
             name: match.target.name
           })
         )
-  const crossProject = candidates.find((candidate) => candidate.target.name === target && !candidate.mapped)
-  return crossProject === undefined
-    ? Effect.fail(new ExternalTrackerTargetNotFoundError({ project, provider, target: NonEmptyString.make(target) }))
-    : Effect.fail(
-        new ExternalTrackerTargetCrossProjectError({
+  const crossProject = candidates.find((candidate) => String(candidate.target.name) === target && !candidate.mapped)
+  return Effect.fail(
+    crossProject === undefined
+      ? new ExternalTrackerTargetNotFoundError({ project, provider, target })
+      : new ExternalTrackerTargetCrossProjectError({
           project,
           provider,
-          target: NonEmptyString.make(target),
-          actualProject: NonEmptyString.make(crossProject.actualProject ?? "another Huly project")
+          target,
+          ...(crossProject.actualProject === undefined ? {} : { actualProject: crossProject.actualProject })
         })
-      )
+  )
 }
 
 /**
@@ -208,7 +230,7 @@ const resolveTargetByName = (
 export const resolveExternalTrackerTarget = (
   project: ProjectIdentifier,
   provider: ExternalTrackerProvider,
-  target: string | undefined,
+  target: ExternalTrackerTargetLocatorType | undefined,
   candidates: ReadonlyArray<ExternalTrackerTargetCandidate>
 ): TargetResolutionEffect =>
   target === undefined
@@ -220,25 +242,28 @@ export const resolveExternalTrackerTarget = (
           : resolveTargetById(project, provider, idMatch)
       })()
 
-const isoTimestamp = (milliseconds: number): Iso8601Timestamp => {
-  const normalized = Number.isFinite(milliseconds) && milliseconds >= 0 ? milliseconds : 0
-  const rendered = Option.match(DateTime.make(normalized), {
+const isoTimestamp = (milliseconds: TimestampType): Iso8601Timestamp => {
+  const rendered = Option.match(DateTime.make(milliseconds), {
     onNone: () => DateTime.formatIso(DateTime.makeUnsafe(0)),
     onSome: DateTime.formatIso
   })
   return Iso8601Timestamp.make(rendered)
 }
 
-const elapsedMilliseconds = (now: number, changedAt: number): number => Math.max(0, now - changedAt)
+const elapsedMilliseconds = (
+  now: TimestampType,
+  changedAt: TimestampType
+): ExternalPublicationElapsedMillisecondsType =>
+  ExternalPublicationElapsedMilliseconds.make(Math.max(0, now - changedAt))
 
-const changedAtFor = (input: PublicationProjectionInput): number =>
+const changedAtFor = (input: PublicationProjectionInput): TimestampType =>
   input.syncInfo?.modifiedOn ?? input.mixin?.modifiedOn ?? input.issueModifiedOn
 
 const makePublishedPublication = (
   input: PublicationProjectionInput,
   target: ExternalTrackerTarget,
-  url: string,
-  number: number
+  url: UrlStringType,
+  issueNumber: ExternalIssueNumberType
 ): ExternalTrackerPublicationStatus => ({
   project: input.project,
   identifier: input.identifier,
@@ -246,14 +271,18 @@ const makePublishedPublication = (
   provider: externalProvider,
   target,
   stateChangedAt: isoTimestamp(changedAtFor(input)),
-  url: UrlString.make(url),
-  externalIssueNumber: PositiveInteger.make(number)
+  url,
+  externalIssueNumber: issueNumber
 })
 
-const completedValues = (record: { readonly url: string; readonly githubNumber: number } | undefined) => {
+const completedValues = (
+  record: GithubIssueMixinRecord | DocSyncInfoRecord | undefined
+): { readonly url: UrlStringType; readonly number: ExternalIssueNumberType } | undefined => {
   if (record === undefined) return undefined
   const url = record.url.trim()
-  return url === "" || record.githubNumber <= 0 ? undefined : { url, number: record.githubNumber }
+  return url === "" || record.githubNumber === 0
+    ? undefined
+    : { url: UrlString.make(url), number: record.githubNumber }
 }
 
 const completedPublication = (
@@ -270,8 +299,8 @@ const hasPersistedFailure = (value: unknown): boolean => {
 }
 
 /** Do not expose raw worker/provider payloads; return only a bounded fixed summary. */
-export const redactPublicationFailure = (_value: unknown): NonEmptyString =>
-  NonEmptyString.make(EXTERNAL_PUBLICATION_FAILURE_SUMMARY)
+export const redactPublicationFailure = (_value: unknown): ExternalTrackerFailureSummaryType =>
+  EXTERNAL_PUBLICATION_FAILURE_SUMMARY
 
 const projectPublicationState = (
   input: PublicationProjectionInput,
@@ -301,9 +330,7 @@ const projectPublicationState = (
       provider: externalProvider,
       target,
       stateChangedAt: isoTimestamp(changedAt),
-      failureSummary: NonEmptyString.make(
-        "Huly did not complete external publication within the bounded wait; retry the same target to requeue it."
-      )
+      failureSummary: EXTERNAL_PUBLICATION_TIMEOUT_FAILURE_SUMMARY
     }
   }
   return {
@@ -329,33 +356,52 @@ export const projectExternalPublicationState = (
     ExternalTrackerTargetSchema.make({
       provider: externalProvider,
       kind: repositoryKind,
-      targetId: ExternalTrackerTargetId.make(input.mixin.repository),
-      name: NonEmptyString.make(input.mixin.repository),
+      targetId: input.mixin.repository,
+      name: ExternalTrackerTargetName.make(input.mixin.repository),
       enabled: false,
-      unavailableReason: NonEmptyString.make("The mapped Huly GitHub repository record is unavailable.")
+      unavailableReason: ExternalTrackerUnavailableReason.make(
+        "The mapped Huly GitHub repository record is unavailable."
+      )
     })
   return projectPublicationState(input, target)
 }
 
 /** Build an immediate pending response after Huly accepted a native mixin write. */
-export const pendingPublicationState = (input: {
+type PendingPublicationStateInput = {
   readonly project: ProjectIdentifier
   readonly identifier: IssueIdentifier
   readonly target: ExternalTrackerTarget
-  readonly now: number
-  readonly retrying?: boolean
-  readonly previousFailure?: NonEmptyString
-}): ExternalTrackerPublicationStatus => ({
-  project: input.project,
-  identifier: input.identifier,
-  state: "pending",
-  provider: externalProvider,
-  target: input.target,
-  stateChangedAt: isoTimestamp(input.now),
-  elapsedMs: 0,
-  ...(input.retrying === undefined ? {} : { retrying: input.retrying }),
-  ...(input.previousFailure === undefined ? {} : { previousFailure: input.previousFailure })
-})
+  readonly now: TimestampType
+} & (
+  | { readonly retrying?: never; readonly previousFailure?: never }
+  | { readonly retrying: true; readonly previousFailure: ExternalTrackerFailureSummaryType }
+)
+
+export const pendingPublicationState = (input: PendingPublicationStateInput): ExternalTrackerPublicationStatus => {
+  const stateChangedAt = isoTimestamp(input.now)
+  const elapsedMs = ExternalPublicationElapsedMilliseconds.make(0)
+  return input.retrying === true
+    ? {
+        project: input.project,
+        identifier: input.identifier,
+        state: "pending",
+        provider: externalProvider,
+        target: input.target,
+        stateChangedAt,
+        elapsedMs,
+        retrying: true,
+        previousFailure: input.previousFailure
+      }
+    : {
+        project: input.project,
+        identifier: input.identifier,
+        state: "pending",
+        provider: externalProvider,
+        target: input.target,
+        stateChangedAt,
+        elapsedMs
+      }
+}
 
 /** Parse helper for output assertions in adapter tests without exposing raw SDK records. */
 export const parseExternalPublicationStatus = Schema.decodeUnknownEffect(ExternalTrackerPublicationStatusSchema)

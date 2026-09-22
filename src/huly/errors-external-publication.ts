@@ -2,16 +2,23 @@ import { Schema } from "effect"
 
 import {
   ExternalTrackerProviderSchema,
-  ExternalTrackerTargetId
+  ExternalTrackerTargetId,
+  ExternalTrackerTargetLocator,
+  ExternalTrackerTargetName,
+  GithubCompatibilityCapabilitySchema
 } from "../domain/schemas/external-tracker-publication.js"
-import { NonEmptyString, ProjectIdentifier } from "../domain/schemas/shared.js"
+import { IssueIdentifier, ProjectIdentifier } from "../domain/schemas/shared.js"
+import { DocId } from "../domain/schemas/shared-refs.js"
 
-const ExternalTrackerTargetCandidateSchema = Schema.Struct({ targetId: ExternalTrackerTargetId, name: NonEmptyString })
+const ExternalTrackerTargetCandidateSchema = Schema.Struct({
+  targetId: ExternalTrackerTargetId,
+  name: ExternalTrackerTargetName
+})
 
 /** Required unpublished GitHub model records are not present in this Huly workspace. */
 export class ExternalTrackerModelUnavailableError extends Schema.TaggedError<ExternalTrackerModelUnavailableError>()(
   "ExternalTrackerModelUnavailableError",
-  { provider: ExternalTrackerProviderSchema, capabilities: Schema.Array(NonEmptyString) }
+  { provider: ExternalTrackerProviderSchema, capabilities: Schema.Array(GithubCompatibilityCapabilitySchema) }
 ) {
   override get message(): string {
     return `External tracker provider '${this.provider}' is unavailable because Huly does not expose the required model capabilities: ${this.capabilities.join(", ")}. Enable the Huly GitHub integration or use a compatible Huly deployment.`
@@ -31,7 +38,7 @@ export class ExternalTrackerNoEnabledTargetError extends Schema.TaggedError<Exte
 /** A supplied target ID/name does not resolve within the requested project. */
 export class ExternalTrackerTargetNotFoundError extends Schema.TaggedError<ExternalTrackerTargetNotFoundError>()(
   "ExternalTrackerTargetNotFoundError",
-  { project: ProjectIdentifier, provider: ExternalTrackerProviderSchema, target: NonEmptyString }
+  { project: ProjectIdentifier, provider: ExternalTrackerProviderSchema, target: ExternalTrackerTargetLocator }
 ) {
   override get message(): string {
     return `External tracker target '${this.target}' was not found for ${this.provider} in project '${this.project}'. Use list_external_tracker_targets and pass a stable targetId or exact target name.`
@@ -44,7 +51,7 @@ export class ExternalTrackerTargetAmbiguousError extends Schema.TaggedError<Exte
   {
     project: ProjectIdentifier,
     provider: ExternalTrackerProviderSchema,
-    target: Schema.optionalKey(NonEmptyString),
+    target: Schema.optionalKey(ExternalTrackerTargetLocator),
     candidates: Schema.Array(ExternalTrackerTargetCandidateSchema)
   }
 ) {
@@ -62,7 +69,7 @@ export class ExternalTrackerTargetDisabledError extends Schema.TaggedError<Exter
     project: ProjectIdentifier,
     provider: ExternalTrackerProviderSchema,
     targetId: ExternalTrackerTargetId,
-    name: NonEmptyString
+    name: ExternalTrackerTargetName
   }
 ) {
   override get message(): string {
@@ -76,12 +83,13 @@ export class ExternalTrackerTargetCrossProjectError extends Schema.TaggedError<E
   {
     project: ProjectIdentifier,
     provider: ExternalTrackerProviderSchema,
-    target: NonEmptyString,
-    actualProject: NonEmptyString
+    target: ExternalTrackerTargetLocator,
+    actualProject: Schema.optionalKey(DocId)
   }
 ) {
   override get message(): string {
-    return `External tracker target '${this.target}' belongs to Huly project '${this.actualProject}', not '${this.project}'. Select a target mapped to the requested project.`
+    const actualProject = this.actualProject ?? "another Huly project"
+    return `External tracker target '${this.target}' belongs to Huly project '${actualProject}', not '${this.project}'. Select a target mapped to the requested project.`
   }
 }
 
@@ -90,9 +98,9 @@ export class ExternalTrackerPublicationConflictError extends Schema.TaggedError<
   "ExternalTrackerPublicationConflictError",
   {
     project: ProjectIdentifier,
-    identifier: NonEmptyString,
-    requestedTargetId: NonEmptyString,
-    existingTargetId: NonEmptyString
+    identifier: IssueIdentifier,
+    requestedTargetId: ExternalTrackerTargetId,
+    existingTargetId: ExternalTrackerTargetId
   }
 ) {
   override get message(): string {

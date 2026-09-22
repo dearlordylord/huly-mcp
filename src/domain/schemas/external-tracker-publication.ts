@@ -26,8 +26,33 @@ export const ExternalTrackerTargetKindSchema = Schema.Literals(["repository"]).a
 })
 export type ExternalTrackerTargetKind = Schema.Schema.Type<typeof ExternalTrackerTargetKindSchema>
 
+export const githubCompatibilityCapabilities = [
+  "github:class:GithubIntegrationRepository",
+  "github:class:DocSyncInfo",
+  "github:mixin:GithubIssue",
+  "github:mixin:GithubProject"
+] as const
+export const GithubCompatibilityCapabilitySchema = Schema.Literals(githubCompatibilityCapabilities)
+export type GithubCompatibilityCapability = Schema.Schema.Type<typeof GithubCompatibilityCapabilitySchema>
+
 export const ExternalTrackerTargetId = DocId.pipe(Schema.brand("ExternalTrackerTargetId"))
 export type ExternalTrackerTargetId = Schema.Schema.Type<typeof ExternalTrackerTargetId>
+
+export const ExternalTrackerTargetName = NonEmptyString.pipe(Schema.brand("ExternalTrackerTargetName"))
+export type ExternalTrackerTargetName = Schema.Schema.Type<typeof ExternalTrackerTargetName>
+
+export const ExternalTrackerTargetLocator = NonEmptyString.pipe(Schema.brand("ExternalTrackerTargetLocator"))
+export type ExternalTrackerTargetLocator = Schema.Schema.Type<typeof ExternalTrackerTargetLocator>
+
+export const ExternalIssueNumber = PositiveInteger.pipe(Schema.brand("ExternalIssueNumber"))
+export type ExternalIssueNumber = Schema.Schema.Type<typeof ExternalIssueNumber>
+
+export const ExternalPublicationElapsedMilliseconds = NonNegativeInteger.pipe(
+  Schema.brand("ExternalPublicationElapsedMilliseconds")
+)
+export type ExternalPublicationElapsedMilliseconds = Schema.Schema.Type<
+  typeof ExternalPublicationElapsedMilliseconds
+>
 
 const Iso8601TimestampPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u
 const MAX_FAILURE_SUMMARY_LENGTH = 512
@@ -43,22 +68,37 @@ export const Iso8601Timestamp = Schema.String.pipe(
 })
 export type Iso8601Timestamp = Schema.Schema.Type<typeof Iso8601Timestamp>
 
-const BoundedFailureSummary = NonEmptyString.pipe(
-  Schema.check(Schema.isMaxLength(MAX_FAILURE_SUMMARY_LENGTH))
+export const ExternalTrackerFailureSummary = NonEmptyString.pipe(
+  Schema.check(Schema.isMaxLength(MAX_FAILURE_SUMMARY_LENGTH)),
+  Schema.brand("ExternalTrackerFailureSummary")
 ).annotate({
   identifier: "ExternalTrackerFailureSummary",
   title: "External tracker failure summary",
   description: "Bounded, redacted summary of a persisted Huly worker failure."
 })
+export type ExternalTrackerFailureSummary = Schema.Schema.Type<typeof ExternalTrackerFailureSummary>
 
-export const ExternalTrackerTargetSchema = Schema.Struct({
+export const ExternalTrackerUnavailableReason = NonEmptyString.pipe(
+  Schema.check(Schema.isMaxLength(MAX_FAILURE_SUMMARY_LENGTH)),
+  Schema.brand("ExternalTrackerUnavailableReason")
+)
+export type ExternalTrackerUnavailableReason = Schema.Schema.Type<typeof ExternalTrackerUnavailableReason>
+
+const ExternalTrackerTargetIdentityFields = {
   provider: ExternalTrackerProviderSchema,
   kind: ExternalTrackerTargetKindSchema,
   targetId: ExternalTrackerTargetId,
-  name: NonEmptyString,
-  enabled: Schema.Boolean,
-  unavailableReason: Schema.optionalKey(BoundedFailureSummary)
-}).annotate({
+  name: ExternalTrackerTargetName
+} as const
+
+export const ExternalTrackerTargetSchema = Schema.Union([
+  Schema.Struct({ ...ExternalTrackerTargetIdentityFields, enabled: Schema.Literal(true) }),
+  Schema.Struct({
+    ...ExternalTrackerTargetIdentityFields,
+    enabled: Schema.Literal(false),
+    unavailableReason: Schema.optionalKey(ExternalTrackerUnavailableReason)
+  })
+]).annotate({
   identifier: "ExternalTrackerTarget",
   title: "External tracker target",
   description:
@@ -101,7 +141,7 @@ export const PublishIssueToExternalTrackerParamsSchema = Schema.Struct({
     description: "External provider. GitHub is currently the only supported value."
   }),
   target: Schema.optionalKey(
-    NonEmptyString.annotateKey({
+    ExternalTrackerTargetLocator.annotateKey({
       description:
         "Optional stable Huly target ID or exact target name. Omit only when exactly one enabled target exists for the provider and project."
     })
@@ -134,13 +174,11 @@ const PublicationTargetFields = {
   stateChangedAt: Iso8601Timestamp
 } as const
 
-const PendingPublicationFields = {
+const PendingPublicationBaseFields = {
   ...PublicationIdentityFields,
   state: Schema.Literal("pending"),
   ...PublicationTargetFields,
-  elapsedMs: NonNegativeInteger,
-  retrying: Schema.optionalKey(Schema.Boolean),
-  previousFailure: Schema.optionalKey(BoundedFailureSummary)
+  elapsedMs: ExternalPublicationElapsedMilliseconds
 } as const
 
 const PublishedPublicationFields = {
@@ -148,19 +186,24 @@ const PublishedPublicationFields = {
   state: Schema.Literal("published"),
   ...PublicationTargetFields,
   url: UrlString,
-  externalIssueNumber: PositiveInteger
+  externalIssueNumber: ExternalIssueNumber
 } as const
 
 const FailedPublicationFields = {
   ...PublicationIdentityFields,
   state: Schema.Literal("failed"),
   ...PublicationTargetFields,
-  failureSummary: BoundedFailureSummary
+  failureSummary: ExternalTrackerFailureSummary
 } as const
 
 export const ExternalTrackerPublicationStatusSchema = Schema.Union([
   Schema.Struct({ ...PublicationIdentityFields, state: Schema.Literal("not_requested") }),
-  Schema.Struct(PendingPublicationFields),
+  Schema.Struct({
+    ...PendingPublicationBaseFields,
+    retrying: Schema.Literal(true),
+    previousFailure: ExternalTrackerFailureSummary
+  }),
+  Schema.Struct(PendingPublicationBaseFields),
   Schema.Struct(PublishedPublicationFields),
   Schema.Struct(FailedPublicationFields)
 ]).annotate({

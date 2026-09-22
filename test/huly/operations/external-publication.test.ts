@@ -10,6 +10,7 @@ import {
   publishIssueToExternalTracker
 } from "../../../src/huly/operations/external-publication.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
+import { Diagnostics } from "../../../src/huly/diagnostics.js"
 import { github } from "../../../src/huly/github-plugin.js"
 import { core, tracker } from "../../../src/huly/huly-plugins.js"
 import {
@@ -21,8 +22,15 @@ import {
   ExternalTrackerTargetDisabledError,
   ExternalTrackerTargetNotFoundError
 } from "../../../src/huly/errors-external-publication.js"
-import { IssueIdentifier, NonEmptyString, ProjectIdentifier } from "../../../src/domain/schemas/shared.js"
-import { ExternalTrackerTargetId } from "../../../src/domain/schemas/external-tracker-publication.js"
+import { IssueIdentifier, ProjectIdentifier } from "../../../src/domain/schemas/shared.js"
+import { DocId } from "../../../src/domain/schemas/shared-refs.js"
+import type { ToolWarning } from "../../../src/domain/schemas/tool-warnings.js"
+import {
+  ExternalTrackerTargetId,
+  ExternalTrackerTargetLocator,
+  ExternalTrackerTargetName,
+  GithubCompatibilityCapabilitySchema
+} from "../../../src/domain/schemas/external-tracker-publication.js"
 import type {
   ListExternalTrackerTargetsParams,
   PublishIssueToExternalTrackerParams
@@ -39,12 +47,14 @@ interface FixtureState {
   readonly modelClassRefs: Array<string>
   readonly createMixins: Array<Record<string, unknown>>
   readonly updateMixins: Array<Record<string, unknown>>
+  readonly warnings: Array<ToolWarning>
 }
 
 const projectId = "project-1"
 const issueId = "issue-1"
 const repositoryId = "repository-1"
 const secondRepositoryId = "repository-2"
+const targetLocator = ExternalTrackerTargetLocator.make
 
 const projectDoc = { _id: projectId, identifier: "ENG" }
 const issueDoc = { _id: issueId, identifier: "ENG-1", modifiedOn: 10_000, space: projectId }
@@ -56,7 +66,7 @@ const baseRepository = (id: string, name: string, enabled = true, mappedProject 
   githubProject: mappedProject
 })
 
-const makeFixtureLayer = (state: FixtureState, now = 11_000): Layer.Layer<HulyClient> => {
+const makeFixtureLayer = (state: FixtureState, now = 11_000): Layer.Layer<HulyClient | Diagnostics> => {
   const matches = (value: unknown, query: unknown): boolean => {
     if (typeof query !== "object" || query === null) return true
     return Object.entries(query).every(([key, expected]) => Reflect.get(value as object, key) === expected)
@@ -124,6 +134,10 @@ const makeFixtureLayer = (state: FixtureState, now = 11_000): Layer.Layer<HulyCl
     return Effect.succeed({} as TxResult)
   }) as HulyClientOperations["updateMixin"]
   const operations = HulyClient.testLayer({ findOne, findAll, findAllInModel, createMixin, updateMixin })
+  const diagnostics = Layer.succeed(Diagnostics, {
+    warnAgent: (warning) => Effect.sync(() => state.warnings.push(warning)).pipe(Effect.asVoid),
+    trail: () => Effect.void
+  })
   const clock: Clock.Clock = {
     currentTimeMillisUnsafe: () => now,
     currentTimeMillis: Effect.succeed(now),
@@ -133,7 +147,7 @@ const makeFixtureLayer = (state: FixtureState, now = 11_000): Layer.Layer<HulyCl
     monotonicTimeNanos: Effect.succeed(BigInt(now) * 1_000_000n),
     sleep: () => Effect.void
   }
-  return Layer.merge(operations, Layer.succeed(Clock.Clock, clock))
+  return Layer.merge(Layer.merge(operations, Layer.succeed(Clock.Clock, clock)), diagnostics)
 }
 
 const params = {
@@ -149,7 +163,8 @@ const baseState = (): FixtureState => ({
   modelClassRefs: [],
   sdkMixinWrappers: false,
   createMixins: [],
-  updateMixins: []
+  updateMixins: [],
+  warnings: []
 })
 
 describe("external publication Huly adapter", () => {
@@ -231,7 +246,8 @@ describe("external publication Huly adapter", () => {
       publishIssueToExternalTracker(params).pipe(Effect.provide(makeFixtureLayer(state, 10_001)))
     )
     expect(result.state).toBe("pending")
-    if (result.state === "pending") expect(result.previousFailure).toContain("worker reported")
+    if (result.state === "pending" && "previousFailure" in result)
+      expect(result.previousFailure).toContain("worker reported")
     expect(state.updateMixins).toEqual([{ repository: repositoryId, url: "", githubNumber: 0 }])
     expect(JSON.stringify(result)).not.toContain("secret")
   })
@@ -240,7 +256,7 @@ describe("external publication Huly adapter", () => {
     const disabled = baseState()
     disabled.repositories = [baseRepository(repositoryId, "owner/repo", false)]
     const disabledExit = Effect.runSyncExit(
-      publishIssueToExternalTracker({ ...params, target: repositoryId }).pipe(
+      publishIssueToExternalTracker({ ...params, target: targetLocator(repositoryId) }).pipe(
         Effect.provide(makeFixtureLayer(disabled))
       )
     )
@@ -249,7 +265,9 @@ describe("external publication Huly adapter", () => {
 
     const missing = baseState()
     const missingExit = Effect.runSyncExit(
-      publishIssueToExternalTracker({ ...params, target: "missing" }).pipe(Effect.provide(makeFixtureLayer(missing)))
+      publishIssueToExternalTracker({ ...params, target: targetLocator("missing") }).pipe(
+        Effect.provide(makeFixtureLayer(missing))
+      )
     )
     expect(Exit.isFailure(missingExit)).toBe(true)
 
@@ -261,7 +279,7 @@ describe("external publication Huly adapter", () => {
     conflict.projectRepositories = [repositoryId, secondRepositoryId]
     conflict.mixin = { repository: repositoryId, url: "", githubNumber: 0 }
     const conflictExit = Effect.runSyncExit(
-      publishIssueToExternalTracker({ ...params, target: secondRepositoryId }).pipe(
+      publishIssueToExternalTracker({ ...params, target: targetLocator(secondRepositoryId) }).pipe(
         Effect.provide(makeFixtureLayer(conflict))
       )
     )
@@ -338,19 +356,20 @@ describe("external publication Huly adapter", () => {
     )
     expect(unavailableStatus.state).toBe("pending")
     if (unavailableStatus.state === "pending") expect(unavailableStatus.target.enabled).toBe(false)
+    expect(unavailable.warnings).toHaveLength(1)
   })
 
   it("renders actionable messages for every publication-domain failure", () => {
     const messages = [
       new ExternalTrackerModelUnavailableError({
         provider: "github",
-        capabilities: [NonEmptyString.make("github:mixin:GithubIssue")]
+        capabilities: [GithubCompatibilityCapabilitySchema.make("github:mixin:GithubIssue")]
       }),
       new ExternalTrackerNoEnabledTargetError({ project: ProjectIdentifier.make("ENG"), provider: "github" }),
       new ExternalTrackerTargetNotFoundError({
         project: ProjectIdentifier.make("ENG"),
         provider: "github",
-        target: NonEmptyString.make("missing")
+        target: targetLocator("missing")
       }),
       new ExternalTrackerTargetAmbiguousError({
         project: ProjectIdentifier.make("ENG"),
@@ -360,26 +379,26 @@ describe("external publication Huly adapter", () => {
       new ExternalTrackerTargetAmbiguousError({
         project: ProjectIdentifier.make("ENG"),
         provider: "github",
-        target: NonEmptyString.make("owner/repo"),
+        target: targetLocator("owner/repo"),
         candidates: []
       }),
       new ExternalTrackerTargetDisabledError({
         project: ProjectIdentifier.make("ENG"),
         provider: "github",
         targetId: ExternalTrackerTargetId.make(repositoryId),
-        name: NonEmptyString.make("owner/repo")
+        name: ExternalTrackerTargetName.make("owner/repo")
       }),
       new ExternalTrackerTargetCrossProjectError({
         project: ProjectIdentifier.make("ENG"),
         provider: "github",
-        target: NonEmptyString.make(repositoryId),
-        actualProject: NonEmptyString.make("OTHER")
+        target: targetLocator(repositoryId),
+        actualProject: DocId.make("OTHER")
       }),
       new ExternalTrackerPublicationConflictError({
         project: ProjectIdentifier.make("ENG"),
-        identifier: NonEmptyString.make("ENG-1"),
-        requestedTargetId: NonEmptyString.make(secondRepositoryId),
-        existingTargetId: NonEmptyString.make(repositoryId)
+        identifier: IssueIdentifier.make("ENG-1"),
+        requestedTargetId: ExternalTrackerTargetId.make(secondRepositoryId),
+        existingTargetId: ExternalTrackerTargetId.make(repositoryId)
       })
     ].map((error) => error.message)
     expect(messages.every((message) => message.length > 20)).toBe(true)

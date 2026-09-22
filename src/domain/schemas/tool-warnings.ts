@@ -11,6 +11,8 @@ export const PlannerDocumentMetadataDegradedWarningCode = "planner_document_meta
 export const RecruitingCandidateCustomFieldMetadataDegradedWarningCode =
   "recruiting_candidate_custom_field_metadata_degraded" as const
 export const CustomFieldMetadataDegradedWarningCode = "custom_field_metadata_degraded" as const
+export const ExternalPublicationTargetMetadataDegradedWarningCode =
+  "external_publication_target_metadata_degraded" as const
 
 export const ToolWarningCodeSchema = Schema.Literals([
   "status_metadata_unresolved",
@@ -38,7 +40,8 @@ export const ToolWarningCodeSchema = Schema.Literals([
   LeadCustomerMetadataDegradedWarningCode,
   CalendarMeetingRoomMetadataDegradedWarningCode,
   RecruitingCandidateCustomFieldMetadataDegradedWarningCode,
-  CustomFieldMetadataDegradedWarningCode
+  CustomFieldMetadataDegradedWarningCode,
+  ExternalPublicationTargetMetadataDegradedWarningCode
 ]).pipe(
   Schema.annotate({
     identifier: "ToolWarningCode",
