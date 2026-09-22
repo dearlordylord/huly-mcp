@@ -11,9 +11,9 @@ external-publication operation and schema surfaces.
 - Effect 3 baseline SHA-256:
   `02bb5e4bf2fdb0e4dd30f980810bd0fe70d5c91482c309b4621264c373d6adac`
 - Reviewed Effect 4 corpus SHA-256:
-  `483a4586950fb62b5f48dc6a8d7dc15001fecb4ce1149c745574ecf4fbfc237e`
-- Exact structural deltas: 29,176
-- Added: 11,297
+  `94705031c0d66e145409c531a655f9cf34edb69792f210e471538fc139881610`
+- Exact structural deltas: 29,712
+- Added: 11,833
 - Changed: 11,412
 - Removed: 6,467
 
@@ -28,7 +28,7 @@ references, and corpus hash drift.
 
 | Count | Classification | Evidence |
 | ---: | --- | --- |
-| 15,647 | Draft-07 structural dialect and feature schemas | Effect 4 refs, definitions, optional/null unions, refinements, and composition wrappers are reviewed together with the new or changed #97, #264-#268, and #282 schemas, including the shared `calendar_meeting_room_metadata_degraded` warning code. All 606 native and 6 proxy schemas compile under strict Ajv Draft-07. |
+| 16,183 | Draft-07 structural dialect and feature schemas | Effect 4 refs, definitions, optional/null unions, refinements, and composition wrappers are reviewed together with the new or changed #97, #264-#268, and #282 schemas, including the shared `calendar_meeting_room_metadata_degraded` warning code. All 606 native and 6 proxy schemas compile under strict Ajv Draft-07. |
 | 1,885 | Schema metadata | Authored descriptions restored by the central adapter and obsolete Effect 3 generator-default titles/descriptions removed; metadata from #97, #245, #264-#268, and #282 is explicitly co-owned instead of being inferred from array position. |
 | 290 | Authored-constraint projection | Pre-administration tools remain represented; generated ref/composition paths and #245 assignee-alternative descriptions changed. Manual cross-field constraints remain in the corpus and representative runtime/Ajv agreement passes. |
 | 6 | Direct issue-assignee descriptions | Direct issue create, update, and list advertise exact agent UserProfile titles in both their tool and assignee input descriptions (#245). |
@@ -54,6 +54,6 @@ mise exec node@22.22.2 -- pnpm exec vitest run \
   test/scripts/effect4-oracle-parity.test.ts
 ```
 
-The full verifier re-renders the current bundled corpus and matches all 29,176
+The full verifier re-renders the current bundled corpus and matches all 29,712
 exact entries. Any future semantic or structural drift is unexpected; an
 accepted entry that stops occurring is stale and also fails verification.

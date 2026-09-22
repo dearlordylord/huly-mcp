@@ -95,12 +95,7 @@ export const externalTrackerTargetFromRepository = (
   repository: GithubIntegrationRepositoryRecord
 ): ExternalTrackerTarget => {
   const unavailableReason = repositoryUnavailableReason(repository)
-  const identity = {
-    provider: externalProvider,
-    kind: repositoryKind,
-    targetId: repository._id,
-    name: repository.name
-  }
+  const identity = { provider: externalProvider, kind: repositoryKind, targetId: repository._id, name: repository.name }
   return unavailableReason === undefined
     ? ExternalTrackerTargetSchema.make({ ...identity, enabled: true })
     : ExternalTrackerTargetSchema.make({ ...identity, enabled: false, unavailableReason })
@@ -189,12 +184,7 @@ const resolveTargetByName = (
   const matches = candidatesForName(candidates, target)
   if (matches.length > 1) {
     return Effect.fail(
-      new ExternalTrackerTargetAmbiguousError({
-        project,
-        provider,
-        target,
-        candidates: matches.map(candidateSummary)
-      })
+      new ExternalTrackerTargetAmbiguousError({ project, provider, target, candidates: matches.map(candidateSummary) })
     )
   }
   const [match] = matches
@@ -280,9 +270,7 @@ const completedValues = (
 ): { readonly url: UrlStringType; readonly number: ExternalIssueNumberType } | undefined => {
   if (record === undefined) return undefined
   const url = record.url.trim()
-  return url === "" || record.githubNumber === 0
-    ? undefined
-    : { url: UrlString.make(url), number: record.githubNumber }
+  return url === "" || record.githubNumber === 0 ? undefined : { url: UrlString.make(url), number: record.githubNumber }
 }
 
 const completedPublication = (

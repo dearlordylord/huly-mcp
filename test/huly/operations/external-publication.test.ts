@@ -54,7 +54,7 @@ const projectId = "project-1"
 const issueId = "issue-1"
 const repositoryId = "repository-1"
 const secondRepositoryId = "repository-2"
-const targetLocator = ExternalTrackerTargetLocator.make
+const targetLocator = (value: string) => ExternalTrackerTargetLocator.make(value)
 
 const projectDoc = { _id: projectId, identifier: "ENG" }
 const issueDoc = { _id: issueId, identifier: "ENG-1", modifiedOn: 10_000, space: projectId }

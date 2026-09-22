@@ -14,10 +14,7 @@ import {
 } from "../../../src/domain/schemas/external-tracker-publication.js"
 import { IssueIdentifier, ProjectIdentifier, Timestamp, UrlString } from "../../../src/domain/schemas/shared.js"
 import { DocId } from "../../../src/domain/schemas/shared-refs.js"
-import {
-  DocSyncInfoRecordSchema,
-  GithubIssueMixinRecordSchema
-} from "../../../src/huly/github-plugin.js"
+import { DocSyncInfoRecordSchema, GithubIssueMixinRecordSchema } from "../../../src/huly/github-plugin.js"
 import {
   EXTERNAL_PUBLICATION_MAX_PENDING_MS,
   pendingPublicationState,
@@ -45,10 +42,11 @@ const candidate = (
   ...(actualProject === undefined ? {} : { actualProject: DocId.make(actualProject) })
 })
 
-const locator = ExternalTrackerTargetLocator.make
-const timestamp = Timestamp.make
-const targetId = ExternalTrackerTargetId.make
-const mixin = (value: Readonly<Record<string, unknown>>) => Schema.decodeUnknownSync(GithubIssueMixinRecordSchema)(value)
+const locator = (value: string) => ExternalTrackerTargetLocator.make(value)
+const timestamp = (value: number) => Timestamp.make(value)
+const targetId = (value: string) => ExternalTrackerTargetId.make(value)
+const mixin = (value: Readonly<Record<string, unknown>>) =>
+  Schema.decodeUnknownSync(GithubIssueMixinRecordSchema)(value)
 const syncInfo = (value: Readonly<Record<string, unknown>>) => Schema.decodeUnknownSync(DocSyncInfoRecordSchema)(value)
 
 describe("external publication core", () => {

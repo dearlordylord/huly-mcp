@@ -105,10 +105,7 @@ const ensureGithubModelCapabilities = Effect.fn("ExternalPublication.ensureGithu
   const present = new Set(classes.map((entry) => entry._id))
   const missing = githubCompatibilityCapabilities.filter((capability) => !present.has(capability))
   if (missing.length > 0) {
-    return yield* new ExternalTrackerModelUnavailableError({
-      provider: "github",
-      capabilities: missing
-    })
+    return yield* new ExternalTrackerModelUnavailableError({ provider: "github", capabilities: missing })
   }
   return undefined
 })
@@ -228,8 +225,7 @@ const loadSyncInfo = (
 const targetCandidateById = (
   candidates: ReadonlyArray<ExternalTrackerTargetCandidate>,
   id: ExternalTrackerTargetIdType
-): ExternalTrackerTargetCandidate | undefined =>
-  candidates.find((candidate) => candidate.target.targetId === id)
+): ExternalTrackerTargetCandidate | undefined => candidates.find((candidate) => candidate.target.targetId === id)
 
 const targetForExistingMixin = (
   candidates: ReadonlyArray<ExternalTrackerTargetCandidate>,
@@ -408,7 +404,7 @@ export const publishIssueToExternalTracker = (
     const [candidates, mixin, now] = yield* Effect.all([
       loadTargetCandidates(client, project),
       loadIssueMixin(client, issue),
-      Clock.currentTimeMillis.pipe(Effect.map(Timestamp.make))
+      Clock.currentTimeMillis.pipe(Effect.map((value) => Timestamp.make(value)))
     ])
     const target = yield* resolveExternalTrackerTarget(project.identifier, params.provider, params.target, candidates)
 
