@@ -251,21 +251,12 @@ describe("Effect 4 oracle structural parity", () => {
 
     const review = createOracleDeltaReview("baseline", "current", deltas, candidateToolIdentities)
     expect(review.categories.map(({ category, issues }) => ({ category, issues }))).toEqual([
-      {
-        category: "draft07-structure",
-        issues: ["#97", "#225", "#264", "#265", "#266", "#267", "#268", "#282"]
-      },
-      {
-        category: "schema-metadata",
-        issues: ["#97", "#225", "#245", "#264", "#265", "#266", "#267", "#268", "#282"]
-      },
+      { category: "draft07-structure", issues: ["#97", "#225", "#264", "#265", "#266", "#267", "#268", "#282"] },
+      { category: "schema-metadata", issues: ["#97", "#225", "#245", "#264", "#265", "#266", "#267", "#268", "#282"] },
       { category: "authored-constraints", issues: ["#225", "#245"] },
       { category: "issue-assignee-description", issues: ["#245"] },
       { category: "cli-json-diagnostic", issues: ["#228"] },
-      {
-        category: "cli-help",
-        issues: ["#97", "#228", "#245", "#264", "#265", "#266", "#267", "#268", "#282"]
-      }
+      { category: "cli-help", issues: ["#97", "#228", "#245", "#264", "#265", "#266", "#267", "#268", "#282"] }
     ])
     expect(() =>
       createOracleDeltaReview("baseline", "current", [{ _tag: "Added", path: "/unclassified", after: true }])

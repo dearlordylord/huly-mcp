@@ -33,6 +33,7 @@ interface FixtureState {
   syncInfo?: Record<string, unknown> | undefined
   projectMixin?: Record<string, unknown> | undefined
   modelCapabilities?: boolean
+  sdkMixinWrappers?: boolean
   projectRepositories: ReadonlyArray<string>
   repositories: ReadonlyArray<Record<string, unknown>>
   readonly modelClassRefs: Array<string>
@@ -66,9 +67,19 @@ const makeFixtureLayer = (state: FixtureState, now = 11_000): Layer.Layer<HulyCl
       return Effect.succeed(matches(projectDoc, query) ? projectDoc : undefined)
     if (ref === String(tracker.class.Issue)) return Effect.succeed(matches(issueDoc, query) ? issueDoc : undefined)
     if (ref === String(github.mixin.GithubProject)) {
-      return Effect.succeed(state.projectMixin)
+      return Effect.succeed(
+        state.sdkMixinWrappers && state.projectMixin !== undefined
+          ? { [String(github.mixin.GithubProject)]: state.projectMixin }
+          : state.projectMixin
+      )
     }
-    if (ref === String(github.mixin.GithubIssue)) return Effect.succeed(state.mixin)
+    if (ref === String(github.mixin.GithubIssue)) {
+      return Effect.succeed(
+        state.sdkMixinWrappers && state.mixin !== undefined
+          ? { [String(github.mixin.GithubIssue)]: state.mixin }
+          : state.mixin
+      )
+    }
     if (ref === String(github.class.DocSyncInfo)) return Effect.succeed(state.syncInfo)
     return Effect.succeed(undefined)
   }) as HulyClientOperations["findOne"]
@@ -136,11 +147,27 @@ const baseState = (): FixtureState => ({
   projectMixin: { repositories: [repositoryId] },
   repositories: [baseRepository(repositoryId, "owner/repo")],
   modelClassRefs: [],
+  sdkMixinWrappers: false,
   createMixins: [],
   updateMixins: []
 })
 
 describe("external publication Huly adapter", () => {
+  it("unwraps the native SDK envelope around mixin records", () => {
+    const state = baseState()
+    state.sdkMixinWrappers = true
+    state.mixin = { repository: repositoryId, url: "", githubNumber: 0, modifiedOn: 10_500 }
+    const layer = makeFixtureLayer(state, 12_000)
+    const targets = Effect.runSync(
+      listExternalTrackerTargets({ project: ProjectIdentifier.make("ENG") }).pipe(Effect.provide(layer))
+    )
+    expect(targets.targets).toHaveLength(1)
+
+    const status = Effect.runSync(getIssuePublicationStatus(params).pipe(Effect.provide(layer)))
+    expect(status.state).toBe("pending")
+    if (status.state === "pending") expect(status.elapsedMs).toBe(1_500)
+  })
+
   it("discovers mapped targets and creates the exact native GitHub mixin", () => {
     const state = baseState()
     const layer = makeFixtureLayer(state)

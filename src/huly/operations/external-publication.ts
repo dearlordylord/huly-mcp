@@ -26,7 +26,7 @@ import type {
   ExternalTrackerTargetDisabledError,
   ExternalTrackerTargetNotFoundError
 } from "../errors-external-publication.js"
-import { HulyDataInvalidError } from "../errors-base.js"
+import type { HulyDataInvalidError } from "../errors-base.js"
 import {
   DocSyncInfoRecordSchema,
   github,
@@ -50,6 +50,7 @@ import {
   resolveExternalTrackerTarget,
   type ExternalTrackerTargetCandidate
 } from "./external-publication-core.js"
+import { parseBoundary, parseOptionalBoundary, parseOptionalMixinBoundary } from "./external-publication-boundaries.js"
 import { toClassRef, toRef } from "./sdk-boundary.js"
 import type { MetadataClassDoc } from "./sdk-discovery-mappers.js"
 import type { IssueNotFoundError, ProjectNotFoundError } from "../errors-tracker.js"
@@ -66,25 +67,6 @@ const ProjectPublicationDocumentSchema = Schema.Struct({ _id: NonEmptyString, id
 type ProjectPublicationDocument = Schema.Schema.Type<typeof ProjectPublicationDocumentSchema>
 
 const ModelCapabilityRecordSchema = Schema.Struct({ _id: NonEmptyString })
-
-const parseBoundary = <S extends Schema.ConstraintDecoder<unknown>>(
-  schema: S,
-  value: unknown,
-  operation: string,
-  entity: string
-): Effect.Effect<S["Type"], HulyDataInvalidError> =>
-  Effect.try({
-    try: () => Schema.decodeUnknownSync(schema)(value),
-    catch: (cause) => new HulyDataInvalidError({ operation, entity, cause })
-  })
-
-const parseOptionalBoundary = <S extends Schema.ConstraintDecoder<unknown>>(
-  schema: S,
-  value: unknown,
-  operation: string,
-  entity: string
-): Effect.Effect<S["Type"] | undefined, HulyDataInvalidError> =>
-  value === undefined ? Effect.succeed(undefined) : parseBoundary(schema, value, operation, entity)
 
 const modelClassRef = toClassRef<MetadataClassDoc>(core.class.Class)
 const modelMixinRef = toClassRef<MetadataClassDoc>(core.class.Mixin)
@@ -140,9 +122,10 @@ const loadProjectMixinRepositoryIds = (
       toClassRef<Doc>(String(github.mixin.GithubProject)),
       hulyQuery<Doc>({ _id: toRef<Doc>(project._id) })
     )
-    const parsed = yield* parseOptionalBoundary(
+    const parsed = yield* parseOptionalMixinBoundary(
       GithubProjectMixinRecordSchema,
       raw,
+      String(github.mixin.GithubProject),
       "externalPublication",
       "GitHub project mixin"
     )
@@ -215,7 +198,13 @@ const loadIssueMixin = (
       toClassRef<Doc>(String(github.mixin.GithubIssue)),
       hulyQuery<Doc>({ _id: toRef<Doc>(issue._id) })
     )
-    return yield* parseOptionalBoundary(GithubIssueMixinRecordSchema, raw, "externalPublication", "GitHub issue mixin")
+    return yield* parseOptionalMixinBoundary(
+      GithubIssueMixinRecordSchema,
+      raw,
+      String(github.mixin.GithubIssue),
+      "externalPublication",
+      "GitHub issue mixin"
+    )
   })
 
 const loadSyncInfo = (
