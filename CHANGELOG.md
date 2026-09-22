@@ -1,5 +1,14 @@
 # @firfi/huly-mcp
 
+## 0.52.6
+
+### Patch Changes
+
+- bac8f0b: Upgrade the Effect 4 dependency cohort and replace the MCP SDK server with Effect
+  AI transports while preserving MCP 2026 discovery and MCP 2025 compatibility.
+  Retire the completed migration oracle and retain public schema contracts as
+  regular regression tests.
+
 ## 0.52.5
 
 ### Patch Changes
