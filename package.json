@@ -59,10 +59,6 @@
     "verify-registry-metadata": "node scripts/sync-registry-metadata.mjs --check",
     "verify-registry-schema": "node scripts/verify-registry-schema.mjs",
     "verify-schema-boundaries": "node scripts/verify-schema-boundaries.mjs",
-    "capture:effect4-oracle": "pnpm build && node scripts/run-bundled.mjs scripts/effect4-oracle-command.ts capture",
-    "verify:effect4-oracle": "pnpm build && node scripts/run-bundled.mjs scripts/effect4-oracle-command.ts verify",
-    "verify:effect4-oracle:built": "node scripts/run-bundled.mjs scripts/effect4-oracle-command.ts verify",
-    "report:effect4-oracle-deltas": "node scripts/run-bundled.mjs scripts/report-effect4-oracle-deltas.ts",
     "verify:effect-cohort": "node scripts/verify-effect-cohort.mjs",
     "verify-sdk-parity": "node scripts/audit-sdk-parity.mjs",
     "smoke:http-no-config": "node scripts/smoke-http-no-config.mjs",
@@ -145,14 +141,15 @@
       "@hcengineering/setting@0.7.382>@hcengineering/ui": "0.7.0"
     },
     "patchedDependencies": {
-      "@hcengineering/api-client@0.7.19": "patches/@hcengineering__api-client@0.7.19.patch"
+      "@hcengineering/api-client@0.7.19": "patches/@hcengineering__api-client@0.7.19.patch",
+      "effect@4.0.0-rc.117": "patches/effect@4.0.0-rc.117.patch"
     }
   },
   "devDependencies": {
     "@changesets/cli": "^2.30.0",
-    "@effect/platform-node": "4.0.0-rc.108",
+    "@effect/platform-node": "4.0.0-rc.117",
     "@effect/tsgo": "0.36.4",
-    "@effect/vitest": "4.0.0-rc.108",
+    "@effect/vitest": "4.0.0-rc.117",
     "@hcengineering/account-client": "0.7.25",
     "@hcengineering/activity": "0.7.0",
     "@hcengineering/analytics": "0.7.3",
@@ -186,19 +183,17 @@
     "@hcengineering/ui": "0.7.0",
     "@hcengineering/view": "0.7.0",
     "@modelcontextprotocol/client": "^2.0.0",
-    "@modelcontextprotocol/core": "^2.0.0",
-    "@modelcontextprotocol/server": "^2.0.0",
     "@total-typescript/ts-reset": "^0.6.1",
     "@types/node": "^25.1.0",
     "@types/tar-stream": "^3.1.4",
     "@types/ws": "^8.18.1",
     "@typescript/native": "npm:typescript@^7.0.2",
-    "@vitest/coverage-v8": "4.1.10",
+    "@vitest/coverage-v8": "5.0.1",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
     "dpdm": "^4.2.0",
     "dprint": "^0.55.2",
-    "effect": "4.0.0-rc.108",
+    "effect": "4.0.0-rc.117",
     "esbuild": "^0.27.2",
     "fast-check": "^4.8.0",
     "husky": "^9.1.7",
@@ -211,6 +206,6 @@
     "tar-stream": "^3.2.0",
     "tsx": "^4.21.0",
     "typescript-compiler-api": "npm:typescript@^5.9.3",
-    "vitest": "4.1.10"
+    "vitest": "5.0.1"
   }
 }

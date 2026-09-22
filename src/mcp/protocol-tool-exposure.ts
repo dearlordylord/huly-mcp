@@ -1,5 +1,5 @@
-import type { JSONValue, ListToolsResult } from "@modelcontextprotocol/server"
 import { Schema } from "effect"
+import type * as McpSchema from "effect/unstable/ai/McpSchema"
 import type { ToolExposureContext } from "./huly-context-tool.js"
 import { toClientCompatibleInputSchema } from "./input-schema-compat.js"
 import { stripCollidingSchemaIdsRecord } from "./json-schema-refs.js"
@@ -40,8 +40,9 @@ interface ProtocolObjectSchemaSource {
   readonly [key: string]: unknown
 }
 
-type ProtocolObjectSchema = ListToolsResult["tools"][number]["inputSchema"]
-type ListedTool = ListToolsResult["tools"][number]
+type JSONValue = Schema.Schema.Type<typeof Schema.Json>
+type ProtocolObjectSchema = McpSchema.Tool["inputSchema"]
+type ListedTool = McpSchema.Tool
 
 interface ListedToolSource {
   readonly name: string

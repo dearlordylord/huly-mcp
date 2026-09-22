@@ -222,7 +222,7 @@ HULY_URL="${HULY_URL/localhost/host.docker.internal}" \
   bash scripts/integration_test_full.sh
 ```
 
-This starts `node dist/index.cjs` with `MCP_TRANSPORT=http` and lets the server resolve Huly credentials from process environment variables. The suite sends the released MCP `2026-07-28` request envelope and required HTTP headers. Both transports also retain SDK-owned MCP `2025-06-18` compatibility, covered by focused transport tests rather than a separate integration-harness mode.
+This starts `node dist/index.cjs` with `MCP_TRANSPORT=http` and lets the server resolve Huly credentials from process environment variables. The suite sends the released MCP `2026-07-28` request envelope and required HTTP headers through Effect AI's stateless protocol adapter. The server also configures Effect AI's MCP `2025-06-18` compatibility adapter; focused transport tests cover initialized `Mcp-Session-Id` sessions and isolated bare stateless calls rather than a separate integration-harness mode. Record release-candidate results in [the transport certification](docs/MCP_TRANSPORT_CERTIFICATION.md).
 
 To test hosted URL header configuration, provide a Huly API token and run the same suite with credentials sent as request headers:
 

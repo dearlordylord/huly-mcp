@@ -1,5 +1,7 @@
 # Huly MCP Server - Product Requirements Document
 
+> Historical design input. The current MCP runtime uses Effect AI's MCP registry and stdio/HTTP protocol layers; see [MCP transport architecture and certification](MCP_TRANSPORT_CERTIFICATION.md). Dependency versions and SDK examples below describe the original implementation plan and are not current setup guidance.
+
 ## Overview
 
 This project implements a Model Context Protocol (MCP) server that exposes Huly platform issue tracking capabilities to AI assistants. The server wraps the Huly Platform API in an Effect-based architecture, providing type-safe, composable operations for issue management.

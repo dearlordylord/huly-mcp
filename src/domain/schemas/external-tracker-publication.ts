@@ -50,9 +50,7 @@ export type ExternalIssueNumber = Schema.Schema.Type<typeof ExternalIssueNumber>
 export const ExternalPublicationElapsedMilliseconds = NonNegativeInteger.pipe(
   Schema.brand("ExternalPublicationElapsedMilliseconds")
 )
-export type ExternalPublicationElapsedMilliseconds = Schema.Schema.Type<
-  typeof ExternalPublicationElapsedMilliseconds
->
+export type ExternalPublicationElapsedMilliseconds = Schema.Schema.Type<typeof ExternalPublicationElapsedMilliseconds>
 
 const Iso8601TimestampPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u
 const MAX_FAILURE_SUMMARY_LENGTH = 512

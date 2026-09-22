@@ -212,9 +212,16 @@ const buildOperationRegistry = (tools: ReadonlyArray<RegisteredTool<McpToolName>
 export const operationRegistry: OperationRegistry = buildOperationRegistry(allTools)
 
 export const createScopedRegistry = (scope: ToolRegistryScope): ToolRegistry => {
-  if (!scope.filteringActive) return toolRegistry
+  return createScopedRegistryFrom(toolRegistry, scope)
+}
 
-  return buildRegistry(allTools.filter((t) => scope.categories.has(t.category) || scope.toolNames.has(t.name)))
+export const createScopedRegistryFrom = (registry: ToolRegistry, scope: ToolRegistryScope): ToolRegistry => {
+  if (!scope.filteringActive) return registry
+  return buildRegistry(
+    Array.from(registry.tools.values()).filter(
+      (tool) => scope.categories.has(tool.category) || scope.toolNames.has(tool.name)
+    )
+  )
 }
 
 export const createFilteredRegistry = (categories: ReadonlySet<ToolCategory>): ToolRegistry =>

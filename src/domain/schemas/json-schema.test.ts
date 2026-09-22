@@ -123,7 +123,7 @@ describe("toDraft07JsonSchema", () => {
       Schema.String.pipe(Schema.check(Schema.isPattern(/^a/)), Schema.check(Schema.isPattern(/z$/)))
     )
 
-    expect(schema).toMatchObject({ type: "string", allOf: [{ pattern: "^a" }, { pattern: "z$" }] })
+    expect(schema).toMatchObject({ type: "string", pattern: "^a", allOf: [{ pattern: "z$" }] })
   })
 
   it("does not flatten unsafe, malformed, or conflicting authored allOf members", () => {

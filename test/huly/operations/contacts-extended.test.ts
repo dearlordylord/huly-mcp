@@ -298,7 +298,15 @@ const createTestLayer = (config: MockConfig) => {
   const findOneImpl: HulyClientOperations["findOne"] = ((_class: unknown, query: unknown) => {
     if (_class === contact.class.Person) {
       const q = query as Record<string, unknown>
-      const found = persons.find((p) => p._id === q._id)
+      const found = persons.find((person) => {
+        if (q._id !== undefined) return person._id === q._id
+        const name = q.name
+        if (typeof name === "object" && name !== null && "$like" in name) {
+          const pattern = Reflect.get(name, "$like")
+          return typeof pattern === "string" && matchesLike(person.name, pattern)
+        }
+        return person.name === name
+      })
       return Effect.succeed(found)
     }
     if (_class === contact.mixin.Employee) {
@@ -413,6 +421,22 @@ describe("Contacts Extended Coverage", () => {
         const client = yield* HulyClient
         return yield* findPersonByEmailOrName(client, "john@")
       }).pipe(Effect.provide(createTestLayer({ persons: [person], channels: [channel] })))
+
+      expect(result?._id).toBe(person._id)
+    })
+  )
+
+  it.effect("falls through a stale substring email channel to a matching person name", () =>
+    Effect.gen(function* () {
+      const person = createMockPerson({ name: "Target,Person" })
+      const staleChannel = createMockChannel({
+        value: "arget@example.com",
+        attachedTo: docRef<HulyPerson>("missing-person")
+      })
+      const result = yield* Effect.gen(function* () {
+        const client = yield* HulyClient
+        return yield* findPersonByEmailOrName(client, "arget")
+      }).pipe(Effect.provide(createTestLayer({ persons: [person], channels: [staleChannel] })))
 
       expect(result?._id).toBe(person._id)
     })

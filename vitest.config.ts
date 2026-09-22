@@ -15,11 +15,11 @@ export default defineConfig({
       reporter: ['text', 'json', 'html'],
       skipFull: true,
       exclude: [
-        'node_modules/',
-        'test/',
+        'node_modules/**',
+        'test/**',
         // Generated Quint Studio oracle client is test tooling, never imported by production code.
         // Our typed diagnostic publisher and its delivery/disabled behavior stay in the coverage gate.
-        'quint-specs/oracle-client/',
+        'quint-specs/oracle-client/**',
         '**/*.test.ts',
         '**/*.config.ts',
         'src/globals.d.ts',
@@ -39,12 +39,6 @@ export default defineConfig({
         // Subprocess lifecycle control is an imperative adapter. A dedicated test proves bounded
         // SIGTERM-to-SIGKILL escalation and reaping; callers test the captured output contracts.
         'scripts/captured-process.ts',
-        // Live bundled-process capture is owned by the separately bounded behavioral-oracle gate. Coverage
-        // exercises parsing and oracle assembly through captured fixtures without duplicating nine processes.
-        'scripts/effect4-oracle-process-capture.ts',
-        // The completed Effect migration oracle assembly is retained as historical release tooling. The built
-        // deterministic verifier remains in check-all; its CPU-sensitive full assembly is no longer a unit gate.
-        'scripts/effect4-oracle-data.ts',
         // Certification process wiring is an imperative shell over the tested workflow and secret ledger;
         // live local-Huly runs provide transport evidence for the built stdio and HTTP adapters.
         'scripts/api-token-certification-adapter.ts',

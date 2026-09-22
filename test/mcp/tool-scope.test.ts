@@ -4,10 +4,9 @@ import { describe, expect, it } from "vitest"
 import { sanitizeHulyRuntimeConfigFromEnv } from "../../src/config/config.js"
 import { GetHulyContextResultSchema } from "../../src/domain/schemas/index.js"
 import { buildHulyContext } from "../../src/mcp/huly-context-tool.js"
-import { createMcpProtocolHandlers } from "../../src/mcp/protocol-handlers.js"
+import { resolveProtocolExposure } from "../../src/mcp/protocol-tool-exposure.js"
 import { resolveToolScope } from "../../src/mcp/tool-scope.js"
 import { createScopedRegistry, toolRegistry } from "../../src/mcp/tools/index.js"
-import { createNoopTelemetry } from "../../src/telemetry/noop.js"
 
 interface PartialScopeEnv {
   readonly toolsets?: string
@@ -71,22 +70,22 @@ describe("tool scope filtering", () => {
     expect(names).toContain("list_documents")
   })
 
-  it("keeps only built-in tools visible when an active scope is all invalid", async () => {
+  it("keeps only built-in tools visible when an active scope is all invalid", () => {
     const { registry, scope, warnings } = resolveScoped({ toolsets: "missing_category", tools: "missing_tool" })
-    const handlers = createMcpProtocolHandlers(
-      () => Promise.reject(new Error("clients must not resolve")),
-      createNoopTelemetry(),
-      registry,
-      () => buildHulyContext({ transport: "stdio" }, registry, scope, sanitizeHulyRuntimeConfigFromEnv({}))
+    const exposure = resolveProtocolExposure(
+      { fullRegistry: toolRegistry, scopedNativeRegistry: registry },
+      {
+        exposureConfig: { configuredMode: "native", proxyOutputStrict: false },
+        toolScopeFilteringActive: scope.filteringActive,
+        currentClientInfo: () => undefined
+      }
     )
-
-    const listed = await handlers.listTools()
-    const callResult = await handlers.callTool({ params: { name: "list_documents", arguments: {} } })
 
     expect(scope.filteringActive).toBe(true)
     expect(registry.definitions).toEqual([])
-    expect(listed.tools.map((tool) => tool.name)).toEqual(["get_version", "get_huly_context"])
-    expect(callResult.isError).toBe(true)
+    expect(exposure.visibleNativeRegistry.definitions).toEqual([])
+    expect(exposure.visibleNativeRegistry.tools.has("list_documents")).toBe(false)
+    expect(exposure.context.visibleToolCount).toBe(2)
     expect(warnings).toEqual([
       expect.stringContaining("unknown toolset category"),
       expect.stringContaining("unknown tool name")

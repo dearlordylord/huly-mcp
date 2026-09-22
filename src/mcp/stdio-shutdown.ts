@@ -1,9 +1,13 @@
 import { Deferred, Effect, Fiber, Ref } from "effect"
 
-export const STDIO_DRAIN_ALLOWANCE = "5 seconds"
+export const STDIO_DRAIN_ALLOWANCE = "2 seconds"
+export const STDIO_EOF_DRAIN_ALLOWANCE = "30 seconds"
+export const STDIO_CLOSE_ALLOWANCE = "3 seconds"
 export const STDIO_SHUTDOWN_DEADLINE = "10 seconds"
+export const STDIO_EOF_SHUTDOWN_DEADLINE = "35 seconds"
 export const FORCED_STDIO_EXIT_CODE = 1
 export const FORCED_STDIO_EXIT_DIAGNOSTIC = "Huly MCP stdio shutdown exceeded 10 seconds; forcing process exit"
+export const FORCED_STDIO_EOF_EXIT_DIAGNOSTIC = "Huly MCP stdio EOF shutdown exceeded 35 seconds; forcing process exit"
 
 export type StdioShutdownReason = "stdin-eof" | "stdin-close" | "sigint" | "sigterm" | "stop" | "runtime-interruption"
 
@@ -35,7 +39,9 @@ export interface StdioShutdownResources {
   readonly closeTelemetry: Effect.Effect<void, unknown>
   readonly closeClients: Effect.Effect<void, unknown>
   readonly forceExit: (code: typeof FORCED_STDIO_EXIT_CODE) => Effect.Effect<void>
-  readonly writeDiagnostic: (message: typeof FORCED_STDIO_EXIT_DIAGNOSTIC) => Effect.Effect<void>
+  readonly writeDiagnostic: (
+    message: typeof FORCED_STDIO_EXIT_DIAGNOSTIC | typeof FORCED_STDIO_EOF_EXIT_DIAGNOSTIC
+  ) => Effect.Effect<void>
 }
 
 export interface StdioShutdownHandlers {
@@ -103,7 +109,13 @@ export const makeStdioShutdownCoordinator = (
     return coordinator
   })
 
-const ignoreCloseFailure = (effect: Effect.Effect<void, unknown>): Effect.Effect<void> => Effect.ignore(effect)
+const ignoreCloseFailure = (effect: Effect.Effect<void, unknown>): Effect.Effect<void> =>
+  effect.pipe(Effect.timeoutOption(STDIO_CLOSE_ALLOWANCE), Effect.ignore)
+
+const drainAllowance = (
+  reason: StdioShutdownReason
+): typeof STDIO_DRAIN_ALLOWANCE | typeof STDIO_EOF_DRAIN_ALLOWANCE =>
+  reason === "stdin-eof" || reason === "stdin-close" ? STDIO_EOF_DRAIN_ALLOWANCE : STDIO_DRAIN_ALLOWANCE
 
 const runGracefulShutdown = (
   internals: StdioShutdownInternals,
@@ -111,7 +123,7 @@ const runGracefulShutdown = (
   resources: StdioShutdownResources
 ): Effect.Effect<void> =>
   Effect.gen(function* () {
-    yield* resources.drain.pipe(Effect.timeoutOption(STDIO_DRAIN_ALLOWANCE), Effect.ignore)
+    yield* resources.drain.pipe(Effect.timeoutOption(drainAllowance(reason)), Effect.ignore)
     yield* internals.beginClosing(reason)
     yield* Effect.all([resources.closeWire, resources.closeTelemetry, resources.closeClients].map(ignoreCloseFailure), {
       concurrency: "unbounded",
@@ -124,12 +136,16 @@ const forceShutdown = (
   internals: StdioShutdownInternals,
   reason: StdioShutdownReason,
   resources: StdioShutdownResources
-): Effect.Effect<void> =>
-  Effect.sleep(STDIO_SHUTDOWN_DEADLINE).pipe(
-    Effect.andThen(resources.writeDiagnostic(FORCED_STDIO_EXIT_DIAGNOSTIC)),
+): Effect.Effect<void> => {
+  const isEof = reason === "stdin-eof" || reason === "stdin-close"
+  const deadline = isEof ? STDIO_EOF_SHUTDOWN_DEADLINE : STDIO_SHUTDOWN_DEADLINE
+  const diagnostic = isEof ? FORCED_STDIO_EOF_EXIT_DIAGNOSTIC : FORCED_STDIO_EXIT_DIAGNOSTIC
+  return Effect.sleep(deadline).pipe(
+    Effect.andThen(resources.writeDiagnostic(diagnostic)),
     Effect.andThen(resources.forceExit(FORCED_STDIO_EXIT_CODE)),
     Effect.andThen(internals.complete(reason, "forced"))
   )
+}
 
 const raceDetachedShutdowns = (graceful: Effect.Effect<void>, forced: Effect.Effect<void>): Effect.Effect<void> =>
   Effect.gen(function* () {

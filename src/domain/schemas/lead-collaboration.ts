@@ -99,7 +99,7 @@ export const AddLeadLabelParamsSchema = Schema.Struct({
   ...LeadTargetFields,
   label: TagIdentifier.annotateKey({ description: "Label definition ID or exact title; a missing title creates it." }),
   color: Schema.optionalKey(
-    ColorCode.annotateKey({
+    ColorCode.annotate({
       description: `New-label color from 0 through ${MAX_COLOR_INDEX} (default: ${DEFAULT_COLOR_INDEX}).`
     })
   ),

@@ -45,7 +45,7 @@ const leadIdentifierPattern = /^(?:LEAD-)?(\d+)$/i
 
 export const LeadIdentifier = Schema.String.pipe(
   Schema.decodeTo(CanonicalLeadIdentifier, {
-    decode: SchemaGetter.transformOrFail((input, options) => {
+    decode: SchemaGetter.transformEffect((input, options) => {
       const match = leadIdentifierPattern.exec(input.trim())
       return match !== null
         ? Effect.succeed(`LEAD-${match[1]}`)

@@ -73,7 +73,7 @@ describe("Error Mapping Branch Coverage", () => {
         const response = createSuccessResponse(undefined)
 
         expect(assertAt(response.content, 0).text).toBe("null")
-        expect(response.structuredContent).toEqual({ result: undefined })
+        expect(response.structuredContent).toEqual({ result: null })
       })
     )
   })

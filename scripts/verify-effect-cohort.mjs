@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process"
 
 import { Schema } from "effect"
 
-const EFFECT_COHORT_VERSION = "4.0.0-rc.108"
+const EFFECT_COHORT_VERSION = "4.0.0-rc.117"
 const TSGO_VERSION = "0.36.4"
 
 const requiredVersions = new Map([
@@ -10,8 +10,8 @@ const requiredVersions = new Map([
   ["@effect/platform-node", EFFECT_COHORT_VERSION],
   ["@effect/vitest", EFFECT_COHORT_VERSION],
   ["@effect/tsgo", TSGO_VERSION],
-  ["vitest", "4.1.10"],
-  ["@vitest/coverage-v8", "4.1.10"],
+  ["vitest", "5.0.1"],
+  ["@vitest/coverage-v8", "5.0.1"],
   ["ioredis", "5.11.1"]
 ])
 const prohibitedPackages = new Set(["@effect/cli", "@effect/platform"])

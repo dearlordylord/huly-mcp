@@ -1,4 +1,4 @@
-import type { Exit } from "effect"
+import { Effect, type Exit } from "effect"
 
 import type { ConfigValidationError } from "../config/config.js"
 import type { HulyClientError, HulyClientOperations } from "../huly/client.js"
@@ -14,3 +14,9 @@ export interface ClientBundle {
 export type HulyClientBundleError = ConfigValidationError | HulyClientError | StorageClientError
 
 export type ClientResolver = () => Promise<Exit.Exit<ClientBundle, HulyClientBundleError>>
+
+/** Adapt the process resolver to an interruptible Effect Promise boundary. */
+export const resolveClientBundleAbortably = (
+  resolver: ClientResolver,
+  signal: AbortSignal
+): Promise<Exit.Exit<ClientBundle, HulyClientBundleError>> => Effect.runPromise(Effect.promise(resolver), { signal })

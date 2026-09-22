@@ -103,7 +103,7 @@ export type OpinionId = Schema.Schema.Type<typeof OpinionId>
 const prefixedLocator = (prefix: "APP" | "OPE" | "RVE" | "VCN", expected: string) =>
   RawRecruitingLocatorInput.pipe(
     Schema.decodeTo(NonEmptyString, {
-      decode: SchemaGetter.transformOrFail((input, options) => {
+      decode: SchemaGetter.transformEffect((input, options) => {
         const trimmed = input.trim()
         if (trimmed === "") {
           return Effect.fail(new SchemaIssue.InvalidValue({ message: expected }, input, options))

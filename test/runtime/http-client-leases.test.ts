@@ -7,7 +7,13 @@ import { HulyConnectionError } from "../../src/huly/errors.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
 import { buildScopedClientBundle } from "../../src/runtime/huly-clients.js"
-import { createHttpClientLeaseResolver } from "../../src/runtime/http-client-leases.js"
+import {
+  createClientLeaseResolver,
+  createHttpClientLeaseResolver,
+  createPrimingClientLeaseResolver
+} from "../../src/runtime/http-client-leases.js"
+
+const activeSignal = (): AbortSignal => new AbortController().signal
 
 const baseClientLayer = Layer.merge(
   Layer.merge(HulyClient.testLayer({}), HulyStorageClient.testLayer({})),
@@ -20,6 +26,73 @@ const requestWithConfig = (workspace: string, token: string): Request =>
   })
 
 describe("HTTP client lease resolution", () => {
+  it("returns request-owned leases for successful and failed direct acquisitions", async () => {
+    let releases = 0
+    const trackedLayer = baseClientLayer.pipe(Layer.tap(() => Effect.addFinalizer(() => Effect.sync(() => releases++))))
+    const successful = await createClientLeaseResolver(trackedLayer)(activeSignal())
+
+    expect(Exit.isSuccess(successful.bundle)).toBe(true)
+    expect(releases).toBe(0)
+    await successful.close()
+    expect(releases).toBe(1)
+
+    const failedLayer = Layer.merge(
+      Layer.merge(
+        Layer.effect(HulyClient, Effect.fail(new HulyConnectionError({ message: "client failed" }))),
+        HulyStorageClient.testLayer({})
+      ),
+      WorkspaceClient.testLayer({})
+    )
+    const failed = await createClientLeaseResolver(failedLayer)(activeSignal())
+
+    expect(Exit.isFailure(failed.bundle)).toBe(true)
+    await failed.close()
+  })
+
+  it("transfers a successfully primed lease and closes it when priming fails", async () => {
+    let releases = 0
+    let successfulPrimes = 0
+    let transferredClose: (() => Promise<void>) | undefined
+    const trackedLayer = baseClientLayer.pipe(Layer.tap(() => Effect.addFinalizer(() => Effect.sync(() => releases++))))
+    const successful = await createPrimingClientLeaseResolver(trackedLayer, async (scoped) => {
+      successfulPrimes++
+      transferredClose = scoped.close
+    })(activeSignal())
+
+    expect(Exit.isSuccess(successful.bundle)).toBe(true)
+    expect(successfulPrimes).toBe(1)
+    expect(releases).toBe(0)
+    await successful.close()
+    expect(releases).toBe(0)
+    await transferredClose?.()
+    expect(releases).toBe(1)
+
+    const failure = new Error("prime failed")
+    await expect(
+      createPrimingClientLeaseResolver(trackedLayer, async () => {
+        throw failure
+      })(activeSignal())
+    ).rejects.toBe(failure)
+    expect(releases).toBe(2)
+  })
+
+  it("does not prime a failed acquisition", async () => {
+    let primes = 0
+    const failedLayer = Layer.merge(
+      Layer.merge(
+        Layer.effect(HulyClient, Effect.fail(new HulyConnectionError({ message: "client failed" }))),
+        HulyStorageClient.testLayer({})
+      ),
+      WorkspaceClient.testLayer({})
+    )
+    const lease = await createPrimingClientLeaseResolver(failedLayer, async () => {
+      primes++
+    })(activeSignal())
+
+    expect(Exit.isFailure(lease.bundle)).toBe(true)
+    expect(primes).toBe(0)
+  })
+
   it("isolates header configuration and releases each request-owned bundle", async () => {
     const acquisitions: Array<{ readonly workspace: string; readonly expectedToken: boolean }> = []
     let releases = 0
@@ -45,8 +118,8 @@ describe("HTTP client lease resolution", () => {
     }
     const resolveLease = createHttpClientLeaseResolver(trackedLayer, resolveEnvClients)
 
-    const first = await resolveLease(requestWithConfig("workspace-a", "token-a"))
-    const second = await resolveLease(requestWithConfig("workspace-b", "token-b"))
+    const first = await resolveLease(requestWithConfig("workspace-a", "token-a"), activeSignal())
+    const second = await resolveLease(requestWithConfig("workspace-b", "token-b"), activeSignal())
 
     expect(Exit.isSuccess(first.bundle)).toBe(true)
     expect(Exit.isSuccess(second.bundle)).toBe(true)
@@ -79,12 +152,12 @@ describe("HTTP client lease resolution", () => {
       Exit.die(new Error("env resolver must not serve header-configured requests"))
     )
 
-    const first = await resolveLease(requestWithConfig("workspace-a", "token-a"))
+    const first = await resolveLease(requestWithConfig("workspace-a", "token-a"), activeSignal())
     expect(acquisitions).toBe(1)
     await first.close()
     expect(releases).toBe(1)
 
-    const second = await resolveLease(requestWithConfig("workspace-a", "token-a"))
+    const second = await resolveLease(requestWithConfig("workspace-a", "token-a"), activeSignal())
     expect(acquisitions).toBe(2)
     await second.close()
     expect(releases).toBe(2)
@@ -103,8 +176,8 @@ describe("HTTP client lease resolution", () => {
     const resolveLease = createHttpClientLeaseResolver(sharedLayer, resolveEnvClients)
 
     try {
-      const first = await resolveLease(new Request("http://localhost/mcp"))
-      const second = await resolveLease(new Request("http://localhost/mcp"))
+      const first = await resolveLease(new Request("http://localhost/mcp"), activeSignal())
+      const second = await resolveLease(new Request("http://localhost/mcp"), activeSignal())
 
       expect(Exit.isSuccess(first.bundle) && first.bundle.value).toBe(scoped.bundle)
       expect(Exit.isSuccess(second.bundle) && second.bundle.value).toBe(scoped.bundle)
@@ -131,7 +204,7 @@ describe("HTTP client lease resolution", () => {
     })
 
     try {
-      const lease = await resolveLease(new Request("http://localhost/mcp", { headers }))
+      const lease = await resolveLease(new Request("http://localhost/mcp", { headers }), activeSignal())
 
       expect(Exit.isSuccess(lease.bundle) && lease.bundle.value).toBe(scoped.bundle)
       expect(envResolutions).toBe(1)
@@ -145,7 +218,8 @@ describe("HTTP client lease resolution", () => {
     const resolveEnvClients = async () => Exit.die(new Error("env resolver must not run"))
     const invalidHeaders = createHttpClientLeaseResolver(baseClientLayer, resolveEnvClients)
     const invalid = await invalidHeaders(
-      new Request("http://localhost/mcp", { headers: { "x-huly-url": "not-a-url" } })
+      new Request("http://localhost/mcp", { headers: { "x-huly-url": "not-a-url" } }),
+      activeSignal()
     )
     const failedClientLayer = Layer.merge(
       Layer.merge(
@@ -154,14 +228,30 @@ describe("HTTP client lease resolution", () => {
       ),
       WorkspaceClient.testLayer({})
     )
-    const failedClient = await createHttpClientLeaseResolver(
-      failedClientLayer,
-      resolveEnvClients
-    )(requestWithConfig("workspace-a", "token-a"))
+    const failedClient = await createHttpClientLeaseResolver(failedClientLayer, resolveEnvClients)(
+      requestWithConfig("workspace-a", "token-a"),
+      activeSignal()
+    )
 
     expect(Exit.isFailure(invalid.bundle)).toBe(true)
     expect(Exit.isFailure(failedClient.bundle)).toBe(true)
     await invalid.close()
     await failedClient.close()
+  })
+
+  it("interrupts request-scoped acquisition when the request is canceled", async () => {
+    const controller = new AbortController()
+    controller.abort()
+    const pendingLayer = Layer.merge(
+      Layer.merge(Layer.effect(HulyClient, Effect.never), HulyStorageClient.testLayer({})),
+      WorkspaceClient.testLayer({})
+    )
+    const resolveLease = createHttpClientLeaseResolver(pendingLayer, async () =>
+      Exit.die(new Error("env resolver must not run"))
+    )
+
+    const lease = await resolveLease(requestWithConfig("workspace-a", "token-a"), controller.signal)
+    expect(Exit.isFailure(lease.bundle)).toBe(true)
+    await lease.close()
   })
 })

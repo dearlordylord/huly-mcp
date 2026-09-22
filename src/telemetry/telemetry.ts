@@ -67,10 +67,10 @@ const telemetryEnvNames = {
 } satisfies Record<TelemetrySurface, { readonly debug: string; readonly enabled: string }>
 
 const telemetryEnabled = (surface: TelemetrySurface) =>
-  Config.map(Config.string(telemetryEnvNames[surface].enabled).pipe(Config.withDefault("1")), (v) => v !== "0")
+  Config.map(Config.String(telemetryEnvNames[surface].enabled).pipe(Config.withDefault("1")), (v) => v !== "0")
 
 const telemetryDebug = (surface: TelemetrySurface) =>
-  Config.map(Config.string(telemetryEnvNames[surface].debug).pipe(Config.withDefault("0")), (v) => v === "1")
+  Config.map(Config.String(telemetryEnvNames[surface].debug).pipe(Config.withDefault("0")), (v) => v === "1")
 
 export class TelemetryService extends Context.Service<TelemetryService, TelemetryOperations>()("@hulymcp/Telemetry") {
   static readonly layerForContext = (
