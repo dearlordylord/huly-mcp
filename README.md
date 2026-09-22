@@ -36,7 +36,7 @@ detected executable and required version, and the same `unsupported Node.js runt
 stderr. Upgrade Node.js or configure the MCP server command to use the absolute path of a compatible Node.js
 executable, then restart the MCP server. Huly operations remain unavailable until the runtime is upgraded.
 
-The standard configuration works with most MCP clients:
+The standard configuration uses a Huly API token and works with most MCP clients:
 
 ```json
 {
@@ -46,14 +46,19 @@ The standard configuration works with most MCP clients:
       "args": ["-y", "@firfi/huly-mcp@latest"],
       "env": {
         "HULY_URL": "https://your-huly-instance.example.com",
-        "HULY_EMAIL": "your@email.com",
-        "HULY_PASSWORD": "yourpassword",
+        "HULY_TOKEN": "your-huly-api-token",
         "HULY_WORKSPACE": "yourworkspace"
       }
     }
   }
 }
 ```
+
+Prefer a managed API token created in Huly account settings when the target deployment supports it. Managed tokens
+are bound to one workspace, assigned an expiry, and can be revoked without changing the account password. They still
+inherit the account's full rights in that workspace, so use a dedicated integration account with only the workspace
+role, space memberships, and data access the automation needs. Older Huly deployments may not expose managed token
+settings; email/password authentication remains available as a compatibility fallback.
 
 ## Tool Exposure Defaults
 
@@ -69,8 +74,7 @@ Use Codex's MCP manager:
 ```bash
 codex mcp add huly \
   --env HULY_URL=https://your-huly-instance.example.com \
-  --env HULY_EMAIL=your@email.com \
-  --env HULY_PASSWORD=yourpassword \
+  --env HULY_TOKEN=your-huly-api-token \
   --env HULY_WORKSPACE=yourworkspace \
   -- npx -y @firfi/huly-mcp@latest
 ```
@@ -84,8 +88,7 @@ args = ["-y", "@firfi/huly-mcp@latest"]
 
 [mcp_servers.huly.env]
 HULY_URL = "https://your-huly-instance.example.com"
-HULY_EMAIL = "your@email.com"
-HULY_PASSWORD = "yourpassword"
+HULY_TOKEN = "your-huly-api-token"
 HULY_WORKSPACE = "yourworkspace"
 ```
 
@@ -97,8 +100,7 @@ HULY_WORKSPACE = "yourworkspace"
 ```bash
 claude mcp add huly \
   -e HULY_URL=https://your-huly-instance.example.com \
-  -e HULY_EMAIL=your@email.com \
-  -e HULY_PASSWORD=yourpassword \
+  -e HULY_TOKEN=your-huly-api-token \
   -e HULY_WORKSPACE=yourworkspace \
   -- npx -y @firfi/huly-mcp@latest
 ```
@@ -130,8 +132,7 @@ Add with Command Palette → "MCP: Add Server", or put this in a VS Code MCP con
       "args": ["-y", "@firfi/huly-mcp@latest"],
       "env": {
         "HULY_URL": "https://your-huly-instance.example.com",
-        "HULY_EMAIL": "your@email.com",
-        "HULY_PASSWORD": "yourpassword",
+        "HULY_TOKEN": "your-huly-api-token",
         "HULY_WORKSPACE": "yourworkspace"
       }
     }
@@ -168,8 +169,7 @@ Open the global configuration file (`~/.config/opencode/opencode.json`) and merg
       "command": ["npx", "-y", "@firfi/huly-mcp@latest"],
       "environment": {
         "HULY_URL": "https://your-huly-instance.example.com",
-        "HULY_EMAIL": "your@email.com",
-        "HULY_PASSWORD": "yourpassword",
+        "HULY_TOKEN": "your-huly-api-token",
         "HULY_WORKSPACE": "yourworkspace"
       }
     }
@@ -226,8 +226,7 @@ By default, the server uses stdio transport. For HTTP transport:
 
 ```bash
 HULY_URL=https://your-huly-instance.example.com \
-HULY_EMAIL=your@email.com \
-HULY_PASSWORD=yourpassword \
+HULY_TOKEN=your-huly-api-token \
 HULY_WORKSPACE=yourworkspace \
 MCP_TRANSPORT=http \
 npx -y @firfi/huly-mcp@latest
@@ -285,9 +284,9 @@ For a Smithery publish schema example, see [docs/SMITHERY_URL_PUBLISH.md](docs/S
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `HULY_URL` | Yes | Reachable self-hosted or replacement hosted Huly instance URL |
-| `HULY_EMAIL` | Auth* | Account email |
-| `HULY_PASSWORD` | Auth* | Account password |
-| `HULY_TOKEN` | Auth* | API token (alternative to email/password) |
+| `HULY_TOKEN` | Auth* | Preferred: managed Huly API token where supported |
+| `HULY_EMAIL` | Auth* | Compatibility fallback: account email |
+| `HULY_PASSWORD` | Auth* | Compatibility fallback: account password |
 | `HULY_WORKSPACE` | Yes | Workspace identifier |
 | `HULY_CONNECTION_TIMEOUT` | No | Connection timeout in ms. Omit to use the package default. |
 | `MCP_TRANSPORT` | No | Transport type: `stdio` (default) or `http` |
@@ -299,7 +298,8 @@ For a Smithery publish schema example, see [docs/SMITHERY_URL_PUBLISH.md](docs/S
 | `TOOLSETS` | No | Comma-separated tool categories to expose. If neither `TOOLSETS` nor `TOOLS` is set, all native Huly tools are exposed. Example: `issues,projects,search` |
 | `TOOLS` | No | Comma-separated exact tool names to expose in addition to selected toolsets. Example: `list_documents,create_issue` |
 
-*Auth: Provide either `HULY_EMAIL` + `HULY_PASSWORD` or `HULY_TOKEN`.
+*Auth: Prefer `HULY_TOKEN`. Use `HULY_EMAIL` + `HULY_PASSWORD` only when the Huly deployment does not support a
+managed API token or another compatibility constraint requires password authentication.
 
 ## Built-in Diagnostic Tools
 
@@ -1186,7 +1186,7 @@ When resolved tool exposure is `proxy`, clients see the built-in tools plus thes
 
 ## Troubleshooting
 
-### Passwords with special characters
+### Password fallback with special characters
 
 If your Huly password contains characters like `*`, `%`, `!`, or `#`, passing it via CLI environment flags such as `-e` or `--env` may fail because the shell interprets these characters before they reach the process.
 
@@ -1219,7 +1219,8 @@ For Claude JSON config, the shell-sensitive characters above can be written dire
 }
 ```
 
-Alternatively, use `HULY_TOKEN` instead of email/password to bypass password auth entirely (see [Environment Variables](#environment-variables)).
+Prefer `HULY_TOKEN` instead of this password fallback when the deployment supports managed API tokens (see
+[Environment Variables](#environment-variables)).
 
 ### MCP client shows "Failed to reconnect"
 

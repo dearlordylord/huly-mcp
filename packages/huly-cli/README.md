@@ -44,28 +44,28 @@ huly --help
 
 ## Quick start
 
-Log in once and run a command:
+When the Huly deployment supports managed API tokens, prefer a dedicated integration account and provide its token
+for CI, automation, and other long-running use:
+
+```bash
+export HULY_URL=https://your-huly-instance.example.com
+export HULY_WORKSPACE=yourworkspace
+export HULY_TOKEN=your-huly-api-token
+
+huly projects list
+```
+
+Managed tokens can expire and be revoked, but they inherit the account's full workspace rights. Give the integration
+account only the workspace role, space memberships, and data access its automation needs.
+
+Interactive password login remains available as a compatibility fallback. It prompts for the Huly URL, workspace,
+email, and password, then stores only the returned workspace token; the password is never written to disk.
 
 ```bash
 huly auth login
 huly auth status --json
 huly projects list
 ```
-
-Login prompts for the Huly URL, workspace, email, and password. Only the returned workspace token is stored; the password is never written to disk.
-
-Environment-only configuration remains available for CI and ephemeral execution:
-
-```bash
-export HULY_URL=https://your-huly-instance.example.com
-export HULY_WORKSPACE=yourworkspace
-export HULY_EMAIL=your@email.com
-export HULY_PASSWORD=yourpassword
-
-huly projects list
-```
-
-Use `HULY_TOKEN` instead of `HULY_EMAIL` and `HULY_PASSWORD` when your deployment provides an API token.
 
 ## Configuration
 
@@ -75,12 +75,12 @@ The CLI supports named profiles plus the same Huly connection settings as the MC
 | --- | --- | --- |
 | `HULY_URL` | Yes | Reachable self-hosted or replacement hosted Huly instance URL. |
 | `HULY_WORKSPACE` | Yes | Workspace identifier. |
-| `HULY_EMAIL` | Auth* | Account email. |
-| `HULY_PASSWORD` | Auth* | Account password. |
-| `HULY_TOKEN` | Auth* | API token; use instead of email/password. |
+| `HULY_TOKEN` | Auth* | Preferred: managed Huly API token where supported. |
+| `HULY_EMAIL` | Auth* | Compatibility fallback: account email. |
+| `HULY_PASSWORD` | Auth* | Compatibility fallback: account password. |
 | `HULY_CONNECTION_TIMEOUT` | No | Connection timeout in milliseconds. |
 
-*Auth: provide either `HULY_EMAIL` and `HULY_PASSWORD`, or `HULY_TOKEN`.
+*Auth: prefer `HULY_TOKEN`; use `HULY_EMAIL` and `HULY_PASSWORD` as a compatibility fallback.
 
 ### Authentication and profiles
 
