@@ -14,3 +14,7 @@ CLAUDE.local.md
 .env.local
 .claude/settings.local.json
 .pnpm-store/
+
+# BEGIN UML-VIEWER
+.uml-viewer/
+# END UML-VIEWER

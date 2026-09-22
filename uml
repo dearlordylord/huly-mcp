@@ -1,0 +1,41 @@
+#!/bin/zsh
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT"
+VIEWER_ROOT="$ROOT/.uml-viewer/uml-viewer"
+DEPS="{:deps {uml-viewer/uml-viewer {:local/root \"$VIEWER_ROOT\"} quil/quil {:mvn/version \"4.3.1563\"}}}"
+
+edn_path() {
+  local name base f
+  name="$(basename "$ROOT")"
+  if [[ -f "examples/${name}.edn" ]]; then
+    echo "examples/${name}.edn"
+    return
+  fi
+  if [[ -d examples ]]; then
+    for f in examples/*.edn(N); do
+      [[ -f "$f" ]] || continue
+      base="${f:t}"
+      [[ "$base" == *.policy.edn ]] && continue
+      echo "$f"
+      return
+    done
+  fi
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  echo "usage: ./uml [--restart]" >&2
+  echo "  (no args)   fresh window; companion writes the diagram" >&2
+  echo "  --restart   new JVM, same companion; restores last view" >&2
+  exit 0
+fi
+
+if [[ "${1:-}" == "--restart" ]]; then
+  path="$(edn_path)"
+  if [[ -n "$path" ]]; then
+    exec clj -Sdeps "$DEPS" -M -m uml-viewer.main.uml-viewer --restart "$path"
+  fi
+  exec clj -Sdeps "$DEPS" -M -m uml-viewer.main.uml-viewer --restart
+fi
+
+exec clj -Sdeps "$DEPS" -M -m uml-viewer.main.uml-viewer "$@"

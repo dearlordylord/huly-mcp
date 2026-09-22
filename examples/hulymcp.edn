@@ -1,0 +1,110 @@
+{:title "Huly MCP — external issue publication"
+ :direction :tb
+ :packages
+ [{:id :domain
+   :label "Domain contract"
+   :classes
+   [{:id :external-tracker-publication
+     :name "external-tracker-publication.ts"
+     :ns "src/domain/schemas/external-tracker-publication.ts"
+     :ops [{:name "ExternalTrackerPublicationStatus"}
+           {:name "ExternalTrackerTarget"}
+           {:name "parsePublishIssueToExternalTrackerParams"}
+           {:name "parseGetIssuePublicationStatusParams"}]}
+    {:id :shared-contracts
+     :name "shared.ts"
+     :ns "src/domain/schemas/shared.ts"
+     :ops ["ProjectIdentifier" "IssueIdentifier" "UrlString"]}]}
+  {:id :application
+   :label "Publication application"
+   :classes
+   [{:id :external-publication-core
+     :name "external-publication-core.ts"
+     :ns "src/huly/operations/external-publication-core.ts"
+     :ops [{:name "resolveExternalTrackerTarget"}
+           {:name "projectExternalPublicationState"}
+           {:name "pendingPublicationState"}]}
+    {:id :external-publication-boundaries
+     :name "external-publication-boundaries.ts"
+     :ns "src/huly/operations/external-publication-boundaries.ts"
+     :ops [{:name "parseBoundary"}
+           {:name "parseOptionalBoundary"}
+           {:name "parseOptionalMixinBoundary"}]}
+    {:id :external-publication
+     :name "external-publication.ts"
+     :ns "src/huly/operations/external-publication.ts"
+     :ops [{:name "listExternalTrackerTargets"}
+           {:name "publishIssueToExternalTracker"}
+           {:name "getIssuePublicationStatus"}]}
+    {:id :external-issue-publication
+     :name "external-issue-publication.ts"
+     :ns "src/huly/operations/external-issue-publication.ts"
+     :ops ["public operation facade"]}]}
+  {:id :huly-adapter
+   :label "Huly adapter"
+   :classes
+   [{:id :github-plugin
+     :name "github-plugin.ts"
+     :ns "src/huly/github-plugin.ts"
+     :ops ["GithubIssueMixinRecordSchema"
+           "GithubIntegrationRepositoryRecordSchema"
+           "DocSyncInfoRecordSchema"]}
+    {:id :huly-client
+     :name "client.ts"
+     :ns "src/huly/client.ts"
+     :ops ["HulyClient"]}
+    {:id :sdk-boundary
+     :name "sdk-boundary.ts"
+     :ns "src/huly/operations/sdk-boundary.ts"
+     :ops ["toClassRef" "toRef"]}]}
+  {:id :mcp
+   :label "MCP surface"
+   :classes
+   [{:id :external-publication-tool
+     :name "external-issue-publication tool"
+     :ns "src/mcp/tools/external-issue-publication.ts"
+     :ops ["list_external_tracker_targets"
+           "publish_issue_to_external_tracker"
+           "get_issue_publication_status"]}
+    {:id :tools-index
+     :name "tools/index.ts"
+     :ns "src/mcp/tools/index.ts"
+     :ops ["externalIssuePublicationTools"]}
+    {:id :error-mapping
+     :name "error-mapping.ts"
+     :ns "src/mcp/error-mapping.ts"
+     :ops ["typed MCP error projection"]}]}
+  {:id :verification
+   :label "Integration and regression tests"
+   :classes
+   [{:id :core-tests
+     :name "external-publication-core.test.ts"
+     :ns "test/huly/operations/external-publication-core.test.ts"
+     :ops ["target resolution" "publication projection"]}
+    {:id :operation-tests
+     :name "external-publication.test.ts"
+     :ns "test/huly/operations/external-publication.test.ts"
+     :ops ["Huly adapter boundaries" "publication state"]}
+    {:id :tool-tests
+     :name "tools-index.test.ts"
+     :ns "test/mcp/tools-index.test.ts"
+     :ops ["tool registration" "schema exposure"]}]}]
+ :edges
+ [{:from :external-tracker-publication :to :shared-contracts :kind :dependency}
+  {:from :external-publication-core :to :external-tracker-publication :kind :dependency}
+  {:from :external-publication-core :to :github-plugin :kind :dependency}
+  {:from :external-publication-boundaries :to :github-plugin :kind :dependency}
+  {:from :external-publication :to :external-publication-core :kind :dependency}
+  {:from :external-publication :to :external-publication-boundaries :kind :dependency}
+  {:from :external-publication :to :huly-client :kind :dependency}
+  {:from :external-publication :to :github-plugin :kind :dependency}
+  {:from :external-publication :to :sdk-boundary :kind :dependency}
+  {:from :external-issue-publication :to :external-publication :kind :dependency}
+  {:from :external-publication-tool :to :external-issue-publication :kind :dependency}
+  {:from :external-publication-tool :to :external-tracker-publication :kind :dependency}
+  {:from :tools-index :to :external-publication-tool :kind :dependency}
+  {:from :error-mapping :to :external-publication :kind :dependency}
+  {:from :core-tests :to :external-publication-core :kind :dependency}
+  {:from :operation-tests :to :external-publication :kind :dependency}
+  {:from :operation-tests :to :external-publication-boundaries :kind :dependency}
+  {:from :tool-tests :to :tools-index :kind :dependency}]}
