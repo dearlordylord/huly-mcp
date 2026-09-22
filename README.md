@@ -297,6 +297,7 @@ For a Smithery publish schema example, see [docs/SMITHERY_URL_PUBLISH.md](docs/S
 | `PROXY_OUTPUT_STRICT` | No | Proxy candidate strictness: `false` (default) keeps proxy discovery broad; `true` makes active `TOOLSETS` / `TOOLS` a hard allow-list for proxy search, schema lookup, and invocation. |
 | `TOOLSETS` | No | Comma-separated tool categories to expose. If neither `TOOLSETS` nor `TOOLS` is set, all native Huly tools are exposed. Example: `issues,projects,search` |
 | `TOOLS` | No | Comma-separated exact tool names to expose in addition to selected toolsets. Example: `list_documents,create_issue` |
+| `HULY_MCP_TELEMETRY` | No | Aggregate usage analytics (PostHog), on by default. Set `0` to disable. `DO_NOT_TRACK=1` also disables it. |
 
 *Auth: Prefer `HULY_TOKEN`. Use `HULY_EMAIL` + `HULY_PASSWORD` only when the Huly deployment does not support a
 managed API token or another compatibility constraint requires password authentication.

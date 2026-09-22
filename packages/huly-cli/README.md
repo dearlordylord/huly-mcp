@@ -229,6 +229,8 @@ Aggregate CLI analytics are enabled by default. Disable them with:
 export HULY_CLI_TELEMETRY=0
 ```
 
+`DO_NOT_TRACK=1` also disables it.
+
 The CLI uses the same PostHog project as `@firfi/huly-mcp`, with `surface=cli` and `package_name=@firfi/huly-cli` tags so the two surfaces can be measured separately. Set `HULY_CLI_TELEMETRY_DEBUG=1` to print telemetry diagnostics to stderr.
 
 ## Updating

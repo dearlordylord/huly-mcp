@@ -66,8 +66,16 @@ const telemetryEnvNames = {
   mcp: { debug: "HULY_MCP_TELEMETRY_DEBUG", enabled: "HULY_MCP_TELEMETRY" }
 } satisfies Record<TelemetrySurface, { readonly debug: string; readonly enabled: string }>
 
+// https://consoledonottrack.com: any value other than empty, "0", or "false" opts out.
+const doNotTrack = Config.map(
+  Config.String("DO_NOT_TRACK").pipe(Config.withDefault("")),
+  (v) => !["", "0", "false"].includes(v.trim().toLowerCase())
+)
+
 const telemetryEnabled = (surface: TelemetrySurface) =>
-  Config.map(Config.String(telemetryEnvNames[surface].enabled).pipe(Config.withDefault("1")), (v) => v !== "0")
+  Config.all([Config.String(telemetryEnvNames[surface].enabled).pipe(Config.withDefault("1")), doNotTrack]).pipe(
+    Config.map(([v, optOut]) => v !== "0" && !optOut)
+  )
 
 const telemetryDebug = (surface: TelemetrySurface) =>
   Config.map(Config.String(telemetryEnvNames[surface].debug).pipe(Config.withDefault("0")), (v) => v === "1")

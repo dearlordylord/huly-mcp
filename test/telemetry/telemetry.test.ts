@@ -237,6 +237,35 @@ describe("Telemetry", () => {
       )
     })
 
+    it.effect.each([
+      ["mcp", mcpTelemetryContext, "1"],
+      ["cli", cliTelemetryContext, "true"]
+    ] as const)("DO_NOT_TRACK disables %s telemetry even when surface variable enables it", ([, context, value]) => {
+      const fixture = telemetryLayerFixture()
+      return Effect.gen(function* () {
+        yield* TelemetryService
+        expect(fixture.enabledCalls).toHaveLength(0)
+        expect(fixture.disabledCalls()).toBe(1)
+      }).pipe(
+        Effect.provide(TelemetryService.layerForContext(context, fixture.factories)),
+        Effect.provideService(
+          ConfigProvider.ConfigProvider,
+          envProvider({ DO_NOT_TRACK: value, HULY_MCP_TELEMETRY: "1", HULY_CLI_TELEMETRY: "1" })
+        )
+      )
+    })
+
+    it.effect.each(["0", "false", ""])("DO_NOT_TRACK=%j keeps telemetry enabled", (value) => {
+      const fixture = telemetryLayerFixture()
+      return Effect.gen(function* () {
+        yield* TelemetryService
+        expect(fixture.enabledCalls).toEqual([{ debug: false, surface: "mcp" }])
+      }).pipe(
+        Effect.provide(TelemetryService.layerForContext(mcpTelemetryContext, fixture.factories)),
+        Effect.provideService(ConfigProvider.ConfigProvider, envProvider({ DO_NOT_TRACK: value }))
+      )
+    })
+
     it.effect("MCP debug config reaches the enabled telemetry factory", () => {
       const fixture = telemetryLayerFixture()
       return Effect.gen(function* () {
