@@ -5,7 +5,7 @@ import { execFile } from "node:child_process"
 import { promisify } from "node:util"
 
 import { NodeRuntime } from "@effect/platform-node"
-import { Effect, Schema } from "effect"
+import { Console, Effect, Schema } from "effect"
 
 const execFilePromise = promisify(execFile)
 
@@ -91,7 +91,7 @@ const program = Effect.acquireUseRelease(
       if (stale.length > 0) {
         return yield* new CliSkillPackageError({ message: `Packed Huly CLI skill bytes differ: ${stale.join(", ")}.` })
       }
-      console.log("CLI tarball contains byte-identical generated Huly CLI Agent Skill files.")
+      yield* Console.log("CLI tarball contains byte-identical generated Huly CLI Agent Skill files.")
     }),
   (directory) => Effect.promise(() => fs.rm(directory, { force: true, recursive: true }))
 )

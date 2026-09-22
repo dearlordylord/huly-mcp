@@ -1,5 +1,5 @@
 import type { Sequence } from "@hcengineering/core"
-import { Schema } from "effect"
+import { Console, Effect, Schema } from "effect"
 import { parseArgs } from "node:util"
 
 import { HulySequenceId } from "../src/domain/schemas/sdk-discovery-configurations.js"
@@ -35,15 +35,13 @@ const main = async (): Promise<void> => {
     } else {
       await client.removeDoc(sequence._class, sequence.space, sequence._id)
     }
-    // eslint-disable-next-line no-console -- JSON stdout is this integration helper's result boundary.
-    console.log(JSON.stringify(Schema.encodeSync(ResultSchema)(args)))
+    await Effect.runPromise(Console.log(JSON.stringify(Schema.encodeSync(ResultSchema)(args))))
   } finally {
     await client.close()
   }
 }
 
-main().catch((error: unknown) => {
-  // eslint-disable-next-line no-console -- stderr is this integration helper's failure boundary.
-  console.error(error)
+main().catch(async (error: unknown) => {
+  await Effect.runPromise(Console.error(error))
   process.exitCode = 1
 })

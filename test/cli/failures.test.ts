@@ -1,5 +1,7 @@
-import { Console, Effect } from "effect"
-import { afterEach, describe, expect, it } from "vitest"
+import { it } from "@effect/vitest"
+import { Effect } from "effect"
+import { TestConsole } from "effect/testing"
+import { afterEach, describe, expect } from "vitest"
 
 import { runCliFailureBoundary } from "../../packages/huly-cli/src/failure-boundary.js"
 import { failureFromOperation, presentCliFailure } from "../../packages/huly-cli/src/failures.js"
@@ -15,25 +17,14 @@ afterEach(() => {
   process.exitCode = originalExitCode
 })
 
-const runBoundary = async <A>(
+const runBoundary = <A>(
   program: Effect.Effect<A, CliInputError>
-): Promise<{ readonly output: ReadonlyArray<string>; readonly value: A | void }> => {
-  const output: Array<string> = []
-  const consoleService = await Effect.runPromise(Console.Console)
-  const value = await Effect.runPromise(
-    runCliFailureBoundary(program, true, isKnownCliError).pipe(
-      Effect.provideService(
-        Console.Console,
-        Object.assign(Object.create(consoleService), {
-          error: (message: unknown) => {
-            output.push(String(message))
-          }
-        })
-      )
-    )
-  )
-  return { output, value }
-}
+): Effect.Effect<{ readonly output: ReadonlyArray<string>; readonly value: A | void }> =>
+  Effect.gen(function* () {
+    const value = yield* runCliFailureBoundary(program, true, isKnownCliError)
+    const output = (yield* TestConsole.errorLines).map(String)
+    return { output, value }
+  })
 
 describe("CLI automation failure contract", () => {
   it.each([
@@ -105,29 +96,35 @@ describe("CLI automation failure contract", () => {
     ).toMatchObject({ details: { tag: "ProjectNotFoundError" } })
   })
 
-  it("returns successful values through the failure boundary", async () => {
-    const result = await runBoundary(Effect.succeed("completed"))
+  it.effect("returns successful values through the failure boundary", () =>
+    Effect.gen(function* () {
+      const result = yield* runBoundary(Effect.succeed("completed"))
 
-    expect(result).toEqual({ output: [], value: "completed" })
-    expect(process.exitCode).toBe(originalExitCode)
-  })
+      expect(result).toEqual({ output: [], value: "completed" })
+      expect(process.exitCode).toBe(originalExitCode)
+    })
+  )
 
-  it("renders typed failures and assigns their stable process status", async () => {
-    const result = await runBoundary(Effect.fail(new CliInputError({ message: "Invalid project." })))
+  it.effect("renders typed failures and assigns their stable process status", () =>
+    Effect.gen(function* () {
+      const result = yield* runBoundary(Effect.fail(new CliInputError({ message: "Invalid project." })))
 
-    expect(result.value).toBeUndefined()
-    expect(result.output).toHaveLength(1)
-    expect(JSON.parse(result.output[0] ?? "")).toMatchObject({ code: "INVALID_INPUT", message: "Invalid project." })
-    expect(process.exitCode).toBe(2)
-  })
+      expect(result.value).toBeUndefined()
+      expect(result.output).toHaveLength(1)
+      expect(JSON.parse(result.output[0] ?? "")).toMatchObject({ code: "INVALID_INPUT", message: "Invalid project." })
+      expect(process.exitCode).toBe(2)
+    })
+  )
 
-  it("redacts defects at the in-process failure boundary", async () => {
-    const result = await runBoundary(Effect.die(new Error("token=do-not-print")))
+  it.effect("redacts defects at the in-process failure boundary", () =>
+    Effect.gen(function* () {
+      const result = yield* runBoundary(Effect.die(new Error("token=do-not-print")))
 
-    expect(result.value).toBeUndefined()
-    expect(result.output).toHaveLength(1)
-    expect(result.output[0]).not.toContain("do-not-print")
-    expect(JSON.parse(result.output[0] ?? "")).toMatchObject({ code: "INTERNAL_ERROR" })
-    expect(process.exitCode).toBe(70)
-  })
+      expect(result.value).toBeUndefined()
+      expect(result.output).toHaveLength(1)
+      expect(result.output[0]).not.toContain("do-not-print")
+      expect(JSON.parse(result.output[0] ?? "")).toMatchObject({ code: "INTERNAL_ERROR" })
+      expect(process.exitCode).toBe(70)
+    })
+  )
 })

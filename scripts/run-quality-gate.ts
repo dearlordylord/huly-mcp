@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { Console, Effect, Schema } from "effect"
 
 import { NonEmptyString } from "../src/domain/schemas/shared.js"
 import { addSuccessfulOutputLines, OutputLineCount } from "./quality-output-budget.js"
@@ -63,4 +63,6 @@ for (const gate of gates) {
   })
 }
 
-console.log(`Quality gate emitted ${successfulOutputLines}/${maximumSuccessfulOutputLines} successful output lines.`)
+Effect.runSync(
+  Console.log(`Quality gate emitted ${successfulOutputLines}/${maximumSuccessfulOutputLines} successful output lines.`)
+)

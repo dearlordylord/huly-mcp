@@ -38,7 +38,11 @@
     // Effect Integration
     "plugins": [
       {
-        "name": "@effect/language-service"
+        "name": "@effect/language-service",
+        "diagnosticSeverity": {
+          "globalConsole": "error",
+          "globalConsoleInEffect": "error"
+        }
       }
     ]
   },

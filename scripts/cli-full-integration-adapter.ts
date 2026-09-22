@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process"
 import { readFileSync } from "node:fs"
 
-import { Result, Schema, SchemaTransformation } from "effect"
+import { Console, Effect, Result, Schema, SchemaTransformation } from "effect"
 
 import { McpImageContentSchema } from "../src/domain/schemas/attachments.js"
 import { cliCommandCatalog, isCliToolName } from "../packages/huly-cli/src/catalog.js"
@@ -108,4 +108,4 @@ const successResponse = (): FullIntegrationAdapterResponse => {
 }
 
 const response = execution.status === 0 ? successResponse() : errorResponse()
-console.log(JSON.stringify(Schema.encodeSync(FullIntegrationAdapterResponseSchema)(response)))
+Effect.runSync(Console.log(JSON.stringify(Schema.encodeSync(FullIntegrationAdapterResponseSchema)(response))))

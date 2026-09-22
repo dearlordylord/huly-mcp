@@ -1,7 +1,7 @@
 import type { Card as HulyCard, CardSpace as HulyCardSpace } from "@hcengineering/card"
 import type { ChatMessage } from "@hcengineering/chunter"
 import type { Ref, TxOperations } from "@hcengineering/core"
-import { Effect, Schema } from "effect"
+import { Console, Effect, Schema } from "effect"
 import { createRequire } from "node:module"
 import { parseArgs } from "node:util"
 
@@ -154,13 +154,11 @@ const main = Effect.gen(function* () {
 })
 
 Effect.runPromise(main).then(
-  (commentId) => {
-    // eslint-disable-next-line no-console -- JSON stdout is this integration helper's result boundary.
-    console.log(JSON.stringify(Schema.encodeSync(ResultSchema)({ commentId })))
+  async (commentId) => {
+    await Effect.runPromise(Console.log(JSON.stringify(Schema.encodeSync(ResultSchema)({ commentId }))))
   },
-  (error: unknown) => {
-    // eslint-disable-next-line no-console -- stderr is this integration helper's failure boundary.
-    console.error(error instanceof Error ? (error.stack ?? error.message) : String(error))
+  async (error: unknown) => {
+    await Effect.runPromise(Console.error(error instanceof Error ? (error.stack ?? error.message) : String(error)))
     process.exitCode = 1
   }
 )

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs"
 
-import { Schema } from "effect"
+import { Console, Effect, Schema } from "effect"
 
 import {
   FullIntegrationInventorySchema,
@@ -40,4 +40,4 @@ const inventory = Schema.encodeSync(FullIntegrationInventorySchema)({
   uniqueTools: [...new Set(toolCalls)].sort()
 })
 
-console.log(JSON.stringify(inventory))
+Effect.runSync(Console.log(JSON.stringify(inventory)))

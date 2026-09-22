@@ -2,6 +2,8 @@ import type { MarkupBlobRef, Ref, TxOperations } from "@hcengineering/core"
 import type { Document as HulyDocument } from "@hcengineering/document"
 import { createRequire } from "node:module"
 
+import { Console, Effect } from "effect"
+
 import { documentPlugin } from "../src/huly/huly-plugins.js"
 
 const require = createRequire(import.meta.url)
@@ -46,7 +48,7 @@ const parseArgs = (argv: ReadonlyArray<string>): Args => {
         index++
         break
       case "--help":
-        console.log(usage)
+        Effect.runSync(Console.log(usage))
         process.exit(0)
         break
       default:
@@ -99,10 +101,10 @@ const main = async (): Promise<void> => {
   const args = parseArgs(process.argv.slice(NODE_ARGUMENT_OFFSET))
   const client = await connect()
   await corruptDocumentContent(client, args)
-  console.log(`Corrupted Document.content for ${args.documentId}`)
+  await Effect.runPromise(Console.log(`Corrupted Document.content for ${args.documentId}`))
 }
 
-main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : String(error))
+main().catch(async (error: unknown) => {
+  await Effect.runPromise(Console.error(error instanceof Error ? error.message : String(error)))
   process.exit(1)
 })

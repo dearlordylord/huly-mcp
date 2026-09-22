@@ -1,6 +1,6 @@
 import type { UserProfile } from "@hcengineering/contact"
 import type { Blob, Data, TxOperations } from "@hcengineering/core"
-import { Schema, SchemaIssue } from "effect"
+import { Console, Effect, Schema, SchemaIssue } from "effect"
 import { createRequire } from "node:module"
 import { parseArgs } from "node:util"
 
@@ -93,13 +93,13 @@ const main = async (): Promise<string> => {
 }
 
 void main().then(
-  (output) => {
-    // eslint-disable-next-line no-console -- stdout is this integration helper's JSON result boundary.
-    console.log(output)
+  async (output) => {
+    await Effect.runPromise(Console.log(output))
   },
-  (error: unknown) => {
-    // eslint-disable-next-line no-console -- stderr is this integration helper's failure boundary.
-    console.error(Schema.isSchemaError(error) ? SchemaIssue.makeFormatterDefault()(error.issue) : error)
+  async (error: unknown) => {
+    await Effect.runPromise(
+      Console.error(Schema.isSchemaError(error) ? SchemaIssue.makeFormatterDefault()(error.issue) : error)
+    )
     process.exitCode = 1
   }
 )

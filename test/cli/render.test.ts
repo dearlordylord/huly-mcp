@@ -1,5 +1,7 @@
-import { Console, Effect, Schema } from "effect"
-import { describe, expect, it } from "vitest"
+import { it } from "@effect/vitest"
+import { Effect, Schema } from "effect"
+import { TestConsole } from "effect/testing"
+import { describe, expect } from "vitest"
 
 import { cliCommandCatalog } from "../../packages/huly-cli/src/catalog.js"
 import {
@@ -161,27 +163,10 @@ describe("CLI rendering", () => {
     expect(json).toEqual({ result: { ok: true }, warnings: success.warnings })
   })
 
-  it("logs rendered output through the Effect console service", async () => {
-    const logs: Array<unknown> = []
-    const consoleService = await Effect.runPromise(
-      Effect.gen(function* () {
-        return yield* Console.Console
-      })
-    )
-
-    await Effect.runPromise(
-      renderOperationSuccess({ result: "ok", warnings: [] }, globals).pipe(
-        Effect.provideService(
-          Console.Console,
-          Object.assign(Object.create(consoleService), {
-            log: (value: unknown) => {
-              logs.push(value)
-            }
-          })
-        )
-      )
-    )
-
-    expect(logs).toEqual(["ok"])
-  })
+  it.effect("logs rendered output through the Effect console service", () =>
+    Effect.gen(function* () {
+      yield* renderOperationSuccess({ result: "ok", warnings: [] }, globals)
+      expect(yield* TestConsole.logLines).toEqual(["ok"])
+    })
+  )
 })

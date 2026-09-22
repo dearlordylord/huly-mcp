@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process"
 
-import { Schema } from "effect"
+import { Console, Effect, Schema } from "effect"
 
 const JsonRpcResponseSchema = Schema.Struct({
   id: Schema.Number,
@@ -125,7 +125,7 @@ const main = async (): Promise<void> => {
   process.stdout.write("Packed MCP discovery, calls, EOF, and signal shutdown verified.\n")
 }
 
-main().catch((error: unknown) => {
-  console.error(error)
+main().catch(async (error: unknown) => {
+  await Effect.runPromise(Console.error(error))
   process.exitCode = 1
 })

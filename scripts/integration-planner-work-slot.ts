@@ -2,7 +2,7 @@ import type { Calendar as HulyCalendar } from "@hcengineering/calendar"
 import type { Employee, SocialIdentity } from "@hcengineering/contact"
 import type { TxOperations } from "@hcengineering/core"
 import type { WorkSlot as HulyWorkSlot } from "@hcengineering/time"
-import { Schema } from "effect"
+import { Console, Effect, Schema } from "effect"
 import { setTimeout } from "node:timers/promises"
 import { parseArgs } from "node:util"
 
@@ -150,12 +150,10 @@ const waitForPlannerSlot = async (args: CliArgs): Promise<PlannerSlotState> => {
 
 const main = async (): Promise<void> => {
   const result = Schema.encodeSync(PlannerSlotStateSchema)(await waitForPlannerSlot(parseCliArgs()))
-  // eslint-disable-next-line no-console -- JSON stdout is this integration helper's result boundary.
-  console.log(JSON.stringify(result))
+  await Effect.runPromise(Console.log(JSON.stringify(result)))
 }
 
-main().catch((error: unknown) => {
-  // eslint-disable-next-line no-console -- stderr is this integration helper's failure boundary.
-  console.error(error instanceof Error ? (error.stack ?? error.message) : String(error))
+main().catch(async (error: unknown) => {
+  await Effect.runPromise(Console.error(error instanceof Error ? (error.stack ?? error.message) : String(error)))
   process.exit(1)
 })

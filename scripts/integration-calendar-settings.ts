@@ -4,7 +4,7 @@ import type {
   PrimaryCalendar as HulyPrimaryCalendar
 } from "@hcengineering/calendar"
 import type { Data, Space, TxOperations } from "@hcengineering/core"
-import { Schema, SchemaIssue } from "effect"
+import { Console, Effect, Schema, SchemaIssue } from "effect"
 import { setTimeout as delay } from "node:timers/promises"
 import { parseArgs } from "node:util"
 
@@ -324,13 +324,13 @@ const main = async (): Promise<string> => {
 }
 
 void main().then(
-  (output) => {
-    // eslint-disable-next-line no-console -- JSON stdout is this integration helper's result boundary.
-    console.log(output)
+  async (output) => {
+    await Effect.runPromise(Console.log(output))
   },
-  (cause: unknown) => {
-    // eslint-disable-next-line no-console -- stderr is this integration helper's failure boundary.
-    console.error(Schema.isSchemaError(cause) ? SchemaIssue.makeFormatterDefault()(cause.issue) : cause)
+  async (cause: unknown) => {
+    await Effect.runPromise(
+      Console.error(Schema.isSchemaError(cause) ? SchemaIssue.makeFormatterDefault()(cause.issue) : cause)
+    )
     process.exitCode = 1
   }
 )

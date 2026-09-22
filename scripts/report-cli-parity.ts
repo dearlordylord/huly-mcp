@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs"
 
+import { Console, Effect } from "effect"
+
 import { cliCommandCatalog, ignoredMcpTools } from "../packages/huly-cli/src/catalog.js"
 import { cliIntegrationCoverageDecision } from "../packages/huly-cli/src/live-coverage.js"
 import { CLI_PARITY_BASELINE, CLI_PARITY_TARGET } from "../packages/huly-cli/src/parity-contract.js"
@@ -31,4 +33,4 @@ const report = {
   target: CLI_PARITY_TARGET
 }
 
-console.log(JSON.stringify(report, null, JSON_INDENT_SPACES))
+Effect.runSync(Console.log(JSON.stringify(report, null, JSON_INDENT_SPACES)))

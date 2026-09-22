@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs"
 
+import { Console, Effect } from "effect"
+
 import { cliCommandCatalog } from "../packages/huly-cli/src/catalog.js"
 import {
   cliIntegrationCoverageDecision,
@@ -112,13 +114,15 @@ const errors = [
 ].filter((message) => message !== undefined)
 
 if (errors.length > 0) {
-  console.error("CLI integration coverage is out of sync.")
+  Effect.runSync(Console.error("CLI integration coverage is out of sync."))
   for (const error of errors) {
-    console.error(`- ${error}`)
+    Effect.runSync(Console.error(`- ${error}`))
   }
   process.exitCode = 1
 } else {
-  console.log(
-    `CLI live coverage is in sync: ${coveredCases.length} behavior/risk cases, ${coveredTools.length} directly exercised commands, ${representativeRoutes} routes covered by shared operations plus adapter-class cases, ${catalogTools.length} catalog routes, zero deferrals.`
+  Effect.runSync(
+    Console.log(
+      `CLI live coverage is in sync: ${coveredCases.length} behavior/risk cases, ${coveredTools.length} directly exercised commands, ${representativeRoutes} routes covered by shared operations plus adapter-class cases, ${catalogTools.length} catalog routes, zero deferrals.`
+    )
   )
 }

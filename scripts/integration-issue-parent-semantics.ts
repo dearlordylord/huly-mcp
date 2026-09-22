@@ -1,6 +1,6 @@
 import type { DocumentUpdate, TxOperations } from "@hcengineering/core"
 import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
-import { Cause, Duration, Effect, Exit, Schedule, Schema } from "effect"
+import { Cause, Console, Duration, Effect, Schedule, Schema } from "effect"
 import { parseArgs } from "node:util"
 
 import {
@@ -294,16 +294,17 @@ const program = Effect.gen(function* () {
   return JSON.stringify(encoded)
 })
 
-void Effect.runPromiseExit(program).then(
-  Exit.match({
-    onFailure: (cause) => {
-      // eslint-disable-next-line no-console -- stderr is this integration helper's failure boundary.
-      console.error(Cause.pretty(cause))
-      process.exitCode = 1
-    },
-    onSuccess: (output) => {
-      // eslint-disable-next-line no-console -- JSON stdout is this integration helper's result boundary.
-      console.log(output)
-    }
-  })
+const executable = program.pipe(
+  Effect.tap(Console.log),
+  Effect.catchCause((cause) =>
+    Console.error(Cause.pretty(cause)).pipe(
+      Effect.andThen(
+        Effect.sync(() => {
+          process.exitCode = 1
+        })
+      )
+    )
+  )
 )
+
+void Effect.runPromise(executable)

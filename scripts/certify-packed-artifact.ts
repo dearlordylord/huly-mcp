@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs"
 
-import { Schema } from "effect"
+import { Console, Effect, Schema } from "effect"
 
 import {
   certifyPackedArtifact,
@@ -69,7 +69,7 @@ const main = async (): Promise<void> => {
   process.stdout.write(`${JSON.stringify(certification)}\n`)
 }
 
-main().catch((error: unknown) => {
-  console.error(error)
+main().catch(async (error: unknown) => {
+  await Effect.runPromise(Console.error(error))
   process.exitCode = 1
 })

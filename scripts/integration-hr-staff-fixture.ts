@@ -1,6 +1,6 @@
 import type { Employee, SocialIdentity } from "@hcengineering/contact"
 import type { Staff } from "@hcengineering/hr"
-import { Schema, SchemaIssue } from "effect"
+import { Console, Effect, Schema, SchemaIssue } from "effect"
 
 import { DepartmentId } from "../src/domain/schemas/hr-departments.js"
 import { PersonId } from "../src/domain/schemas/shared.js"
@@ -41,13 +41,13 @@ const main = async (): Promise<string> => {
 }
 
 void main().then(
-  (output) => {
-    // eslint-disable-next-line no-console -- stdout is this integration helper's JSON result boundary.
-    console.log(output)
+  async (output) => {
+    await Effect.runPromise(Console.log(output))
   },
-  (error: unknown) => {
-    // eslint-disable-next-line no-console -- stderr is this integration helper's failure boundary.
-    console.error(Schema.isSchemaError(error) ? SchemaIssue.makeFormatterDefault()(error.issue) : error)
+  async (error: unknown) => {
+    await Effect.runPromise(
+      Console.error(Schema.isSchemaError(error) ? SchemaIssue.makeFormatterDefault()(error.issue) : error)
+    )
     process.exitCode = 1
   }
 )

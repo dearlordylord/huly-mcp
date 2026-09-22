@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs"
 
-import { Schema } from "effect"
+import { Console, Effect, Schema } from "effect"
 
 import { cliCommandCatalog } from "../packages/huly-cli/src/catalog.js"
 import { CLI_FAILURE_CONTRACT } from "../packages/huly-cli/src/failures.js"
@@ -199,13 +199,13 @@ const current = (): typeof generated => ({
 if (check) {
   const existing = current()
   if (existing.skill !== generated.skill || existing.automation !== generated.automation) {
-    console.error("Published Huly CLI Agent Skill is stale. Run `pnpm update-cli-skill`.")
+    Effect.runSync(Console.error("Published Huly CLI Agent Skill is stale. Run `pnpm update-cli-skill`."))
     process.exitCode = 1
   } else {
-    console.log("Huly CLI Agent Skill matches command and failure contracts.")
+    Effect.runSync(Console.log("Huly CLI Agent Skill matches command and failure contracts."))
   }
 } else {
   writeFileSync(skillPath, generated.skill)
   writeFileSync(automationPath, generated.automation)
-  console.log("Updated published Huly CLI Agent Skill.")
+  Effect.runSync(Console.log("Updated published Huly CLI Agent Skill."))
 }

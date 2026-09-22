@@ -1,7 +1,7 @@
 import type { Document as HulyDocument, Teamspace as HulyTeamspace } from "@hcengineering/document"
 import type { TxOperations } from "@hcengineering/core"
 import type { ToDo as HulyToDo } from "@hcengineering/time"
-import { Schema } from "effect"
+import { Console, Effect, Schema } from "effect"
 import { setTimeout } from "node:timers/promises"
 import { parseArgs } from "node:util"
 
@@ -98,12 +98,10 @@ const waitForDocumentTodo = async (args: CliArgs): Promise<DocumentTodoState> =>
 
 const main = async (): Promise<void> => {
   const state = await waitForDocumentTodo(parseCliArgs())
-  // eslint-disable-next-line no-console -- JSON stdout is this integration helper's result boundary.
-  console.log(JSON.stringify(state))
+  await Effect.runPromise(Console.log(JSON.stringify(state)))
 }
 
-main().catch((error: unknown) => {
-  // eslint-disable-next-line no-console -- stderr is this integration helper's failure boundary.
-  console.error(error instanceof Error ? (error.stack ?? error.message) : String(error))
+main().catch(async (error: unknown) => {
+  await Effect.runPromise(Console.error(error instanceof Error ? (error.stack ?? error.message) : String(error)))
   process.exit(1)
 })

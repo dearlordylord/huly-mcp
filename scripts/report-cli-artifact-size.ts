@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { gzipSync } from "node:zlib"
 
-import { Schema } from "effect"
+import { Console, Effect, Schema } from "effect"
 
 import {
   cliArtifactSizeEvidenceMismatchError,
@@ -45,7 +45,7 @@ const main = async (): Promise<void> => {
         throw cliArtifactSizeEvidenceMismatchError(parseEvidence(evidence), report)
       }
     }
-    console.log(encoded.trimEnd())
+    await Effect.runPromise(Console.log(encoded.trimEnd()))
     if (report.materialIncrease) process.exitCode = 1
   } finally {
     rmSync(directory, { force: true, recursive: true })

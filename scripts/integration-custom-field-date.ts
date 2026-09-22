@@ -1,5 +1,5 @@
 import { type AnyAttribute, type Attribute, type Doc, type TxOperations } from "@hcengineering/core"
-import { Schema } from "effect"
+import { Console, Effect, Schema } from "effect"
 import { randomUUID } from "node:crypto"
 import { parseArgs } from "node:util"
 
@@ -115,13 +115,11 @@ const main = async (): Promise<string> => {
 }
 
 void main().then(
-  (output) => {
-    // eslint-disable-next-line no-console -- stdout is this integration helper's JSON result boundary.
-    console.log(output)
+  async (output) => {
+    await Effect.runPromise(Console.log(output))
   },
-  (cause) => {
-    // eslint-disable-next-line no-console -- stderr is this integration helper's failure boundary.
-    console.error(cause)
+  async (cause) => {
+    await Effect.runPromise(Console.error(cause))
     // eslint-disable-next-line functional/immutable-data -- process exit status is the script boundary.
     process.exitCode = 1
   }

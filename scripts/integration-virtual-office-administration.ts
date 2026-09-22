@@ -1,7 +1,7 @@
 import type { Floor, ParticipantInfo, Room } from "@hcengineering/love"
 import type { OfficeSettings } from "@hcengineering/setting"
 import type { TxOperations } from "@hcengineering/core"
-import { Schema } from "effect"
+import { Console, Effect, Schema } from "effect"
 import { createRequire } from "node:module"
 import { setTimeout as delay } from "node:timers/promises"
 import { parseArgs } from "node:util"
@@ -389,7 +389,9 @@ const cleanup = async (args: CleanupArgs): Promise<CleanupResult> => {
   const targets = await resolveCleanupTargets(args)
   const visibility = cleanupVisibility(args, targets)
   if (!visibility.floor || !visibility.room) {
-    console.error("Virtual-office cleanup timed out before every known fixture ID became visible; markers retained.")
+    await Effect.runPromise(
+      Console.error("Virtual-office cleanup timed out before every known fixture ID became visible; markers retained.")
+    )
     return unconfirmedCleanup("targets-not-visible", false, false, false, false)
   }
 
@@ -398,7 +400,9 @@ const cleanup = async (args: CleanupArgs): Promise<CleanupResult> => {
     roomIsPresent(client, args, roomRemoval.roomId)
   )
   if (!roomAbsent) {
-    console.error("Virtual-office Room absence was not confirmed by fresh readback; markers retained.")
+    await Effect.runPromise(
+      Console.error("Virtual-office Room absence was not confirmed by fresh readback; markers retained.")
+    )
     return unconfirmedCleanup("room-absence-unconfirmed", roomRemoval.removedRoom, false, false, false)
   }
 
@@ -407,7 +411,9 @@ const cleanup = async (args: CleanupArgs): Promise<CleanupResult> => {
     floorIsPresent(client, args, floorRemoval.floorId)
   )
   if (!floorAbsent) {
-    console.error("Virtual-office Floor absence was not confirmed by fresh readback; markers retained.")
+    await Effect.runPromise(
+      Console.error("Virtual-office Floor absence was not confirmed by fresh readback; markers retained.")
+    )
     return unconfirmedCleanup(
       "floor-absence-unconfirmed",
       roomRemoval.removedRoom,
@@ -430,13 +436,11 @@ const main = async (): Promise<string> => {
 }
 
 void main().then(
-  (output) => {
-    // eslint-disable-next-line no-console -- stdout is this integration helper's JSON result boundary.
-    console.log(output)
+  async (output) => {
+    await Effect.runPromise(Console.log(output))
   },
-  (cause) => {
-    // eslint-disable-next-line no-console -- stderr is this integration helper's failure boundary.
-    console.error(cause)
+  async (cause) => {
+    await Effect.runPromise(Console.error(cause))
     // eslint-disable-next-line functional/immutable-data -- process exit status is the script boundary.
     process.exitCode = 1
   }

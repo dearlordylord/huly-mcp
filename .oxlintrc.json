@@ -70,7 +70,7 @@
         "skipComments": true
       }
     ],
-    "no-console": "warn",
+    "no-console": "error",
     "no-magic-numbers": [
       "warn",
       {
@@ -91,12 +91,6 @@
     "hulymcp/require-canonical-effect-schema-import": "error"
   },
   "overrides": [
-    {
-      "files": ["scripts/**/*.ts"],
-      "rules": {
-        "no-console": "off"
-      }
-    },
     {
       "files": ["src/domain/schemas/shared.ts"],
       "rules": {

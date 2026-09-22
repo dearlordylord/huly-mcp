@@ -1,7 +1,7 @@
 import type { SocialIdentity } from "@hcengineering/contact"
 import type { TxOperations } from "@hcengineering/core"
 import type { Issue as HulyIssue, Project as HulyProject, TimeSpendReport } from "@hcengineering/tracker"
-import { Schema } from "effect"
+import { Console, Effect, Schema } from "effect"
 import { setTimeout } from "node:timers/promises"
 import { parseArgs } from "node:util"
 
@@ -162,12 +162,10 @@ const main = async (): Promise<void> => {
     afterCreate: toAggregateState(afterCreate),
     afterDelete: toAggregateState(afterDelete)
   })
-  // eslint-disable-next-line no-console -- JSON stdout is this integration helper's result boundary.
-  console.log(JSON.stringify(result))
+  await Effect.runPromise(Console.log(JSON.stringify(result)))
 }
 
-main().catch((error: unknown) => {
-  // eslint-disable-next-line no-console -- stderr is this integration helper's failure boundary.
-  console.error(error instanceof Error ? (error.stack ?? error.message) : String(error))
+main().catch(async (error: unknown) => {
+  await Effect.runPromise(Console.error(error instanceof Error ? (error.stack ?? error.message) : String(error)))
   process.exit(1)
 })

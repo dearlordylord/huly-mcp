@@ -1,7 +1,7 @@
 import { builtinModules } from "node:module"
 import { readFileSync } from "node:fs"
 
-import { Schema } from "effect"
+import { Console, Effect, Schema } from "effect"
 
 const CliPackageJsonSchema = Schema.Struct({
   bin: Schema.Struct({ huly: Schema.Literal("./dist/index.cjs") }),
@@ -39,10 +39,12 @@ const errors = [
 ].filter((message) => message !== undefined)
 
 if (errors.length > 0) {
-  for (const error of errors) console.error(error)
+  for (const error of errors) Effect.runSync(Console.error(error))
   process.exitCode = 1
 } else {
-  console.log(
-    `CLI package closure verified: bundled shared registry plus exactly one declared external runtime dependency (${EXPECTED_EXTERNAL_MODULES[0]}).`
+  Effect.runSync(
+    Console.log(
+      `CLI package closure verified: bundled shared registry plus exactly one declared external runtime dependency (${EXPECTED_EXTERNAL_MODULES[0]}).`
+    )
   )
 }

@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process"
 
-import { Schema } from "effect"
+import { Console, Effect, Schema } from "effect"
 
 import { cliCommandCatalog } from "../packages/huly-cli/src/catalog.js"
 import { CliFailureSchema } from "../packages/huly-cli/src/failures.js"
@@ -160,6 +160,8 @@ if (
   throw new Error("Packed CLI did not accept structured JSON with explicit-field precedence before configuration.")
 }
 
-console.log(
-  `Packed CLI smoke passed: version ${expectedVersion}, ${String(actualCommandCounts.size)} root commands, ${String(packedRegistryRoutes)} catalog routes, representative help, structured precedence, and exact text/JSON failure exits.`
+Effect.runSync(
+  Console.log(
+    `Packed CLI smoke passed: version ${expectedVersion}, ${String(actualCommandCounts.size)} root commands, ${String(packedRegistryRoutes)} catalog routes, representative help, structured precedence, and exact text/JSON failure exits.`
+  )
 )

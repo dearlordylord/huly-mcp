@@ -1,5 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs"
 
+import { Console, Effect } from "effect"
+
 import { cliCommandCatalog, isCliToolName } from "../packages/huly-cli/src/catalog.js"
 import type { CliCommandSpec } from "../packages/huly-cli/src/catalog-types.js"
 import { operationRegistry } from "../src/mcp/tools/index.js"
@@ -113,7 +115,7 @@ const next =
 
 if (checkOnly) {
   if (next !== source) {
-    console.error(`${readmePath} command reference is stale. Run pnpm update-cli-readme.`)
+    Effect.runSync(Console.error(`${readmePath} command reference is stale. Run pnpm update-cli-readme.`))
     process.exitCode = 1
   }
 } else {

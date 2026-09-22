@@ -14,6 +14,8 @@ import type { ProjectStatus, ProjectType, TaskType } from "@hcengineering/task"
 import type { Issue as HulyIssue } from "@hcengineering/tracker"
 import { createRequire } from "node:module"
 
+import { Console, Effect } from "effect"
+
 const require = createRequire(import.meta.url)
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports, no-restricted-syntax -- CJS interop boundary: api-client does not expose these helpers as ESM runtime named exports under tsx.
 const apiClient = require("@hcengineering/api-client") as typeof import("@hcengineering/api-client")
@@ -123,7 +125,7 @@ const parseArgs = (argv: ReadonlyArray<string>): Args => {
         deleteTestIssues = true
         break
       case "--help":
-        console.log(usage)
+        Effect.runSync(Console.log(usage))
         process.exit(0)
         break
       default:
@@ -374,7 +376,7 @@ const maybeRemoveDoc = async <T extends Doc>(
     } catch (error) {
       const message = `removeDoc failed for ${objectId}: ${error instanceof Error ? error.message : String(error)}`
       if (!warnOnly) throw new Error(message)
-      console.warn(`Warning: ${message}`)
+      await Effect.runPromise(Console.warn(`Warning: ${message}`))
     }
   }
 }
@@ -385,14 +387,18 @@ const removeWorkflowArtifacts = async (connection: CleanupConnection, args: Args
   const taskTypeIds = uniqueRefs(artifacts.taskTypes.map((taskType) => taskType._id))
   const statusIds = uniqueRefs(artifacts.statuses.map((status) => status._id))
 
-  console.log(`Project type: ${artifacts.projectType.name} (${artifacts.projectType._id})`)
-  console.log(
-    `Matched task types: ${
-      artifacts.taskTypes.map((taskType) => `${taskType.name} (${taskType._id})`).join(", ") || "none"
-    }`
+  await Effect.runPromise(Console.log(`Project type: ${artifacts.projectType.name} (${artifacts.projectType._id})`))
+  await Effect.runPromise(
+    Console.log(
+      `Matched task types: ${
+        artifacts.taskTypes.map((taskType) => `${taskType.name} (${taskType._id})`).join(", ") || "none"
+      }`
+    )
   )
-  console.log(
-    `Matched statuses: ${artifacts.statuses.map((status) => `${status.name} (${status._id})`).join(", ") || "none"}`
+  await Effect.runPromise(
+    Console.log(
+      `Matched statuses: ${artifacts.statuses.map((status) => `${status.name} (${status._id})`).join(", ") || "none"}`
+    )
   )
 
   const issues = await findIssues(rest, taskTypeIds, statusIds, args.issueTitlePrefixes)
@@ -403,7 +409,9 @@ const removeWorkflowArtifacts = async (connection: CleanupConnection, args: Args
   }
 
   for (const issue of issues) {
-    console.log(`${args.dryRun ? "Would delete" : "Deleting"} issue ${issue.identifier}: ${issue.title}`)
+    await Effect.runPromise(
+      Console.log(`${args.dryRun ? "Would delete" : "Deleting"} issue ${issue.identifier}: ${issue.title}`)
+    )
     await maybeRemoveDoc(tx, args.dryRun, tracker.class.Issue, issue.space, issue._id)
   }
 
@@ -419,7 +427,7 @@ const removeWorkflowArtifacts = async (connection: CleanupConnection, args: Args
       )
     }
   } else {
-    console.log("Dry run: skipping post-delete issue usage check")
+    await Effect.runPromise(Console.log("Dry run: skipping post-delete issue usage check"))
   }
 
   const updatedProjectTasks = artifacts.projectType.tasks.filter((taskTypeId) => !taskTypeIds.includes(taskTypeId))
@@ -430,7 +438,7 @@ const removeWorkflowArtifacts = async (connection: CleanupConnection, args: Args
     updatedProjectTasks.length !== artifacts.projectType.tasks.length ||
     updatedProjectStatuses.length !== artifacts.projectType.statuses.length
   ) {
-    console.log(`${args.dryRun ? "Would update" : "Updating"} project type refs`)
+    await Effect.runPromise(Console.log(`${args.dryRun ? "Would update" : "Updating"} project type refs`))
     await maybeUpdateDoc(tx, args.dryRun, task.class.ProjectType, core.space.Model, artifacts.projectType._id, {
       tasks: updatedProjectTasks,
       statuses: updatedProjectStatuses
@@ -447,7 +455,9 @@ const removeWorkflowArtifacts = async (connection: CleanupConnection, args: Args
     if (taskTypeIds.includes(taskType._id)) continue
     const updatedStatuses = uniqueRefs(taskType.statuses).filter((statusId) => !statusIds.includes(statusId))
     if (updatedStatuses.length !== taskType.statuses.length) {
-      console.log(`${args.dryRun ? "Would update" : "Updating"} task type refs ${taskType.name}`)
+      await Effect.runPromise(
+        Console.log(`${args.dryRun ? "Would update" : "Updating"} task type refs ${taskType.name}`)
+      )
       await maybeUpdateDoc(tx, args.dryRun, task.class.TaskType, core.space.Model, taskType._id, {
         statuses: updatedStatuses
       })
@@ -455,14 +465,20 @@ const removeWorkflowArtifacts = async (connection: CleanupConnection, args: Args
   }
 
   for (const taskType of artifacts.taskTypes) {
-    console.log(`${args.dryRun ? "Would delete" : "Deleting"} task type ${taskType.name} (${taskType._id})`)
+    await Effect.runPromise(
+      Console.log(`${args.dryRun ? "Would delete" : "Deleting"} task type ${taskType.name} (${taskType._id})`)
+    )
     await maybeRemoveDoc(tx, args.dryRun, task.class.TaskType, core.space.Model, taskType._id)
-    console.log(`${args.dryRun ? "Would delete" : "Deleting"} task type target class ${taskType.targetClass}`)
+    await Effect.runPromise(
+      Console.log(`${args.dryRun ? "Would delete" : "Deleting"} task type target class ${taskType.targetClass}`)
+    )
     await maybeRemoveDoc(tx, args.dryRun, core.class.Mixin, core.space.Model, taskType.targetClass)
   }
 
   for (const status of artifacts.statuses) {
-    console.log(`${args.dryRun ? "Would delete" : "Deleting"} status ${status.name} (${status._id})`)
+    await Effect.runPromise(
+      Console.log(`${args.dryRun ? "Would delete" : "Deleting"} status ${status.name} (${status._id})`)
+    )
     await maybeRemoveDoc(tx, args.dryRun, status._class, core.space.Model, status._id)
   }
 }
@@ -473,7 +489,7 @@ const main = async (): Promise<void> => {
   await removeWorkflowArtifacts(connection, args)
 }
 
-main().catch((error: unknown) => {
-  console.error(error instanceof Error ? (error.stack ?? error.message) : String(error))
+main().catch(async (error: unknown) => {
+  await Effect.runPromise(Console.error(error instanceof Error ? (error.stack ?? error.message) : String(error)))
   process.exit(1)
 })

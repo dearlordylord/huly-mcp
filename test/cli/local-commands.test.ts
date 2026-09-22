@@ -2,7 +2,8 @@ import * as fs from "node:fs/promises"
 import * as path from "node:path"
 
 import { NodeServices } from "@effect/platform-node"
-import { Console, Effect, Layer, Redacted, Schema } from "effect"
+import { Effect, Layer, Redacted, Schema } from "effect"
+import { TestConsole } from "effect/testing"
 import { Command } from "effect/unstable/cli"
 import { afterEach, describe, expect, it } from "vitest"
 
@@ -33,28 +34,16 @@ const makePorts = async (): Promise<LocalCliPorts> => {
 }
 
 const run = async (ports: LocalCliPorts, argv: ReadonlyArray<string>): Promise<ReadonlyArray<string>> => {
-  const output: Array<string> = []
-  const consoleService = await Effect.runPromise(
+  return Effect.runPromise(
     Effect.gen(function* () {
-      return yield* Console.Console
-    })
-  )
-  await Effect.runPromise(
-    Command.runWith(buildRootCommand(argv), { version: "test", renderErrors: false })(argv).pipe(
-      Effect.provide(
-        Layer.mergeAll(NodeServices.layer, TelemetryService.testLayer(), Layer.succeed(LocalCliService, ports))
-      ),
-      Effect.provideService(
-        Console.Console,
-        Object.assign(Object.create(consoleService), {
-          log: (value: unknown) => {
-            output.push(String(value))
-          }
-        })
+      yield* Command.runWith(buildRootCommand(argv), { version: "test", renderErrors: false })(argv).pipe(
+        Effect.provide(
+          Layer.mergeAll(NodeServices.layer, TelemetryService.testLayer(), Layer.succeed(LocalCliService, ports))
+        )
       )
-    )
+      return (yield* TestConsole.logLines).map(String)
+    }).pipe(Effect.provide(TestConsole.layer))
   )
-  return output
 }
 
 afterEach(async () => {
