@@ -1,3 +1,10 @@
+import {
+  logoutProfile,
+  saveLogin,
+  selectProfile,
+  updateProfile
+} from "../../packages/huly-cli/src/profile-operations.js"
+import { resolveStdioProfile } from "../../src/profiles/stdio.js"
 import * as fs from "node:fs/promises"
 import * as path from "node:path"
 
@@ -70,7 +77,11 @@ describe("CLI profile store", () => {
     await Effect.runPromise(store.writeCredentials({ version: 1, tokens: { [work]: storedToken("stored-token") } }))
 
     const resolved = await Effect.runPromise(
-      resolveCliConfiguration(store, { HULY_URL: "https://environment.example", HULY_TOKEN: "environment-token" })
+      resolveCliConfiguration(store, {
+        HULY_URL: "https://environment.example",
+        HULY_WORKSPACE: "profile-space",
+        HULY_TOKEN: "environment-token"
+      })
     )
 
     expect(resolved.url).toBe("https://environment.example")
@@ -188,7 +199,12 @@ describe("CLI profile store", () => {
     await Effect.runPromise(store.writeCredentials({ version: 1, tokens: { [work]: storedToken("stored") } }))
 
     const resolved = await Effect.runPromise(
-      resolveCliConfiguration(store, { HULY_EMAIL: "agent@example.com", HULY_PASSWORD: "environment" })
+      resolveCliConfiguration(store, {
+        HULY_URL: "https://profile.example",
+        HULY_WORKSPACE: "workspace",
+        HULY_EMAIL: "agent@example.com",
+        HULY_PASSWORD: "environment"
+      })
     )
 
     expect(resolved.auth.method).toBe("password")
@@ -257,4 +273,187 @@ describe("CLI profile store", () => {
     expect(resolved.profile).toBe("second")
     expect(resolved.url).toBe("https://second.example")
   })
+})
+
+describe("shared profile selection and credential binding", () => {
+  const makeProfiles = async () => {
+    const store = await temporaryStore()
+    const first = await profileName("first")
+    const second = await profileName("second")
+    await Effect.runPromise(
+      saveLogin(store, first, { url: "https://first.example", workspace: "one" }, storedToken("first-secret"))
+    )
+    await Effect.runPromise(
+      saveLogin(store, second, { url: "https://second.example", workspace: "two" }, storedToken("second-secret"))
+    )
+    return { store, first, second }
+  }
+
+  it("selects CLI flag before environment before active", async () => {
+    const { store } = await makeProfiles()
+    expect((await Effect.runPromise(resolveCliConfiguration(store, {}, "first"))).profile).toBe("first")
+    expect((await Effect.runPromise(resolveCliConfiguration(store, { HULY_PROFILE: "first" }))).profile).toBe("first")
+    expect((await Effect.runPromise(resolveCliConfiguration(store, { HULY_PROFILE: "second" }, "first"))).profile).toBe(
+      "first"
+    )
+    expect((await Effect.runPromise(resolveCliConfiguration(store, {}))).profile).toBe("second")
+    expect(
+      (await Effect.runPromise(resolveCliConfiguration(store, { HULY_PROFILE: "bad name" }, "first"))).profile
+    ).toBe("first")
+  })
+
+  it("stdio never follows CLI active selection", async () => {
+    const { first, store } = await makeProfiles()
+    expect((await Effect.runPromise(resolveStdioProfile({}, store))).auth.method).toBe("none")
+    await Effect.runPromise(selectProfile(store, first))
+    const resolved = await Effect.runPromise(resolveStdioProfile({ HULY_PROFILE: "second" }, store))
+    expect(resolved.workspace).toBe("two")
+    expect(resolved.auth.method).toBe("token")
+    if (resolved.auth.method === "token") expect(Redacted.value(resolved.auth.token)).toBe("second-secret")
+  })
+
+  it("rejects destination overrides and metadata edits without exposing secrets", async () => {
+    const { first, store } = await makeProfiles()
+    for (const environment of [
+      { HULY_URL: "https://other.example" },
+      { HULY_WORKSPACE: "other" },
+      { HULY_TOKEN: "incomplete-secret" }
+    ]) {
+      const exit = await Effect.runPromiseExit(resolveCliConfiguration(store, environment, "first"))
+      expect(exit.toString()).toContain("CliProfileStoreError")
+      expect(exit.toString()).not.toContain("first-secret")
+      expect(exit.toString()).not.toContain("incomplete-secret")
+    }
+    await Effect.runPromise(updateProfile(store, first, { workspace: "changed" }))
+    expect((await Effect.runPromiseExit(resolveStdioProfile({ HULY_PROFILE: "first" }, store))).toString()).toContain(
+      "destination changed"
+    )
+  })
+
+  it("keeps a credential usable after changing only the default project", async () => {
+    const { first, store } = await makeProfiles()
+    await Effect.runPromise(updateProfile(store, first, { defaultProject: "NEW" }))
+    expect((await Effect.runPromise(resolveCliConfiguration(store, {}, "first"))).defaultProject).toBe("NEW")
+  })
+
+  it("allows complete ephemeral environment credentials after a destination change", async () => {
+    const { first, store } = await makeProfiles()
+    await Effect.runPromise(updateProfile(store, first, { workspace: "changed" }))
+    const resolved = await Effect.runPromise(
+      resolveStdioProfile(
+        { HULY_PROFILE: "first", HULY_URL: "https://other.example", HULY_WORKSPACE: "other", HULY_TOKEN: "ephemeral" },
+        store
+      )
+    )
+    expect(resolved.workspace).toBe("other")
+    const credentials = await Effect.runPromise(store.readCredentials())
+    const saved = credentials.tokens[first]
+    expect(saved).toBeDefined()
+    if (saved !== undefined) expect(Redacted.value(saved)).toBe("first-secret")
+  })
+
+  it("fails selected profiles with missing credentials without prompting", async () => {
+    const { first, store } = await makeProfiles()
+    await Effect.runPromise(store.writeCredentials({ version: 1, tokens: {} }))
+    expect((await Effect.runPromiseExit(resolveStdioProfile({ HULY_PROFILE: first }, store))).toString()).toContain(
+      "no usable credentials"
+    )
+    expect((await Effect.runPromiseExit(resolveCliConfiguration(store, {}, "absent"))).toString()).toContain(
+      "does not exist"
+    )
+    expect((await Effect.runPromiseExit(resolveCliConfiguration(store, {}, "bad name"))).toString()).toContain(
+      "Invalid Huly profile name"
+    )
+  })
+})
+
+it("requires reauthentication for legacy tokens with no destination binding", async () => {
+  const store = await temporaryStore()
+  const name = await profileName("legacy")
+  await Effect.runPromise(
+    store.writeProfiles({
+      version: 1,
+      activeProfile: name,
+      profiles: { [name]: { url: "https://legacy.example", workspace: "old" } }
+    })
+  )
+  await Effect.runPromise(store.writeCredentials({ version: 1, tokens: { [name]: storedToken("legacy-secret") } }))
+  const exit = await Effect.runPromiseExit(resolveCliConfiguration(store, {}))
+  expect(exit.toString()).toContain("unbound")
+  expect(exit.toString()).not.toContain("legacy-secret")
+})
+
+it("uses the same injected credential selector for CLI and stdio", async () => {
+  const store = await temporaryStore()
+  const name = await profileName("native-ready")
+  const profile = { url: "https://native.example", workspace: "shared" }
+  await Effect.runPromise(store.writeProfiles({ version: 1, activeProfile: name, profiles: { [name]: profile } }))
+  const destinations: Array<string> = []
+  const selector = () => ({
+    read: (selected: typeof name, destination: typeof profile) => {
+      destinations.push(`${selected}:${destination.url}:${destination.workspace}`)
+      return Effect.succeed(storedToken("external-secret"))
+    },
+    save: () => Effect.void,
+    remove: () => Effect.void
+  })
+  const cli = await Effect.runPromise(resolveCliConfiguration(store, {}, undefined, true, selector))
+  const stdio = await Effect.runPromise(resolveStdioProfile({ HULY_PROFILE: name }, store, selector))
+  expect(cli).toEqual(stdio)
+  expect(destinations).toEqual([
+    "native-ready:https://native.example:shared",
+    "native-ready:https://native.example:shared"
+  ])
+  expect(await Effect.runPromise(store.readCredentials())).toEqual({ version: 1, tokens: {} })
+})
+
+it("removes an unbound legacy token without requiring migration", async () => {
+  const store = await temporaryStore()
+  const name = await profileName("legacy")
+  await Effect.runPromise(
+    store.writeProfiles({
+      version: 1,
+      activeProfile: name,
+      profiles: { [name]: { url: "https://legacy.example", workspace: "old" } }
+    })
+  )
+  await Effect.runPromise(store.writeCredentials({ version: 1, tokens: { [name]: storedToken("legacy-secret") } }))
+  await Effect.runPromise(logoutProfile(store))
+  expect((await Effect.runPromise(store.readCredentials())).tokens).toEqual({})
+})
+
+it("rejects URLs with embedded credentials without exposing them", async () => {
+  const store = await temporaryStore()
+  const exit = await Effect.runPromiseExit(
+    resolveCliConfiguration(store, {
+      HULY_URL: "https://user:private-password@huly.example",
+      HULY_TOKEN: "private-token"
+    })
+  )
+  expect(exit.toString()).toContain("Invalid resolved Huly CLI configuration")
+  expect(exit.toString()).not.toContain("private-password")
+  expect(exit.toString()).not.toContain("private-token")
+})
+
+it("uses complete ephemeral password credentials for explicitly selected stdio profiles", async () => {
+  const store = await temporaryStore()
+  const name = await profileName("password-env")
+  await Effect.runPromise(
+    store.writeProfiles({ version: 1, profiles: { [name]: { url: "https://old.example", workspace: "old" } } })
+  )
+  const resolved = await Effect.runPromise(
+    resolveStdioProfile(
+      {
+        HULY_PROFILE: name,
+        HULY_URL: "https://new.example",
+        HULY_WORKSPACE: "new",
+        HULY_EMAIL: "user@example.com",
+        HULY_PASSWORD: "ephemeral-password"
+      },
+      store
+    )
+  )
+  expect(resolved.auth.method).toBe("password")
+  expect(resolved.workspace).toBe("new")
+  expect(await Effect.runPromise(store.readCredentials())).toEqual({ version: 1, tokens: {} })
 })

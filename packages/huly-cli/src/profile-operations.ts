@@ -1,3 +1,4 @@
+import { type CredentialStoreSelector, selectCredentialStore } from "../../../src/profiles/credential-store.js"
 import { Effect, type Redacted, Schema } from "effect"
 
 import {
@@ -106,18 +107,19 @@ export const saveLogin = (
   store: CliProfileStore,
   name: ProfileName,
   profile: CliProfile,
-  token: Redacted.Redacted<string>
+  token: Redacted.Redacted<string>,
+  credentialStore: CredentialStoreSelector = selectCredentialStore
 ): Effect.Effect<void, CliProfileStoreError> =>
   Effect.gen(function* () {
     const profiles = yield* store.readProfiles()
-    const credentials = yield* store.readCredentials()
     yield* store.writeProfiles({ ...withActiveProfile(profiles, name, profile), activeProfile: name })
-    yield* store.writeCredentials({ ...credentials, tokens: { ...credentials.tokens, [name]: token } })
+    yield* credentialStore(store).save(name, profile, token)
   })
 
 export const logoutProfile = (
   store: CliProfileStore,
-  requestedName?: ProfileName
+  requestedName?: ProfileName,
+  credentialStore: CredentialStoreSelector = selectCredentialStore
 ): Effect.Effect<ProfileName, CliProfileStoreError> =>
   Effect.gen(function* () {
     const profiles = yield* store.readProfiles()
@@ -125,9 +127,7 @@ export const logoutProfile = (
     if (name === undefined || profiles.profiles[name] === undefined) {
       return yield* new CliProfileStoreError({ kind: "input", message: "No active Huly CLI profile." })
     }
-    const credentials = yield* store.readCredentials()
-    const { [name]: _removed, ...tokens } = credentials.tokens
-    yield* store.writeCredentials({ ...credentials, tokens })
+    yield* credentialStore(store).remove(name)
     return name
   })
 
@@ -157,7 +157,7 @@ const makeAuthStatus = (
   resolved: ResolvedCliConfiguration,
   environment: NodeJS.ProcessEnv
 ): CliAuthStatus => {
-  const profile = profiles.activeProfile === undefined ? undefined : profiles.profiles[profiles.activeProfile]
+  const profile = resolved.profile === undefined ? undefined : profiles.profiles[resolved.profile]
   const method = authMethod(resolved)
   return Schema.decodeUnknownSync(CliAuthStatusSchema)({
     authenticated: method !== "none",
@@ -168,7 +168,7 @@ const makeAuthStatus = (
       workspace: source(environment["HULY_WORKSPACE"], profile?.workspace),
       authentication: source(
         environment["HULY_TOKEN"] ?? environment["HULY_EMAIL"] ?? environment["HULY_PASSWORD"],
-        profiles.activeProfile === undefined || resolved.auth.method !== "token" ? undefined : profiles.activeProfile
+        resolved.profile === undefined || resolved.auth.method !== "token" ? undefined : resolved.profile
       )
     }
   })
@@ -176,10 +176,18 @@ const makeAuthStatus = (
 
 export const getAuthStatus = (
   store: CliProfileStore,
-  environment: NodeJS.ProcessEnv
+  environment: NodeJS.ProcessEnv,
+  requestedName?: string
 ): Effect.Effect<CliAuthStatus, CliProfileStoreError> =>
   Effect.gen(function* () {
     const profiles = yield* store.readProfiles()
-    const resolved = yield* resolveCliConfiguration(store, environment)
+    const resolved = yield* resolveCliConfiguration(
+      store,
+      environment,
+      requestedName,
+      true,
+      selectCredentialStore,
+      false
+    )
     return makeAuthStatus(profiles, resolved, environment)
   })

@@ -40,7 +40,7 @@ export interface SanitizedHulyRuntimeConfigContext {
   }
   readonly auth: {
     readonly method: "token" | "password" | "unknown"
-    readonly source: "env" | "header" | "none"
+    readonly source: "env" | "header" | "profile" | "none"
     readonly tokenConfigured: boolean
     readonly emailConfigured: boolean
     readonly passwordConfigured: boolean

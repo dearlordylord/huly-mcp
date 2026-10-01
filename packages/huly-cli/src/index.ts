@@ -17,7 +17,7 @@ declare const PKG_VERSION: unknown
 const cliVersion = typeof PKG_VERSION === "string" ? PKG_VERSION : "0.43.0"
 const NODE_ARGUMENT_OFFSET = 2
 const GLOBAL_BOOLEAN_FLAGS = new Set(["--json", "--yes"])
-const GLOBAL_TEXT_FLAGS = new Set(["--input-json", "--input-file", "--output"])
+const GLOBAL_TEXT_FLAGS = new Set(["--input-json", "--input-file", "--output", "--profile"])
 
 interface GlobalOptionClassification {
   readonly isBoolean: boolean

@@ -8,13 +8,18 @@
 import "./polyfills.js"
 
 import { NodeRuntime } from "@effect/platform-node"
-import { Config, type Duration, Effect, Exit, Layer, Option, type Redacted, Schema } from "effect"
+import { Config, ConfigProvider, type Duration, Effect, Exit, Layer, Option, type Redacted, Schema } from "effect"
 
 import {
   type ConfigValidationError,
+  HulyConfigService,
   sanitizeHulyRuntimeConfigFromEnv,
   sanitizeHulyRuntimeConfigFromHeaders
 } from "./config/config.js"
+import { resolvedConfigProvider } from "./profiles/config-provider.js"
+import type { CliProfileStoreError } from "./profiles/model.js"
+import { profileRuntimeContext } from "./profiles/runtime-context.js"
+import { defaultProfileStore, resolveStdioProfile } from "./profiles/stdio.js"
 import type { HulyClientError } from "./huly/client.js"
 import type { StorageClientError } from "./huly/storage.js"
 import {
@@ -37,7 +42,13 @@ import { createHttpClientLeaseResolver } from "./runtime/http-client-leases.js"
 import { TelemetryService } from "./telemetry/telemetry.js"
 import { writeStderrLine } from "./utils/stderr.js"
 
-type AppError = ConfigValidationError | HulyClientError | StorageClientError | McpServerError | Config.ConfigError
+type AppError =
+  | CliProfileStoreError
+  | ConfigValidationError
+  | HulyClientError
+  | StorageClientError
+  | McpServerError
+  | Config.ConfigError
 
 const getTransportType = Config.String("MCP_TRANSPORT").pipe(
   Config.withDefault("stdio"),
@@ -117,7 +128,8 @@ export const buildAppLayer = (
     signal: AbortSignal
   ) => Promise<RequestClientLease<Exit.Exit<ClientBundle, HulyClientBundleError>>>,
   httpServerFactoryLayer: Layer.Layer<HttpServerFactoryService> = HttpServerFactoryService.defaultLayer,
-  closeClients?: () => Promise<void>
+  closeClients?: () => Promise<void>,
+  runtimeConfigContext = () => sanitizeHulyRuntimeConfigFromEnv(process.env)
 ): Layer.Layer<McpServerService | HttpServerFactoryService, McpServerError, never> => {
   const mcpServerConfig = {
     transport,
@@ -128,7 +140,7 @@ export const buildAppLayer = (
     resolveClients,
     ...(closeClients === undefined ? {} : { closeClients }),
     resolveClientLeaseForHttpRequest,
-    getRuntimeConfigContext: () => sanitizeHulyRuntimeConfigFromEnv(process.env),
+    getRuntimeConfigContext: runtimeConfigContext,
     getRuntimeConfigContextForHttpRequest: (req: Request) =>
       sanitizeHulyRuntimeConfigFromHeaders(webHeadersRecord(req.headers), process.env)
   }
@@ -139,13 +151,22 @@ export const buildAppLayer = (
 
 const runConfiguredServer = (transport: McpTransportType): Effect.Effect<void, AppError> =>
   Effect.gen(function* () {
+    const environment = { ...process.env }
     const httpPort = yield* getHttpPort
     const httpHost = yield* getHttpHost
     const mcpAuthToken = transport === "http" ? Option.getOrUndefined(yield* getMcpAuthToken) : undefined
     const lazyEnvs = yield* getLazyEnvs
-    const authMethod: "token" | "password" = process.env["HULY_TOKEN"] ? "token" : "password"
-
-    const combinedClientLayer = buildCombinedClientLayer()
+    const profile =
+      transport === "stdio" && environment["HULY_PROFILE"] !== undefined
+        ? yield* resolveStdioProfile(environment, yield* defaultProfileStore(environment))
+        : undefined
+    const authMethod: "token" | "password" =
+      profile?.auth.method === "token" || environment["HULY_TOKEN"] ? "token" : "password"
+    const configLayer =
+      profile === undefined
+        ? HulyConfigService.layer
+        : HulyConfigService.layer.pipe(Layer.provide(ConfigProvider.layer(resolvedConfigProvider(profile))))
+    const combinedClientLayer = buildCombinedClientLayer(configLayer)
     yield* Effect.acquireUseRelease(
       Effect.sync(() => createClientResolver(combinedClientLayer)),
       ({ close: closeClients, resolve: resolveClients }) => {
@@ -170,7 +191,11 @@ const runConfiguredServer = (transport: McpTransportType): Effect.Effect<void, A
             resolveClients,
             resolveHttpClientLease,
             HttpServerFactoryService.defaultLayer,
-            closeClients
+            closeClients,
+            () =>
+              profile === undefined
+                ? sanitizeHulyRuntimeConfigFromEnv(environment)
+                : profileRuntimeContext(profile, environment)
           )
 
           yield* Effect.gen(function* () {

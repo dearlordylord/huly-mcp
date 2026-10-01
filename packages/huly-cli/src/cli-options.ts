@@ -48,7 +48,7 @@ interface ParsedBase64FileFieldOption {
 
 interface ParsedGlobalOption {
   readonly _tag: "GlobalOption"
-  readonly name: "input-file" | "input-json" | "output"
+  readonly name: "input-file" | "input-json" | "output" | "profile"
   readonly value: string
 }
 
@@ -213,6 +213,7 @@ export const cliFieldOptionHelpRows = (tool: ToolDefinition, spec: CliCommandSpe
 }
 
 const GLOBAL_OPTION_DESCRIPTIONS = {
+  profile: "Select a saved Huly profile; overrides HULY_PROFILE and the active profile.",
   inputFile: "Merge a JSON object from this file before explicit field flags.",
   inputJson: "Merge this JSON object into operation input before explicit field flags.",
   json: "Print the operation result as JSON.",
@@ -221,6 +222,9 @@ const GLOBAL_OPTION_DESCRIPTIONS = {
 }
 
 const globalOptions: ReadonlyArray<Flag.Flag<ReadonlyArray<ParsedCliOption>>> = [
+  optionalTextOption("profile", (value) => ({ _tag: "GlobalOption", name: "profile", value })).pipe(
+    Flag.withDescription(GLOBAL_OPTION_DESCRIPTIONS.profile)
+  ),
   booleanOption("json").pipe(Flag.withDescription(GLOBAL_OPTION_DESCRIPTIONS.json)),
   booleanOption("yes").pipe(Flag.withDescription(GLOBAL_OPTION_DESCRIPTIONS.yes)),
   optionalTextOption("input-json", (value) => ({ _tag: "GlobalOption", name: "input-json", value })).pipe(
@@ -235,6 +239,7 @@ const globalOptions: ReadonlyArray<Flag.Flag<ReadonlyArray<ParsedCliOption>>> = 
 ]
 
 const GLOBAL_OPTION_HELP_ROWS = {
+  profile: { syntax: "--profile <name>", description: GLOBAL_OPTION_DESCRIPTIONS.profile },
   inputFile: { syntax: "--input-file <path>", description: GLOBAL_OPTION_DESCRIPTIONS.inputFile },
   inputJson: { syntax: "--input-json <object>", description: GLOBAL_OPTION_DESCRIPTIONS.inputJson },
   json: { syntax: "--json[=true|false], --no-json", description: GLOBAL_OPTION_DESCRIPTIONS.json },
@@ -246,6 +251,7 @@ export const cliGlobalOptionHelpRows = (options: {
   readonly includeOutput: boolean
   readonly includeYes: boolean
 }): ReadonlyArray<CliOptionHelpRow> => [
+  GLOBAL_OPTION_HELP_ROWS.profile,
   GLOBAL_OPTION_HELP_ROWS.json,
   GLOBAL_OPTION_HELP_ROWS.inputJson,
   GLOBAL_OPTION_HELP_ROWS.inputFile,
@@ -254,7 +260,7 @@ export const cliGlobalOptionHelpRows = (options: {
 ]
 
 const GLOBAL_BOOLEAN_OPTION_NAMES = new Set(["json", "yes"])
-const GLOBAL_TEXT_OPTION_NAMES = new Set(["input-json", "input-file", "output"])
+const GLOBAL_TEXT_OPTION_NAMES = new Set(["input-json", "input-file", "output", "profile"])
 const LONG_OPTION_PREFIX_LENGTH = 2
 
 const flattenOptions = (parsed: ReadonlyArray<ReadonlyArray<ParsedCliOption>>): ReadonlyArray<ParsedCliOption> =>

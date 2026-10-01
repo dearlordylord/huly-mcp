@@ -247,3 +247,14 @@ describe("Effect CLI local commands", () => {
     expect(exit.toString()).toContain("authMethod")
   })
 })
+
+it("reports a selected logged-out profile without prompting", async () => {
+  const ports = await makePorts()
+  await run(ports, ["profile", "create", "logged-out", "--url", "https://huly.example", "--workspace", "main"])
+  const output = await run(ports, ["auth", "status", "--profile", "logged-out", "--json"])
+  expect(JSON.parse(output.join("\n"))).toMatchObject({
+    profile: "logged-out",
+    authenticated: false,
+    authMethod: "none"
+  })
+})

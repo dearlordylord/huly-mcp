@@ -262,6 +262,10 @@ Authorization: Bearer <MCP_AUTH_TOKEN>
 
 `MCP_AUTH_TOKEN` protects only the MCP HTTP `/mcp` endpoint. It is unrelated to `HULY_TOKEN`, does not authenticate to Huly, and does not replace `HULY_EMAIL` / `HULY_PASSWORD` / `HULY_TOKEN`. Huly credentials are still required through process env vars or, for hosted URL deployments, the supported `x-huly-*` headers. Stdio deployments do not use `MCP_AUTH_TOKEN`.
 
+### Shared CLI and stdio profiles
+
+Save a profile with `huly auth login --profile work`, then set `HULY_PROFILE=work` in the stdio MCP server's environment. Both processes must run under the same OS user and configuration directory. Stdio never follows the active CLI profile implicitly. Saved tokens are bound to their instance URL and workspace; changes require login again or complete environment credential injection. See the [CLI profile instructions](packages/huly-cli/README.md#authentication-and-profiles). HTTP configuration remains unchanged.
+
 ### Hosted HTTP Header Configuration
 
 For hosted URL deployments, keep the server process configured with `MCP_TRANSPORT=http`. A hosting layer can forward per-session Huly credentials as request headers, so one hosted server can serve different Huly workspaces without process-wide `HULY_*` env vars.

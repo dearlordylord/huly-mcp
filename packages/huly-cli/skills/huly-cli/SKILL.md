@@ -16,12 +16,12 @@ huly auth login
 huly auth status --json
 ```
 
-Use `huly profile create|list|select|update` for named URL, workspace, and default-project contexts. Environment variables take priority over the active profile. Never print, copy into chat, or persist a password; login stores only the returned token in the operating system's user config directory.
+Use `huly profile create|list|select|update` for named URL, workspace, and default-project contexts. CLI selection uses `--profile`, then `HULY_PROFILE`, then the active profile. Stdio requires explicit `HULY_PROFILE` and never follows the active CLI selection. Saved tokens are bound to their exact URL/workspace: destination edits require login again. Complete environment destination and credentials may override them without being persisted; partial overrides fail. Never print, copy into chat, or persist a password; login stores only the returned token in the operating system's user config directory.
 
 Key local command surfaces:
 
 `huly auth login [--profile <name>] [--json]`
-`huly auth status [--json]`
+`huly auth status [--profile <name>] [--json]`
 `huly auth logout [--profile <name>] [--json]`
 `huly profile create <name> --url <url> --workspace <workspace> [--default-project <project>] [--json]`
 `huly profile list [--json]`

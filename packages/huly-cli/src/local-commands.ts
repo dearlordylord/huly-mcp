@@ -145,7 +145,9 @@ const profileForLogin = (
 ): Effect.Effect<{ readonly name: ProfileName; readonly profile: CliProfile }, CliRuntimeError> =>
   Effect.gen(function* () {
     const profiles = yield* ports.store.readProfiles().pipe(Effect.mapError(storeError))
-    const name = yield* profileName(requestedName ?? profiles.activeProfile ?? "default")
+    const name = yield* profileName(
+      requestedName ?? ports.environment["HULY_PROFILE"] ?? profiles.activeProfile ?? "default"
+    )
     const existing = profiles.profiles[name]
     const url = yield* valueOrPrompt(existing?.url, ports, "Huly URL")
     const workspace = yield* valueOrPrompt(existing?.workspace, ports, "Huly workspace")
@@ -190,7 +192,7 @@ const clearDefaultProjectFlag = optionalBooleanFlag("clear-default-project")
 
 const localCommandConfigs = {
   authLogin: { profile: profileFlag.param, json: jsonFlag.param },
-  authStatus: { json: jsonOption },
+  authStatus: { profile: profileFlag.param, json: jsonOption },
   authLogout: { profile: profileFlag.param, json: jsonFlag.param },
   profileCreate: {
     name: nameArgument.param,
@@ -215,7 +217,7 @@ const stripOuterBrackets = (syntax: string): string => syntax.slice("[".length, 
 
 export const localCommandSkillSurfaces = {
   authLogin: `huly auth login ${profileFlag.syntax} ${jsonFlag.syntax}`,
-  authStatus: `huly auth status ${jsonFlag.syntax}`,
+  authStatus: `huly auth status ${profileFlag.syntax} ${jsonFlag.syntax}`,
   authLogout: `huly auth logout ${profileFlag.syntax} ${jsonFlag.syntax}`,
   profileCreate: `huly profile create ${nameArgument.syntax} ${urlFlag.syntax} ${workspaceFlag.syntax} ${defaultProjectFlag.syntax} ${jsonFlag.syntax}`,
   profileList: `huly profile list ${jsonFlag.syntax}`,
@@ -268,10 +270,12 @@ const authLogin = Command.make("login", localCommandConfigs.authLogin, ({ json, 
   })
 ).pipe(Command.withDescription("Log in interactively and store only the resulting token."))
 
-const authStatus = Command.make("status", localCommandConfigs.authStatus, ({ json }) =>
+const authStatus = Command.make("status", localCommandConfigs.authStatus, ({ json, profile }) =>
   Effect.gen(function* () {
     const ports = yield* LocalCliService
-    const status = yield* getAuthStatus(ports.store, ports.environment).pipe(Effect.mapError(storeError))
+    const status = yield* getAuthStatus(ports.store, ports.environment, optionValue(profile)).pipe(
+      Effect.mapError(storeError)
+    )
     yield* print(status, json)
   })
 ).pipe(Command.withDescription("Show sanitized authentication and configuration status."))
@@ -279,7 +283,8 @@ const authStatus = Command.make("status", localCommandConfigs.authStatus, ({ jso
 const authLogout = Command.make("logout", localCommandConfigs.authLogout, ({ json, profile }) =>
   Effect.gen(function* () {
     const ports = yield* LocalCliService
-    const requested = Option.isNone(profile) ? undefined : yield* profileName(profile.value)
+    const selected = optionValue(profile) ?? ports.environment["HULY_PROFILE"]
+    const requested = selected === undefined ? undefined : yield* profileName(selected)
     const name = yield* logoutProfile(ports.store, requested).pipe(Effect.mapError(storeError))
     yield* print(`Logged out of Huly profile '${name}'.`, json)
   })

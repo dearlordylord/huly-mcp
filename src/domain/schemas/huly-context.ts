@@ -54,7 +54,7 @@ const HulyRuntimeContextSchema = Schema.Struct({
 
 const AuthContextSchema = Schema.Struct({
   method: Schema.Literals(["token", "password", "unknown"]),
-  source: Schema.Literals(["env", "header", "none"]),
+  source: Schema.Literals(["env", "header", "profile", "none"]),
   tokenConfigured: Schema.Boolean,
   emailConfigured: Schema.Boolean,
   passwordConfigured: Schema.Boolean

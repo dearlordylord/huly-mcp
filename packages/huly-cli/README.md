@@ -69,7 +69,7 @@ huly projects list
 
 ## Configuration
 
-The CLI supports named profiles plus the same Huly connection settings as the MCP server. Each environment variable overrides the corresponding active-profile value, so CI can remain fully environment-driven without modifying user configuration.
+The CLI and stdio MCP share named profiles. CLI selection uses `--profile`, then `HULY_PROFILE`, then the active profile. Stdio uses a saved profile only when `HULY_PROFILE` is explicitly set; changing the CLI active profile cannot redirect it. CI can supply a complete environment configuration without modifying or saving user credentials.
 
 | Variable | Required | Description |
 | --- | --- | --- |
@@ -78,6 +78,7 @@ The CLI supports named profiles plus the same Huly connection settings as the MC
 | `HULY_TOKEN` | Auth* | Preferred: managed Huly API token where supported. |
 | `HULY_EMAIL` | Auth* | Compatibility fallback: account email. |
 | `HULY_PASSWORD` | Auth* | Compatibility fallback: account password. |
+| `HULY_PROFILE` | No | Saved profile name; overridden by CLI `--profile`. |
 | `HULY_CONNECTION_TIMEOUT` | No | Connection timeout in milliseconds. |
 
 *Auth: prefer `HULY_TOKEN`; use `HULY_EMAIL` and `HULY_PASSWORD` as a compatibility fallback.
@@ -97,11 +98,29 @@ huly profile select work
 huly profile update work --default-project CLI
 ```
 
-Configuration precedence is:
+Profile selection and credential precedence are separate:
 
-1. `HULY_*` environment variables, independently by field;
-2. the selected profile's URL, workspace, stored token, and optional default project; and
-3. no implicit fallback.
+1. CLI `--profile <name>`, then `HULY_PROFILE`, then the active CLI profile.
+2. Complete environment credentials and destination override saved credentials: `HULY_URL` and `HULY_WORKSPACE` plus either `HULY_TOKEN` or both `HULY_EMAIL` and `HULY_PASSWORD`.
+3. Otherwise, use the selected profile's saved token, URL, workspace, and optional default project. Connection timeout remains configurable through the environment.
+
+Saved credentials are bound to the exact instance URL and workspace used at login. A URL/workspace edit or conflicting environment override requires another `huly auth login --profile <name>`; partial credential overrides fail before a saved secret is forwarded. Changing only the default project retains the credential. Older tokens without a saved destination binding require login again; files are not automatically migrated. Login stores the returned workspace token, never the password, and does not create a managed API token. Ordinary operations never prompt for missing credentials.
+
+To share a profile with stdio MCP, run the server under the same OS user and configuration directory:
+
+```json
+{
+  "mcpServers": {
+    "huly": {
+      "command": "npx",
+      "args": ["-y", "@firfi/huly-mcp"],
+      "env": { "HULY_PROFILE": "work" }
+    }
+  }
+}
+```
+
+A profile belongs to the local OS user's configuration directory. Containers and CI may not share that directory with the terminal; use complete environment credential injection in those sessions. Injected credentials are never persisted automatically. HTTP compatibility modes continue to use their existing environment/header configuration and do not select local profiles.
 
 Profiles are stored in the operating system's user configuration directory: `$XDG_CONFIG_HOME/huly` (or `~/.config/huly`) on Linux, `~/Library/Application Support/huly` on macOS, and `%APPDATA%\huly` on Windows. Profile metadata and credentials are separate schema-validated JSON files. On systems that support POSIX permissions, directories use mode `0700` and files use `0600`.
 
@@ -272,7 +291,7 @@ pnpm add --global @firfi/huly-cli@latest
 
 This release provides 604 native commands for 604 shared Huly operations.
 
-All commands also accept `--json`, `--input-json <object>`, and `--input-file <path>`. Explicit field flags override JSON sources. Structured fields accept JSON. Named positionals are required and are not duplicated as flags. Required non-positional inputs may instead be supplied through either JSON source.
+All commands also accept `--profile <name>`, `--json`, `--input-json <object>`, and `--input-file <path>`. Explicit field flags override JSON sources. Structured fields accept JSON. Named positionals are required and are not duplicated as flags. Required non-positional inputs may instead be supplied through either JSON source.
 
 | Command | Purpose and behavior | Required positionals | Required inputs (flag or JSON) | Optional flags and alternatives |
 | --- | --- | --- | --- | --- |

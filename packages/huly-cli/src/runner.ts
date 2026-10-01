@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises"
 import * as path from "node:path"
 
-import { Clock, ConfigProvider, type Duration, Effect, Redacted, Ref } from "effect"
+import { Clock, ConfigProvider, type Duration, Effect, Ref } from "effect"
 
 import { AttachmentId } from "../../../src/domain/schemas/shared.js"
 import { attachment } from "../../../src/huly/huly-plugins.js"
@@ -13,14 +13,12 @@ import { buildCombinedClientLayer, buildScopedClientBundle } from "../../../src/
 import { TelemetryService } from "../../../src/telemetry/telemetry.js"
 import type { CliCommandSpec } from "./catalog-types.js"
 import { cliCommandCatalog, type CliToolName } from "./catalog.js"
+import { resolvedConfigProvider } from "../../../src/profiles/config-provider.js"
+
 import type { CliGlobalOptions, ParsedCliCommandLine } from "./cli-options.js"
 import { buildCliInvocation, type CliInputError, type CliInvocation } from "./input.js"
 import { LocalCliService } from "./local-commands.js"
-import {
-  type CliConnectionAuthMethod,
-  type ResolvedCliConfiguration,
-  resolveCliConfiguration
-} from "./profile-store.js"
+import { type CliConnectionAuthMethod, resolveCliConfiguration } from "./profile-store.js"
 import { CliRuntimeError, renderOperationSuccess } from "./render.js"
 import { explicitCliConfirmationMessage } from "./safety-policies.js"
 import { collectFieldSpecs } from "./schema-fields.js"
@@ -72,26 +70,6 @@ const jsonBytes = (value: unknown): number | undefined => {
 }
 
 const cliTelemetryErrorTag = (error: CliInputError | CliRuntimeError): string => error._tag
-
-const resolvedConfigProvider = (configuration: ResolvedCliConfiguration): ConfigProvider.ConfigProvider => {
-  const entries = new Map<string, string>()
-  if (configuration.url !== undefined) entries.set("HULY_URL", configuration.url)
-  if (configuration.workspace !== undefined) entries.set("HULY_WORKSPACE", configuration.workspace)
-  if (configuration.connectionTimeout !== undefined) {
-    entries.set("HULY_CONNECTION_TIMEOUT", configuration.connectionTimeout)
-  }
-  if (configuration.auth.method === "token") {
-    entries.set("HULY_TOKEN", Redacted.value(configuration.auth.token))
-  } else if (configuration.auth.method === "password") {
-    if (configuration.auth.credentialState !== "password-only") {
-      entries.set("HULY_EMAIL", configuration.auth.email)
-    }
-    if (configuration.auth.credentialState !== "email-only") {
-      entries.set("HULY_PASSWORD", Redacted.value(configuration.auth.password))
-    }
-  }
-  return ConfigProvider.fromUnknown(Object.fromEntries(entries))
-}
 
 /* c8 ignore start -- production Huly storage adapter is covered by integration tests; unit tests exercise it through CliRunnerPorts. */
 const resultField = (success: ToolOperationSuccess, fieldName: string): unknown =>
@@ -307,7 +285,13 @@ export const runCliTool = (
 ): Effect.Effect<void, CliInputError | CliRuntimeError, LocalCliService | TelemetryService> =>
   Effect.gen(function* () {
     const local = yield* LocalCliService
-    const resolved = yield* resolveCliConfiguration(local.store, local.environment).pipe(
+    const resolved = yield* resolveCliConfiguration(
+      local.store,
+      local.environment,
+      parsed.options
+        .flatMap((option) => (option._tag === "GlobalOption" && option.name === "profile" ? [option.value] : []))
+        .pop()
+    ).pipe(
       Effect.mapError((error) => new CliRuntimeError({ kind: error.kind, message: error.message, retryable: false }))
     )
     const provider = resolvedConfigProvider(resolved)

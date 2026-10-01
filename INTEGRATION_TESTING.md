@@ -484,3 +484,7 @@ printf '%s\n' \
 # Pretty print
 ... | grep '"id":2' | jq -r '.result.content[0].text' | jq .
 ```
+
+### Shared local profiles
+
+Run `pnpm build`, source `.env.local`, and run `HULY_URL="${HULY_URL/localhost/host.docker.internal}" pnpm integration:profiles` from a Linux-local checkout in this container. The focused harness packs/installs the CLI, logs into local Huly through its real prompts, removes environment credentials, reads projects through CLI and stdio with the same profile, and checks independent active selection, destination binding, and prompt-free missing credentials. It uses an isolated temporary configuration directory and deletes it afterward. Requires Python 3 and jq. Test telemetry is disabled by the shared harness helper.

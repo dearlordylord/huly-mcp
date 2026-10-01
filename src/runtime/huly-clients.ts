@@ -1,7 +1,7 @@
 import { type Cause, Context, Effect, Exit, Fiber, Layer, Scope } from "effect"
 
 import { observeHttpAdmission } from "../mcp/http-admission-observations.js"
-import { HulyConfigService } from "../config/config.js"
+import { type ConfigValidationError, HulyConfigService } from "../config/config.js"
 import { HulyClient } from "../huly/client.js"
 import { HulyUnavailableError } from "../huly/errors-base.js"
 import { HulyStorageClient } from "../huly/storage.js"
@@ -40,9 +40,9 @@ interface ActiveClientAcquisition {
 /**
  * Build the combined client layer (not yet evaluated — deferred until first use).
  */
-export const buildCombinedClientLayer = (): CombinedClientLayer => {
-  const configLayer = HulyConfigService.layer
-
+export const buildCombinedClientLayer = (
+  configLayer: Layer.Layer<HulyConfigService, ConfigValidationError> = HulyConfigService.layer
+): CombinedClientLayer => {
   const hulyClientLayer = HulyClient.layer.pipe(Layer.provide(configLayer))
 
   const storageClientLayer = HulyStorageClient.layer.pipe(Layer.provide(configLayer))
