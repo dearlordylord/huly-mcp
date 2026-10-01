@@ -2,6 +2,10 @@
 
 Research date: 2026-09-22. Narrow documentary follow-up to [Optional bring-your-own MCP authorization](bring-your-own-mcp-authorization.md). This proposes a reference profile; no provider, accounts, credentials, or application code were created, and no interoperability test was run.
 
+## Accepted planning decision
+
+The user selected the hosted Logto Cloud development tenant and confirmed the minimal contract in [Choose the supported hosted authorization-provider contract](https://github.com/dearlordylord/huly-mcp/issues/287#issuecomment-5780578666). This is additive: existing password/token authentication, environment/secret injection, and explicitly selected HTTP compatibility modes remain supported. The OAuth-mode no-fallback rule does not remove those modes. The resolution comment owns the accepted contract; the evidence below remains documentary and does not claim a completed integration check.
+
 ## Recommendation
 
 For minimum setup, use a **Logto Cloud development tenant**, with **Claude Code on the macOS host** as the interactive client and an **MCP TypeScript SDK client** in the development container for client credentials. A disposable **Logto OSS + PostgreSQL** fixture on OrbStack is the self-hosted alternative. This is a recommendation inferred from the capabilities below, not a completed integration check. Keep the initial contract JWT/JWKS-only, with explicit client registration; defer opaque-token introspection, dynamic registration, and provider comparison.
