@@ -149,7 +149,7 @@ export type SpaceTypeIdentifier = Schema.Schema.Type<typeof SpaceTypeIdentifier>
 // === Tier 3: Constrained String Domains ===
 
 export const Email = Schema.NonEmptyString.pipe(
-  Schema.check(Schema.isPattern(/^[^@]+@[^@]+$/, { message: "must contain exactly one @" })),
+  Schema.check(Schema.isPattern(/^[^@]+@[^@]+$/u, { message: "must contain exactly one @" })),
   Schema.brand("Email")
 )
 export type Email = Schema.Schema.Type<typeof Email>

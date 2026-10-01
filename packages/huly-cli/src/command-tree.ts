@@ -1,6 +1,6 @@
 import type { NodeServices } from "@effect/platform-node"
 import { Effect, Option } from "effect"
-import { Command } from "effect/unstable/cli"
+import { Command } from "effect/cli"
 
 import { operationRegistry } from "../../../src/mcp/tools/index.js"
 import type { TelemetryService } from "../../../src/telemetry/telemetry.js"

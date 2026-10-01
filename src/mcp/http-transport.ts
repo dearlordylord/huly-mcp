@@ -10,11 +10,11 @@ import { NodeHttpServer } from "@effect/platform-node"
 import { timingSafeEqual } from "node:crypto"
 import { createServer as createNodeServer } from "node:http"
 import { Cause, Context, Effect, Exit, Layer, Redacted, Schema, Scope, type Duration } from "effect"
-import { HttpRouter, HttpServer } from "effect/unstable/http"
-import type * as HttpMiddlewareModule from "effect/unstable/http/HttpMiddleware"
-import * as HttpHeaders from "effect/unstable/http/Headers"
-import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse"
-import * as HttpServerRequestModule from "effect/unstable/http/HttpServerRequest"
+import { HttpRouter, HttpServer } from "effect/http"
+import type * as HttpMiddlewareModule from "effect/http/HttpMiddleware"
+import * as HttpHeaders from "effect/http/Headers"
+import * as HttpServerResponse from "effect/http/HttpServerResponse"
+import * as HttpServerRequestModule from "effect/http/HttpServerRequest"
 
 import { DEFAULT_HTTP_HOST_VALUE, DEFAULT_HTTP_PORT_NUMBER } from "./http-defaults.js"
 
@@ -224,7 +224,7 @@ const boundedShutdownStep = (
   )
 
 const closeTransportScope = (
-  scope: Scope.Scope,
+  scope: Scope.Closeable,
   gracePeriod: Duration.Input,
   writeError: (message: string) => void,
   onShutdown: (() => Effect.Effect<void, unknown>) | undefined

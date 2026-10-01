@@ -3,7 +3,7 @@ import * as readline from "node:readline/promises"
 import { Writable } from "node:stream"
 
 import { Console, Context, Effect, Layer, Option, Redacted, Schema } from "effect"
-import { Argument, Command, Flag } from "effect/unstable/cli"
+import { Argument, Command, Flag } from "effect/cli"
 
 import { HulySdk } from "../../../src/huly/sdk-deps.js"
 import {

@@ -38,7 +38,7 @@ export type FunnelIdentifier = Schema.Schema.Type<typeof FunnelIdentifier>
 // - https://github.com/hcengineering/platform/blob/b9657d53d130a2ed8034c1b71ab0cf8b7a0b4994/models/lead/src/types.ts#L70
 // - https://github.com/hcengineering/platform/blob/b9657d53d130a2ed8034c1b71ab0cf8b7a0b4994/models/lead/src/migration.ts#L67
 export const CanonicalLeadIdentifier = Schema.String.check(
-  Schema.isPattern(/^LEAD-[0-9]+$/, { message: "Expected lead identifier like 'LEAD-1'" })
+  Schema.isPattern(/^LEAD-[0-9]+$/u, { message: "Expected lead identifier like 'LEAD-1'" })
 ).pipe(Schema.brand("LeadIdentifier"))
 
 const leadIdentifierPattern = /^(?:LEAD-)?(\d+)$/i

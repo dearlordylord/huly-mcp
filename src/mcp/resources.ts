@@ -4,7 +4,7 @@
  * @module
  */
 import { Effect, Schema } from "effect"
-import * as McpSchema from "effect/unstable/ai/McpSchema"
+import * as McpSchema from "effect/ai/McpSchema"
 
 import {
   type Issue,

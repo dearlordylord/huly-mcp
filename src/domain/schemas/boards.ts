@@ -41,7 +41,7 @@ export const BoardCardTitle = NonEmptyString.pipe(Schema.brand("BoardCardTitle")
 export type BoardCardTitle = Schema.Schema.Type<typeof BoardCardTitle>
 
 export const BoardCardSequenceIdentifier = Schema.String.pipe(
-  Schema.check(Schema.isPattern(/^CARD-\d+$/)),
+  Schema.check(Schema.isPattern(/^CARD-\d+$/u)),
   Schema.brand("BoardCardSequenceIdentifier")
 ).annotate({
   identifier: "BoardCardSequenceIdentifier",

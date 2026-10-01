@@ -5,7 +5,7 @@ import { Schema } from "effect"
 import * as tar from "tar-stream"
 
 const PackMetadataSchema = Schema.Struct({
-  filename: Schema.String.pipe(Schema.check(Schema.isEndsWith(".tgz"))),
+  filename: Schema.String.pipe(Schema.check(Schema.isEndingWith(".tgz"))),
   files: Schema.Array(Schema.Struct({ path: Schema.NonEmptyString })),
   name: Schema.Literal("@firfi/huly-cli"),
   version: Schema.NonEmptyString

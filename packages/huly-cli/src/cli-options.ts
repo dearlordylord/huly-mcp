@@ -1,6 +1,6 @@
 import type { NodeServices } from "@effect/platform-node"
 import { Effect, Option, Ref, Schema } from "effect"
-import { Argument, CliError, Command, Flag } from "effect/unstable/cli"
+import { Argument, CliError, Command, Flag } from "effect/cli"
 
 import type { ToolDefinition } from "../../../src/mcp/tools/registry.js"
 import type { CliCommandSpec, CliOptionName, CliSchemaFieldName } from "./catalog-types.js"

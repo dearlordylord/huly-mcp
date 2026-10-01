@@ -8,8 +8,8 @@
  * caller's closure while making protocol dispatch Effect-native.
  */
 import { Clock, Context, Effect, type Exit, Layer } from "effect"
-import { McpServer } from "effect/unstable/ai/McpServer"
-import * as McpSchema from "effect/unstable/ai/McpSchema"
+import { McpServer } from "effect/ai/McpServer"
+import * as McpSchema from "effect/ai/McpSchema"
 
 import type { GetHulyContextResult } from "../domain/schemas/index.js"
 import { HulyError } from "../huly/errors-base.js"

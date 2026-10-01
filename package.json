@@ -142,14 +142,14 @@
     },
     "patchedDependencies": {
       "@hcengineering/api-client@0.7.19": "patches/@hcengineering__api-client@0.7.19.patch",
-      "effect@4.0.0-rc.117": "patches/effect@4.0.0-rc.117.patch"
+      "effect@4.0.0": "patches/effect@4.0.0.patch"
     }
   },
   "devDependencies": {
     "@changesets/cli": "^2.30.0",
-    "@effect/platform-node": "4.0.0-rc.117",
+    "@effect/platform-node": "4.0.0",
     "@effect/tsgo": "0.36.4",
-    "@effect/vitest": "4.0.0-rc.117",
+    "@effect/vitest": "4.0.0",
     "@hcengineering/account-client": "0.7.25",
     "@hcengineering/activity": "0.7.0",
     "@hcengineering/analytics": "0.7.3",
@@ -193,7 +193,7 @@
     "ajv-formats": "^3.0.1",
     "dpdm": "^4.2.0",
     "dprint": "^0.55.2",
-    "effect": "4.0.0-rc.117",
+    "effect": "4.0.0",
     "esbuild": "^0.27.2",
     "fast-check": "^4.8.0",
     "husky": "^9.1.7",

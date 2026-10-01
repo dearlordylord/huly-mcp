@@ -64,7 +64,7 @@ export type GetProjectParams = Schema.Schema.Type<typeof GetProjectParamsSchema>
 
 export const CreateProjectParamsSchema = Schema.Struct({
   name: NonEmptyString.annotate({ description: "Project name" }),
-  identifier: Schema.String.check(Schema.isPattern(/^[A-Z][A-Z0-9_]{0,4}$/)).annotate({
+  identifier: Schema.String.check(Schema.isPattern(/^[A-Z][A-Z0-9_]{0,4}$/u)).annotate({
     description: "Unique project identifier, 1-5 uppercase alphanumeric chars starting with letter (e.g., 'HULY', 'QA')"
   }),
   description: Schema.optional(Schema.String.annotate({ description: "Project description" })),

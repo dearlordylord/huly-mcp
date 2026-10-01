@@ -21,7 +21,7 @@ import {
 } from "effect"
 import * as Stdio from "effect/Stdio"
 import * as Stream from "effect/Stream"
-import { McpProtocol, McpServer } from "effect/unstable/ai"
+import { McpProtocol, McpServer } from "effect/ai"
 
 import { type SanitizedHulyRuntimeConfigContext, sanitizeHulyRuntimeConfigFromEnv } from "../config/config.js"
 import type { GetHulyContextResult } from "../domain/schemas/index.js"

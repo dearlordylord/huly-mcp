@@ -1,9 +1,9 @@
 import { describe, it } from "@effect/vitest"
 import { type Doc, toFindResult } from "@hcengineering/core"
 import { Context, Effect, Exit, Layer, Schema } from "effect"
-import { McpProtocol } from "effect/unstable/ai"
-import { McpServer } from "effect/unstable/ai/McpServer"
-import * as McpSchema from "effect/unstable/ai/McpSchema"
+import { McpProtocol } from "effect/ai"
+import { McpServer } from "effect/ai/McpServer"
+import * as McpSchema from "effect/ai/McpSchema"
 import { expect } from "vitest"
 
 import { CanonicalBase64ImageData, SupportedAttachmentImageTypeSchema } from "../../src/domain/schemas/attachments.js"

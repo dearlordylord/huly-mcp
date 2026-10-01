@@ -1,5 +1,5 @@
 /** Mapping between Huly's rich tool response and Effect AI MCP content. */
-import * as McpSchema from "effect/unstable/ai/McpSchema"
+import * as McpSchema from "effect/ai/McpSchema"
 
 import type { McpImageContent } from "./tool-responses.js"
 import type { McpToolResponse } from "./error-mapping.js"

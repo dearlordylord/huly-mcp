@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { NodeRuntime, NodeServices } from "@effect/platform-node"
 import { Console, Effect, Layer, Logger, Option } from "effect"
-import { CliError, Command } from "effect/unstable/cli"
+import { CliError, Command } from "effect/cli"
 
 import { TelemetryService } from "../../../src/telemetry/telemetry.js"
 import { buildRootCommand } from "./command-tree.js"

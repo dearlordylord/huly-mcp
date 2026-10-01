@@ -1,7 +1,7 @@
 import { Context, Effect, Exit, Layer, Schema } from "effect"
-import { McpProtocol } from "effect/unstable/ai"
-import { McpServer } from "effect/unstable/ai/McpServer"
-import * as McpSchema from "effect/unstable/ai/McpSchema"
+import { McpProtocol } from "effect/ai"
+import { McpServer } from "effect/ai/McpServer"
+import * as McpSchema from "effect/ai/McpSchema"
 import { describe, expect, it } from "vitest"
 
 import { sanitizeHulyRuntimeConfigFromEnv } from "../../src/config/config.js"

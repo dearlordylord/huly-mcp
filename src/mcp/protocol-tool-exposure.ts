@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import type * as McpSchema from "effect/unstable/ai/McpSchema"
+import type * as McpSchema from "effect/ai/McpSchema"
 import type { ToolExposureContext } from "./huly-context-tool.js"
 import { toClientCompatibleInputSchema } from "./input-schema-compat.js"
 import { stripCollidingSchemaIdsRecord } from "./json-schema-refs.js"

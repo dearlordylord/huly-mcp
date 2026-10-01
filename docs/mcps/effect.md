@@ -8,22 +8,22 @@ reviewed refs.
 
 | Purpose | Local path | Upstream ref | Commit |
 | --- | --- | --- | --- |
-| Active Effect 4 target source | `.reference/effect-v4.0.0-rc.117/` | `effect@4.0.0-rc.117` | `14a3f140095fdebbff9162944fe7d4ea83e054e6` |
+| Active Effect 4 target source | `.reference/effect-v4.0.0/` | `effect@4.0.0` | `67ba4e46a11ccda0b6761578bfd22c04ae00167d` |
 | Official agent workflows | `.reference/effect-skills/` | `Effect-TS/skills` `main`, reviewed pin | `28822c9e19998876a6b0e0d97877442012ed4391` |
 
 The installed target cohort is:
 
-- `effect@4.0.0-rc.117`
-- `@effect/platform-node@4.0.0-rc.117`
-- `@effect/vitest@4.0.0-rc.117`
+- `effect@4.0.0`
+- `@effect/platform-node@4.0.0`
+- `@effect/vitest@4.0.0`
 - `@effect/tsgo@0.36.4`
 - `vitest@5.0.1`
 - `@vitest/coverage-v8@5.0.1`
 
 The installed `effect` package includes the tracked
-`patches/effect@4.0.0-rc.117.patch` extension. The pnpm lockfile records patch
-hash `48dd300ad8ca97ea41839a226dc716242015feab66fd050c1032725451ea8a06`.
-The extension keeps the native rc.117 transports and protocol codecs while
+`patches/effect@4.0.0.patch` extension. The pnpm lockfile records patch
+hash `583f1592041bd3cbff9dfc3f99b63c6f3a33410e4b22579e7d774074645a5755`.
+The extension keeps the native 4.0.0 transports and protocol codecs while
 adding the application hooks required to preserve this server's established
 MCP behavior:
 
@@ -41,13 +41,13 @@ MCP behavior:
 - graceful RPC transport finishing with a joined output queue writer so stdio
   responses admitted before EOF are flushed before the transport closes.
 
-These hooks are a local extension contract, not an upstream rc.117 API. Review
+These hooks are a local extension contract, not an upstream 4.0.0 API. Review
 or remove the patch when adopting a later Effect release that provides
 equivalent public capabilities.
 
 `@effect/cli` and `@effect/platform` are intentionally absent as direct target
 dependencies. Their APIs moved into the core package, including
-`effect/unstable/cli` and `effect/unstable/http`; use the exact import map for
+`effect/cli` and `effect/http`; use the exact import map for
 symbol-level replacements. `@effect/platform-node` remains a separate package.
 
 There is intentionally no ambiguous `.reference/effect` alias. Choose the source
@@ -68,15 +68,15 @@ Exact installed package declarations and the tracked patch override the
 unmodified source snapshot, generic guidance, and globally installed skills.
 The installed `AGENTS.md` is generated consumer guidance; the pinned source's
 `.agents/AGENTS.md` contains instructions for contributors to Effect itself and
-does not replace this project's instructions. This matters for `4.0.0-rc.117`:
+does not replace this project's instructions. This matters for `4.0.0`:
 the installed guide and declarations use `Schema.TaggedError`, even when
 generic guidance describes a different name.
 
-The installed rc.117 declarations also confirm the current surfaces used by
+The installed 4.0.0 declarations also confirm the current surfaces used by
 this project: class-style `Context.Service<Self, Shape>()`,
 `Schema.toJsonSchemaDocument` with `JsonSchema.toDocumentDraft07`,
 `Effect.runPromiseExit`, the flat `Cause.reasons` representation, and the
-`effect/unstable/cli` and `effect/unstable/process` package exports. Search the
+`effect/cli` and `effect/process` package exports. Search the
 installed declarations before applying any of these patterns; this list is a
 provenance checkpoint, not a substitute for exact signatures.
 

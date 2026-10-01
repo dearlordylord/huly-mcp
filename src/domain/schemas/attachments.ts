@@ -237,7 +237,7 @@ export const SupportedAttachmentImageTypeSchema = Schema.Literals([
 })
 export type SupportedAttachmentImageType = Schema.Schema.Type<typeof SupportedAttachmentImageTypeSchema>
 
-const CANONICAL_BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
+const CANONICAL_BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u
 const MIN_NON_EMPTY_BASE64_LENGTH = 4
 const canonicalBase64RoundTrips = (value: Base64FileData): boolean | string =>
   Buffer.from(value, "base64").toString("base64") === value

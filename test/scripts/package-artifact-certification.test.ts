@@ -59,7 +59,7 @@ const expectedArtifact = {
 }
 
 const validEffectCohortMarker =
-  "effect@4.0.0-rc.117_patch_hash=48dd300ad8ca97ea41839a226dc716242015feab66fd050c1032725451ea8a06/node_modules/effect/dist/Effect.js"
+  "effect@4.0.0_patch_hash=583f1592041bd3cbff9dfc3f99b63c6f3a33410e4b22579e7d774074645a5755/node_modules/effect/dist/Effect.js"
 
 describe("packed artifact certification", () => {
   it("reports both expected and actual certificates when evidence is stale", () => {
@@ -157,7 +157,7 @@ describe("packed artifact certification", () => {
       await writeArchive(
         archive,
         0o755,
-        `${validMarker} const other = "effect@4.0.0-rc.1170/node_modules/effect/dist/Effect.js"; require("ws");`
+        `${validMarker} const other = "effect@4.0.00/node_modules/effect/dist/Effect.js"; require("ws");`
       )
       await expect(certifyPackedArtifact(archive, expectedArtifact)).rejects.toThrow(/unexpected Effect dependency/u)
 

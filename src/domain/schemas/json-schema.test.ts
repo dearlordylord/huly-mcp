@@ -120,7 +120,7 @@ describe("toDraft07JsonSchema", () => {
 
   it("keeps repeated scalar constraints conjunctive", () => {
     const schema = toDraft07JsonSchema(
-      Schema.String.pipe(Schema.check(Schema.isPattern(/^a/)), Schema.check(Schema.isPattern(/z$/)))
+      Schema.String.pipe(Schema.check(Schema.isPattern(/^a/u)), Schema.check(Schema.isPattern(/z$/u)))
     )
 
     expect(schema).toMatchObject({ type: "string", pattern: "^a", allOf: [{ pattern: "z$" }] })

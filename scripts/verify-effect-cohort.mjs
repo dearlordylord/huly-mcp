@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process"
 
 import { Schema } from "effect"
 
-const EFFECT_COHORT_VERSION = "4.0.0-rc.117"
+const EFFECT_COHORT_VERSION = "4.0.0"
 const TSGO_VERSION = "0.36.4"
 
 const requiredVersions = new Map([

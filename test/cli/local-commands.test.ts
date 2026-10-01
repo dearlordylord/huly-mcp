@@ -4,7 +4,7 @@ import * as path from "node:path"
 import { NodeServices } from "@effect/platform-node"
 import { Effect, Layer, Redacted, Schema } from "effect"
 import { TestConsole } from "effect/testing"
-import { Command } from "effect/unstable/cli"
+import { Command } from "effect/cli"
 import { afterEach, describe, expect, it } from "vitest"
 
 import { buildRootCommand } from "../../packages/huly-cli/src/command-tree.js"

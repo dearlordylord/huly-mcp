@@ -16,7 +16,7 @@ import {
   TimeReportDayType
 } from "@hcengineering/tracker"
 import { Effect } from "effect"
-import * as McpSchema from "effect/unstable/ai/McpSchema"
+import * as McpSchema from "effect/ai/McpSchema"
 import { expect } from "vitest"
 import { assertAt } from "../../src/utils/assertions.js"
 

@@ -1,5 +1,5 @@
 import { Context, Effect, Exit } from "effect"
-import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
+import { HttpServerRequest, HttpServerResponse } from "effect/http"
 import { describe, expect, it } from "vitest"
 
 import { ConfigValidationError, sanitizeHulyRuntimeConfigFromEnv } from "../../src/config/config.js"

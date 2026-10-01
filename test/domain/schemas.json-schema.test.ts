@@ -35,9 +35,9 @@ describe("JSON schema helpers", () => {
     )
     const repeatedConstraints = toDraft07JsonSchema(
       Schema.String.pipe(
-        Schema.check(Schema.isPattern(/^a/)),
-        Schema.check(Schema.isPattern(/b/)),
-        Schema.check(Schema.isPattern(/z$/))
+        Schema.check(Schema.isPattern(/^a/u)),
+        Schema.check(Schema.isPattern(/b/u)),
+        Schema.check(Schema.isPattern(/z$/u))
       )
     )
     const nonRecordMember = toDraft07JsonSchema(Schema.String.annotate({ jsonSchema: { allOf: [null] } }))

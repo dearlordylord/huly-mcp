@@ -4,7 +4,7 @@ import { NonEmptyString } from "./shared-base.js"
 export const DocId = NonEmptyString.pipe(Schema.brand("DocId"))
 export type DocId = Schema.Schema.Type<typeof DocId>
 
-const HulyRef = <T extends string>(tag: T) => DocId.pipe(Schema.brand(tag))
+const HulyRef = <T extends string>(tag: T & Parameters<typeof Schema.brand<T>>[0]) => DocId.pipe(Schema.brand<T>(tag))
 
 export const PersonId = HulyRef("PersonId")
 export type PersonId = Schema.Schema.Type<typeof PersonId>

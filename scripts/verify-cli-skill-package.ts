@@ -13,7 +13,7 @@ class CliSkillPackageError extends Schema.TaggedError<CliSkillPackageError>()("C
   message: Schema.String
 }) {}
 
-const PackageFileNameSchema = Schema.String.pipe(Schema.check(Schema.isEndsWith(".tgz")))
+const PackageFileNameSchema = Schema.String.pipe(Schema.check(Schema.isEndingWith(".tgz")))
 const TarEntrySchema = Schema.Array(Schema.NonEmptyString)
 const requiredEntries = [
   "package/dist/index.cjs",

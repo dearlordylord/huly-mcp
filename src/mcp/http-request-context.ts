@@ -1,7 +1,7 @@
 /** Request-local configuration, Huly lease, and client-disconnect ownership for MCP HTTP. */
 import { Deferred, Effect, type Exit } from "effect"
-import type * as HttpMiddlewareModule from "effect/unstable/http/HttpMiddleware"
-import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest"
+import type * as HttpMiddlewareModule from "effect/http/HttpMiddleware"
+import * as HttpServerRequest from "effect/http/HttpServerRequest"
 
 import { type SanitizedHulyRuntimeConfigContext, sanitizeHulyRuntimeConfigFromEnv } from "../config/config.js"
 import type { ClientBundle, ClientResolver, HulyClientBundleError } from "../runtime/client-resolver.js"

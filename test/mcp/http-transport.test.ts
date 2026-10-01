@@ -1,8 +1,8 @@
 import * as http from "node:http"
 
 import { Context, Deferred, Effect, Fiber, Layer, Redacted, type Duration } from "effect"
-import { HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http"
-import * as NetAddress from "effect/unstable/net/NetAddress"
+import { HttpRouter, HttpServer, HttpServerResponse } from "effect/http"
+import * as NetAddress from "effect/net/NetAddress"
 import { describe, expect, it } from "vitest"
 
 import {

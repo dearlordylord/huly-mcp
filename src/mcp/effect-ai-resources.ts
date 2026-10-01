@@ -1,7 +1,7 @@
 /** Effect AI resource-template registration for Huly project and issue URIs. */
 import { Effect, Exit, Schema } from "effect"
-import { McpServer, registerResource } from "effect/unstable/ai/McpServer"
-import * as McpSchema from "effect/unstable/ai/McpSchema"
+import { McpServer, registerResource } from "effect/ai/McpServer"
+import * as McpSchema from "effect/ai/McpSchema"
 
 import { ConfigValidationError } from "../config/config.js"
 import { IssueIdentifier, ProjectIdentifier } from "../domain/schemas/shared.js"
