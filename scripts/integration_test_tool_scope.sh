@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source "$(dirname "${BASH_SOURCE[0]}")/test-telemetry-env.sh" || exit 1
+
 # Tool-scope integration matrix for stdio MCP discovery.
 # Usage: set -a && source .env.local && set +a && pnpm integration:tool-scope
 

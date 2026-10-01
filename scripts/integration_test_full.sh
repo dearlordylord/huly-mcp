@@ -7,6 +7,8 @@
 # HULY_EMPLOYEE_EMAIL, or the password-auth HULY_EMAIL fallback.
 set -o pipefail
 
+source "$(dirname "${BASH_SOURCE[0]}")/test-telemetry-env.sh" || exit 1
+
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$SCRIPT_DIR"
 

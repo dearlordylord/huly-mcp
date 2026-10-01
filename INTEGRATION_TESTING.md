@@ -318,6 +318,11 @@ For HTTP header mode, send the same JSON-RPC methods to `/mcp` with `x-huly-url`
 
 ## Full Integration Test Suite
 
+All integration entrypoints disable MCP and CLI telemetry for themselves and
+their child processes, overriding caller opt-in. Vitest also disables both
+surfaces; SDK stdio tests use an explicit environment because the SDK filters
+inherited variables. Harness traffic must stay out of production usage analytics.
+
 **Coverage**: 800+ tool calls across 22 domains. Self-cleaning: all created entities are deleted at the end of each section. Tools that would leak data (no delete counterpart) are skipped.
 
 **Last verified**: 2026-08-13 — native stdio passed 1095, failed 0, and skipped 27;

@@ -2,9 +2,11 @@ import { execFileSync, spawn } from "node:child_process"
 import { resolve } from "node:path"
 
 import { Client, type Transport } from "@modelcontextprotocol/client"
-import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/client/stdio"
+import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"
 import { Schema } from "effect"
 import { beforeAll, describe, expect, it } from "vitest"
+
+import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 
 const protocolVersion = "2026-07-28"
 const legacyProtocolVersion = "2025-06-18"
@@ -52,7 +54,7 @@ describe("MCP 2026-07-28 stdio transport with 2025 compatibility", () => {
       const transport = new StdioClientTransport({
         command: process.execPath,
         args: [builtServerPath],
-        env: { ...getDefaultEnvironment(), LAZY_ENVS: "true" },
+        env: testStdioEnvironment(),
         stderr: "pipe"
       })
       const client = new Client(
@@ -79,7 +81,7 @@ describe("MCP 2026-07-28 stdio transport with 2025 compatibility", () => {
     async () => {
       const child = spawn(process.execPath, [builtServerPath], {
         cwd: process.cwd(),
-        env: { ...getDefaultEnvironment(), LAZY_ENVS: "true" },
+        env: testStdioEnvironment(),
         stdio: ["pipe", "pipe", "pipe"]
       })
       let stdout = ""
@@ -128,7 +130,7 @@ describe("MCP 2026-07-28 stdio transport with 2025 compatibility", () => {
       const transport = new StdioClientTransport({
         command: process.execPath,
         args: [builtServerPath],
-        env: { ...getDefaultEnvironment(), LAZY_ENVS: "true" },
+        env: testStdioEnvironment(),
         stderr: "pipe"
       })
       const client = new Client(
@@ -154,7 +156,7 @@ describe("MCP 2026-07-28 stdio transport with 2025 compatibility", () => {
       const transport = new StdioClientTransport({
         command: process.execPath,
         args: [builtServerPath],
-        env: { ...getDefaultEnvironment(), LAZY_ENVS: "true" },
+        env: testStdioEnvironment(),
         stderr: "pipe"
       })
       try {

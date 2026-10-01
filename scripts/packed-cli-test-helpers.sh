@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+source "$(dirname "${BASH_SOURCE[0]}")/test-telemetry-env.sh" || exit 1
+
 prepare_packed_cli() {
   local test_tmpdir="$1"
 

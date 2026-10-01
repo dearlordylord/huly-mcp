@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 set -uo pipefail
+
+source "$(dirname "${BASH_SOURCE[0]}")/test-telemetry-env.sh" || exit 1
 umask 077
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -48,7 +50,7 @@ run_target() {
 
     export HULY_URL="${HULY_URL/localhost/host.docker.internal}"
     export HULY_TOOL_MODE=native
-    export HULY_TELEMETRY=false
+    source "$REPO_ROOT/scripts/test-telemetry-env.sh" || exit 1
     bash "$REPO_ROOT/scripts/integration_test_full.sh"
   ) >"$log_file" 2>&1 || status=$?
 
