@@ -75,3 +75,9 @@ An overseer-owned untouched-base Effect diagnostics run completed successfully: 
 ## Gate timing evidence
 
 The untouched-base Effect diagnostics run took approximately 128 seconds from its first log-file creation to completion (filesystem timestamps 1791058141 → 1791058269), then exited 0 with 1033 files and no diagnostics. The current quality harness bounds the entire TypeScript-plus-Effect stage at 120 seconds. Thus the same Linux environment can exceed that stage bound even on the untouched base; the candidate timeout alone does not prove a source regression. The candidate still needs an actual successful full gate—no timer, coverage, lint, complexity, or diagnostic check was waived by the overseer.
+
+## Validation interruption and unreadable lifecycle
+
+Candidate de6098aa records fresh Standards and Spec round-2 reviews with no blocking findings. Dedicated ordinary-Huly movement validation passed again. The latest full quality gate reached its test stage: 4796 passed and one stdio ownership-signal test timed out; that test file then passed all 10 tests in an isolated rerun. Broader CLI integration continued through attachment download/cleanup. These results do not yet prove a successful full gate or accepted delivery.
+
+The retained main executor turn 01a10369-aaf7-7d90-bad6-0977542a8f8b ended with turn_aborted at 2026-10-03T20:42:11.510Z, reason interrupted, duration 1512368 ms. Dalph consumed the exact completion hint but then emitted an Unreadable lifecycle projection and EvidenceUnavailable/Blocked delivery status. Supported application Exit returned Failed with requestedStatus 1 and process exit 1, without an explanatory public failure reason. Logs are preserved as slices-run/validation-interruption-*. Ordinary same-config recovery was requested without editing private stores or replacing the task worktree.
