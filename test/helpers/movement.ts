@@ -68,6 +68,9 @@ const updateAggregates = (issues: Array<Issue>): void => {
 }
 
 export interface MovementFixtureOptions {
+  selectorTotal?: number
+  projectSelectorTotal?: number
+  onRead?: (query: Readonly<Record<string, unknown>>, issues: Array<Issue>, written: boolean) => void
   projects?: Array<Project>
   failWriteAt?: number
   failVerification?: boolean
@@ -86,6 +89,7 @@ export const movementFixture = (issues: Array<Issue>, options: MovementFixtureOp
     if (options.failVerification && writes.length > 0)
       return Effect.fail(new HulyAuthError({ message: "Read unavailable" }))
     const q = query as Record<string, unknown>
+    options.onRead?.(q, issues, writes.length > 0)
     const records = cls === tracker.class.Project ? projects : issues
     const matching = records.filter((record) =>
       Object.entries(q).every(([key, value]) => {
@@ -97,6 +101,10 @@ export const movementFixture = (issues: Array<Issue>, options: MovementFixtureOp
     )
     const selected = options.invalidSelectorResult && q.identifier !== undefined ? issues.slice(0, 1) : matching
     const result = toFindResult(selected.map((record) => ({ ...record }))) as unknown as FindResult<T>
+    if ((q.identifier !== undefined || q._id !== undefined) && options.selectorTotal !== undefined)
+      result.total = options.selectorTotal
+    if (cls === tracker.class.Project && options.projectSelectorTotal !== undefined)
+      result.total = options.projectSelectorTotal
     if (q.space !== undefined && options.discoveryTotal !== undefined) result.total = options.discoveryTotal
     if (q.attachedTo !== undefined && options.closureTotal !== undefined) result.total = options.closureTotal
     if (q.space !== undefined && options.changeRootDuringRead) {

@@ -5,6 +5,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // Bundled CLI subprocesses compete with coverage workers for CPU and memory.
+    maxWorkers: 4,
     // Keep real subprocesses and packed-artifact tests out of usage analytics.
     env: { HULY_MCP_TELEMETRY: '0', HULY_CLI_TELEMETRY: '0' },
     include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
