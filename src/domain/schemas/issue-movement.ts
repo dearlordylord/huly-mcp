@@ -1,0 +1,38 @@
+import { Schema } from "effect"
+import { toDraft07JsonSchema } from "./json-schema.js"
+import { IssueId, IssueIdentifier, NonEmptyString, ProjectIdentifier } from "./shared.js"
+
+const MovementDestinationSchema = Schema.Union([
+  Schema.Struct({ project: ProjectIdentifier, parent: Schema.optionalKey(Schema.NullOr(IssueIdentifier)) }),
+  Schema.Struct({ parent: Schema.NullOr(IssueIdentifier), project: Schema.optionalKey(ProjectIdentifier) })
+]).annotate({
+  description:
+    "{project: 'HULY'} selects project top level; {parent: 'HULY-42'} infers the parent's project; {project: 'HULY', parent: 'HULY-42'} requires agreement; {parent: null} selects current project top level. Selectors accept identifiers or stable IDs."
+})
+
+export const MoveIssueParamsSchema = Schema.Struct({
+  issue: IssueIdentifier.annotate({
+    description: "Complete issue identifier or stable issue ID; source project is inferred."
+  }),
+  destination: MovementDestinationSchema,
+  resolutions: Schema.optionalKey(
+    Schema.Array(
+      Schema.Struct({
+        issueId: IssueId,
+        field: Schema.Literals(["component", "milestone"]),
+        from: NonEmptyString,
+        to: Schema.NullOr(NonEmptyString)
+      })
+    ).annotate({
+      description:
+        "Cross-project-only decisions. Omit for same-project movement, including no-ops. Cross-project execution is unavailable in this slice."
+    })
+  )
+}).annotate({
+  title: "MoveIssueParams",
+  description: "Move a complete issue tree within its project. Cross-project destinations are refused before writes."
+})
+
+export type MoveIssueParams = Schema.Schema.Type<typeof MoveIssueParamsSchema>
+export const moveIssueParamsJsonSchema = toDraft07JsonSchema(MoveIssueParamsSchema)
+export const parseMoveIssueParams = Schema.decodeUnknownEffect(MoveIssueParamsSchema)

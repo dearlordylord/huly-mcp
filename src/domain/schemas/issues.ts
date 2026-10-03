@@ -428,15 +428,12 @@ export const RemoveLabelParamsSchema = Schema.Struct({
 
 export type RemoveLabelParams = Schema.Schema.Type<typeof RemoveLabelParamsSchema>
 
-export const MoveIssueParamsSchema = Schema.Struct({
-  project: ProjectIdentifier.annotate({ description: "Project identifier (e.g., 'HULY')" }),
-  identifier: IssueIdentifier.annotate({ description: "Issue to move (e.g., 'HULY-123')" }),
-  newParent: Schema.NullOr(IssueIdentifier).annotate({
-    description: "New parent issue identifier, or null to restore the native top-level issue shape"
-  })
-}).annotate({ title: "MoveIssueParams", description: "Parameters for moving an issue to a new parent or to top-level" })
-
-export type MoveIssueParams = Schema.Schema.Type<typeof MoveIssueParamsSchema>
+export {
+  MoveIssueParamsSchema,
+  type MoveIssueParams,
+  moveIssueParamsJsonSchema,
+  parseMoveIssueParams
+} from "./issue-movement.js"
 
 export const listIssuesParamsJsonSchema = toDraft07JsonSchema(ListIssuesParamsSchema)
 export const getIssueParamsJsonSchema = toDraft07JsonSchema(GetIssueParamsSchema)
@@ -448,7 +445,6 @@ export const updateIssueParamsJsonSchema = withAtLeastOneRequired(
 export const addLabelParamsJsonSchema = toDraft07JsonSchema(AddLabelParamsSchema)
 export const removeLabelParamsJsonSchema = toDraft07JsonSchema(RemoveLabelParamsSchema)
 export const deleteIssueParamsJsonSchema = toDraft07JsonSchema(DeleteIssueParamsSchema)
-export const moveIssueParamsJsonSchema = toDraft07JsonSchema(MoveIssueParamsSchema)
 
 export const parseIssue = Schema.decodeUnknownEffect(IssueSchema)
 export const parseIssueSummary = Schema.decodeUnknownEffect(IssueSummarySchema)
@@ -459,4 +455,3 @@ export const parseUpdateIssueParams = Schema.decodeUnknownEffect(UpdateIssuePara
 export const parseAddLabelParams = Schema.decodeUnknownEffect(AddLabelParamsSchema)
 export const parseRemoveLabelParams = Schema.decodeUnknownEffect(RemoveLabelParamsSchema)
 export const parseDeleteIssueParams = Schema.decodeUnknownEffect(DeleteIssueParamsSchema)
-export const parseMoveIssueParams = Schema.decodeUnknownEffect(MoveIssueParamsSchema)

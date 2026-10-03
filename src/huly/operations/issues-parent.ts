@@ -32,8 +32,8 @@ export const childIssueParent = (
   attachedToClass: tracker.class.Issue,
   collection: "subIssues",
   parents: [
-    ...parentIssue.parents,
-    { parentId: parentIssue._id, identifier: parentIssue.identifier, parentTitle: parentIssue.title, space: project }
+    { parentId: parentIssue._id, identifier: parentIssue.identifier, parentTitle: parentIssue.title, space: project },
+    ...parentIssue.parents
   ]
 })
 

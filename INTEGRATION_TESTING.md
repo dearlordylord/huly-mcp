@@ -488,3 +488,20 @@ printf '%s\n' \
 ### Shared local profiles
 
 Run `pnpm build`, source `.env.local`, and run `HULY_URL="${HULY_URL/localhost/host.docker.internal}" pnpm integration:profiles` from a Linux-local checkout in this container. The focused harness packs/installs the CLI, logs into local Huly through its real prompts, removes environment credentials, reads projects through CLI and stdio with the same profile, and checks independent active selection, destination binding, and prompt-free missing credentials. It uses an isolated temporary configuration directory and deletes it afterward. Requires Python 3 and jq. Test telemetry is disabled by the shared harness helper.
+
+## Destination-based same-project movement
+
+After building, run the focused MCP/CLI tree and aggregate certification:
+
+```bash
+set -a
+source .env.local
+set +a
+HULY_URL="${HULY_URL/localhost/host.docker.internal}" bash scripts/integration_test_issue_movement.sh
+```
+
+This creates and cleans up a three-level tree with old/new ancestors, verifies
+preserved fields and relations, and checks actual `parents`, `subIssues` and
+`childInfo` data. See `docs/implementation/issue-306.md` for ordinary Huly 0.7.409
+trigger ownership and parent-array ordering. Movement refuses inconsistent trees;
+it does not repair or resume a partially moved tree automatically.
