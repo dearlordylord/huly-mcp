@@ -4580,7 +4580,7 @@ if [ $? -eq 0 ]; then
     assert_json_array_not_contains "list_issues(isTopLevel) excludes attached child" \
       "$TOP_LEVEL_BEFORE_DETACH_TEXT" "map(.identifier)" "$SUB_ID"
     run_test "move_issue($SUB_ID)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"move_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$SUB_ID\",\"newParent\":null}},\"id\":2}"
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"move_issue\",\"arguments\":{\"issue\":\"$SUB_ID\",\"destination\":{\"parent\":null}}},\"id\":2}"
     if DETACHED_PARENT_STATE=$(pnpm exec tsx scripts/integration-issue-parent-semantics.ts \
       --project "$PROJECT" --issue "$SUB_ID" --mode top-level --parent "$ISSUE_ID" \
       --expectedIssueChildren 0 --expectedParentChildren 0); then
@@ -4602,17 +4602,10 @@ if [ $? -eq 0 ]; then
     else
       fail_test "create legacy project-attached issue fixture" "parent semantics helper failed"
     fi
-    run_test "move_issue($SUB_ID repair legacy top-level)" \
-      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"move_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$SUB_ID\",\"newParent\":null}},\"id\":2}"
-    if REPAIRED_PARENT_STATE=$(pnpm exec tsx scripts/integration-issue-parent-semantics.ts \
-      --project "$PROJECT" --issue "$SUB_ID" --mode top-level --parent "$ISSUE_ID" \
-      --expectedIssueChildren 0 --expectedParentChildren 0); then
-      echo "PASS: move_issue(null) repairs legacy attachment without changing parent count"
-      PASSED=$((PASSED + 1))
-      echo "  => $REPAIRED_PARENT_STATE"
-    else
-      fail_test "move_issue(null) legacy repair/count" "parent semantics helper failed"
-    fi
+    run_capture_to_var LEGACY_MOVE_TEXT "move_issue($SUB_ID refuses inconsistent legacy top-level)" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"move_issue\",\"arguments\":{\"issue\":\"$SUB_ID\",\"destination\":{\"parent\":null}}},\"id\":2}"
+    assert_json_field_equals "move_issue refuses inconsistent legacy attachment" "$LEGACY_MOVE_TEXT" '.outcome' 'blocked'
+    assert_json_field_equals "move_issue refuses before writes" "$LEGACY_MOVE_TEXT" '.changed' 'false'
     run_test "delete_issue(sub:$SUB_ID)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$SUB_ID\"}},\"id\":2}"
   fi
