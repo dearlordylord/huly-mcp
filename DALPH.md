@@ -27,3 +27,9 @@ After valid configuration, the shipped CLI exited 1 with empty stdout and stderr
 - Requested SIGTERM application Exit after observing the two allocated worktrees. Dalph reported ApplicationExitDisposition TimedOut (requestedStatus 1), process status 130, and an owned-descendant suspension failure. Independently confirmed the run app-server process was absent afterward. This is not successful graceful exit or Run completion; preserved all journal/private state/worktrees for ordinary same-Run recovery.
 - Public stdout contained an Effect ERROR log line among version-1 JSON records. This violates the advertised newline-delimited JSON stream and breaks a strict JSON-lines reader. Preserved first-run-public.ndjson and first-run-stderr.log.
 - Run id retained in the first RunSelected record and journal; target base f072f3a2fbee27287097ed4c496e5c7c70bdbb1e. Recovery uses the same config and journal, not a competing new coordinator.
+
+## Recovery and cancellation
+
+Ordinary restart selected Recovered with the same RunId, but its latest delivery status reported TrackerFactWait (GraphNotEstablished) and EvidenceUnavailable (ResponsibilityFacts) instead of resuming implementation. No task edits existed. Its subsequent application Exit also returned TimedOut and lifecycle.exit_timed_out.
+
+The supported cancellation invocation released GitHub claims (independently verified #305 and #306 have only ready-for-agent labels), then exited 1 with cancellation.blocked: “cancellation could not prove UnsettledResponsibility.” Historical evidence includes RunCancellationApplied, CancelledAttemptImplementationAbandoned, and TaskClaimReleased, but no Run termination. Both allocated worktrees remain clean, and no run-owned Dalph/app-server process remained. Retrying the supported cancellation command after these tracker observations; no manual store/journal edits or force cleanup performed.
