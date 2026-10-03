@@ -63,3 +63,11 @@ A second successful application Exit was used to inspect the journal because the
 ## Slice 306 verification progress
 
 The live retained executor produced a successful dedicated local-Huly movement run (/tmp/issue-306-live.log): MCP destination discovery, three-level reparenting with identity/content/attribute/relation preservation and actual ancestry/count/aggregate assertions, agreeing stable-ID destination no-op, same-project resolution refusal without writes, and CLI destination/cycle checks. The build passed, and focused tests reached 43 passes across two files. These are in-flight results, not accepted delivery or final gate evidence. Full pnpm check-all and the required two-axis code review remain pending; all later slices remain unimplemented/unaccepted.
+
+## Candidate and parallel review progress
+
+The #306 executor committed candidate 60da4b11 (Implement destination-based same-project issue movement), with a clean task worktree. Its report is docs/implementation/issue-306.md and identifies ordinary server 0.7.409/model 0.7.343, observed immediate-parent-first ordering, selective attachment writes to invoke ancestry triggers, and manual direct-count responsibility. It marks full gate and both review axes pending.
+
+The executor spawned standards_round1 and spec_round1 reviewers at 20:09:52Z and 20:10:09Z, using medium reasoning; their lifetimes overlapped. This verifies that Dalph’s implementer applied the requested separate review axes. The main turn then records turn_aborted at 20:11:20Z (970487 ms). Dalph this time reports ExecutorWorkSafelySuspended, but no automatic resumed main turn appeared during subsequent observation. Supported application Exit succeeded again; ordinary same-Run recovery will preserve the candidate and review context.
+
+An overseer-owned untouched-base Effect diagnostics run completed successfully: 1033 files, zero errors/warnings/messages, exit 0 (/tmp/issue-306-overseer-baseline-effect.log). The candidate full gate exceeded its 120-second TypeScript/Effect stage bound; baseline success does not satisfy the candidate gate. The required gate is still pending and must not be waived.
