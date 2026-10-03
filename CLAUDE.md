@@ -197,3 +197,11 @@ Versioning uses [Changesets](https://github.com/changesets/changesets):
 `prepublishOnly` runs `pnpm check-all` automatically before publish.
 
 Package: `@firfi/huly-mcp` on npm.
+
+## Dalph delivery for issues 306–311
+
+Dalph owns task and integration worktrees and the issue dependency frontier. You are an implementer; do not create competing orchestration or manually close issues. You are not alone in this codebase; accommodate others’ changes and do not revert them. Run bash scripts/bootstrap-worktree.sh /tmp/hulymcp-dalph-306-311/repository when starting in a generated worktree. This isolated repository has Linux-local dependencies; never install into the canonical shared checkout.
+
+Before acceptance, invoke $code-review against the immutable base_sha from the Dalph task prompt. Use separate parallel Standards and Spec reviewer sub-agents. Consult .claude/review-rules.md and the parent GitHub issue #305 in addition to the task issue. Record both review reports and validation evidence in docs/implementation/issue-NNN.md. Resolve blocking findings before returning an accepted commit. Required local Huly integrations must run for each feature slice; include exact server version and observed trigger behavior. Do not defer integrations or silently drop acceptance criteria.
+
+The authoritative specification is GitHub #305; local docs/issue-movement-spec.md and docs/issue-transfer-design.md provide supporting design investigation. Fetch all issue acceptance criteria via gh.
