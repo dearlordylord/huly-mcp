@@ -39,3 +39,11 @@ The cancellation retry returned the same cancellation.blocked result. Preserve t
 ## Active slice delivery
 
 The isolated #311 target allocated a new Run and exactly one initial task worktree for #306. Dalph’s executor reports ExecutorWorkExecuting; later slices remain dependency waits. Artifacts: /tmp/hulymcp-dalph-306-311/slices-run (production.json, journal.sqlite, public.ndjson, stderr.log, private stores, overseer-handoff.json). Target clone: /tmp/hulymcp-dalph-306-311/slices-repository. Live command session: 39325. No implementation slice, reviewer acceptance, integration candidate, or final verification is yet complete.
+
+## Slice 306 implementation observed
+
+The #311 closure Run is live. The #306 task executor bootstrapped Linux-local resources, ran the required quality gate, started the full local-Huly integration suite, and produced two real-server hierarchy trigger probes. Source edits now cover movement schemas, the shared operation, MCP description, and CLI catalog, with new dedicated hierarchy/application modules. In-flight typecheck/lint/complexity failures remain and are being addressed; no accepted candidate or review outcome exists.
+
+The overseer captured all 71 acceptance criteria from #306–311 into slices-run/acceptance-audit.json (10/12/11/14/12/12 per slice), all initially unverified. Final completion requires concrete evidence for every criterion and the full quality/integration gates.
+
+At roughly nine minutes into this Run, public.ndjson exceeded 10 MB while one task was still executing. Current status repeatedly carries large reversible identifiers and action identities containing entire serialized task facts/specification revisions. This makes routine supervision noisy and expensive; a compact status summary with references to separately retrievable immutable details would improve operator usability without dropping authority facts.
