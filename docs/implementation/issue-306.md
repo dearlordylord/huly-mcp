@@ -219,3 +219,13 @@ Log: `/tmp/issue-306-final-check-all.log`. All checks passed and the gate emitte
 Overseer-owned broad integration results remain pending in
 `/tmp/hulymcp-dalph-306-311/verification-run/integration-status.json`; no duplicate
 broad suites were launched. Production is unchanged from its candidate.
+
+External evidence update: `git diff b16cd48c HEAD -- src packages scripts` is
+empty; the overseer candidate has identical production and integration scripts.
+The overseer status now records `sr: not found error (no response, expected error)`
+in the continuing MCP full run and explicitly requires a successful rerun.
+The next assertion confirmed content unchanged, but that does not erase the
+missing-response failure. Broad-suite acceptance remains pending; this candidate
+must not be accepted using the partial log. The overseer retains ownership of
+broad suites and their rerun. The fresh quality gate and focused movement suite
+are successful evidence only for their respective checks.
