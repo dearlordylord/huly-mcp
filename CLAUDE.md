@@ -205,3 +205,13 @@ Dalph owns task and integration worktrees and the issue dependency frontier. You
 Before acceptance, invoke $code-review against the immutable base_sha from the Dalph task prompt. Use separate parallel Standards and Spec reviewer sub-agents. Consult .claude/review-rules.md and the parent GitHub issue #305 in addition to the task issue. Record both review reports and validation evidence in docs/implementation/issue-NNN.md. Resolve blocking findings before returning an accepted commit. Required local Huly integrations must run for each feature slice; include exact server version and observed trigger behavior. Do not defer integrations or silently drop acceptance criteria.
 
 The authoritative specification is GitHub #305; local docs/issue-movement-spec.md and docs/issue-transfer-design.md provide supporting design investigation. Fetch all issue acceptance criteria via gh.
+
+## Retained candidate recovery instructions
+
+This fresh Dalph Run follows a successfully cancelled predecessor. All six issues306–311 remain required. The complete supplied task body identifies the current slice; target311 is the prerequisite-closure root, not an instruction to implement311 first.
+
+For task306, reuse the retained candidate commits60da4b11,96d16437,de6098aa by cherry-picking them onto this attempt before continuing. They are available in Git objects. Candidate report docs/implementation/issue-306.md contains prior separate Standards/Spec reviews and live-server evidence. Do not redo the implementation from scratch or claim delivery until required validation completes. Original review base is f072f3a2fbee27287097ed4c496e5c7c70bdbb1e. Inspect the complete feature diff against that base, even when reusing a candidate.
+
+Dalph limits a single executor tool item to600000ms. Long live suites must launch as a process/session and return the tool call promptly, then poll in separate bounded calls; never await a complete suite inside one outer functions.exec invocation. The previous broad CLI suite reached the limit while still passing cases, which stranded that attempt. Keep every tool call under10minutes. Required suites must run to completion; do not shorten or waive them. Existing logs /tmp/issue-306-*.log are prior evidence only. The full quality gate had4796tests pass and one stdio signal timeout; the isolated server file then passed10/10. Fresh full gate still required.
+
+Bootstrap generated worktrees using: bash scripts/bootstrap-worktree.sh /tmp/hulymcp-dalph-306-311/retry-repository . This source has Linux-local dependencies; never reinstall canonical cross-platform dependencies.
