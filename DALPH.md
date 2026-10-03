@@ -105,3 +105,7 @@ Source inspection of productionPlannedTaskAttemptPlanner (production-configurati
 ## Interrupted ordinary turn recovery remains unreliable
 
 Verification-run main turn01a10399-157e-7e13-9a40-a11c44943fb9 records turn_aborted at21:13:18.254Z, duration271658ms. All23retained tooleffects were Completed; no StopIntended/LimitReached record was present. Dalph still emitted ExecutorWorkExecuting after that terminal provider event. SupportedExit again returned Failed/requestedStatus1; sameRunrestart reports EvidenceUnavailable/ResponsibilityFacts without a new executor turn. Thus not every interruption here is the known600000ms tooldeadline. The initiatingcause of this one remainsunproved. Sourceedits/logs/privatehistoryare preserved; externaloverseer-ownedintegration keepsrunning independently. The latest fullgate finished4809passed/1failed, so acceptance remainsunproved.
+
+## Cancellation finality and process exit disagree
+
+Supported cancellation of verification-run emitted RunDisposition Cancelled, but the CLI process exited1. Its redacted NodeMainExit diagnostic reports a Defect/CodexAppServerFailure with operation close and category Ownership. This distinguishes successful domain cancellation from failed resource finalization; a consumer must not infer Run cancellation failure from process exit alone. The overseer is verifying journal claim release and terminality before a later freshRun. Independent root-owned pnpmcheck-all and broadintegration remainlive; no featureacceptance is claimed.
