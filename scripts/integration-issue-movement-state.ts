@@ -1,5 +1,5 @@
 import type { Issue, Project } from "@hcengineering/tracker"
-import { Cause, Console, Effect, Schema } from "effect"
+import { Console, Effect, Schema } from "effect"
 
 import { MovementIssueSchema } from "../src/domain/schemas/issue-movement-state.js"
 import {
@@ -34,50 +34,34 @@ const SnapshotSchema = Schema.Array(
     })
   })
 )
-class MovementProbeError extends Schema.TaggedError<MovementProbeError>()("MovementProbeError", {
-  operation: Schema.String,
-  cause: Schema.Defect()
-}) {}
-type Arguments = Schema.Schema.Type<typeof ArgumentsSchema>
-const readSnapshot = (args: Arguments): Effect.Effect<string, MovementProbeError> =>
-  Effect.tryPromise({
-    try: async () => {
-      const { client } = await connectIntegrationHuly()
-      try {
-        const project = await client.findOne<Project>(
-          tracker.class.Project,
-          hulyQuery<Project>({ identifier: args.project })
-        )
-        if (project === undefined) throw new Error("Project missing")
-        const issues = await client.findAll<Issue>(
-          tracker.class.Issue,
-          hulyQuery<Issue>({ space: project._id, identifier: { $in: [...args.issues] } })
-        )
-        if (issues.length !== args.issues.length) throw new Error("Incomplete issue snapshot")
-        const parsed = Schema.decodeUnknownSync(SnapshotSchema)(
-          issues.map((issue) => ({ hierarchy: issue, preserved: issue }))
-        )
-        return JSON.stringify(parsed)
-      } finally {
-        await client.close()
-      }
-    },
-    catch: (cause) => new MovementProbeError({ operation: "snapshot", cause })
-  })
-
-const program = Schema.decodeUnknownEffect(ArgumentsSchema)(process.argv[2]).pipe(Effect.flatMap(readSnapshot))
-
-void Effect.runPromise(
-  program.pipe(
-    Effect.tap(Console.log),
-    Effect.catchCause((cause) =>
-      Console.error(Cause.pretty(cause)).pipe(
-        Effect.andThen(
-          Effect.sync(() => {
-            process.exitCode = 1
-          })
-        )
-      )
+const parseSnapshot = Schema.decodeUnknownSync(SnapshotSchema)
+const readSnapshot = async (): Promise<string> => {
+  const args = Schema.decodeUnknownSync(ArgumentsSchema)(process.argv[2])
+  const { client } = await connectIntegrationHuly()
+  try {
+    const project = await client.findOne<Project>(
+      tracker.class.Project,
+      hulyQuery<Project>({ identifier: args.project })
     )
-  )
+    if (project === undefined) throw new Error("Project missing")
+    const issues = await client.findAll<Issue>(
+      tracker.class.Issue,
+      hulyQuery<Issue>({ space: project._id, identifier: { $in: [...args.issues] } })
+    )
+    if (issues.length !== args.issues.length) throw new Error("Incomplete issue snapshot")
+    const parsed = parseSnapshot(issues.map((issue) => ({ hierarchy: issue, preserved: issue })))
+    return JSON.stringify(parsed)
+  } finally {
+    await client.close()
+  }
+}
+
+void readSnapshot().then(
+  (snapshot) => {
+    process.stdout.write(`${snapshot}\n`)
+  },
+  (cause: unknown) => {
+    Effect.runSync(Console.error(cause))
+    process.exitCode = 1
+  }
 )

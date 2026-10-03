@@ -75,4 +75,8 @@ Round 1 at candidate `60da4b11`, against the immutable base: no reasonable block
 
 ## Spec review
 
-Pending immutable-base candidate review.
+Round 2 at candidate `96d16437`, against the immutable base: no reasonable blocking findings. The fresh medium-reasoning reviewer consulted #305/#306, repository instructions, supporting specifications and the entire candidate diff. Destination forms, stable selectors, prewrite refusals, edge-based discovery, consistent no-op, preservation, shared operation, honest verification and observed trigger ownership match the same-project slice. Required validation remains a separate acceptance dependency.
+
+## Fresh Standards review
+
+Round 2: no reasonable blocking findings. The fresh medium-reasoning reviewer checked both candidate commits and the integration snapshot bootstrap simplification against repository rules and the full Fowler heuristic baseline. Schema-owned boundaries, typed application failures, strict SDK queries, injected tests, shared logic and resource cleanup conform. Bootstrap rejection handling is permitted by the documented bootstrap exception.
