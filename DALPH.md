@@ -109,3 +109,7 @@ Verification-run main turn01a10399-157e-7e13-9a40-a11c44943fb9 records turn_abor
 ## Cancellation finality and process exit disagree
 
 Supported cancellation of verification-run emitted RunDisposition Cancelled, but the CLI process exited1. Its redacted NodeMainExit diagnostic reports a Defect/CodexAppServerFailure with operation close and category Ownership. This distinguishes successful domain cancellation from failed resource finalization; a consumer must not infer Run cancellation failure from process exit alone. The overseer is verifying journal claim release and terminality before a later freshRun. Independent root-owned pnpmcheck-all and broadintegration remainlive; no featureacceptance is claimed.
+
+## First successful full candidate gate
+
+Finalization executor committed53e02d93 (Bound coverage worker contention and recover movement safety tests), leaving its task worktree clean. It recovered the feature candidate, typed safetytests and a four-worker Vitest cap. The actual full pnpmcheck-all completed successfully:342testfiles/4810tests pass; statements99.47%,branches99.00%,functions99.01%,lines99.56%;277of300successfuloutputlines. No coverage threshold, testtimeout, inventory or stage deadline changed. Fresh Standards, Spec and medium task-model reviews report no blockers and include safetytests/worker cap. Focused ordinary-Huly MCP/CLI movement passedagain. Broad externalintegration remainslive; candidate acceptance/integration and later306–311delivery are not yetproved.
