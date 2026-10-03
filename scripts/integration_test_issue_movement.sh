@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-source "$(dirname "${BASH_SOURCE[0]}")/test-telemetry-env.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/test-telemetry-env.sh" || exit 1
 PROJECT="${HULY_TEST_PROJECT:-HULY}"
 CLI=(node packages/huly-cli/dist/index.cjs)
 ISSUES=()

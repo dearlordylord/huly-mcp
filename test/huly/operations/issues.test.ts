@@ -2413,11 +2413,11 @@ describe("createIssue", () => {
           parentTitle: string
         }>
         expect(parents).toHaveLength(2)
-        expect(assertAt(parents, 0).parentId).toBe("grandparent-1")
-        expect(assertAt(parents, 0).identifier).toBe("TEST-1")
-        expect(assertAt(parents, 1).parentId).toBe("parent-2")
-        expect(assertAt(parents, 1).identifier).toBe("TEST-5")
-        expect(assertAt(parents, 1).parentTitle).toBe("Parent Issue")
+        expect(assertAt(parents, 0).parentId).toBe("parent-2")
+        expect(assertAt(parents, 0).identifier).toBe("TEST-5")
+        expect(assertAt(parents, 0).parentTitle).toBe("Parent Issue")
+        expect(assertAt(parents, 1).parentId).toBe("grandparent-1")
+        expect(assertAt(parents, 1).identifier).toBe("TEST-1")
       })
     )
 

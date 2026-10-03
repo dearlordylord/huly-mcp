@@ -38,36 +38,34 @@ class MovementProbeError extends Schema.TaggedError<MovementProbeError>()("Movem
   operation: Schema.String,
   cause: Schema.Defect()
 }) {}
-const io = <A>(operation: string, run: () => Promise<A>) =>
-  Effect.tryPromise({ try: run, catch: (cause) => new MovementProbeError({ operation, cause }) })
-
-const program = Effect.gen(function* () {
-  const args = yield* Schema.decodeUnknownEffect(ArgumentsSchema)(process.argv[2])
-  return yield* Effect.acquireUseRelease(
-    io("connect", connectIntegrationHuly),
-    ({ client }) =>
-      Effect.gen(function* () {
-        const project = yield* io("find-project", () =>
-          client.findOne<Project>(tracker.class.Project, hulyQuery<Project>({ identifier: args.project }))
+type Arguments = Schema.Schema.Type<typeof ArgumentsSchema>
+const readSnapshot = (args: Arguments): Effect.Effect<string, MovementProbeError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const { client } = await connectIntegrationHuly()
+      try {
+        const project = await client.findOne<Project>(
+          tracker.class.Project,
+          hulyQuery<Project>({ identifier: args.project })
         )
-        if (project === undefined)
-          return yield* new MovementProbeError({ operation: "find-project", cause: "Project missing" })
-        const issues = yield* io("find-issues", () =>
-          client.findAll<Issue>(
-            tracker.class.Issue,
-            hulyQuery<Issue>({ space: project._id, identifier: { $in: [...args.issues] } })
-          )
+        if (project === undefined) throw new Error("Project missing")
+        const issues = await client.findAll<Issue>(
+          tracker.class.Issue,
+          hulyQuery<Issue>({ space: project._id, identifier: { $in: [...args.issues] } })
         )
-        if (issues.length !== args.issues.length)
-          return yield* new MovementProbeError({ operation: "find-issues", cause: "Incomplete issue snapshot" })
-        const parsed = yield* Schema.decodeUnknownEffect(SnapshotSchema)(
+        if (issues.length !== args.issues.length) throw new Error("Incomplete issue snapshot")
+        const parsed = Schema.decodeUnknownSync(SnapshotSchema)(
           issues.map((issue) => ({ hierarchy: issue, preserved: issue }))
         )
-        return JSON.stringify(yield* Schema.encodeEffect(SnapshotSchema)(parsed))
-      }),
-    ({ client }) => io("close", () => client.close()).pipe(Effect.orDie)
-  )
-})
+        return JSON.stringify(parsed)
+      } finally {
+        await client.close()
+      }
+    },
+    catch: (cause) => new MovementProbeError({ operation: "snapshot", cause })
+  })
+
+const program = Schema.decodeUnknownEffect(ArgumentsSchema)(process.argv[2]).pipe(Effect.flatMap(readSnapshot))
 
 void Effect.runPromise(
   program.pipe(

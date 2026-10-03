@@ -71,7 +71,7 @@ aggregate updates. The existing parent constructor now uses the observed orderin
 
 ## Standards review
 
-Pending immutable-base candidate review.
+Round 1 at candidate `60da4b11`, against the immutable base: no reasonable blocking findings. The reviewer checked schema-owned boundaries, SDK queries, shared domain rules, dependency-injected tests, failure honesty, internal nonserialized types, resources and state minimality. No blocking Fowler heuristic findings. Pending validation was excluded from this code-standards assessment.
 
 ## Spec review
 

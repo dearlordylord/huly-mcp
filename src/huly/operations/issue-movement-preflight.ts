@@ -12,11 +12,18 @@ import type { MoveIssueParams } from "../../domain/schemas/issue-movement.js"
 import { type IssueIdentifier, type ProjectIdentifier } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import { tracker } from "../huly-plugins.js"
-import { ancestorsOf, descendantsOf, hierarchyProblem, movementHierarchy } from "./issue-movement-hierarchy.js"
+import {
+  ancestorsOf,
+  descendantsOf,
+  hierarchyProblem,
+  type MovementHierarchy,
+  movementHierarchy
+} from "./issue-movement-hierarchy.js"
 import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 
 const DISCOVERY_LIMIT = 10_001
+export type MovementError = HulyClientError | HulyDataInvalidError
 
 // Internal operation plan; boundary snapshots are parsed separately and the plan is not serialized.
 export interface MovementPlan {
@@ -30,7 +37,7 @@ export interface MovementPlan {
 export const selectMovementIssue = Effect.fn("movement.selectIssue")(function* (
   client: HulyClient["Service"],
   selector: IssueIdentifier
-) {
+): Effect.fn.Return<Issue | undefined, MovementError> {
   const matches = yield* client.findAll<SdkIssue>(tracker.class.Issue, hulyQuery<SdkIssue>({ identifier: selector }), {
     limit: DISCOVERY_LIMIT
   })
@@ -50,7 +57,7 @@ export const selectMovementIssue = Effect.fn("movement.selectIssue")(function* (
 export const selectMovementProject = Effect.fn("movement.selectProject")(function* (
   client: HulyClient["Service"],
   selector: ProjectIdentifier
-) {
+): Effect.fn.Return<Project | undefined, MovementError> {
   const matches = yield* client.findAll<SdkProject>(
     tracker.class.Project,
     hulyQuery<SdkProject>({ identifier: selector }),
@@ -72,7 +79,7 @@ export const selectMovementProject = Effect.fn("movement.selectProject")(functio
 export const inspectMovementProject = Effect.fn("movement.inspectProject")(function* (
   client: HulyClient["Service"],
   root: Issue
-) {
+): Effect.fn.Return<MovementHierarchy | undefined, MovementError> {
   const issues = yield* client.findAll<SdkIssue>(
     tracker.class.Issue,
     hulyQuery<SdkIssue>({ space: toRef<SdkProject>(root.space) }),
@@ -119,7 +126,7 @@ export const inspectMovementPlan = Effect.fn("movement.inspectPlan")(function* (
   root: Issue,
   parent: Issue | undefined,
   source: Project
-): Effect.fn.Return<MovementPlan | string, HulyClientError | HulyDataInvalidError> {
+): Effect.fn.Return<MovementPlan | string, MovementError> {
   const hierarchy = yield* inspectMovementProject(client, root)
   if (hierarchy === undefined) return "Incomplete or duplicate project discovery; safety limit may have been exceeded."
   const observedRoot = hierarchy.byId.get(root._id)
@@ -146,7 +153,7 @@ export const inspectMovementClosure = Effect.fn("movement.inspectClosure")(funct
   client: HulyClient["Service"],
   hierarchy: ReturnType<typeof movementHierarchy>,
   relevant: ReadonlyArray<Issue>
-) {
+): Effect.fn.Return<string | undefined, MovementError> {
   const closure = yield* client.findAll<SdkIssue>(
     tracker.class.Issue,
     hulyQuery<SdkIssue>({ attachedTo: { $in: relevant.map((issue) => toRef<SdkIssue>(issue._id)) } }),

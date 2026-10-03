@@ -7,18 +7,30 @@ import { DocId, IssueId, ProjectIdentifier, UrlString } from "../../domain/schem
 import { HulyClient } from "../client.js"
 import { toRef } from "./sdk-boundary.js"
 import { tracker } from "../huly-plugins.js"
-import { descendantsOf, hierarchyProblem, movementNoParent } from "./issue-movement-hierarchy.js"
+import {
+  descendantsOf,
+  hierarchyProblem,
+  type MovementHierarchy,
+  movementNoParent
+} from "./issue-movement-hierarchy.js"
 import {
   inspectMovementClosure,
   inspectMovementPlan,
   inspectMovementProject,
   movementDestinationProblem,
+  type MovementError,
   type MovementPlan,
   selectMovementIssue,
   selectMovementProject
 } from "./issue-movement-preflight.js"
 
 const VERIFY_ATTEMPTS = 5
+
+// Internal verification proof carrying the root read from the verified snapshot.
+interface VerifiedMovement {
+  readonly hierarchy: MovementHierarchy
+  readonly root: MovementPlan["root"]
+}
 const issueIds = (plan: MovementPlan) => plan.tree.map((issue) => IssueId.make(issue._id))
 const inspection = (plan: MovementPlan) =>
   `Inspect current state before any retry: ${plan.tree
@@ -37,7 +49,10 @@ const refusal = (reason: string, root?: Effect.Success<ReturnType<typeof selectM
     "Use MCP list_projects {} to obtain the project identifier, then MCP list_issues with that project identifier to inspect the reported stable issue IDs. Do not automatically repeat movement."
 })
 
-const executeMove = Effect.fn("movement.execute")(function* (client: HulyClient["Service"], plan: MovementPlan) {
+const executeMove = Effect.fn("movement.execute")(function* (
+  client: HulyClient["Service"],
+  plan: MovementPlan
+): Effect.fn.Return<void, MovementError> {
   const { parent, root, tree } = plan
   yield* client.updateDoc(tracker.class.Issue, toRef<SdkProject>(root.space), toRef<SdkIssue>(root._id), {
     attachedTo: parent === undefined ? tracker.ids.NoParent : toRef<SdkIssue>(parent._id)
@@ -59,7 +74,10 @@ const executeMove = Effect.fn("movement.execute")(function* (client: HulyClient[
   }
 })
 
-const verifyMove = Effect.fn("movement.verify")(function* (client: HulyClient["Service"], plan: MovementPlan) {
+const verifyMove = Effect.fn("movement.verify")(function* (
+  client: HulyClient["Service"],
+  plan: MovementPlan
+): Effect.fn.Return<VerifiedMovement | undefined, MovementError> {
   const hierarchy = yield* inspectMovementProject(client, plan.root)
   const target = plan.parent?._id ?? movementNoParent
   if (hierarchy === undefined) return undefined
@@ -81,7 +99,7 @@ const uncertain = (outcome: "incomplete" | "indeterminate", reason: string, plan
 
 const completeMove = (
   plan: MovementPlan,
-  verified: NonNullable<Effect.Success<ReturnType<typeof verifyMove>>>,
+  verified: VerifiedMovement,
   client: HulyClient["Service"]
 ): MoveIssueResult => {
   const noOp = plan.root.attachedTo === (plan.parent?._id ?? movementNoParent)
@@ -102,7 +120,10 @@ const completeMove = (
   }
 }
 
-const runMovementPlan = Effect.fn("movement.runPlan")(function* (client: HulyClient["Service"], plan: MovementPlan) {
+const runMovementPlan = Effect.fn("movement.runPlan")(function* (
+  client: HulyClient["Service"],
+  plan: MovementPlan
+): Effect.fn.Return<MoveIssueResult, MovementError> {
   const noOp = plan.root.attachedTo === (plan.parent?._id ?? movementNoParent)
   if (!noOp) {
     const execution = yield* Effect.result(executeMove(client, plan))
@@ -124,7 +145,9 @@ const runMovementPlan = Effect.fn("movement.runPlan")(function* (client: HulyCli
     : completeMove(plan, verification.success, client)
 })
 
-export const moveIssue = Effect.fn("moveIssue")(function* (params: MoveIssueParams) {
+export const moveIssue = Effect.fn("moveIssue")(function* (
+  params: MoveIssueParams
+): Effect.fn.Return<MoveIssueResult, MovementError, HulyClient> {
   const client = yield* HulyClient
   const root = yield* selectMovementIssue(client, params.issue)
   if (root === undefined) return refusal("Issue selector must match exactly one issue.")
@@ -145,11 +168,7 @@ export const moveIssue = Effect.fn("moveIssue")(function* (params: MoveIssuePara
   return typeof plan === "string" ? refusal(plan, root) : yield* runMovementPlan(client, plan)
 })
 
-const treePreserved = (
-  plan: MovementPlan,
-  hierarchy: NonNullable<Effect.Success<ReturnType<typeof inspectMovementProject>>>,
-  root: MovementPlan["root"]
-) => {
+const treePreserved = (plan: MovementPlan, hierarchy: MovementHierarchy, root: MovementPlan["root"]) => {
   const currentTree = descendantsOf(hierarchy, root)
   if (currentTree.length !== plan.tree.length) return false
   return plan.tree.every((previous) => {
@@ -160,11 +179,7 @@ const treePreserved = (
   })
 }
 
-const verificationMatches = (
-  plan: MovementPlan,
-  hierarchy: NonNullable<Effect.Success<ReturnType<typeof inspectMovementProject>>>,
-  root: MovementPlan["root"]
-) =>
+const verificationMatches = (plan: MovementPlan, hierarchy: MovementHierarchy, root: MovementPlan["root"]) =>
   treePreserved(plan, hierarchy, root) &&
   plan.relevant.every((previous) => {
     const issue = hierarchy.byId.get(previous._id)
