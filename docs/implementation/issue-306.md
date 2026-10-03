@@ -5,7 +5,8 @@ The supplied Dalph task body is GitHub #306, despite the immutable target identi
 [authoritative parent #305](https://github.com/dearlordylord/huly-mcp/issues/305).
 Cross-project execution and cross-project conflict resolution remain unavailable.
 
-Base: `f072f3a2fbee27287097ed4c496e5c7c70bdbb1e`.
+Immutable current attempt base: `b0d90d49886232c688751bde7fb3e38bd1cd5b3f`.
+Complete-feature review base: `f072f3a2fbee27287097ed4c496e5c7c70bdbb1e`.
 
 ## Behavior
 
@@ -57,175 +58,73 @@ ancestry and aggregate triggers. It adjusts old/new direct counts once. It never
 writes `parents` or `childInfo` during movement and never duplicates server-owned
 aggregate updates. The existing parent constructor now uses the observed ordering.
 
-## Validation evidence
+## Current recovery and validation cadence
 
-- Focused application/MCP/CLI tests: 47 tests passed, including generated tree invariants and observed concurrent tree changes.
-- `scripts/integration_test_issue_movement.sh`: passed MCP discovery/calls and CLI
-  executable calls on the ordinary local server. Six fixture issues included an
-  old parent, moved root/child/grandchild, and destination parent/ancestor.
-  The suite compared preserved SDK fields and relation results, immediate-first
-  ancestry and exact old/new counts/aggregate entries. It tested stable selectors,
-  explicit agreement, parent-only inference, both top-level forms, no-op,
-  resolutions refusal and descendant refusal. Fixture cleanup ran.
-- Full quality gate, final feature rerun and broader MCP/CLI suites: pending.
+Recovered complete retained chain `271468c9`, `a25550d6`, `1c1dcb97`,
+`53e02d93`, `1654ff15` in order. `git diff 1654ff15 HEAD -- src packages scripts`
+and `git diff b16cd48c HEAD -- src packages scripts` were empty before this
+report update. Scoped historical live evidence therefore matches this production
+candidate and its executable movement fixtures.
 
-## Standards review
+The user directs live Huly integration only after all six slices 306–311 are
+integrated. Intermediate acceptance requires a fresh quality gate and fresh
+reviews, and permits progression without certifying final live behavior. No live
+suite was launched in this attempt.
 
-Round 1 at candidate `60da4b11`, against the immutable base: no reasonable blocking findings. The reviewer checked schema-owned boundaries, SDK queries, shared domain rules, dependency-injected tests, failure honesty, internal nonserialized types, resources and state minimality. No blocking Fowler heuristic findings. Pending validation was excluded from this code-standards assessment.
+Historical focused movement suite passed on ordinary server `0.7.409`, model
+`0.7.343`; `/tmp/issue-306-final-movement.log` records MCP discovery/calls,
+three-level preservation and actual ancestry/count/aggregate assertions, stable-ID
+no-op and resolutions refusal, CLI destination forms and cycle refusal, and
+fixture cleanup. The observed attachment trigger behavior is recorded above.
+Historical `pnpm check-all` passed 342 files / 4810 tests, with statements 99.47%,
+branches 99.00%, functions 99.01%, lines 99.56% in
+`/tmp/issue-306-final-check-all.log`. These are historical results, not this
+attempt's fresh gate result.
 
-## Spec review
+Final certification obligations remain: final integrated check-all, all authored
+movement/transfer fixtures through MCP and CLI, whole-server MCP and full CLI
+regression suites. The historical broad MCP run passed 1441 cases but had one
+document-edit missing response; focused diagnostic passed 27 cases. This remains
+an open final regression obligation. Historical broad CLI runs cannot certify
+the final integrated candidate. The overseer owns long live suites.
 
-Round 2 at candidate `96d16437`, against the immutable base: no reasonable blocking findings. The fresh medium-reasoning reviewer consulted #305/#306, repository instructions, supporting specifications and the entire candidate diff. Destination forms, stable selectors, prewrite refusals, edge-based discovery, consistent no-op, preservation, shared operation, honest verification and observed trigger ownership match the same-project slice. Required validation remains a separate acceptance dependency.
+## Fresh current attempt evidence
 
-## Fresh Standards review
-
-Round 2: no reasonable blocking findings. The fresh medium-reasoning reviewer checked both candidate commits and the integration snapshot bootstrap simplification against repository rules and the full Fowler heuristic baseline. Schema-owned boundaries, typed application failures, strict SDK queries, injected tests, shared logic and resource cleanup conform. Bootstrap rejection handling is permitted by the documented bootstrap exception.
-
-
-## Retry attempt reviews
-
-Immutable attempt base: `324e98b65c4d8a98d8c793572e81ac2108389e0a`.
-The retained commits were recovered as `c321e577`, `068d84aa`, and `b16cd48c`.
-All three fresh reviewers inspected both `Base...HEAD` and the complete feature
-against original base `f072f3a2fbee27287097ed4c496e5c7c70bdbb1e`, with GitHub
-#305/#306 and repository review instructions.
-
-### Standards
-
-No reasonable blocking Standards findings. Boundary snapshots and command/results
-are schema-owned; shared modules own domain decisions; queries use `hulyQuery`;
-tests use the existing HulyClient seam. Failure results do not claim unchanged
-state after possible writes. Internal nonserialized plans explain their scope.
-No blocking Fowler smell, distant connascence, dead export or misplaced rule.
-
-### Spec
-
-No reasonable blocking implementation findings. Stable/full selectors, destination
-forms, inference/agreement and prewrite refusals match the slice. Edge discovery
-and hierarchy checks reject inconsistent no-ops. Parent-first attachment updates
-invoke observed ancestry/aggregate triggers, with separate direct count updates.
-Verification distinguishes completion from incomplete/indeterminate outcomes.
-
-### Dalph fresh review, round 1
-
-A fresh reviewer using the inherited task model and medium reasoning reported
-no reasonable blocking implementation findings against the issue, linked
-specifications, repository instructions and both diffs. Fresh validation completion
-was explicitly retained as an acceptance dependency, separate from code review.
-
-
-## Fresh retry validation
-
-- Focused movement suite: exit 0 on ordinary Huly server `0.7.409`, model
-  `0.7.343` (fresh `/config.json` lookup). Command: source `.env.local`, replace
-  `localhost` with `host.docker.internal` in `HULY_URL`, then
-  `bash scripts/integration_test_issue_movement.sh`.
-  Log: `/tmp/issue-306-retry-movement.log`. All five labeled checks passed:
-  MCP discovery, three-level movement and preserved data/relations, actual
-  ancestry/counts/aggregate state, stable-ID no-op and resolutions refusal,
-  and CLI destination forms/stable selectors/cycle refusal. Cleanup completed.
-  The fresh state assertions confirm the retained trigger-ownership behavior:
-  attachment updates refresh immediate-first ancestry and childInfo; client
-  direct-count updates produce exact old/new counts without duplicate aggregates.
-
-## Verification-run attempt review
-
-Immutable base: `204caecf187dba5477af85b6902f70f445f83470`. Recovered retained
-candidates as `d206e1ef`, `40844fae`, and `80942273`, plus the retained 14 safety
-tests. The project-change fixture now uses a project SDK reference. Reviewers
-inspected both this attempt diff and the entire feature against original base
-`f072f3a2fbee27287097ed4c496e5c7c70bdbb1e`, with GitHub #305/#306.
+Fresh quality gate and separate Standards, Spec, and Dalph review results are
+recorded below when complete.
 
 ### Standards
 
-No reasonable blocking findings. Schema-owned inputs, outputs and SDK snapshots
-preserve boundary typing. Shared operations own destination and hierarchy rules;
-MCP and CLI remain adapters. Queries use `hulyQuery`; tests use the HulyClient
-seam and TestClock. Internal plans explain their nonserialized scope. Possible
-write failures avoid claiming unchanged state. No actionable heuristic smells;
-local selector similarity does not require an extraction.
+Fresh separate reviewer inspected immutable-base and complete-feature diffs,
+AGENTS.md, review-rules and the full Fowler baseline: no reasonable blocking
+findings. Schema-derived boundaries, typed failures, shared application rules,
+strict queries and HulyClient injection seams conform; no blocking heuristic
+smells identified.
 
 ### Spec
 
-No reasonable blocking implementation findings. Stable selectors, destination
-inference/agreement, cross-project refusal, resolutions rejection, incomplete
-discovery/cycle safeguards, consistent no-op checks, shared MCP/CLI behavior,
-identity preservation and failure reporting match the slice. Attachment updates
-and separate count adjustments follow ordinary-server trigger evidence.
+Fresh separate reviewer consulted fetched #305/#306 and supporting specifications:
+no reasonable blocking implementation findings. Stable selectors, all destination
+forms, prewrite refusals, consistent no-op inspection, narrowly scoped writes and
+structured verification failures match the slice. The reviewer confirmed the
+rewritten report resolves its stale evidence-status wording finding.
 
-### Dalph fresh reviewer, round 1
+### Dalph review, round 1
 
-Fresh task-model reviewer at medium reasoning: no reasonable blocking findings
-against the issue, linked specifications, repository instructions and both diffs.
-Separate parallel Standards and Spec reviews also found no blockers. Validation
-completion remains a separate acceptance dependency.
+Fresh reviewer using the inherited task model with medium reasoning inspected
+both diffs, linked specifications, repository instructions, core/schema/adapters,
+safety/property tests and executable fixture: no reasonable blocking findings.
+The separate Standards and Spec reviews agree. No further review round required.
 
-## Finalize-run review and validation
+### Fresh quality gate
 
-Immutable attempt base: `a5eacf36c145f8f7856ec866719eb566bdc333ac`.
-Recovered all three retained production commits and the fixed 14 safety tests.
-Reviewers also inspected the complete feature against original base `f072f3a2`.
-GitHub #305 and #306 were fetched again for this attempt.
-
-### Standards
-
-Separate fresh Standards reviewer: no reasonable blocking findings. Schema-owned
-boundaries, typed failures, strict queries, shared movement rules and injected
-client tests follow repository instructions. The four-worker Vitest cap limits
-coverage/subprocess contention without weakening timeouts or required checks.
-No actionable heuristic smells were found.
-
-### Spec
-
-Separate fresh Spec reviewer: no reasonable blocking findings. Stable selectors,
-all destination forms, inference/agreement, prewrite cross-project/resolutions
-refusal, closure discovery, consistent no-op and cycle safeguards match #306.
-Parent-first attachment updates and separate direct-count adjustments match the
-ordinary-server observations. Verification distinguishes incomplete and
-indeterminate outcomes. Validation completion remains an acceptance dependency.
-
-### Dalph fresh review, round 1
-
-Fresh task-model reviewer with medium reasoning: no reasonable blocking findings
-against immutable-base and complete-feature diffs, #305/#306 and review rules.
-The recovered safety tests and worker cap were included in all three reviews.
-
-### Reliability change
-
-Previous gates alternated between subprocess/stdio test timeouts while focused
-retests passed. Full coverage previously launched workers across all detected
-CPUs while tests also bundle Effect and spawn real Node executables. Vitest now
-uses at most four workers to bound that resource competition; coverage thresholds,
-test timeouts, test inventory and the five-minute coverage-stage deadline remain.
-No production behavior changed after the retained candidate.
-
-### Fresh focused local Huly integration
-
-`bash scripts/integration_test_issue_movement.sh` completed with exit 0, including
-fixture cleanup. Environment was sourced from `.env.local` with `localhost`
-replaced by `host.docker.internal` in `HULY_URL`. Fresh `/config.json` reports
-server `0.7.409`, model `0.7.343`. Log: `/tmp/issue-306-final-movement.log`.
-MCP discovery, three-level preservation and actual ancestry/count/aggregate state,
-stable-ID no-op/resolutions refusal, and CLI destination forms/cycle refusal all
-passed. Attachment writes refreshed immediate-first ancestry and childInfo;
-separate direct-count updates produced the expected old/new counts, without
-client writes to server-owned derived arrays.
-
-Full gate: `pnpm check-all`, exit 0. All 342 files and 4810 tests passed;
-coverage statements 99.47%, branches 99.00%, functions 99.01%, lines 99.56%.
-Coverage stage duration 227.90 seconds, inside the unchanged five-minute bound.
-Log: `/tmp/issue-306-final-check-all.log`. All checks passed and the gate emitted
-277/300 permitted successful output lines.
-Overseer-owned broad integration results remain pending in
-`/tmp/hulymcp-dalph-306-311/verification-run/integration-status.json`; no duplicate
-broad suites were launched. Production is unchanged from its candidate.
-
-External evidence update: `git diff b16cd48c HEAD -- src packages scripts` is
-empty; the overseer candidate has identical production and integration scripts.
-The overseer status now records `sr: not found error (no response, expected error)`
-in the continuing MCP full run and explicitly requires a successful rerun.
-The next assertion confirmed content unchanged, but that does not erase the
-missing-response failure. Broad-suite acceptance remains pending; this candidate
-must not be accepted using the partial log. The overseer retains ownership of
-broad suites and their rerun. The fresh quality gate and focused movement suite
-are successful evidence only for their respective checks.
+`pnpm check-all` completed with exit 0 in this attempt. All 342 test files and
+4810 tests passed. Coverage: statements 99.47%, branches 99.00%, functions
+99.01%, lines 99.56%. Build, TypeScript and Effect diagnostics, circular and
+complexity checks, generated contracts/package checks, lint/format/duplication
+and coverage gates passed. Successful output was 274/300 permitted lines.
+Log: `/tmp/issue-306-current-check-all.log`; explicit exit record:
+`/tmp/issue-306-current-check-all.exit` (0).
+The first gate was interrupted before completion and supplies no pass evidence;
+this result is the fresh restarted gate. Intermediate code acceptance is ready;
+final integrated live certification remains pending as described above.
