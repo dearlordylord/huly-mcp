@@ -101,3 +101,7 @@ The overseer now facilitates long-running unchanged broadMCP/CLI verification th
 ## Dependent task base selection to verify
 
 Source inspection of productionPlannedTaskAttemptPlanner (production-configuration.ts, plan) proves ordinary attempts always use configuration.plannedAttemptBaseSha; only ExactReplacement requests supply a different base. The current closure has several dependent feature slices, so later attempts will not automatically inherit newly promoted prerequisite code through this planner. This has not yet been exercised:306is still unaccepted and307has not started. The overseer must verify actual prerequisite availability and integration lineage before accepting later slices, rather than assume GitHub dependency ordering also updates their base.
+
+## Interrupted ordinary turn recovery remains unreliable
+
+Verification-run main turn01a10399-157e-7e13-9a40-a11c44943fb9 records turn_aborted at21:13:18.254Z, duration271658ms. All23retained tooleffects were Completed; no StopIntended/LimitReached record was present. Dalph still emitted ExecutorWorkExecuting after that terminal provider event. SupportedExit again returned Failed/requestedStatus1; sameRunrestart reports EvidenceUnavailable/ResponsibilityFacts without a new executor turn. Thus not every interruption here is the known600000ms tooldeadline. The initiatingcause of this one remainsunproved. Sourceedits/logs/privatehistoryare preserved; externaloverseer-ownedintegration keepsrunning independently. The latest fullgate finished4809passed/1failed, so acceptance remainsunproved.
