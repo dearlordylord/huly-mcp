@@ -14,13 +14,13 @@ Approved automatic/explicit deltas travel through the transfer plan to condition
 - Resolver/property focused suite: 8 tests passed, including scoped consent, literal case/whitespace distinctions, duplicates, null/unset staleness, total/class/space/invalid/limit discovery refusal and simultaneous workflow conflicts.
 - MCP/CLI published-schema round trip: 2 tests passed using the real registered operation and CLI parser/invocation with injected Huly ports.
 - Focused lint and complexity passed at the intermediate checkpoint; final gate pending scheduled compiler availability.
-- Initial TypeScript diagnostic found adapter optional update and generic fixture result typing errors; both corrected. Final TypeScript/Effect diagnostics pending.
+- Final `GOMAXPROCS=2 pnpm typecheck` passed at dee81971: TypeScript clean; Effect checked 1,060/1,060 files with 0 errors, 0 warnings and 0 messages. Earlier adapter/fixture/test output typing errors were corrected. The property fixture now parses SDK inputs through an explicit unknown boundary, eliminating the captured `containsUnresolvedTypeVariable` diagnostic recursion without changing settings, severities or deadlines.
 - Executable final certification fixture: `scripts/integration_test_issue_attributes.sh` (shell syntax checked). Both transports cover unchanged blocked-state/sequence snapshots, two simultaneous conflicts, response-derived retry, intervening stale data, selective milestone clear, automatic exact names and duplicate-name ambiguity.
 - Live Huly evidence remains pending root-owned final combined certification per explicit delivery instruction. No live fixture writes have been performed by this slice.
 
 ## Remaining acceptance evidence
 
-The final candidate must pass `pnpm check-all`, fresh independent Standards/Spec reviews, and root-owned combined MCP/CLI local Huly certification. Do not interpret intermediate focused tests as final acceptance or atomicity/isolation evidence. The inherited SDK conditional batch contract is cooperative; scopes do not establish global isolation.
+Independent Standards and Spec reviews passed e02ab4a1. Subsequent test-only parser-boundary fixes passed TypeScript and Effect diagnostics at dee81971. The final candidate must still pass `pnpm check-all`, final delta review as required, and root-owned combined MCP/CLI local Huly certification. Do not interpret intermediate focused tests as final acceptance or atomicity/isolation evidence. The inherited SDK conditional batch contract is cooperative; scopes do not establish global isolation.
 
 ## All 14 acceptance criteria
 
