@@ -113,11 +113,12 @@ for transport in mcp cli; do
     .migrationTransactions as $transactions |
     (.issues[] | select(.issue._id == $root)) as $after |
     ($before.issues[] | select(.issue._id == $root)) as $old |
+    issue_history_anchor($old; $after) as $anchor |
     ($after.issue | del(.space,.identifier,.number,.rank,.attachedTo,.parents,.modifiedOn)) == ($old.issue | del(.space,.identifier,.number,.rank,.attachedTo,.parents,.modifiedOn)) and
     $after.issue.attachedTo == $parent and
     $after.incomingReferences == $old.incomingReferences and
     (.projects | map(del(.sequence))) == ($before.projects | map(del(.sequence))) and
-    all($old.owned.records[]; . as $record | any($after.owned.records[]; ._id == $record._id and preserved_record($record; .; $transactions) and .space == $after.issue.space))' >/dev/null <<<"$AFTER"
+    all($old.owned.records[]; . as $record | any($after.owned.records[]; ._id == $record._id and preserved_record($record; .; $transactions; $anchor) and .space == $after.issue.space))' >/dev/null <<<"$AFTER"
   jq -e --argjson before "$BEFORE" --arg root "$ROOT_ID" --arg old "$OLD_ID" --arg parent "$PARENT_ID" --arg existing "$EXISTING_ID" --arg counterpart "$COUNTERPART_ID" '
     (.issues[] | select(.issue._id == $old) | .issue) as $sourceParent |
     (.issues[] | select(.issue._id == $parent) | .issue) as $targetParent |
