@@ -4,6 +4,7 @@ import { TestClock } from "effect/testing"
 import { expect } from "vitest"
 import { HulyClient } from "../../../src/huly/client.js"
 import {
+  MovementTransactionReceiptSchema,
   MovementTransactionsSchema,
   type MovementTransactionProgress,
   type MovementTransactionReceipt
@@ -83,7 +84,9 @@ for (const scenario of scenarios) {
               }))
             )
             if (scenario !== "no-receipt") yield* assertExists(publish)(transactions)
-            const root = assertExists(transactions.find((tx) => tx.objectId === write.rootId))
+            const root = Schema.decodeUnknownSync(MovementTransactionReceiptSchema)(
+              assertExists(transactions.find((tx) => tx.objectId === write.rootId))
+            )
             const addHistory = Effect.sync(() => {
               f.records.push(makeHistory(root, assertExists(write.tasks[0]).destinationId, scenario))
             })
