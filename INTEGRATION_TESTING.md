@@ -517,11 +517,16 @@ they are not evidence of improved product latency.
 
 ## Bounded movement qualification
 
-The current process qualification has an open detached-stage cleanup blocker;
-see [the campaign retrospective](docs/postmortems/issue-305-integration-churn.md#bounded-campaign-outcome).
-A successful preparation leader exit alone does not prove its detached quality
-stage groups stopped. Resolve and review that custody boundary before claiming
-the coordinator provides complete descendant cleanup.
+Preparation tracks detached quality-stage groups in private `<log>.custody`
+directories. A successful leader exit alone never proves cleanup. Each stage
+writes a schema-owned starting record before launch, registers its group after
+installing cleanup handlers and removes the record only after proving group
+absence. TERM/KILL escalation and group-absence checks are finite; missing close
+or failed registration leaves custody unconfirmed. Any retained entry, including
+a malformed record, keeps the coordinator lock and prevents live-suite admission.
+Inspect the recorded owner/group and prove cleanup before removing custody;
+never delete a lock simply to restart. Physical nested-process regressions run
+through `check-all`/CI. See [the campaign retrospective](docs/postmortems/issue-305-integration-churn.md#bounded-campaign-outcome).
 
 For #305–311, use all five movement fixtures. The coordinator runs attributes,
 tree and concurrency before movement and rich transfer, putting unresolved
