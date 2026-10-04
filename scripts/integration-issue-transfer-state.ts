@@ -5,7 +5,7 @@ import { MovementIssueSchema } from "../src/domain/schemas/issue-movement-state.
 import { TransferIssueSchema, TransferProjectSchema } from "../src/domain/schemas/issue-transfer.js"
 import { DocId, IssueId, ProjectIdentifier, Count } from "../src/domain/schemas/shared.js"
 import { activity, tracker } from "../src/huly/huly-plugins.js"
-import { inspectTransferRecords } from "../src/huly/issue-transfer-adapter.js"
+import { inspectTransferForest } from "../src/huly/issue-transfer-forest.js"
 import { hulyQuery } from "../src/huly/operations/query-helpers.js"
 import { toRef } from "../src/huly/operations/sdk-boundary.js"
 import { connectIntegrationHuly } from "./integration-huly-client.js"
@@ -33,11 +33,16 @@ const run = async () => {
       args.issues.map((id) => client.findOne<Issue>(tracker.class.Issue, hulyQuery<Issue>({ _id: toRef<Issue>(id) })))
     )
     const inspectedTree = rawIssues.map((raw) => parseSnapshot(MovementIssueSchema, raw))
+    const forest = await Effect.runPromise(inspectTransferForest(client, args.issues, inspectedTree))
     const issues = await Promise.all(
       args.issues.map(async (id, index) => {
         const raw = rawIssues[index]
         const issue = parseSnapshot(IssueSnapshot, raw)
-        const owned = await Effect.runPromise(inspectTransferRecords(client, id, undefined, inspectedTree))
+        const entry = forest.find((observation) => observation.ownerId === id)
+        if (entry === undefined || entry.status !== "observed")
+          throw new Error(`Owned-record snapshot unavailable for ${id}`)
+        // Preserve incomplete observations as incomplete, including their blockers and known records.
+        const owned = entry.inspection
         const references = await client.findAll<ActivityReference>(
           activity.class.ActivityReference,
           hulyQuery<ActivityReference>({ attachedTo: toRef(id) }),
