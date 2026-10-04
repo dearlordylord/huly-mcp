@@ -61,6 +61,9 @@ export const transferFixture = () => {
       _class: ObjectClassName.make(String(activity.class.DocUpdateMessage)),
       space: DocId.make(source._id),
       attachedTo: DocId.make(root._id),
+      attachedToClass: ObjectClassName.make(String(tracker.class.Issue)),
+      collection: "docUpdateMessages",
+      snapshot: "original history payload",
       modifiedOn: Timestamp.make(0),
       modifiedBy: NonEmptyString.make("author"),
       history: {
@@ -132,6 +135,7 @@ export const transferFixture = () => {
       return Effect.succeed(
         Schema.decodeUnknownSync(TransferInspectionSchema)({
           discovery: "complete",
+          classes: [...new Set(records.map((record) => record._class))],
           records: records.map((record) => ({ ...record })),
           blockers: state.recordsBlockers,
           limitation: "Fixture inspects model-owned records; unsupported structure is not a complete inventory."

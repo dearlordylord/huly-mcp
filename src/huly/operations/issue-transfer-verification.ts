@@ -15,10 +15,16 @@ import {
   movementNoParent,
   type MovementHierarchy
 } from "./issue-movement-hierarchy.js"
-import { inspectMovementClosure, inspectMovementProject, type MovementError } from "./issue-movement-preflight.js"
+import { inspectMovementClosureState, inspectMovementProject, type MovementError } from "./issue-movement-preflight.js"
 import type { TransferPlan } from "./issue-transfer-preflight.js"
 import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
+
+// Internal verification state; issue snapshots remain owned by their boundary schemas.
+type Verification =
+  | { readonly state: "consistent"; readonly issue: TransferPlan["plan"]["root"] }
+  | { readonly state: "inconsistent" }
+  | { readonly state: "unavailable" }
 
 const parseObservedIssue = (input: unknown) => Schema.decodeUnknownOption(TransferIssueSchema)(input)
 
@@ -27,18 +33,21 @@ export const verifyTransfer = Effect.fn("transfer.verify")(function* (
   prepared: TransferPlan,
   destination: MovementProject,
   write: TransferWrite
-): Effect.fn.Return<TransferPlan["plan"]["root"] | undefined, MovementError> {
+): Effect.fn.Return<Verification, MovementError> {
   const { plan } = prepared
   const source = yield* inspectMovementProject(client, plan.root)
   const target = yield* inspectMovementProject(client, { ...plan.root, space: destination._id })
   const hierarchy = combinedHierarchy(source, target)
-  if (hierarchy === undefined) return undefined
+  if (hierarchy === undefined) return { state: "unavailable" }
   const observed = hierarchy.byId.get(plan.root._id)
-  if (observed === undefined || !destinationMatches(observed, destination, write)) return undefined
-  if (!hierarchyMatches(plan, hierarchy)) return undefined
-  if ((yield* inspectMovementClosure(client, hierarchy, plan.relevant)) !== undefined) return undefined
-  if (!(yield* preservedIssueMatches(client, prepared, write))) return undefined
-  return (yield* verifyRecords(client, prepared, destination)) ? observed : undefined
+  if (observed === undefined || !destinationMatches(observed, destination, write)) return { state: "inconsistent" }
+  if (!hierarchyMatches(plan, hierarchy)) return { state: "inconsistent" }
+  const closureProblem = yield* inspectMovementClosureState(client, hierarchy, plan.relevant)
+  if (closureProblem !== undefined) return { state: closureProblem.state }
+  const preservation = yield* inspectIssuePreservation(client, prepared, write)
+  if (preservation !== "consistent") return { state: preservation }
+  const records = yield* verifyRecords(client, prepared, destination)
+  return records === "consistent" ? { state: "consistent", issue: observed } : { state: records }
 })
 
 const hierarchyMatches = (plan: TransferPlan["plan"], hierarchy: MovementHierarchy) =>
@@ -47,26 +56,27 @@ const hierarchyMatches = (plan: TransferPlan["plan"], hierarchy: MovementHierarc
     return current !== undefined && hierarchyProblem(hierarchy, current) === undefined
   })
 
-const preservedIssueMatches = Effect.fn("transfer.verifyPreservation")(function* (
+const inspectIssuePreservation = Effect.fn("transfer.verifyPreservation")(function* (
   client: HulyClient["Service"],
   prepared: TransferPlan,
   write: TransferWrite
-): Effect.fn.Return<boolean, MovementError> {
+): Effect.fn.Return<Verification["state"], MovementError> {
   const { plan } = prepared
   const current = yield* client.findOne<Issue>(
     tracker.class.Issue,
     hulyQuery<Issue>({ _id: toRef<Issue>(plan.root._id) })
   )
+  if (current === undefined) return "inconsistent"
   const parsed = parseObservedIssue(current)
-  if (parsed._tag === "None") return false
+  if (parsed._tag === "None") return "unavailable"
   const { number: _oldNumber, rank: _oldRank, ...previous } = prepared.protectedIssue
   const { number, rank, ...preserved } = parsed.value
-  return (
-    number === write.number &&
+  return number === write.number &&
     rank === write.rank &&
     isDeepStrictEqual(plannedAttributes(previous, prepared), preserved) &&
-    current?.title === plan.root.title
-  )
+    current.title === plan.root.title
+    ? "consistent"
+    : "inconsistent"
 })
 
 const plannedAttributes = (
@@ -84,7 +94,7 @@ const recordsMatch = (previous: TransferPlan["records"], current: TransferInspec
   previous.every((old) =>
     current.records.some((record) => isDeepStrictEqual(record, { ...old, space: destination._id }))
   ) &&
-  current.records.every((record) => record.space === destination._id)
+  current.records.every((record) => record.kind !== "unsupported" && record.space === destination._id)
 
 const destinationMatches = (
   observed: TransferPlan["plan"]["root"],
@@ -99,9 +109,11 @@ const verifyRecords = Effect.fn("transfer.verifyRecords")(function* (
   client: HulyClient["Service"],
   prepared: TransferPlan,
   destination: MovementProject
-): Effect.fn.Return<boolean, MovementError> {
-  if (client.inspectTransferRecords === undefined) return false
-  return recordsMatch(prepared.records, yield* client.inspectTransferRecords(prepared.plan.root._id), destination)
+): Effect.fn.Return<"consistent" | "inconsistent" | "unavailable", MovementError> {
+  if (client.inspectTransferRecords === undefined) return "unavailable"
+  const current = yield* client.inspectTransferRecords(prepared.plan.root._id)
+  if (current.discovery === "incomplete") return "unavailable"
+  return recordsMatch(prepared.records, current, destination) ? "consistent" : "inconsistent"
 })
 
 const combinedHierarchy = (source: MovementHierarchy | undefined, target: MovementHierarchy | undefined) =>
@@ -111,9 +123,9 @@ export const movementNoopProblem = Effect.fn("movement.inspectNoop")(function* (
   client: HulyClient["Service"],
   plan: TransferPlan["plan"]
 ): Effect.fn.Return<string | undefined, MovementError> {
-  if (!canInspectNoop(client, plan)) return undefined
+  if (!canInspectNoop(plan)) return undefined
   const inspect = client.inspectTransferRecords
-  if (inspect === undefined) return undefined
+  if (inspect === undefined) return "No-op ownership inspection unavailable; cannot confirm a consistent destination."
   for (const issue of plan.tree) {
     const current = yield* client.findOne<Issue>(
       tracker.class.Issue,
@@ -123,18 +135,19 @@ export const movementNoopProblem = Effect.fn("movement.inspectNoop")(function* (
     if (parsed._tag === "None") return "No-op identity inspection failed."
     if (issue.identifier !== `${plan.source.identifier}-${parsed.value.number}`)
       return "Inconsistent issue number/identifier; not a successful no-op."
-    const records = yield* inspect(issue._id)
+    const records = yield* inspect(issue._id, plan.tree)
     const problem = ownedNoopProblem(records, issue)
     if (problem !== undefined) return problem
   }
   return undefined
 })
 
-const canInspectNoop = (client: HulyClient["Service"], plan: TransferPlan["plan"]) =>
-  plan.root.attachedTo === (plan.parent?._id ?? movementNoParent) && client.inspectTransferRecords !== undefined
+const canInspectNoop = (plan: TransferPlan["plan"]) => plan.root.attachedTo === (plan.parent?._id ?? movementNoParent)
 
 const ownedNoopProblem = (records: TransferInspection, issue: TransferPlan["plan"]["root"]) => {
   if (records.discovery === "incomplete") return "Incomplete owned-record discovery; not a successful no-op."
+  if (records.blockers.length > 0 || records.records.some((record) => record.kind === "unsupported"))
+    return "Unsupported or inconsistent owned-record closure; not a successful no-op."
   return records.records.some((record) => record.space !== issue.space)
     ? "Owned records remain in another project; not a successful no-op."
     : undefined

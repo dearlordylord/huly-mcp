@@ -20,12 +20,14 @@ import {
   movementDestinationProblem,
   type MovementError,
   type MovementPlan,
+  type MovementPlanRefusal,
   selectMovementIssue,
   selectMovementProject
 } from "./issue-movement-preflight.js"
 
 import { movementNoopProblem } from "./issue-transfer-verification.js"
 import { transferIssue } from "./issue-transfer.js"
+import { TRANSFER_DISCOVERY_BUDGET, TRANSFER_EXECUTION_BUDGET } from "./issue-transfer-tree.js"
 
 const VERIFY_ATTEMPTS = 5
 
@@ -182,11 +184,72 @@ const runDestination = Effect.fn("movement.runDestination")(function* (
     parent === undefined ? project : yield* selectMovementProject(client, ProjectIdentifier.make(parent.space))
   if (destination !== undefined && destination._id !== source._id)
     return yield* transferIssue(client, root, parent, source, destination, params)
-  const plan = yield* inspectMovementPlan(client, root, parent, source)
-  if (typeof plan === "string") return refusal(plan, root)
-  const noopProblem = yield* movementNoopProblem(client, plan)
-  if (noopProblem !== undefined) return refusal(noopProblem, root)
-  return yield* runMovementPlan(client, plan)
+  return yield* inspectAndRunSameProject(client, root, parent, source)
+})
+
+const inspectAndRunSameProject = Effect.fn("movement.inspectAndRunSameProject")(function* (
+  client: HulyClient["Service"],
+  root: MovementPlan["root"],
+  parent: MovementPlan["parent"],
+  source: MovementPlan["source"]
+) {
+  const inspected = yield* Effect.result(
+    inspectMovementPlan(client, root, parent, source).pipe(Effect.timeout(TRANSFER_DISCOVERY_BUDGET))
+  )
+  if (inspected._tag === "Failure")
+    return hierarchyRefusal(root, source, {
+      reason: `Hierarchy inspection unavailable: ${inspected.failure.message}`,
+      issueIds: [root._id]
+    })
+  const plan = inspected.success
+  if ("reason" in plan) return hierarchyRefusal(root, source, plan)
+  return yield* runAdmittedMovement(client, plan)
+})
+
+const runAdmittedMovement = Effect.fn("movement.runAdmittedMovement")(function* (
+  client: HulyClient["Service"],
+  plan: MovementPlan
+) {
+  const { root, source } = plan
+  const inspectedNoop = yield* Effect.result(
+    movementNoopProblem(client, plan).pipe(Effect.timeout(TRANSFER_DISCOVERY_BUDGET))
+  )
+  if (inspectedNoop._tag === "Failure")
+    return hierarchyRefusal(root, source, {
+      reason: `No-op ownership inspection unavailable: ${inspectedNoop.failure.message}`,
+      issueIds: plan.tree.map((issue) => issue._id)
+    })
+  if (inspectedNoop.success !== undefined)
+    return hierarchyRefusal(root, source, {
+      reason: inspectedNoop.success,
+      issueIds: plan.tree.map((issue) => issue._id)
+    })
+  const result = yield* Effect.result(runMovementPlan(client, plan).pipe(Effect.timeout(TRANSFER_EXECUTION_BUDGET)))
+  if (result._tag === "Success") return result.success
+  return plan.root.attachedTo === (plan.parent?._id ?? movementNoParent)
+    ? hierarchyRefusal(root, source, {
+        reason: "No-op verification deadline or read unavailable; no writes performed.",
+        issueIds: plan.tree.map((issue) => issue._id)
+      })
+    : uncertain(
+        "indeterminate",
+        "Movement execution/verification deadline or response unavailable; effects may have occurred.",
+        plan
+      )
+})
+
+const hierarchyRefusal = (
+  root: MovementPlan["root"],
+  source: MovementPlan["source"],
+  problem: MovementPlanRefusal
+): MoveIssueResult => ({
+  outcome: "blocked",
+  changed: false,
+  discovery: "incomplete",
+  issueIds: problem.issueIds,
+  reason: problem.reason,
+  conflicts: [{ code: "discovery", issueId: root._id, identifier: root.identifier, reason: problem.reason }],
+  inspection: `Inspect every stable ID before retry: ${problem.issueIds.map((issueId) => `MCP get_issue ${JSON.stringify({ project: source.identifier, identifier: issueId })}; CLI huly issues get ${source.identifier} ${issueId} --json`).join("; ")}. Do not renumber or automatically repair inconsistent trees.`
 })
 
 const treePreserved = (plan: MovementPlan, hierarchy: MovementHierarchy, root: MovementPlan["root"]) => {

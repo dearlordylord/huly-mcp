@@ -4,6 +4,7 @@ import { TestClock } from "effect/testing"
 import { expect } from "vitest"
 import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"
 import { MoveIssueResultSchema } from "../../../src/domain/schemas/issues-results.js"
+import { UNKNOWN_TOTAL } from "../../../src/domain/schemas/shared.js"
 import { moveIssue } from "../../../src/huly/operations/issue-movement.js"
 import { HulyClient } from "../../../src/huly/client.js"
 import { assertExists } from "../../../src/utils/assertions.js"
@@ -192,7 +193,7 @@ it.effect(
         value(f, "source", "component", "API", false)
         value(f, "target", "component", "API")
         if (scenario === "total") f.state.attributeTotal = 50
-        if (scenario === "invalid-total") f.state.attributeTotal = -1
+        if (scenario === "invalid-total") f.state.attributeTotal = UNKNOWN_TOTAL
         if (scenario === "limit") {
           for (let index = 0; index < 1001; index++) value(f, `target-${index}`, "component", "API")
         }
