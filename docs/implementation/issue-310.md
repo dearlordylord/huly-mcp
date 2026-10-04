@@ -45,3 +45,13 @@ Installed SDK/server source evidence is recorded in the root-owned `310-311-sour
 ## Verification status
 
 Implementation in progress. Compiler, tests and full gate are waiting for root's shared verification scheduling and combined prerequisites. No live fixture has run; all live suites are explicitly reserved for final all-six certification. Coverage thresholds, diagnostics and deadlines remain unchanged.
+
+Review successor: incomplete attachment discovery now retains usable parsed siblings,
+continues their descendant inspection within the existing bound, and aggregates their
+workflow, attributes and supplied resolution conflicts before refusing all writes.
+Malformed rows and truncated totals remain explicitly incomplete. Every transfer,
+including a leaf, requires the guarded complete-tree port before sequence allocation.
+Verification distinguishes unavailable closure/payload parsing from confirmed absent
+or inconsistent state using the typed closure inspector. Public regression cases and
+the pinned batch ancestry simulation are authored; verification remains unrun pending
+the root's scheduled slot. No live Huly writes were made.

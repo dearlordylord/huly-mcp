@@ -174,6 +174,15 @@ export const transferFixture = () => {
       return Effect.succeed("applied")
     }
   }
+  // The leaf fixture supplies the same complete-tree port; its derived-state
+  // initializer models final ancestry and old-ancestor cleanup, never production fallback.
+  operations.commitTransferTree = (write) => {
+    const task = write.tasks[0]
+    const commit = operations.commitTransfer
+    return task === undefined || write.tasks.length !== 1 || commit === undefined
+      ? Effect.succeed("condition-not-met")
+      : commit(task)
+  }
   return {
     ...fixture,
     attributeRows,

@@ -110,7 +110,7 @@ const inspectExecutionAdmission = Effect.fn("transfer.inspectExecutionAdmission"
   destination: MovementProject,
   params: MoveIssueParams
 ): Effect.fn.Return<ExecutionAdmission, MovementError> {
-  if (client.commitTransferTree === undefined && (prepared.tasks.length !== 1 || client.commitTransfer === undefined))
+  if (client.commitTransferTree === undefined)
     return { status: "blocked", reason: "Complete-tree batch adapter is unavailable; no writes performed." }
   const last = yield* Effect.result(
     client.findOne<Issue>(tracker.class.Issue, hulyQuery<Issue>({ space: toRef<Project>(destination._id) }), {
@@ -181,8 +181,5 @@ const sendTransferTree = (
   write: TransferTreeWrite
 ): Effect.Effect<HulyConditionalWriteResult, HulyClientError> => {
   if (client.commitTransferTree !== undefined) return client.commitTransferTree(write)
-  const root = write.tasks[0]
-  return client.commitTransfer !== undefined && root !== undefined
-    ? client.commitTransfer(root)
-    : Effect.succeed("condition-not-met")
+  return Effect.succeed("condition-not-met")
 }

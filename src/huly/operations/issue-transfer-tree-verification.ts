@@ -12,7 +12,7 @@ import {
   movementHierarchy,
   type MovementHierarchy
 } from "./issue-movement-hierarchy.js"
-import { inspectMovementClosure, inspectMovementProject, type MovementError } from "./issue-movement-preflight.js"
+import { inspectMovementClosureState, inspectMovementProject, type MovementError } from "./issue-movement-preflight.js"
 import type { TransferPlan } from "./issue-transfer-preflight.js"
 import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
@@ -22,6 +22,8 @@ export type TransferTreeVerification =
   | { readonly status: "consistent"; readonly tasks: ReadonlyArray<MovementIssue> }
   | { readonly status: "inconsistent"; readonly tasks: ReadonlyArray<MovementIssue>; readonly reason: string }
   | { readonly status: "unavailable"; readonly reason: string }
+
+type TaskObservationProblem = { readonly status: "inconsistent" | "unavailable"; readonly reason: string }
 
 const parseIssue = (input: unknown) => Schema.decodeUnknownOption(TransferIssueSchema)(input)
 
@@ -43,11 +45,17 @@ export const verifyTransferTree = Effect.fn("transfer.verifyTree")(function* (
   const inconsistent = (reason: string): TransferTreeVerification => ({ status: "inconsistent", tasks, reason })
   if (tasks.length !== write.tasks.length) return inconsistent("Some inspected tasks are absent from both projects.")
   const taskProblem = yield* inspectTreeTasks(client, hierarchy, destination, write)
-  if (taskProblem !== undefined) return inconsistent(taskProblem)
+  if (taskProblem !== undefined)
+    return taskProblem.status === "unavailable"
+      ? { status: "unavailable", reason: taskProblem.reason }
+      : inconsistent(taskProblem.reason)
   const hierarchyState = treeHierarchyProblem(prepared, hierarchy, write)
   if (hierarchyState !== undefined) return inconsistent(hierarchyState)
-  const closureProblem = yield* inspectMovementClosure(client, hierarchy, prepared.plan.relevant)
-  if (closureProblem !== undefined) return inconsistent(closureProblem)
+  const closureProblem = yield* inspectMovementClosureState(client, hierarchy, prepared.plan.relevant)
+  if (closureProblem !== undefined)
+    return closureProblem.state === "unavailable"
+      ? { status: "unavailable", reason: closureProblem.message }
+      : inconsistent(closureProblem.message)
   return yield* inspectTreeRecords(client, prepared, destination, tasks)
 })
 
@@ -67,11 +75,14 @@ const inspectTreeTasks = Effect.fn("transfer.inspectTreeTasks")(function* (
   hierarchy: MovementHierarchy,
   destination: MovementProject,
   write: TransferTreeWrite
-): Effect.fn.Return<string | undefined, MovementError> {
+): Effect.fn.Return<TaskObservationProblem | undefined, MovementError> {
   for (const task of write.tasks) {
     const current = hierarchy.byId.get(task.issueId)
     if (!taskDestinationMatches(current, destination, task))
-      return `Task ${task.issueId} does not satisfy its planned destination, identifier and parent.`
+      return {
+        status: "inconsistent",
+        reason: `Task ${task.issueId} does not satisfy its planned destination, identifier and parent.`
+      }
     const preservation = yield* inspectTaskPreservation(client, task)
     if (preservation !== undefined) return preservation
   }
@@ -98,15 +109,17 @@ const treeHierarchyProblem = (
 const inspectTaskPreservation = Effect.fn("transfer.inspectTaskPreservation")(function* (
   client: HulyClient["Service"],
   task: TransferTreeTaskWrite
-): Effect.fn.Return<string | undefined, MovementError> {
+): Effect.fn.Return<TaskObservationProblem | undefined, MovementError> {
   const raw = yield* client.findOne<Issue>(tracker.class.Issue, hulyQuery<Issue>({ _id: toRef<Issue>(task.issueId) }))
+  if (raw === undefined) return { status: "inconsistent", reason: `Protected payload of ${task.issueId} is absent.` }
   const parsed = parseIssue(raw)
-  if (parsed._tag === "None") return `Protected payload of ${task.issueId} is absent or invalid.`
+  if (parsed._tag === "None")
+    return { status: "unavailable", reason: `Protected payload of ${task.issueId} could not be parsed.` }
   const expected = { ...task.expectedIssue, number: task.number, rank: task.rank }
   for (const change of task.attributeChanges ?? []) expected[change.field] = change.to
   return isDeepStrictEqual(expected, parsed.value) && raw?.title === task.expectedHierarchy.title
     ? undefined
-    : `Protected payload of ${task.issueId} differs from approved final values.`
+    : { status: "inconsistent", reason: `Protected payload of ${task.issueId} differs from approved final values.` }
 })
 
 const inspectTreeRecords = Effect.fn("transfer.inspectTreeRecords")(function* (

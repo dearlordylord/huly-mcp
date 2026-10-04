@@ -237,6 +237,7 @@ interface TransferContext {
   readonly hierarchy: MovementHierarchy
   readonly tree: ReadonlyArray<MovementIssue>
   readonly relevant: ReadonlyArray<MovementIssue>
+  readonly discoveryReasons: ReadonlyArray<string>
 }
 const inspectTransferContext = Effect.fn("transfer.inspectContext")(function* (
   client: HulyClient["Service"],
@@ -244,7 +245,7 @@ const inspectTransferContext = Effect.fn("transfer.inspectContext")(function* (
   parent: MovementIssue | undefined,
   destination: MovementProject
 ): Effect.fn.Return<TransferContext | TransferRefusal, MovementError> {
-  if (client.commitTransfer === undefined && client.commitTransferTree === undefined)
+  if (client.commitTransferTree === undefined)
     return {
       conflicts: [conflict(root, "discovery", "Transfer adapter unavailable; no writes performed.")],
       limitation: "Inspection unavailable."
@@ -258,14 +259,12 @@ const inspectTransferContext = Effect.fn("transfer.inspectContext")(function* (
     }
   const hierarchy = movementHierarchy([...sourceHierarchy.issues, ...destinationHierarchy.issues])
   const discovered = yield* inspectTransferTree(client, root)
-  if (!discovered.complete)
-    return {
-      issueIds: discovered.issues.map((issue) => issue._id),
-      conflicts: discovered.reasons.map((reason) => conflict(root, "discovery", reason)),
-      discovery: "incomplete",
-      limitation: "Complete attachment discovery is required; no writes performed."
-    }
-  return { hierarchy, tree: discovered.issues, relevant: [...discovered.issues, ...related(hierarchy, root, parent)] }
+  return {
+    hierarchy,
+    tree: discovered.issues,
+    relevant: [...discovered.issues, ...related(hierarchy, root, parent)],
+    discoveryReasons: discovered.complete ? [] : discovered.reasons
+  }
 })
 
 const inspectTransferTasks = Effect.fn("transfer.inspectTasks")(function* (
@@ -314,11 +313,16 @@ export const inspectTransferPlan = Effect.fn("transfer.inspectPlan")(function* (
   const context = yield* inspectTransferContext(client, root, parent, destination)
   if ("conflicts" in context) return context
   const { hierarchy, tree, relevant } = context
-  const closureProblem = yield* inspectMovementClosure(client, hierarchy, relevant)
+  const closureProblem =
+    context.discoveryReasons.length === 0 ? yield* inspectMovementClosure(client, hierarchy, relevant) : undefined
   const inventories = yield* inspectTransferAttributes(client, source, destination)
   const inspectedTasks = yield* inspectTransferTasks(client, inspectRecords, tree, root, parent, source, destination)
   const { tasks } = inspectedTasks
-  const conflicts = [...hierarchyConflicts(root, hierarchy, relevant), ...inspectedTasks.conflicts]
+  const conflicts = [
+    ...context.discoveryReasons.map((reason) => conflict(root, "discovery", reason)),
+    ...hierarchyConflicts(root, hierarchy, relevant),
+    ...inspectedTasks.conflicts
+  ]
   const attributes = resolveTransferTreeAttributes(root, tasks, inventories, params.resolutions)
   conflicts.push(...attributes.conflicts)
   if (closureProblem !== undefined) conflicts.push(conflict(root, "discovery", closureProblem))
@@ -335,7 +339,11 @@ export const inspectTransferPlan = Effect.fn("transfer.inspectPlan")(function* (
     return {
       issueIds: tree.map((issue) => issue._id),
       conflicts,
-      discovery: combinedDiscovery(attributes.complete, "complete", conflicts),
+      discovery: combinedDiscovery(
+        attributes.complete,
+        context.discoveryReasons.length === 0 ? "complete" : "incomplete",
+        conflicts
+      ),
       limitation: "Every discovered task is inspected independently; incomplete discovery is reported explicitly."
     }
   const rootTask = tasks.find((task) => task.issue._id === root._id)
