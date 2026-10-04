@@ -48,7 +48,7 @@ it.effect("guards outgoing reference source identity while preserving its indepe
 )
 
 it.effect(
-  "discovers inherited model-owned records, migrates automatic history preserving authors/timestamps and inspects SDK commit",
+  "discovers inherited model-owned records, retains history creation data and queues migration with the SDK caller",
   () =>
     Effect.gen(function* () {
       const f = adapterFixture()
@@ -60,7 +60,8 @@ it.effect(
       const write = Schema.decodeUnknownSync(TransferWriteSchema)({ ...writeInput, records: records.records })
       expect(yield* Effect.promise(() => commitTransfer(f.client, write))).toBe("applied")
       expect(f.scopes.every((scope) => typeof scope === "string" && scope.length > 0)).toBe(true)
-      expect(f.updates[0]?.slice(-2)).toEqual([1, "author"])
+      expect(f.updates[0]?.[5]).toBe(1)
+      expect(f.updates[0]?.[6]).toBeUndefined()
       expect(f.updates[1]?.[3]).toMatchObject({
         space: "destination",
         number: 2,
