@@ -37,7 +37,7 @@ export const parseMovementHistoryAttributes = (
       if (Result.isFailure(attribute)) return Result.fail(invalidMetadata())
       if (attribute.success.hidden === true) continue
       const parsed = parseHistoryAttribute(hierarchy, key, attribute.success.type)
-      if (Result.isFailure(parsed)) return parsed
+      if (Result.isFailure(parsed)) return Result.fail(parsed.failure)
       attributes.push(parsed.success)
     }
     return Result.succeed(attributes)
