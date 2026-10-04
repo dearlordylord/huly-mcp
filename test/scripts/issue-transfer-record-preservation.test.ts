@@ -33,6 +33,9 @@ const messages = attributes.map(({ attrClass, key, value }) => ({
   _id: `history-${key}`,
   _class: "activity:class:DocUpdateMessage",
   kind: "history",
+  attachedTo: "issue",
+  attachedToClass: "tracker:class:Issue",
+  collection: "docUpdateMessages",
   space: "destination",
   modifiedOn: 10,
   modifiedBy: "migration-author",
@@ -43,7 +46,7 @@ const messages = attributes.map(({ attrClass, key, value }) => ({
     txId: "new-issue-tx",
     createdOn: 10,
     createdBy: "migration-author",
-    attributeUpdates: JSON.stringify({ attrKey: key, attrClass, set: [value], added: [], removed: [] })
+    attributeUpdates: JSON.stringify({ attrKey: key, attrClass, set: [value], added: [], removed: [], isMixin: false })
   }
 }))
 const before = { issue: beforeIssue, owned: { records: [beforeRecord] } }
@@ -66,6 +69,58 @@ const check = (input: Schema.Json) =>
 describe("fixture record metadata evidence", () => {
   it("authenticates changed last author while preserving original created metadata and content", () => {
     expect(check({ before, after, old: beforeRecord, new: afterRecord, transactions: [] })).toBe(true)
+  })
+  it("authenticates a cross-project move whose allocated number equals its old number", () => {
+    const equalNumber = {
+      ...after,
+      issue: { ...afterIssue, number: beforeIssue.number },
+      owned: { records: [afterRecord, ...messages.filter((message) => message._id !== "history-number")] }
+    }
+    expect(check({ before, after: equalNumber, old: beforeRecord, new: afterRecord, transactions: [] })).toBe(true)
+  })
+  it("rejects history attached to a different owner or collection", () => {
+    for (const routing of [
+      { attachedTo: "other-issue" },
+      { attachedToClass: "document:class:Document" },
+      { collection: "references" }
+    ]) {
+      const wrong = messages.map((message) => ({ ...message, ...routing }))
+      expect(
+        check({
+          before,
+          after: { ...after, owned: { records: [afterRecord, ...wrong] } },
+          old: beforeRecord,
+          new: afterRecord,
+          transactions: []
+        })
+      ).toBe(false)
+    }
+  })
+  it("rejects mixin and collection-update histories", () => {
+    const mixins = messages.map((message) => ({
+      ...message,
+      history: {
+        ...message.history,
+        attributeUpdates: JSON.stringify({
+          ...Schema.decodeUnknownSync(Schema.fromJsonString(Schema.JsonObject))(message.history.attributeUpdates),
+          isMixin: true
+        })
+      }
+    }))
+    const collectionUpdates = messages.map((message) => ({
+      ...message,
+      history: { ...message.history, updateCollection: "children" }
+    }))
+    for (const wrong of [mixins, collectionUpdates])
+      expect(
+        check({
+          before,
+          after: { ...after, owned: { records: [afterRecord, ...wrong] } },
+          old: beforeRecord,
+          new: afterRecord,
+          transactions: []
+        })
+      ).toBe(false)
   })
   it("rejects an existing history transaction reused as a migration anchor", () => {
     const existing = { ...messages[0], _id: "old-history", kind: "history", history: { txId: "new-issue-tx" } }
@@ -102,7 +157,8 @@ describe("fixture record metadata evidence", () => {
                 attrClass: "core:class:TypeString",
                 set: ["DST-999"],
                 added: [],
-                removed: []
+                removed: [],
+                isMixin: false
               })
             }
           }

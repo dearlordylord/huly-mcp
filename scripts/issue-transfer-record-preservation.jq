@@ -5,19 +5,19 @@ def issue_history_anchor($before; $after):
   [$before.owned.records[]|select(.kind=="history")|._id] as $oldIds |
   [$before.owned.records[]|select(.kind=="history")|.history.txId] as $oldTransactions |
   [$after.owned.records[] |
-    select(.kind=="history" and ._class=="activity:class:DocUpdateMessage" and .space==$after.issue.space) |
-    select(.history.action=="update" and .history.objectId==$after.issue._id and .history.objectClass=="tracker:class:Issue") |
+    select(.kind=="history" and ._class=="activity:class:DocUpdateMessage" and .space==$after.issue.space and .attachedTo==$after.issue._id and .attachedToClass=="tracker:class:Issue" and .collection=="docUpdateMessages") |
+    select(.history.action=="update" and .history.objectId==$after.issue._id and .history.objectClass=="tracker:class:Issue" and (.history|has("updateCollection")|not)) |
     select((.history.txId|type)=="string" and (.history.txId|length)>0) |
     select((._id as $id|$oldIds|index($id))==null and (.history.txId as $tx|$oldTransactions|index($tx))==null) |
     . as $record | (.history.attributeUpdates|fromjson) as $updates |
     select($classes[$updates.attrKey]!=null and ($changed|index($updates.attrKey))!=null) |
-    select($updates.attrClass==$classes[$updates.attrKey] and $updates.set==[$after.issue[$updates.attrKey]] and $updates.added==[] and $updates.removed==[]) |
+    select($updates.isMixin==false and $updates.attrClass==$classes[$updates.attrKey] and $updates.set==[$after.issue[$updates.attrKey]] and $updates.added==[] and $updates.removed==[]) |
     select(($updates|has("prevValue")|not) or $updates.prevValue==$before.issue[$updates.attrKey]) |
     select(.modifiedOn==.history.createdOn and .modifiedBy==.history.createdBy) |
     {key:$updates.attrKey,txId:.history.txId,stamp:.history.createdOn,author:.history.createdBy}
   ] as $messages |
-  # Cross-project fixtures must establish all three public identity/location changes.
-  if ($changed|index("space"))!=null and ($changed|index("number"))!=null and ($changed|index("identifier"))!=null and
+  # Cross-project fixtures establish project and identifier changes; number may coincide.
+  if ($changed|index("space"))!=null and ($changed|index("identifier"))!=null and
      ($messages|map(.key)|sort)==($changed|sort) and
      ($messages|map({txId,stamp,author})|unique|length)==1
   then $messages[0]|{stamp,author}
