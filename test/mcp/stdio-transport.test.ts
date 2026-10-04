@@ -1,16 +1,18 @@
-import { execFileSync, spawn } from "node:child_process"
-import { resolve } from "node:path"
+import { spawn } from "node:child_process"
 
 import { Client, type Transport } from "@modelcontextprotocol/client"
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"
 import { Schema } from "effect"
-import { beforeAll, describe, expect, it } from "vitest"
+import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
+import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 
 const protocolVersion = "2026-07-28"
 const legacyProtocolVersion = "2025-06-18"
-const builtServerPath = resolve(process.cwd(), "dist/index.cjs")
+
+let builtServerPath: string
+let cleanupBuild: (() => Promise<void>) | undefined
 const SPAWNED_PROCESS_TEST_TIMEOUT_MS = 15_000
 const JsonRpcResponseSchema = Schema.Struct({
   jsonrpc: Schema.Literal("2.0"),
@@ -43,8 +45,13 @@ const meta = {
 }
 
 describe("MCP 2026-07-28 stdio transport with 2025 compatibility", () => {
-  beforeAll(() => {
-    execFileSync("pnpm", ["build:mcp"], { cwd: process.cwd(), stdio: "ignore" })
+  beforeAll(async () => {
+    const build = await buildIsolatedStdioServer(SPAWNED_PROCESS_TEST_TIMEOUT_MS)
+    builtServerPath = build.path
+    cleanupBuild = build.cleanup
+  })
+  afterAll(async () => {
+    await cleanupBuild?.()
   })
 
   it(
