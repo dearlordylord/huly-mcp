@@ -126,7 +126,8 @@ export const sendMovementTransaction = Effect.fn("movement.sendTransaction")(fun
 export const makeMovementTxOperations = (
   ordinary: TxOperations,
   config: MovementTransportConfig,
-  http: MovementHttpPort = movementHttpPort
+  http: MovementHttpPort = movementHttpPort,
+  signal?: AbortSignal
 ) => {
   const client: Client = {
     getHierarchy: () => ordinary.getHierarchy(),
@@ -138,7 +139,7 @@ export const makeMovementTxOperations = (
     domainRequest: (domain, params, options) => ordinary.domainRequest(domain, params, options),
     close: () => Promise.resolve(),
     tx: async (transaction) => {
-      const exit = await Effect.runPromiseExit(sendMovementTransaction(transaction, config, http))
+      const exit = await Effect.runPromiseExit(sendMovementTransaction(transaction, config, http), { signal })
       if (exit._tag === "Success") return exit.value
       const error = Cause.findErrorOption(exit.cause)
       // Client.tx requires a rejected Promise; preserve the typed expected error for the Effect adapter.
