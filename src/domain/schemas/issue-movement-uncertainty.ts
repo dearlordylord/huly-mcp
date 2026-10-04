@@ -41,9 +41,10 @@ export const MovementVerificationEvidenceSchema = Schema.Union([
     status: Schema.Literal("observed"),
     completeness: Schema.Literal("complete"),
     consistency: Schema.Literal("consistent"),
+    absentIssueIds: Schema.optionalKey(Schema.Never),
     tasks: Schema.Array(MovementObservedTaskSchema),
     records: Schema.Array(MovementObservedRecordSchema)
-  }).annotate({ parseOptions: { onExcessProperty: "error" } }),
+  }),
   Schema.Struct({
     ...ObservationPresenceSchema.fields,
     status: Schema.Literal("observed"),
@@ -64,10 +65,11 @@ export const MovementVerificationEvidenceSchema = Schema.Union([
     status: Schema.Literal("observed"),
     completeness: Schema.Literal("incomplete"),
     consistency: Schema.Literal("undetermined"),
+    absentIssueIds: Schema.optionalKey(Schema.Never),
     reason: NonEmptyString,
     tasks: Schema.Array(MovementObservedTaskSchema),
     records: Schema.Array(MovementObservedRecordSchema)
-  }).annotate({ parseOptions: { onExcessProperty: "error" } })
+  })
 ])
 export const MovementNumberReservationSchema = Schema.Union([
   Schema.Struct({ status: Schema.Literal("confirmed"), issueId: IssueId, number: PositiveInteger }),

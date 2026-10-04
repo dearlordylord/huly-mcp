@@ -55,6 +55,32 @@ it("does not accept confirmed absence as consistent or merely undetermined verif
   ).toBe("None")
 })
 
+it("rejects a forbidden absence property rather than stripping it through the union", () => {
+  for (const absentIssueIds of [[], undefined]) {
+    expect(
+      decodeVerification({
+        status: "observed",
+        completeness: "complete",
+        consistency: "consistent",
+        tasks: [],
+        records: [],
+        absentIssueIds
+      })._tag
+    ).toBe("None")
+    expect(
+      decodeVerification({
+        status: "observed",
+        completeness: "incomplete",
+        consistency: "undetermined",
+        reason: "Read unavailable",
+        tasks: [],
+        records: [],
+        absentIssueIds
+      })._tag
+    ).toBe("None")
+  }
+})
+
 it("keeps unread verification undetermined without asserting an absence", () => {
   const result = decodeVerification({
     status: "observed",
