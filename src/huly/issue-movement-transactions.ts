@@ -11,6 +11,7 @@ export const MovementTransactionReceiptSchema = Schema.Struct({
   objectId: IssueId,
   objectClass: Schema.Literal(ObjectClassName.make("tracker:class:Issue")),
   objectSpace: DocId,
+  // Queued client time is intent metadata; Huly normalizes committed time on the server.
   modifiedOn: Timestamp,
   modifiedBy: SocialIdentityId,
   operations: Schema.JsonObject,

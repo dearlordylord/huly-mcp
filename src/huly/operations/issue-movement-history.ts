@@ -54,9 +54,8 @@ const historyIdentityMatches = (
 
 const historyMetadataMatches = (record: TransferHistoryRecord, transaction: MovementTransactionReceipt): boolean =>
   record.collection === "docUpdateMessages" &&
-  record.modifiedOn === transaction.modifiedOn &&
   record.modifiedBy === transaction.modifiedBy &&
-  record.history.createdOn === transaction.modifiedOn &&
+  record.history.createdOn === record.modifiedOn &&
   record.history.createdBy === transaction.modifiedBy &&
   record.history.updateCollection === undefined
 

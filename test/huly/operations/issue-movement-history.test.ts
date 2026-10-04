@@ -20,6 +20,8 @@ const parseHistory = (input: unknown) => Schema.decodeUnknownSync(TransferHistor
 
 const scenarios = [
   "acknowledged",
+  "server-clock",
+  "server-clock-reply-lost",
   "same-project",
   "array-delta",
   "reply-lost",
@@ -44,7 +46,7 @@ for (const scenario of scenarios) {
     Effect.gen(function* () {
       const f = transferTreeFixture()
       const commit = assertExists(f.operations.commitTransferTree)
-      f.state.failCommit = scenario === "reply-lost"
+      f.state.failCommit = scenario === "reply-lost" || scenario === "server-clock-reply-lost"
       const params = yield* parseMoveIssueParams(
         scenario === "same-project" ? { issue: f.input.issue, destination: { parent: null } } : f.input
       )
@@ -91,9 +93,14 @@ for (const scenario of scenarios) {
       const fiber = yield* moveIssue(params).pipe(Effect.provide(HulyClient.testLayer(operations)), Effect.forkChild)
       yield* TestClock.adjust("2 seconds")
       const result = yield* Fiber.join(fiber)
-      if (scenario === "acknowledged" || scenario === "same-project" || scenario === "array-delta")
+      if (
+        scenario === "acknowledged" ||
+        scenario === "server-clock" ||
+        scenario === "same-project" ||
+        scenario === "array-delta"
+      )
         expect(result.outcome).toBe("completed")
-      else if (scenario === "reply-lost") {
+      else if (scenario === "reply-lost" || scenario === "server-clock-reply-lost") {
         expect(result.outcome).toBe("indeterminate")
         if (result.outcome !== "indeterminate") throw new Error("Expected uncertain commit reply")
         expect(result.execution).toMatchObject({ phase: "commit", commit: "reply-lost" })
@@ -118,14 +125,20 @@ const makeHistory = (transaction: MovementTransactionReceipt, destinationId: Doc
     attachedToClass: transaction.objectClass,
     collection: scenario === "different-collection" ? "comments" : "docUpdateMessages",
     snapshot: "New server-generated movement history",
-    modifiedOn: scenario === "different-time" ? transaction.modifiedOn + 1 : transaction.modifiedOn,
+    modifiedOn:
+      scenario === "different-time" || scenario === "server-clock" || scenario === "server-clock-reply-lost"
+        ? transaction.modifiedOn + 1
+        : transaction.modifiedOn,
     modifiedBy: scenario === "different-author" ? "later-author" : transaction.modifiedBy,
     history: {
       txId: scenario === "different-tx" ? "later-transaction" : transaction.txId,
       objectId: scenario === "different-object" ? "different-task" : transaction.objectId,
       objectClass: transaction.objectClass,
       action: "update",
-      createdOn: scenario === "different-created-time" ? transaction.modifiedOn + 1 : transaction.modifiedOn,
+      createdOn:
+        scenario === "different-created-time" || scenario === "server-clock" || scenario === "server-clock-reply-lost"
+          ? transaction.modifiedOn + 1
+          : transaction.modifiedOn,
       createdBy: scenario === "different-created-author" ? "other-author" : transaction.modifiedBy,
       ...(scenario === "different-update-collection" ? { updateCollection: "subIssues" } : {}),
       attributeUpdates: JSON.stringify({
