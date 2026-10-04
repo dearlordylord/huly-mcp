@@ -693,6 +693,7 @@ it.effect("refuses legacy creation when project metadata and workflow expose no 
           createLayer({
             captures,
             project: sdkFixture<HulyProject>(projectWithoutDefault),
+            projectType: makeProjectType({ statuses: [] }),
             statuses: [],
             modelStatuses: []
           })
