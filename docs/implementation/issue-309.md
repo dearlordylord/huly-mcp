@@ -52,3 +52,24 @@ Additional adapter guards require approved non-null replacement documents to rem
 Unsupported structure and inconsistent discovery conflicts mark the blocked inventory incomplete as well as providing the explicit refusal/limitation. Fully inspected supported leaf attribute and workflow conflicts retain complete inventory reporting.
 
 SDK completeness audit: installed `FindOptions.total` is opt-in, and `toFindResult` defaults the total to the returned row count when absent. Attribute queries explicitly request `total: true`; the fixture models opt-in total reporting so the observable truncated-total refusal depends on that actual boundary behavior.
+
+## Historical combined attribute integration evidence
+
+The final-campaign attribute fixture passed through both MCP and CLI at
+`0d7d6a00fe67bfff6e2eff5126857f00bb1fe8a4`. Its original receipt records
+exit 0, clean true and inputsStable true. The retained log SHA256 is
+`9e497aec2e777fef92467c0787e3e7c81b9caa4143e35a1cc315995223f496ad`;
+separate transport PASS results cover simultaneous conflicts, response-derived
+retry, unchanged state and sequence on refusal, stale consent, selective clear
+and replacement, exact matching, ambiguity and explicit resolution. This
+demonstrates criterion 309.13 historically and supplies partial evidence for
+309.3–5, 309.7–9 and 309.11; it does not certify every criterion.
+
+Independent Spec evidence review compared that source with `c963d474` and
+confirmed that only process management, its tests and documentation changed.
+Attribute production code, protocol handlers, fixture, helpers and the
+dependency lock are unchanged. Retain this result as source-equivalent
+characterization with its original commit, fingerprints, timestamps and log
+hash. It is neither execution on the current commit nor qualification under
+the repaired custody runner. The remaining tree, concurrency, movement and
+rich-transfer qualification is still incomplete; the previous campaign expired.
