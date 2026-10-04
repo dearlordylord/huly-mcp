@@ -220,3 +220,32 @@ test.skipIf(process.platform === "win32")(
   },
   PROCESS_TEST_TIMEOUT_MS
 )
+
+test.skipIf(process.platform === "win32")(
+  "settles unconfirmed cleanup when an escaped descendant holds stage stdio",
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), "hulymcp-escaped-stdio-"))
+    const pidFile = join(directory, "descendant.pid")
+    const leader = `
+    const {spawn}=require('node:child_process');
+    const {writeFileSync}=require('node:fs');
+    const child=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{detached:true,stdio:'inherit'});
+    writeFileSync(${JSON.stringify(pidFile)},String(child.pid));child.unref();
+  `
+    try {
+      await expect(
+        runBoundedCommand({
+          executable: process.execPath,
+          args: ["-e", leader],
+          name: "escaped stdio",
+          timeoutMilliseconds: COMMAND_TIMEOUT,
+          terminationGraceMilliseconds: Milliseconds.make(100)
+        })
+      ).rejects.toThrow("process-group cleanup is unconfirmed")
+    } finally {
+      await terminateRecordedDescendant(pidFile)
+      await rm(directory, { recursive: true, force: true })
+    }
+  },
+  PROCESS_TEST_TIMEOUT_MS
+)

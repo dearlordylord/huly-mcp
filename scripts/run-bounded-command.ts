@@ -133,12 +133,14 @@ export const runBoundedCommand = ({
       detached: process.platform !== "win32",
       stdio: ["inherit", "pipe", "pipe"]
     })
-    record("active", child.pid)
     const stdoutLineCounter = { endsWithLineBreak: true, lineBreaks: OutputLineCount.make(0), wasWritten: false }
     const stderrLineCounter = { endsWithLineBreak: true, lineBreaks: OutputLineCount.make(0), wasWritten: false }
     let timedOut = false
     let interrupted: NodeJS.Signals | undefined
     let escalationTimer: NodeJS.Timeout | undefined
+    let settlementTimer: NodeJS.Timeout | undefined
+    let registrationFailure: unknown
+    let cleanupUnconfirmed = false
 
     const observeOutput = (output: Buffer, destination: NodeJS.WriteStream, lineCounter: LineCounter): void => {
       lineCounter.wasWritten = true
@@ -176,6 +178,13 @@ export const runBoundedCommand = ({
       escalationTimer ??= setTimeout(() => {
         try {
           terminate(child, "SIGKILL")
+          settlementTimer = setTimeout(() => {
+            retainUnconfirmed()
+            clearTimeout(timer)
+            child.stdout.destroy()
+            child.stderr.destroy()
+            reject(new Error(`${name} process-group cleanup is unconfirmed`))
+          }, GROUP_POLL_MILLISECONDS)
         } catch (error) {
           /* v8 ignore start -- Unexpected escalation defects are forwarded unchanged. */
           reject(error)
@@ -211,6 +220,7 @@ export const runBoundedCommand = ({
       }
     })
     const retainUnconfirmed = (): void => {
+      cleanupUnconfirmed = true
       try {
         terminate(child, "SIGKILL")
       } catch {
@@ -223,11 +233,18 @@ export const runBoundedCommand = ({
       }
       removeHandlers()
       clearTimeout(escalationTimer)
+      clearTimeout(settlementTimer)
+    }
+    const checkRegistration = (): void => {
+      if (cleanupUnconfirmed) throw new Error(`${name} process-group cleanup is unconfirmed`)
+      if (registrationFailure !== undefined) throw registrationFailure
     }
     child.once("close", async (code, signal) => {
       clearTimeout(timer)
+      clearTimeout(settlementTimer)
       try {
         await proveStoppedGroup(child, cleanup, terminationGraceMilliseconds, stop, name)
+        checkRegistration()
         if (custody !== undefined) unlinkSync(custody)
       } catch (error) {
         retainUnconfirmed()
@@ -259,4 +276,10 @@ export const runBoundedCommand = ({
         resolve({ outputLineCount })
       }
     })
+    try {
+      record("active", child.pid)
+    } catch (error) {
+      registrationFailure = error
+      stop()
+    }
   })
