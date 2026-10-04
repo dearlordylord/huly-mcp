@@ -149,23 +149,36 @@ const parentHierarchy = (hierarchy: ReturnType<typeof movementHierarchy>, parent
 const movementSpace = (root: Issue, parent: Issue | undefined, project: Project | undefined) =>
   parent?.space ?? project?._id ?? root.space
 
+// Internal closure inspection state; parsed issue schemas own the observed records.
+type ClosureProblem = { readonly state: "unavailable" | "inconsistent"; readonly message: string }
+
 export const inspectMovementClosure = Effect.fn("movement.inspectClosure")(function* (
   client: HulyClient["Service"],
   hierarchy: ReturnType<typeof movementHierarchy>,
   relevant: ReadonlyArray<Issue>
 ): Effect.fn.Return<string | undefined, MovementError> {
+  return (yield* inspectMovementClosureState(client, hierarchy, relevant))?.message
+})
+
+export const inspectMovementClosureState = Effect.fn("movement.inspectClosureState")(function* (
+  client: HulyClient["Service"],
+  hierarchy: ReturnType<typeof movementHierarchy>,
+  relevant: ReadonlyArray<Issue>
+): Effect.fn.Return<ClosureProblem | undefined, MovementError> {
   const closure = yield* client.findAll<SdkIssue>(
     tracker.class.Issue,
     hulyQuery<SdkIssue>({ attachedTo: { $in: relevant.map((issue) => toRef<SdkIssue>(issue._id)) } }),
     { limit: DISCOVERY_LIMIT }
   )
-  if (closure.total > closure.length || closure.length >= DISCOVERY_LIMIT) return "Descendant discovery is incomplete."
+  if (closure.total < 0 || closure.total !== closure.length || closure.length >= DISCOVERY_LIMIT)
+    return { state: "unavailable", message: "Descendant discovery is incomplete." }
   const observed = yield* Effect.forEach(closure, parseIssueState)
   const expected = hierarchy.issues.filter((issue) => relevant.some((parent) => parent._id === issue.attachedTo))
-  if (observed.length !== expected.length) return "Child closure changed or discovery is incomplete."
+  if (observed.length !== expected.length)
+    return { state: "unavailable", message: "Child closure changed or discovery is incomplete." }
   return observed.every((issue) => closureIssueMatches(hierarchy, issue))
     ? undefined
-    : "Foreign-project or changed child; inspect hierarchy."
+    : { state: "inconsistent", message: "Foreign-project or changed child; inspect hierarchy." }
 })
 
 const closureIssueMatches = (hierarchy: ReturnType<typeof movementHierarchy>, observed: Issue) => {

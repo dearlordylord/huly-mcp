@@ -15,7 +15,7 @@ import {
   movementNoParent,
   type MovementHierarchy
 } from "./issue-movement-hierarchy.js"
-import { inspectMovementClosure, inspectMovementProject, type MovementError } from "./issue-movement-preflight.js"
+import { inspectMovementClosureState, inspectMovementProject, type MovementError } from "./issue-movement-preflight.js"
 import type { TransferPlan } from "./issue-transfer-preflight.js"
 import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
@@ -42,15 +42,11 @@ export const verifyTransfer = Effect.fn("transfer.verify")(function* (
   const observed = hierarchy.byId.get(plan.root._id)
   if (observed === undefined || !destinationMatches(observed, destination, write)) return { state: "inconsistent" }
   if (!hierarchyMatches(plan, hierarchy)) return { state: "inconsistent" }
-  const closureProblem = yield* inspectMovementClosure(client, hierarchy, plan.relevant)
-  if (closureProblem !== undefined) return closureVerification(closureProblem)
+  const closureProblem = yield* inspectMovementClosureState(client, hierarchy, plan.relevant)
+  if (closureProblem !== undefined) return { state: closureProblem.state }
   if (!(yield* preservedIssueMatches(client, prepared, write))) return { state: "inconsistent" }
   const records = yield* verifyRecords(client, prepared, destination)
   return records === "consistent" ? { state: "consistent", issue: observed } : { state: records }
-})
-
-const closureVerification = (problem: string): Verification => ({
-  state: problem.includes("incomplete") ? "unavailable" : "inconsistent"
 })
 
 const hierarchyMatches = (plan: TransferPlan["plan"], hierarchy: MovementHierarchy) =>
