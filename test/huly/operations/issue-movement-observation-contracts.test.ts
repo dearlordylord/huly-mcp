@@ -413,3 +413,24 @@ it.effect("postcommit forest refinements retain known record facts and refuse cl
     expect(f.state.sent).toBe(1)
   })
 )
+
+it.effect("a refused top-level destination preserves null parent and stable recovery reads", () =>
+  Effect.gen(function* () {
+    const f = transferTreeFixture()
+    f.state.refuseCommit = true
+    const result = yield* run(f, f.operations, {
+      issue: IssueId.make(f.root._id),
+      destination: { project: f.destination.identifier }
+    })
+    expect(result.outcome).toBe("incomplete")
+    if (result.outcome !== "incomplete") throw new Error("Expected conditional refusal")
+    expect(result.destination).toEqual({ projectId: f.destination._id, parentId: null })
+    expect(result.execution).toMatchObject({ phase: "commit", commit: "refused" })
+    const expectedIds = [f.root, f.child, f.grandchild].map((issue) => IssueId.make(issue._id))
+    expect(result.issueIds).toEqual(expectedIds)
+    for (const identifier of expectedIds)
+      expect(result.inspection).toContain(JSON.stringify({ project: f.destination.identifier, identifier }))
+    expect(f.state.sent).toBe(1)
+    expect(f.state.allocated).toBe(3)
+  })
+)
