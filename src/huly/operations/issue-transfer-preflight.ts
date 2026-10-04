@@ -14,7 +14,7 @@ import {
   type TransferInspection,
   type TransferConflict,
   type TransferIssue,
-  type TransferHistoryRecord
+  type TransferSupportedRecord
 } from "../../domain/schemas/issue-transfer.js"
 import type { MovementIssue, MovementProject } from "../../domain/schemas/issue-movement-state.js"
 import { HulyDataInvalidError } from "../errors-base.js"
@@ -35,8 +35,12 @@ export interface TransferPlan {
   readonly plan: MovementPlan
   readonly attributeChanges: ReadonlyArray<TransferAttributeChange>
   readonly protectedIssue: TransferIssue
-  readonly records: ReadonlyArray<TransferHistoryRecord>
-  readonly tasks: ReadonlyArray<TransferTaskSnapshot & { readonly records: ReadonlyArray<TransferHistoryRecord> }>
+  readonly records: ReadonlyArray<TransferSupportedRecord>
+  readonly recordClasses: TransferInspection["classes"]
+  readonly tasks: ReadonlyArray<TransferTaskSnapshot & {
+    readonly records: ReadonlyArray<TransferSupportedRecord>
+    readonly recordClasses: TransferInspection["classes"]
+  }>
 }
 export interface TransferRefusal {
   readonly issueIds?: ReadonlyArray<MovementIssue["_id"]>
@@ -269,7 +273,8 @@ export const inspectTransferPlan = Effect.fn("transfer.inspectPlan")(function* (
     tasks.push({
       issue,
       protectedIssue: workflow.protectedIssue,
-      records: records.records.filter((record) => record.kind === "history")
+      recordClasses: records.classes,
+      records: records.records.filter((record) => record.kind !== "unsupported")
     })
   }
   const attributes = resolveTransferTreeAttributes(root, tasks, inventories, params.resolutions)
@@ -293,6 +298,7 @@ export const inspectTransferPlan = Effect.fn("transfer.inspectPlan")(function* (
     tasks,
     attributeChanges: attributes.changes,
     protectedIssue: rootTask.protectedIssue,
+    recordClasses: [...new Set(tasks.flatMap((task) => task.recordClasses))],
     records: tasks.flatMap((task) => task.records)
   }
 })

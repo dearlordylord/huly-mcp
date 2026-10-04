@@ -16,12 +16,12 @@ import { movementFixture, movementIssue, threeLevelMovementFixture } from "../..
 const tool = assertExists(issueTools.find((entry) => entry.name === "move_issue"))
 const ajv = new Ajv({ strict: false })
 const accepts = ajv.compile(tool.inputSchema)
-const inputFor = (destination: unknown) => ({ issue: "TEST-root", destination })
+const inputFor = (destination: unknown) => ({ issue: movementIssue("root").identifier, destination })
 
 for (const destination of [
   { project: "TEST" },
-  { parent: "TEST-destination" },
-  { project: "TEST", parent: "TEST-destination" },
+  { parent: movementIssue("destination").identifier },
+  { project: "TEST", parent: movementIssue("destination").identifier },
   { parent: null }
 ]) {
   it.effect(`MCP discovery, call and CLI agree for ${JSON.stringify(destination)}`, () =>
@@ -35,7 +35,7 @@ for (const destination of [
       expect(response.isError).not.toBe(true)
       expect(JSON.stringify(response)).toContain('"completed"')
       const parsed = yield* parseCliCommandLine(tool, cliCommandCatalog.move_issue, [
-        "TEST-root",
+        movementIssue("root").identifier,
         "--destination",
         JSON.stringify(destination)
       ]).pipe(Effect.provide(NodeServices.layer))

@@ -29,6 +29,7 @@ export const planTransferTreeWrites = (
       identifier: IssueIdentifier.make(`${destination.identifier}-${number}`),
       rank,
       records: task.records,
+      recordClasses: task.recordClasses,
       attributeChanges: prepared.attributeChanges.filter((change) => change.issueId === task.issue._id),
       expectedIssue: task.protectedIssue,
       expectedHierarchy: task.issue
