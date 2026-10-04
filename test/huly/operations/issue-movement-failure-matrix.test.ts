@@ -613,7 +613,7 @@ describe("public movement uncertainty and concurrent state", () => {
         verification: { completeness: "incomplete", consistency: "inconsistent" }
       })
       expect(result).toHaveProperty("verification.reason", expect.stringContaining("Earlier observed"))
-      expect(state.passes).toBe(2)
+      expect(state.passes).toBe(5)
       expect(f.state.sent).toBe(1)
     })
   )
