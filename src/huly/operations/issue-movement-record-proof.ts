@@ -1,3 +1,4 @@
+import type { MovementBatchAnchor } from "./issue-movement-batch-anchor.js"
 import { isDeepStrictEqual } from "node:util"
 import { Option, Schema } from "effect"
 import type { TransferSupportedRecord } from "../../domain/schemas/issue-transfer.js"
@@ -8,7 +9,6 @@ import type {
   MovementTransactions
 } from "../issue-movement-transactions.js"
 
-const LAST_ENTRY = -1
 const parseSnapshot = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.JsonObject))
 // Internal proof decision; receipt and document payloads are schema-owned at their boundaries.
 export type MovementRecordProof = "preserved" | "changed" | "unavailable"
@@ -18,19 +18,21 @@ export const movementRecordProof = (
   expected: TransferSupportedRecord,
   destinationId: DocId,
   queued: MovementTransactions,
-  persisted: MovementTransactionInspection | undefined
+  persisted: MovementTransactionInspection | undefined,
+  anchor?: MovementBatchAnchor
 ): MovementRecordProof => {
   if (isDeepStrictEqual(current, { ...expected, space: destinationId })) return "preserved"
   if (!protectedRouteMatches(current, expected, destinationId)) return "changed"
   if (!hasQueuedRecordIntent(queued, expected)) return "changed"
-  return changedMetadataProof(current, expected, destinationId, queued, persisted)
+  return changedMetadataProof(current, expected, destinationId, queued, persisted, anchor)
 }
 const changedMetadataProof = (
   current: TransferSupportedRecord,
   expected: TransferSupportedRecord,
   destinationId: DocId,
   queued: MovementTransactions,
-  persisted: MovementTransactionInspection | undefined
+  persisted: MovementTransactionInspection | undefined,
+  anchor: MovementBatchAnchor | undefined
 ): MovementRecordProof => {
   const before = parseSnapshot(expected.snapshot)
   const after = parseSnapshot(current.snapshot)
@@ -38,22 +40,33 @@ const changedMetadataProof = (
     return current.snapshot === expected.snapshot ? "unavailable" : "changed"
   if (!protectedSnapshotMatches(before.value, after.value)) return "changed"
   if (!snapshotMetadataMatches(after.value, current)) return "changed"
-  return committedRecordTime(current, expected, destinationId, queued, persisted)
+  return committedRecordTime(current, expected, destinationId, queued, persisted, anchor)
 }
 const committedRecordTime = (
   current: TransferSupportedRecord,
   expected: TransferSupportedRecord,
   destinationId: DocId,
   queued: MovementTransactions,
-  persisted: MovementTransactionInspection | undefined
+  persisted: MovementTransactionInspection | undefined,
+  anchor: MovementBatchAnchor | undefined
 ): MovementRecordProof => {
   const intents = queued
     .filter((value): value is MovementRecordTransactionReceipt => "target" in value)
     .filter((value) => value.objectId === expected._id)
-  const intent = intents.at(LAST_ENTRY)
-  if (intent === undefined || persisted === undefined) return "unavailable"
+  const intent = intents.length === 1 ? intents[0] : undefined
+  if (intent === undefined) return "unavailable"
   if (!queuedRecordMatches(intent, expected, destinationId)) return "unavailable"
-  const transaction = uniqueCommittedTransaction(persisted, intent)
+  return committedMetadataProof(current, intent, persisted, anchor)
+}
+const committedMetadataProof = (
+  current: TransferSupportedRecord,
+  intent: MovementRecordTransactionReceipt,
+  persisted: MovementTransactionInspection | undefined,
+  anchor: MovementBatchAnchor | undefined
+): MovementRecordProof => {
+  const matches = persisted?.transactions.filter((value) => value.txId === intent.txId) ?? []
+  if (matches.length === 0) return anchoredRecordMetadata(current, intent, anchor)
+  const transaction = uniqueCommittedTransaction(matches)
   if (transaction === undefined) return "unavailable"
   const { modifiedOn: _queuedTime, target: _target, ...identity } = intent
   const { modifiedOn: serverTime, ...committedIdentity } = transaction
@@ -82,22 +95,13 @@ const snapshotMetadataMatches = (
   current: TransferSupportedRecord
 ): boolean => snapshot["modifiedOn"] === current.modifiedOn && snapshot["modifiedBy"] === current.modifiedBy
 
-const uniqueCommittedTransaction = (
-  persisted: MovementTransactionInspection,
-  intent: MovementRecordTransactionReceipt
-) => {
-  const matches = persisted.transactions.filter((value) => value.txId === intent.txId)
-  return matches.length === 1 ? matches[0] : undefined
-}
-
-const protectedRouteMatches = (
+const uniqueCommittedTransaction = (matches: MovementTransactionInspection["transactions"]) =>
+  matches.length === 1 ? matches[0] : undefined
+const anchoredRecordMetadata = (
   current: TransferSupportedRecord,
-  expected: TransferSupportedRecord,
-  destinationId: DocId
-): boolean => {
-  const { modifiedBy: _oldAuthor, modifiedOn: _oldTime, snapshot: _beforeSnapshot, ...beforeRoute } = expected
-  const { modifiedBy: _newAuthor, modifiedOn: _newTime, snapshot: _afterSnapshot, ...afterRoute } = current
-  return isDeepStrictEqual(afterRoute, { ...beforeRoute, space: destinationId })
+  intent: MovementRecordTransactionReceipt,
+  anchor: MovementBatchAnchor | undefined
+): MovementRecordProof => {
+  if (anchor === undefined || anchor.modifiedBy !== intent.modifiedBy) return "unavailable"
+  return current.modifiedOn === anchor.modifiedOn && current.modifiedBy === intent.modifiedBy ? "preserved" : "changed"
 }
-const hasQueuedRecordIntent = (queued: MovementTransactions, expected: TransferSupportedRecord): boolean =>
-  queued.some((value) => "target" in value && value.objectId === expected._id)

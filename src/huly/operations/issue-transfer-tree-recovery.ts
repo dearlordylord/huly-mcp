@@ -1,4 +1,4 @@
-import type { MovementTransactions } from "../issue-movement-transactions.js"
+import type { MovementTransactionBatch, MovementTransactions } from "../issue-movement-transactions.js"
 import {
   publishVerification,
   interruptVerification,
@@ -18,9 +18,17 @@ import { verifyTransferTree, type TransferTreeVerification } from "./issue-trans
 import { transferTreeFailure, transferTreeRefusal } from "./issue-transfer-tree-results.js"
 import { TRANSFER_DISCOVERY_BUDGET } from "./issue-transfer-tree.js"
 
+// Internal publication state prevents multiple callbacks from claiming one batch.
+export type MovementBatchCapture =
+  | { readonly status: "awaiting" }
+  | { readonly status: "captured"; readonly batch: MovementTransactionBatch | undefined }
+  | { readonly status: "repeated" }
+export const capturedMovementBatch = (progress: ExecutionProgress) =>
+  Ref.get(progress.batch).pipe(Effect.map((value) => (value.status === "captured" ? value.batch : undefined)))
 // Request-local progress proof; no durable state or replay protocol is introduced.
 export interface ExecutionProgress {
   readonly transactions: Ref.Ref<MovementTransactions>
+  readonly batch: Ref.Ref<MovementBatchCapture>
   readonly execution: MovementExecutionProgress
   readonly verification: Ref.Ref<TransferTreeVerification>
   readonly verificationFacts: VerificationFactsRef
@@ -56,7 +64,8 @@ export const observeFailure = Effect.fn("transfer.observeFailure")(function* (
       destination,
       write,
       (observed) => publishVerification(progress.verification, progress.verificationFacts, observed),
-      yield* Ref.get(progress.transactions)
+      yield* Ref.get(progress.transactions),
+      yield* capturedMovementBatch(progress)
     ).pipe(Effect.timeout(TRANSFER_DISCOVERY_BUDGET))
   )
   if (observed._tag === "Failure")

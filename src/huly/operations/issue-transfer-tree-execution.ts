@@ -21,7 +21,14 @@ import { toRef } from "./sdk-boundary.js"
 import { TRANSFER_DISCOVERY_BUDGET, TRANSFER_EXECUTION_BUDGET } from "./issue-transfer-tree.js"
 import { allocateTransferTree } from "./issue-transfer-tree-allocation.js"
 import { transferTreeRefusal, completedTransferTreeResult } from "./issue-transfer-tree-results.js"
-import { stoppedResult, observeFailure, failedCommit, type ExecutionProgress } from "./issue-transfer-tree-recovery.js"
+import {
+  capturedMovementBatch,
+  stoppedResult,
+  observeFailure,
+  failedCommit,
+  type MovementBatchCapture,
+  type ExecutionProgress
+} from "./issue-transfer-tree-recovery.js"
 import { movementNoParent } from "./issue-movement-hierarchy.js"
 
 const reinspect = Effect.fn("transfer.reinspectTree")(function* (
@@ -43,6 +50,7 @@ export const executeTransferTree = Effect.fn("transfer.executeTree")(function* (
 ): Effect.fn.Return<MoveIssueResult, MovementError> {
   const progress: ExecutionProgress = {
     transactions: yield* Ref.make<MovementTransactions>([]),
+    batch: yield* Ref.make<MovementBatchCapture>({ status: "awaiting" }),
     execution: yield* Ref.make<MovementUncertaintyEvidence["execution"] | undefined>(undefined),
     verification: yield* Ref.make<TransferTreeVerification>({ status: "not-attempted" }),
     verificationFacts: yield* Ref.make<VerificationProof | undefined>(undefined)
@@ -234,7 +242,16 @@ const commitAndVerify = Effect.fn("transfer.commitAndVerify")(function* (
     commit: "sent",
     reservations
   })
-  const committed = yield* Effect.result(commit(write, (transactions) => Ref.set(progress.transactions, transactions)))
+  const committed = yield* Effect.result(
+    commit(write, (transactions, batch) =>
+      Effect.gen(function* () {
+        yield* Ref.set(progress.transactions, transactions)
+        yield* Ref.update(progress.batch, (current) =>
+          current.status === "awaiting" ? { status: "captured", batch } : { status: "repeated" }
+        )
+      })
+    )
+  )
   if (committed._tag === "Failure")
     return yield* failedCommit(client, prepared, destination, write, progress, committed.failure, reservations)
   if (committed.success === "condition-not-met") {
@@ -274,7 +291,8 @@ const finishVerification = Effect.fn("transfer.finishVerification")(function* (
       destination,
       write,
       (observed) => publishVerification(progress.verification, progress.verificationFacts, observed),
-      yield* Ref.get(progress.transactions)
+      yield* Ref.get(progress.transactions),
+      yield* capturedMovementBatch(progress)
     ).pipe(
       Effect.tap((value) =>
         value.status === "unavailable"

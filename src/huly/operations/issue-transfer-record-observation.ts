@@ -1,6 +1,11 @@
+import { movementBatchAnchor, type MovementBatchAnchor } from "./issue-movement-batch-anchor.js"
 import { movementRecordProof } from "./issue-movement-record-proof.js"
 import { movementHistoryMatches } from "./issue-movement-history.js"
-import type { MovementTransactionInspection, MovementTransactions } from "../issue-movement-transactions.js"
+import type {
+  MovementTransactionBatch,
+  MovementTransactionInspection,
+  MovementTransactions
+} from "../issue-movement-transactions.js"
 import { observeTransferForest } from "../issue-transfer-forest-observation.js"
 import type { TransferForestEntry } from "../issue-transfer-forest-state.js"
 import { Effect, Schema } from "effect"
@@ -41,7 +46,8 @@ export const observeTransferRecords = Effect.fn("transfer.observeRecords")(funct
   write: TransferTreeWrite,
   observed: ReadonlyArray<ObservedIssue>,
   publish: (observation: RecordObservation) => Effect.Effect<void>,
-  transactions: MovementTransactions = []
+  transactions: MovementTransactions = [],
+  batch?: MovementTransactionBatch
 ): Effect.fn.Return<RecordObservation> {
   if (client.inspectTransferRecords === undefined && client.inspectTransferForest === undefined)
     return { records: [], problems: [], limitations: ["Owned-record verifier is unavailable."] }
@@ -51,41 +57,22 @@ export const observeTransferRecords = Effect.fn("transfer.observeRecords")(funct
       ? yield* Effect.result(client.inspectMovementTransactions(recordIntents))
       : undefined
   const persisted = persistedResult?._tag === "Success" ? persistedResult.success : undefined
-  const records: Array<RecordObservation["records"][number]> = []
-  const problems: Array<string> = []
-  const limitations: Array<string> = []
+  const entries = new Map<TransferForestEntry["ownerId"], TransferForestEntry>()
   const owners = [
     ...new Set([...prepared.tasks.map((task) => task.issue._id), ...observed.map((issue) => issue.hierarchy._id)])
   ]
-  const observeOwner = Effect.fn("transfer.observeOwner")(function* (
-    entry: TransferForestEntry
-  ): Effect.fn.Return<void> {
-    const issueId = entry.ownerId
-    if (entry.status === "unavailable") {
-      limitations.push(`Record closure of ${issueId} could not be read.`)
-    } else {
-      const task = prepared.tasks.find((value) => value.issue._id === issueId)
-      const planned = write.tasks.find((value) => value.issueId === issueId)
-      const ownerProof = inspectOwnerRecords(
-        entry.inspection,
-        task?.records ?? [],
-        planned?.destinationId,
-        transactions,
-        persisted
-      )
-      records.push(...ownerProof.records)
-      problems.push(...ownerProof.problems)
-      limitations.push(...ownerProof.limitations)
-    }
-    yield* publish({ records: [...records], problems: [...problems], limitations: [...limitations] })
-  })
+  const observeOwner = (entry: TransferForestEntry) =>
+    Effect.gen(function* () {
+      entries.set(entry.ownerId, entry)
+      yield* publish(projectRecordObservations([...entries.values()], prepared, write, transactions, persisted, batch))
+    })
   yield* observeTransferForest(
     client,
     owners,
     observed.map((issue) => issue.hierarchy),
     observeOwner
   )
-  return { records, problems, limitations }
+  return projectRecordObservations([...entries.values()], prepared, write, transactions, persisted, batch)
 })
 
 const inspectOwnerRecords = (
@@ -93,7 +80,8 @@ const inspectOwnerRecords = (
   previous: ReadonlyArray<TransferSupportedRecord>,
   destinationId: TransferTreeWrite["tasks"][number]["destinationId"] | undefined,
   transactions: MovementTransactions,
-  persisted: MovementTransactionInspection | undefined
+  persisted: MovementTransactionInspection | undefined,
+  anchor: MovementBatchAnchor | undefined
 ): RecordObservation => {
   const records: Array<RecordObservation["records"][number]> = []
   const problems: Array<string> = []
@@ -103,7 +91,7 @@ const inspectOwnerRecords = (
     if (route._tag === "Some") records.push(route.value)
     else limitations.push(`Record route of ${record._id} is unavailable.`)
     const expected = previous.find((value) => value._id === record._id)
-    const decision = recordPreservationDecision(record, expected, destinationId, transactions, persisted)
+    const decision = recordPreservationDecision(record, expected, destinationId, transactions, persisted, anchor)
     if (decision.status === "changed") problems.push(decision.problem)
     if (decision.status === "unavailable") limitations.push(decision.limitation)
     if (record.kind === "unsupported") limitations.push(`Protected payload of record ${record._id} is unavailable.`)
@@ -140,7 +128,8 @@ const recordPreservationDecision = (
   expected: TransferSupportedRecord | undefined,
   destinationId: TransferTreeWrite["tasks"][number]["destinationId"] | undefined,
   transactions: MovementTransactions,
-  persisted: MovementTransactionInspection | undefined
+  persisted: MovementTransactionInspection | undefined,
+  anchor: MovementBatchAnchor | undefined
 ): RecordPreservationDecision => {
   if (expected === undefined) {
     if (movementHistoryMatches(record, transactions, destinationId)) return { status: "preserved" }
@@ -149,7 +138,7 @@ const recordPreservationDecision = (
   if (destinationId === undefined)
     return { status: "changed", problem: `Record ${record._id} belongs to an unplanned task.` }
   if (record.kind === "unsupported") return unsupportedRecordDecision(record, expected, destinationId)
-  const proof = movementRecordProof(record, expected, destinationId, transactions, persisted)
+  const proof = movementRecordProof(record, expected, destinationId, transactions, persisted, anchor)
   if (proof === "preserved") return { status: "preserved" }
   if (proof === "unavailable")
     return {
@@ -173,3 +162,41 @@ const unsupportedRecordDecision = (
         problem: `Observed ownership or project of record ${current._id} differs from approved state.`
       }
     : { status: "preserved" }
+
+const projectRecordObservations = (
+  entries: ReadonlyArray<TransferForestEntry>,
+  prepared: TransferPlan,
+  write: TransferTreeWrite,
+  transactions: MovementTransactions,
+  persisted: MovementTransactionInspection | undefined,
+  batch: MovementTransactionBatch | undefined
+): RecordObservation => {
+  const inspections = entries.flatMap((entry) => (entry.status === "observed" ? [entry.inspection] : []))
+  const anchor = movementBatchAnchor(
+    inspections,
+    prepared.tasks.flatMap((task) => task.records),
+    write.tasks[0]?.destinationId,
+    transactions,
+    batch,
+    write.rootId
+  )
+  const proofs = entries.map((entry) => {
+    if (entry.status === "unavailable")
+      return { records: [], problems: [], limitations: [`Record closure of ${entry.ownerId} could not be read.`] }
+    const task = prepared.tasks.find((value) => value.issue._id === entry.ownerId)
+    const planned = write.tasks.find((value) => value.issueId === entry.ownerId)
+    return inspectOwnerRecords(
+      entry.inspection,
+      task?.records ?? [],
+      planned?.destinationId,
+      transactions,
+      persisted,
+      anchor
+    )
+  })
+  return {
+    records: proofs.flatMap((value) => value.records),
+    problems: proofs.flatMap((value) => value.problems),
+    limitations: proofs.flatMap((value) => value.limitations)
+  }
+}
