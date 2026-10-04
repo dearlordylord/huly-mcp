@@ -24,6 +24,9 @@ import {
   selectMovementProject
 } from "./issue-movement-preflight.js"
 
+import { movementNoopProblem } from "./issue-transfer-verification.js"
+import { transferIssue } from "./issue-transfer.js"
+
 const VERIFY_ATTEMPTS = 5
 
 // Internal verification proof carrying the root read from the verified snapshot.
@@ -164,8 +167,26 @@ export const moveIssue = Effect.fn("moveIssue")(function* (
   if (problem !== undefined) return refusal(problem, root)
   const source = yield* selectMovementProject(client, ProjectIdentifier.make(root.space))
   if (source === undefined) return refusal("Source project selector must match exactly one project.", root)
+  return yield* runDestination(client, root, parent, project, source, params)
+})
+
+const runDestination = Effect.fn("movement.runDestination")(function* (
+  client: HulyClient["Service"],
+  root: MovementPlan["root"],
+  parent: MovementPlan["parent"],
+  project: MovementPlan["source"] | undefined,
+  source: MovementPlan["source"],
+  params: MoveIssueParams
+) {
+  const destination =
+    parent === undefined ? project : yield* selectMovementProject(client, ProjectIdentifier.make(parent.space))
+  if (destination !== undefined && destination._id !== source._id)
+    return yield* transferIssue(client, root, parent, source, destination, params)
   const plan = yield* inspectMovementPlan(client, root, parent, source)
-  return typeof plan === "string" ? refusal(plan, root) : yield* runMovementPlan(client, plan)
+  if (typeof plan === "string") return refusal(plan, root)
+  const noopProblem = yield* movementNoopProblem(client, plan)
+  if (noopProblem !== undefined) return refusal(noopProblem, root)
+  return yield* runMovementPlan(client, plan)
 })
 
 const treePreserved = (plan: MovementPlan, hierarchy: MovementHierarchy, root: MovementPlan["root"]) => {

@@ -61,7 +61,7 @@ it.effect("MCP discovery excludes empty destinations and legacy contracts; calls
     )
     expect(JSON.stringify(response)).toContain("Omit resolutions")
     expect(fixture.writes).toEqual([])
-    expect(tool.description).toContain("Cross-project execution is unavailable")
+    expect(tool.description).toContain("Cross-project movement supports a compatible leaf")
     expect(tool.description).toContain("parent: null")
     expect(tool.description).toContain("stable IDs")
   })

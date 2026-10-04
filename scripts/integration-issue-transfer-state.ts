@@ -1,0 +1,48 @@
+import type { Issue, Project } from "@hcengineering/tracker"
+import { Effect, Schema } from "effect"
+import { MovementIssueSchema } from "../src/domain/schemas/issue-movement-state.js"
+import { TransferIssueSchema } from "../src/domain/schemas/issue-transfer.js"
+import { DocId, IssueId, ProjectIdentifier, Count } from "../src/domain/schemas/shared.js"
+import { tracker } from "../src/huly/huly-plugins.js"
+import { inspectTransferRecords } from "../src/huly/issue-transfer-adapter.js"
+import { hulyQuery } from "../src/huly/operations/query-helpers.js"
+import { toRef } from "../src/huly/operations/sdk-boundary.js"
+import { connectIntegrationHuly } from "./integration-huly-client.js"
+
+const Arguments = Schema.fromJsonString(
+  Schema.Struct({ issues: Schema.Array(IssueId), projects: Schema.Array(ProjectIdentifier) })
+)
+const IssueSnapshot = Schema.Struct({ ...MovementIssueSchema.fields, ...TransferIssueSchema.fields })
+const ProjectSnapshot = Schema.Struct({ _id: DocId, identifier: ProjectIdentifier, sequence: Count })
+const parseSnapshot = <A>(schema: Schema.ConstraintDecoder<A>, input: unknown): A =>
+  Schema.decodeUnknownSync(schema)(input)
+
+const run = async () => {
+  const args = Schema.decodeUnknownSync(Arguments)(process.argv[2])
+  const { client } = await connectIntegrationHuly()
+  try {
+    const issues = await Promise.all(
+      args.issues.map(async (id) => {
+        const raw = await client.findOne<Issue>(tracker.class.Issue, hulyQuery<Issue>({ _id: toRef<Issue>(id) }))
+        const issue = parseSnapshot(IssueSnapshot, raw)
+        const owned = await Effect.runPromise(inspectTransferRecords(client, id))
+        return { issue, owned }
+      })
+    )
+    const projects = await Promise.all(
+      args.projects.map(async (identifier) =>
+        parseSnapshot(
+          ProjectSnapshot,
+          await client.findOne<Project>(tracker.class.Project, hulyQuery<Project>({ identifier }))
+        )
+      )
+    )
+    process.stdout.write(`${JSON.stringify({ issues, projects })}\n`)
+  } finally {
+    await client.close()
+  }
+}
+void run().catch((cause: unknown) => {
+  process.stderr.write(`${String(cause)}\n`)
+  process.exitCode = 1
+})

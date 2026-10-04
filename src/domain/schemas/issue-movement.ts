@@ -25,12 +25,13 @@ export const MoveIssueParamsSchema = Schema.Struct({
       })
     ).annotate({
       description:
-        "Cross-project-only decisions. Omit for same-project movement, including no-ops. Cross-project execution is unavailable in this slice."
+        "Cross-project-only decisions. Omit for same-project movement, including no-ops. This slice refuses component/milestone resolutions; choose a compatible leaf without those references."
     })
   )
 }).annotate({
   title: "MoveIssueParams",
-  description: "Move a complete issue tree within its project. Cross-project destinations are refused before writes."
+  description:
+    "Move a tree within its project or a compatible leaf across projects. Cross-project moves require equal project types, supported kind/status and no component/milestone references; only automatic history records are supported. Unsupported structure is refused before allocation. Stable IDs persist; cross-project identifiers change."
 })
 
 export type MoveIssueParams = Schema.Schema.Type<typeof MoveIssueParamsSchema>

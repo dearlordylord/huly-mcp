@@ -57,7 +57,7 @@ export const cliCommandCatalog = {
     path: ["issues", "move"],
     positional: ["issue"],
     description:
-      "Move an issue tree within its project. --destination JSON forms: {project: HULY} selects project top level; {parent: HULY-42} infers the parent project; {project: HULY, parent: HULY-42} requires agreement; {parent: null} selects current project top level. Selectors accept identifiers or stable IDs. Omit resolutions for same-project calls. Cross-project execution is unavailable."
+      "Move an issue tree within its project. --destination JSON forms: {project: HULY} selects project top level; {parent: HULY-42} infers the parent project; {project: HULY, parent: HULY-42} requires agreement; {parent: null} selects current project top level. Selectors accept identifiers or stable IDs. Omit resolutions for same-project calls. Cross-project movement supports compatible leaves with equal project types and supported kind/status, no component/milestone references or owned records except automatic history. Unsupported structure is refused before allocation. Cross-project identifiers change."
   },
   add_issue_label: { path: ["issues", "labels", "add"], positional: [], description: "Add an issue label" },
   remove_issue_label: { path: ["issues", "labels", "remove"], positional: [], description: "Remove an issue label" },

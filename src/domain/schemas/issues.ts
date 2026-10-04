@@ -292,8 +292,14 @@ export type ListIssuesInput = Schema.Codec.Encoded<typeof ListIssuesParamsSchema
 
 export const GetIssueParamsSchema = Schema.Struct({
   project: ProjectIdentifier.annotate({ description: "Project identifier (e.g., 'HULY')" }),
-  identifier: IssueIdentifier.annotate({ description: "Issue identifier (e.g., 'HULY-123')" })
-}).annotate({ title: "GetIssueParams", description: "Parameters for getting a single issue" })
+  identifier: IssueIdentifier.annotate({
+    description: "Issue identifier, number, or stable issue ID. Stable IDs resolve after project movement."
+  })
+}).annotate({
+  title: "GetIssueParams",
+  description:
+    "Read by identifier/number within project, or by stable issue ID across the workspace. When a stable ID moved, returns its actual project. The supplied project must exist."
+})
 
 export type GetIssueParams = Schema.Schema.Type<typeof GetIssueParamsSchema>
 
