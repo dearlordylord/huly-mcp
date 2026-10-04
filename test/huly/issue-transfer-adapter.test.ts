@@ -26,6 +26,7 @@ const adapterFixture = () => {
   const state = { refused: false, incomplete: false, failRead: false, invalidMetadata: false }
   const updates: Array<ReadonlyArray<unknown>> = []
   const conditions: Array<unknown> = []
+  const scopes: Array<string | undefined> = []
   const metadata = new Map([
     ["history", { type: { _class: core.class.Collection, of: activity.class.DocUpdateMessage } }],
     ["scalar", { type: { _class: core.class.TypeString } }]
@@ -38,7 +39,7 @@ const adapterFixture = () => {
       updates.push(args)
       return {}
     },
-    commit: async () => ({ result: !state.refused })
+    commit: async () => ({ result: !state.refused || scopes.at(-1) === undefined })
   }
   const client = sdkFixture<TxOperations>({
     getHierarchy: () => ({
@@ -58,9 +59,12 @@ const adapterFixture = () => {
       if (state.incomplete) result.total = 10_002
       return result
     },
-    apply: () => apply
+    apply: (scope: string | undefined) => {
+      scopes.push(scope)
+      return apply
+    }
   })
-  return { client, docs, history, state, updates, conditions }
+  return { client, docs, history, state, updates, conditions, scopes }
 }
 const writeInput = {
   issueId: "root",
@@ -86,6 +90,7 @@ it.effect(
       ])
       const write = Schema.decodeUnknownSync(TransferWriteSchema)({ ...writeInput, records: records.records })
       expect(yield* Effect.promise(() => commitTransfer(f.client, write))).toBe("applied")
+      expect(f.scopes.every((scope) => typeof scope === "string" && scope.length > 0)).toBe(true)
       expect(f.updates[0]?.slice(-2)).toEqual([1, "author"])
       expect(f.updates[1]?.[3]).toMatchObject({
         space: "destination",
@@ -109,6 +114,7 @@ it.effect(
         )
       ).toBe("condition-not-met")
       expect(f.updates).toHaveLength(6)
+      expect(new Set(f.scopes).size).toBe(1)
     })
 )
 
