@@ -251,7 +251,7 @@ for (const lostReply of [false, true]) {
               _id: DocId,
               objectId: DocId,
               operations: Schema.JsonObject,
-              modifiedOn: Count,
+              modifiedOn: Timestamp,
               modifiedBy: NonEmptyString
             })
           )
