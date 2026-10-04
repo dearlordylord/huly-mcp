@@ -349,3 +349,67 @@ it.effect("forest dispatch observes the complete public movement before and afte
     expect(f.state.sent).toBe(1)
   })
 )
+
+it.effect("unavailable then observed forest refinements refuse preflight before any writes", () =>
+  Effect.gen(function* () {
+    const f = transferTreeFixture()
+    const inspect = assertExists(f.operations.inspectTransferRecords)
+    const result = yield* run(f, {
+      ...f.operations,
+      inspectTransferForest: (roots, tree, publish) =>
+        Effect.gen(function* () {
+          const entries: Array<TransferForestEntry> = []
+          for (const ownerId of roots) {
+            const inspection = yield* inspect(ownerId, tree)
+            const entry: TransferForestEntry = { status: "observed", ownerId, inspection }
+            if (ownerId === IssueId.make(f.root._id)) {
+              yield* assertExists(publish)({ status: "unavailable", ownerId, reason: "inspection-unavailable" })
+              yield* assertExists(publish)(entry)
+            }
+            entries.push(entry)
+          }
+          return entries
+        })
+    })
+    expect(result.outcome).toBe("blocked")
+    if (result.outcome !== "blocked") throw new Error("Expected preflight refusal")
+    expect(result.changed).toBe(false)
+    expect(result.conflicts).toEqual(
+      expect.arrayContaining([expect.objectContaining({ issueId: f.root._id, code: "discovery" })])
+    )
+    expect(f.state.allocated).toBe(0)
+    expect(f.state.sent).toBe(0)
+  })
+)
+
+it.effect("postcommit forest refinements retain known record facts and refuse claimed completeness", () =>
+  Effect.gen(function* () {
+    const f = transferTreeFixture()
+    const inspect = assertExists(f.operations.inspectTransferRecords)
+    const result = yield* run(f, {
+      ...f.operations,
+      inspectTransferForest: (roots, tree, publish) =>
+        Effect.gen(function* () {
+          const entries: Array<TransferForestEntry> = []
+          for (const ownerId of roots) {
+            const inspection = yield* inspect(ownerId, tree)
+            const entry: TransferForestEntry = { status: "observed", ownerId, inspection }
+            yield* assertExists(publish)(entry)
+            if (f.state.sent > 0 && ownerId === IssueId.make(f.root._id))
+              yield* assertExists(publish)({ status: "unavailable", ownerId, reason: "owner-unavailable" })
+            entries.push(entry)
+          }
+          return entries
+        })
+    })
+    expect(result.outcome).toBe("indeterminate")
+    if (result.outcome !== "indeterminate") throw new Error("Expected unavailable verification")
+    expect(result.verification).toMatchObject({ status: "observed", completeness: "incomplete" })
+    if (result.verification.status !== "observed" || result.verification.completeness !== "incomplete")
+      throw new Error("Expected parsed actual observations")
+    const record = assertExists(f.records[0])
+    expect(result.verification.records.map((route) => route.recordId)).toContain(record._id)
+    expect(result.verification.reason).toContain(`Record closure of ${f.root._id} could not be read.`)
+    expect(f.state.sent).toBe(1)
+  })
+)
