@@ -9,13 +9,60 @@ printf -v SOURCE 'T%04X' "$RANDOM"
 printf -v TARGET 'U%04X' "$RANDOM"
 ISSUES=(); PROJECTS=(); TEAMSPACE=''; DOCUMENT=''
 INIT='{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"tree-transfer-certification","version":"1.0"}},"id":1}'
+tree_mcp_pipeline_status() {
+  local tool="$1" process_status="$2" json_status="$3" input_status="$4"
+  if (( process_status != 0 )); then
+    local category=process-exit
+    [[ "$process_status" == 124 ]] && category=timeout
+    printf 'FAIL: tree MCP tool=%s phase=%s exit=%s\n' "$tool" "$category" "$process_status" >&2
+    return "$process_status"
+  fi
+  if (( json_status != 0 || input_status != 0 )); then
+    printf 'FAIL: tree MCP tool=%s phase=json-stream exit=%s inputExit=%s\n' "$tool" "$json_status" "$input_status" >&2
+    return 1
+  fi
+}
+tree_mcp_reply() {
+  local tool="$1" response="$2" text
+  if [[ -z "$response" ]]; then
+    printf 'FAIL: tree MCP tool=%s phase=empty-reply\n' "$tool" >&2
+    return 1
+  fi
+  if ! jq -es 'length==1 and (.[0]|type=="object" and .jsonrpc=="2.0" and .id==2 and (((.result|type)=="object") or ((.error|type)=="object")))' >/dev/null 2>&1 <<<"$response"; then
+    printf 'FAIL: tree MCP tool=%s phase=envelope-shape\n' "$tool" >&2
+    return 1
+  fi
+  if jq -e '.error!=null or .result.isError==true' >/dev/null <<<"$response"; then
+    printf 'FAIL: tree MCP tool=%s phase=envelope-error\n' "$tool" >&2
+    return 1
+  fi
+  text=$(jq -er '.result.content[0].text | select(type=="string" and length>0)' 2>/dev/null <<<"$response") || {
+    printf 'FAIL: tree MCP tool=%s phase=result-text\n' "$tool" >&2
+    return 1
+  }
+  if ! jq -es 'length==1' >/dev/null 2>&1 <<<"$text"; then
+    printf 'FAIL: tree MCP tool=%s phase=result-json\n' "$tool" >&2
+    return 1
+  fi
+  printf '%s\n' "$text"
+}
 mcp() {
   local request response
-  request=$(jq -nc --arg tool "$1" --argjson args "$2" '{jsonrpc:"2.0",method:"tools/call",params:{name:$tool,arguments:$args},id:2}')
-  response=$(printf '%s\n%s\n' "$INIT" "$request" | timeout 45 env MCP_AUTO_EXIT=true HULY_TOOL_MODE=native node dist/index.cjs 2>/dev/null | jq -c 'select(.id==2)')
-  jq -e '.result.isError != true and .error==null' >/dev/null <<<"$response"
-  jq -r '.result.content[0].text' <<<"$response"
+  printf 'PHASE: tree MCP tool=%s call\n' "$1" >&2
+  request=$(jq -nc --arg tool "$1" --argjson args "$2" '{jsonrpc:"2.0",method:"tools/call",params:{name:$tool,arguments:$args},id:2}' 2>/dev/null) || {
+    printf 'FAIL: tree MCP tool=%s phase=request-json\n' "$1" >&2
+    return 1
+  }
+  response=$(
+    set +e
+    trap - ERR
+    printf '%s\n%s\n' "$INIT" "$request" | timeout 45 env MCP_AUTO_EXIT=true HULY_TOOL_MODE=native node dist/index.cjs 2>/dev/null | jq -c 'select(.id==2)' 2>/dev/null
+    pipeline_status=("${PIPESTATUS[@]}")
+    tree_mcp_pipeline_status "$1" "${pipeline_status[1]}" "${pipeline_status[2]}" "${pipeline_status[0]}"
+  ) || return 1
+  tree_mcp_reply "$1" "$response" || return 1
 }
+
 move() {
   if [[ "$TRANSPORT" == mcp ]]; then mcp move_issue "$1"; else
     local issue destination resolutions
