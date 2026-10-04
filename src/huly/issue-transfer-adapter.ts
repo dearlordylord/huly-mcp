@@ -1,6 +1,6 @@
 import type { Issue } from "@hcengineering/tracker"
 import type { AttachedDoc, Doc, TxOperations } from "@hcengineering/core"
-import { Effect, Schema, Result } from "effect"
+import { Effect, Schema } from "effect"
 import {
   AutomaticHistoryClass,
   TransferHistorySchema,
@@ -10,7 +10,7 @@ import {
   TransferRecordSchema,
   type TransferWrite
 } from "../domain/schemas/issue-transfer.js"
-import { ObjectClassName } from "../domain/schemas/shared.js"
+import { ObjectClassName, type HulyConditionalWriteResult } from "../domain/schemas/shared.js"
 import type { HulyClientError } from "./client.js"
 import { HulyDataInvalidError, makeOperationConnectionError } from "./errors-base.js"
 import { core, tracker } from "./huly-plugins.js"
@@ -20,6 +20,10 @@ import { hulyQuery } from "./operations/query-helpers.js"
 const LIMIT = 10_001
 const invalid = (cause: unknown) =>
   new HulyDataInvalidError({ operation: "move_issue", entity: "owned collection", cause })
+const parseBoundary = <A, R>(
+  schema: Schema.ConstraintDecoder<A, R>,
+  input: unknown
+): Effect.Effect<A, HulyDataInvalidError, R> => Schema.decodeUnknownEffect(schema)(input).pipe(Effect.mapError(invalid))
 const CollectionTypeSchema = Schema.Struct({ of: ObjectClassName })
 
 export const inspectTransferRecords = Effect.fn("transfer.inspectRecords")(function* (
@@ -30,7 +34,7 @@ export const inspectTransferRecords = Effect.fn("transfer.inspectRecords")(funct
   const attributes = hierarchy.getAllAttributes(tracker.class.Issue)
   const declared = yield* Effect.forEach(
     [...attributes.values()].filter((attribute) => hierarchy.isDerived(attribute.type._class, core.class.Collection)),
-    (attribute) => Schema.decodeUnknownEffect(CollectionTypeSchema)(attribute.type).pipe(Effect.mapError(invalid))
+    (attribute) => parseBoundary(CollectionTypeSchema, attribute.type)
   )
   const classes = new Set([
     ...declared.map((collection) => toClassRef<AttachedDoc>(collection.of)),
@@ -68,31 +72,24 @@ export const inspectTransferRecords = Effect.fn("transfer.inspectRecords")(funct
     limitation:
       "Discovery covers model-declared collections and loaded model AttachedDoc classes; independent references are not ownership. Unsupported structure is not a complete conflict inventory."
   }
-  return yield* Schema.decodeUnknownEffect(TransferInspectionSchema)(inspection).pipe(Effect.mapError(invalid))
+  return yield* parseBoundary(TransferInspectionSchema, inspection)
 })
 
 const { attributeUpdates: _encodedUpdates, ...historyFields } = TransferHistorySchema.fields
 const RawHistorySchema = Schema.Struct(historyFields)
 const parseHistoricalUpdates = (input: unknown): Effect.Effect<string | undefined, HulyDataInvalidError> => {
   if (input === undefined) return Effect.succeed(undefined)
-  const parsed = Schema.decodeUnknownResult(Schema.Json)(input)
-  return Result.isFailure(parsed)
-    ? Effect.fail(invalid(parsed.failure))
-    : Effect.succeed(JSON.stringify(parsed.success))
+  return Schema.encodeUnknownEffect(Schema.fromJsonString(Schema.Json))(input).pipe(Effect.mapError(invalid))
 }
 const parseOwnedRecord = Effect.fn("transfer.parseOwnedRecord")(function* (
   row: AttachedDoc
 ): Effect.fn.Return<TransferRecord, HulyDataInvalidError> {
   if (String(row._class) !== AutomaticHistoryClass)
-    return yield* Schema.decodeUnknownEffect(TransferRecordSchema)({ ...row, kind: "unsupported" }).pipe(
-      Effect.mapError(invalid)
-    )
-  const raw = yield* Schema.decodeUnknownEffect(RawHistorySchema)(row).pipe(Effect.mapError(invalid))
+    return yield* parseBoundary(TransferRecordSchema, { ...row, kind: "unsupported" })
+  const raw = yield* parseBoundary(RawHistorySchema, row)
   const attributeUpdates = yield* parseHistoricalUpdates(Reflect.get(row, "attributeUpdates"))
   const history = { ...raw, ...(attributeUpdates === undefined ? {} : { attributeUpdates }) }
-  return yield* Schema.decodeUnknownEffect(TransferRecordSchema)({ ...row, kind: "history", history }).pipe(
-    Effect.mapError(invalid)
-  )
+  return yield* parseBoundary(TransferRecordSchema, { ...row, kind: "history", history })
 })
 
 const inspectNestedHistory = Effect.fn("transfer.inspectNestedHistory")(function* (
@@ -119,7 +116,10 @@ const inspectNestedHistory = Effect.fn("transfer.inspectNestedHistory")(function
   return blockers
 })
 
-export const commitTransfer = async (client: TxOperations, write: TransferWrite) => {
+export const commitTransfer = async (
+  client: TxOperations,
+  write: TransferWrite
+): Promise<HulyConditionalWriteResult> => {
   const apply = client.apply()
   apply.match(
     tracker.class.Issue,

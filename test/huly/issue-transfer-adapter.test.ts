@@ -153,3 +153,16 @@ for (const mode of ["failRead", "invalidMetadata"] as const) {
     })
   )
 }
+
+it.effect("parses historical update payloads into immutable encoded snapshots and rejects non-JSON history", () =>
+  Effect.gen(function* () {
+    const f = adapterFixture()
+    const updates = { title: { set: "Original title" } }
+    Reflect.set(f.history, "attributeUpdates", updates)
+    const inspection = yield* inspectTransferRecords(f.client, IssueId.make("root"))
+    expect(inspection.records).toMatchObject([{ history: { attributeUpdates: JSON.stringify(updates) } }])
+    Reflect.set(f.history, "attributeUpdates", () => "invalid")
+    expect((yield* Effect.result(inspectTransferRecords(f.client, IssueId.make("root"))))._tag).toBe("Failure")
+    expect(f.updates).toEqual([])
+  })
+)

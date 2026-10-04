@@ -127,7 +127,7 @@ const executeTransfer = Effect.fn("transfer.execute")(function* (
     number: sequence.value.object.sequence,
     identifier: IssueIdentifier.make(`${destination.identifier}-${sequence.value.object.sequence}`),
     rank: NonEmptyString.make(makeRank(last.success?.rank, undefined)),
-    records: prepared.records.records
+    records: prepared.records
   }
   return yield* commitAndVerify(client, prepared, destination, write, commit)
 })

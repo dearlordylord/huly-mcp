@@ -30,7 +30,7 @@ import {
 export interface TransferPlan {
   readonly plan: MovementPlan
   readonly protectedIssue: TransferIssue
-  readonly records: Omit<TransferInspection, "records"> & { readonly records: ReadonlyArray<TransferHistoryRecord> }
+  readonly records: ReadonlyArray<TransferHistoryRecord>
 }
 export interface TransferRefusal {
   readonly conflicts: ReadonlyArray<TransferConflict>
@@ -309,6 +309,6 @@ export const inspectTransferPlan = Effect.fn("transfer.inspectPlan")(function* (
   return {
     plan: { root, parent, source, tree: [root], relevant },
     protectedIssue: workflow.protectedIssue,
-    records: { ...records, records: records.records.filter((record) => record.kind === "history") }
+    records: records.records.filter((record) => record.kind === "history")
   }
 })

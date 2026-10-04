@@ -67,10 +67,10 @@ const preservedIssueMatches = Effect.fn("transfer.verifyPreservation")(function*
   )
 })
 
-const recordsMatch = (previous: TransferInspection, current: TransferInspection, destination: MovementProject) =>
+const recordsMatch = (previous: TransferPlan["records"], current: TransferInspection, destination: MovementProject) =>
   current.discovery === "complete" &&
   current.blockers.length === 0 &&
-  previous.records.every((old) =>
+  previous.every((old) =>
     current.records.some((record) => isDeepStrictEqual(record, { ...old, space: destination._id }))
   ) &&
   current.records.every((record) => record.space === destination._id)

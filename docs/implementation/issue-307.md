@@ -39,3 +39,25 @@ Standards found a blocking admission invariant: structured incomplete discovery 
 Spec found no confirmed behavioral defects across all 12 criteria and no scope expansion. A successful full quality gate remains an acceptance blocker. Dalph is disabled and has no review or acceptance role.
 
 After the Standards fixes, 74 focused movement/adapter/read tests passed (`/tmp/issue307-focused-current.log`). The first compiler-cap full gate exited 1 at the unchanged 120-second TypeScript/Effect stage bound (`/tmp/issue307-final-gate.log`). Independent compiler progress identifies the new SDK adapter as the slow diagnostic file. Investigation remains active; no timeout, inventory, diagnostics or coverage requirements changed.
+
+
+## Criterion evidence map
+
+| # | Implementation and executable evidence | Live status |
+| --- | --- | --- |
+| 1 | Model collection/AttachedDoc discovery; actual attachment closure inspection; incomplete and unsupported inventory refuse before allocation, including empty blocker text. Adapter and operation tests. | Pending combined run |
+| 2 | Automatic DocUpdateMessage records migrate without rewriting historical payload/author/timestamps; fixture requires ordinary-created history. | Pending combined run |
+| 3 | Stable IDs, content, creator, kind/status and relations preserved; new sequence number/identifier/rank/parent verified. Fixture includes independent document and two relation directions. | Pending combined run |
+| 4 | Destination project type, actual kind/status and parent-kind constraints checked; equal project type restriction described explicitly. Injected workflow refusal. | Server restriction confirmation pending |
+| 5 | Relevant hierarchy, permissions, ownership, workflow and unsupported attributes aggregated; null/unset attributes eligible; allocation count remains zero on refusal. | Fixture refusal pending |
+| 6 | Supported sequence increment/retrieval, conditional commit result and bounded verification of issue/history and both ancestor hierarchies. | Trigger confirmation pending |
+| 7 | Completed/no-op schema-owned root/project/actual parent/task identity/link mapping; public MCP and CLI use shared operation. | Fixture pending |
+| 8 | Pre-write failures blocked/changed:false; sequence/commit uncertainty indeterminate; post-allocation condition refusal incomplete with gap guidance; no blind retry. Injected operation tests. | No uncertain fixture writes issued |
+| 9 | Published get_issue and CLI issues get resolve stable IDs across workspace and report current project/direct parent; shared resolver keeps other operations scoped. | Fixture recovery pending |
+| 10 | No-op verifies hierarchy, identity number/identifier and owned-record routing; no number allocation on a consistent repeat; malformed state blocked. | Fixture repeat pending |
+| 11 | Disposable source/destination projects, existing destination work, relation counterparts and independent document authored for MCP/CLI. Injection covers workflow, permission, commit refusal and post-send uncertainty. | Pending combined run |
+| 12 | Full check-all is required with 99% coverage and unchanged deadlines/inventory/diagnostics. Initial run failed diagnostics deadline; corrected full rerun active. | MCP/CLI full suites pending final candidate |
+
+Second Standards recheck of `01c9f3e5135844d204b6ce31d883e634f8b9a9cb` resolved admission safety, domain types and duplicated selector logic. Its remaining state-space finding was approved-plan inspection metadata; successor stores the approved history array directly. Spec successor recheck found no new behavioral defect and preserved all 12 criteria.
+
+Diagnostic investigation identified `preferTypedSchemaDecoder` recursively walking SDK object types, proven by the compiler stack in `/tmp/issue307-effect-annotated.log`. A shared unknown-input schema parser keeps decoded domain types and typed errors while avoiding that SDK traversal. No diagnostic rule is disabled. Adapter diagnostics pass (`/tmp/issue307-effect-adapter-boundary.log`, 1 file, zero errors/warnings). Historical snapshot serialization now uses the Schema JSON encoder; valid and invalid historical payloads have executable adapter tests.
