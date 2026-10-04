@@ -7,6 +7,7 @@
  * registration effect.  This keeps request-scoped client acquisition in the
  * caller's closure while making protocol dispatch Effect-native.
  */
+import type { MovementStageObserver } from "./movement-stage-observer.js"
 import { Clock, Context, Effect, type Exit, Layer } from "effect"
 import { McpServer } from "effect/ai/McpServer"
 import * as McpSchema from "effect/ai/McpSchema"
@@ -41,6 +42,7 @@ import { dispatchEffectMcpTool, effectMcpEditMode, fetchLatestNpmVersion } from 
 
 /** Inputs needed to build a transport-independent Effect MCP registry. */
 export interface EffectMcpRegistryOptions {
+  readonly observeMovement?: MovementStageObserver
   readonly resolveClients: ClientResolver
   readonly resolveResourceClientLease?: (
     signal: AbortSignal
@@ -196,7 +198,11 @@ const makeToolHandler = (
             const exposure = initializeExposure(registries, exposureOptions, request)
             const call = dispatchEffectMcpTool(options, exposure, definition, args, fetchLatestVersion, resolver)
             const editMode = effectMcpEditMode(String(definition.name), args)
-            const response = yield* call.pipe(
+            const observedCall =
+              definition.name === "move_issue" && options.observeMovement !== undefined
+                ? options.observeMovement(call)
+                : call
+            const response = yield* observedCall.pipe(
               Effect.catchDefect((defect) =>
                 Effect.succeed(
                   mapDomainErrorToMcp(

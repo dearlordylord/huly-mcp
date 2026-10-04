@@ -1,0 +1,64 @@
+import { chmod, lstat, mkdtemp, readdir, readFile, rm, symlink } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { Effect, Schema } from "effect"
+import { test, expect } from "vitest"
+import { MovementStageReportSchema } from "../../src/mcp/movement-stage-observer.js"
+import {
+  makeFileMovementStageObserver,
+  MovementObserverProcessSchema,
+  MovementReportDirectorySchema
+} from "../../src/mcp/movement-stage-report.js"
+const privateDirectoryMode = 0o700
+const publicDirectoryMode = 0o755
+const privateFileMode = 0o600
+const permissionMask = 0o777
+
+for (const mode of ["owned", "public", "symlink", "wrong-owner"]) {
+  test(`private movement report directory ${mode}`, async () => {
+    const directory = await mkdtemp(join(tmpdir(), "movement-report-"))
+    const link = `${directory}-link`
+    try {
+      await chmod(directory, mode === "public" ? publicDirectoryMode : privateDirectoryMode)
+      if (mode === "symlink") await symlink(directory, link)
+      const owner = (await lstat(directory)).uid
+      const identity = Schema.decodeUnknownSync(MovementObserverProcessSchema)({
+        processId: process.pid,
+        userId: mode === "wrong-owner" ? owner + 1 : owner
+      })
+      const path = Schema.decodeUnknownSync(MovementReportDirectorySchema)(mode === "symlink" ? link : directory)
+      const statuses: Array<string> = []
+      const created = await Effect.runPromise(
+        Effect.result(
+          makeFileMovementStageObserver(path, identity, (line) => {
+            statuses.push(line)
+          })
+        )
+      )
+      if (mode !== "owned") {
+        expect(created._tag).toBe("Failure")
+        expect(await readdir(directory)).toEqual([])
+        return
+      }
+      if (created._tag !== "Success") throw new Error("Owned private directory was refused")
+      expect(
+        await Effect.runPromise(created.success(Effect.succeed("unchanged").pipe(Effect.withSpan("moveIssue"))))
+      ).toBe("unchanged")
+      const files = await readdir(directory)
+      expect(files).toHaveLength(1)
+      const file = join(directory, Schema.decodeUnknownSync(Schema.NonEmptyString)(files[0]))
+      expect((await lstat(file)).mode & permissionMask).toBe(privateFileMode)
+      const report = Schema.decodeUnknownSync(Schema.fromJsonString(MovementStageReportSchema))(
+        await readFile(file, "utf8")
+      )
+      expect(report.stages.map((stage) => stage.stage)).toEqual(["moveIssue"])
+      expect(statuses).toEqual(['{"observerStatus":"recorded"}'])
+      await rm(directory, { recursive: true })
+      expect(await Effect.runPromise(created.success(Effect.succeed("still unchanged")))).toBe("still unchanged")
+      expect(statuses.at(-1)).toBe('{"observerStatus":"unavailable"}')
+    } finally {
+      await rm(link, { force: true })
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+}

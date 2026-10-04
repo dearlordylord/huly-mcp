@@ -4,6 +4,7 @@
  * Protocol registration is supplied by `effect-ai-registry`; this module owns
  * transport layer composition, process lifecycle, and Huly runtime wiring.
  */
+import type { MovementStageObserver } from "./movement-stage-observer.js"
 import { NodeStdio } from "@effect/platform-node"
 import {
   Config,
@@ -71,6 +72,7 @@ interface McpServerConfigData {
 }
 
 interface McpServerConfigCallbacks {
+  readonly observeMovement?: MovementStageObserver
   readonly resolveClients: ClientResolver
   readonly resolveClientLeaseForHttpRequest?: (
     req: Request,
@@ -377,6 +379,7 @@ export class McpServerService extends Context.Service<McpServerService, McpServe
                 const runtimeConfig = getRuntimeConfigContext()
                 const registry = makeEffectMcpRegistry({
                   resolveClients: config.resolveClients,
+                  ...(config.observeMovement === undefined ? {} : { observeMovement: config.observeMovement }),
                   telemetry,
                   registry: registries,
                   getHulyContext: (exposure) =>
