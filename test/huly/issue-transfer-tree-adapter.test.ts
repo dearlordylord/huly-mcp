@@ -1,6 +1,7 @@
 import { TxOperations, type Client, type Tx, type Hierarchy } from "@hcengineering/core"
 import { corePersonId, sdkFixture } from "../helpers/huly-sdk.js"
 import { type MovementTransactions } from "../../src/huly/issue-movement-transactions.js"
+import { SocialIdentityId } from "../../src/domain/schemas/person-administration.js"
 import { HulyDataInvalidError } from "../../src/huly/errors-base.js"
 import { MovementTransportError } from "../../src/huly/movement-transaction-transport.js"
 import { it } from "@effect/vitest"
@@ -253,7 +254,7 @@ for (const lostReply of [false, true]) {
               objectId: DocId,
               operations: Schema.JsonObject,
               modifiedOn: Timestamp,
-              modifiedBy: NonEmptyString
+              modifiedBy: SocialIdentityId
             })
           )
         })
