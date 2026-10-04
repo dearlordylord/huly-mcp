@@ -1,9 +1,11 @@
-import type { Tx } from "@hcengineering/core"
+import type { Tx, TxOperations } from "@hcengineering/core"
 import { it } from "@effect/vitest"
 import { Effect, Fiber, Redacted } from "effect"
 import { describe, expect } from "vitest"
 import {
   MovementTransportConfigSchema,
+  MovementTransportError,
+  makeMovementTxOperations,
   MovementTransportMilliseconds,
   sendMovementTransaction,
   type MovementHttpPort
@@ -111,4 +113,14 @@ it.effect("bounds a single write response with Effect Clock and reports after-se
   expect(result._tag).toBe("Failure")
   if (result._tag === "Failure") expect(result.failure.phase).toBe("after-send")
   expect(sent).toHaveLength(1)
+}))
+
+it.effect("preserves the typed write phase across the SDK promise boundary", () => Effect.gen(function* () {
+  const ordinary = sdkFixture<TxOperations>({ user: "person", isDerived: false })
+  const error = new MovementTransportError({ phase: "after-send", reason: NonEmptyString.make("Lost reply") })
+  const http: MovementHttpPort = { send: () => Effect.fail(error) }
+  const movement = makeMovementTxOperations(ordinary, config, http)
+  const result = yield* Effect.tryPromise({ try: () => movement.tx(sequence), catch: (cause) => cause }).pipe(Effect.result)
+  expect(result._tag).toBe("Failure")
+  if (result._tag === "Failure") expect(result.failure).toBe(error)
 }))

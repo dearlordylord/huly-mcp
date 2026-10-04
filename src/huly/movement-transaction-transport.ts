@@ -1,5 +1,5 @@
 import { TxOperations, type Client, type Tx } from "@hcengineering/core"
-import { Effect, Redacted, Schema } from "effect"
+import { Cause, Effect, Redacted, Schema } from "effect"
 import { DocId, NonEmptyString, ObjectClassName, PositiveInteger, Timestamp, UrlString } from "../domain/schemas/shared.js"
 import { TransferSequenceSchema } from "../domain/schemas/issue-transfer.js"
 
@@ -137,7 +137,14 @@ export const makeMovementTxOperations = (
     searchFulltext: (query, options) => ordinary.searchFulltext(query, options),
     domainRequest: (domain, params, options) => ordinary.domainRequest(domain, params, options),
     close: () => Promise.resolve(),
-    tx: (transaction) => Effect.runPromise(sendMovementTransaction(transaction, config, http))
+    tx: async (transaction) => {
+      const exit = await Effect.runPromiseExit(sendMovementTransaction(transaction, config, http))
+      if (exit._tag === "Success") return exit.value
+      const error = Cause.findErrorOption(exit.cause)
+      // Client.tx requires a rejected Promise; preserve the typed expected error for the Effect adapter.
+      if (error._tag === "Some") throw error.value
+      throw Cause.squash(exit.cause)
+    }
   }
   return new TxOperations(client, ordinary.user, ordinary.isDerived)
 }
