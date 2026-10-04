@@ -2,6 +2,7 @@ import { it } from "@effect/vitest"
 import { Effect, Fiber, Schema } from "effect"
 import { TestClock } from "effect/testing"
 import { expect } from "vitest"
+import { DocId } from "../../../src/domain/schemas/shared-refs.js"
 import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"
 import { TransferSupportedRecordSchema } from "../../../src/domain/schemas/issue-transfer.js"
 import { HulyClient } from "../../../src/huly/client.js"
@@ -151,6 +152,6 @@ it.effect("unavailable post-write record totals report indeterminate while prese
     expect(result).toMatchObject({ outcome: "indeterminate" })
     expect(result).not.toMatchObject({ changed: false })
     expect(fixture.f.state.sent).toBe(1)
-    expect(fixture.read().every((record) => record.space === fixture.f.destination._id)).toBe(true)
+    expect(fixture.read().every((record) => record.space === DocId.make(fixture.f.destination._id))).toBe(true)
   })
 )
