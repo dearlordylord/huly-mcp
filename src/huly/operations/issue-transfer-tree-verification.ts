@@ -100,14 +100,15 @@ export const verifyTransferTree = Effect.fn("transfer.verifyTree")(function* (
       }
     observed.push(parsed.value)
   }
+  const knownTaskProblem = taskProblem(observed, write)
   const records = yield* inspectRecords(client, prepared, observed)
   const tasks = observed.map(observedTask)
   if (records.status === "unavailable")
     return {
       status: "observed",
       completeness: "incomplete",
-      consistency: "undetermined",
-      reason: records.reason,
+      consistency: knownTaskProblem === undefined ? "undetermined" : "inconsistent",
+      reason: knownTaskProblem ?? records.reason,
       tasks,
       records: records.observed
     }
@@ -116,16 +117,13 @@ export const verifyTransferTree = Effect.fn("transfer.verifyTree")(function* (
     return {
       status: "observed",
       completeness: "incomplete",
-      consistency: "undetermined",
-      reason: closure.message,
+      consistency: knownTaskProblem === undefined ? "undetermined" : "inconsistent",
+      reason: knownTaskProblem ?? closure.message,
       tasks,
       records: records.observed
     }
   const reason =
-    taskProblem(observed, write) ??
-    hierarchyProblemAfterMove(prepared, hierarchy, write) ??
-    closure?.message ??
-    records.reason
+    knownTaskProblem ?? hierarchyProblemAfterMove(prepared, hierarchy, write) ?? closure?.message ?? records.reason
   return reason === undefined
     ? { status: "observed", completeness: "complete", consistency: "consistent", tasks, records: records.observed }
     : {

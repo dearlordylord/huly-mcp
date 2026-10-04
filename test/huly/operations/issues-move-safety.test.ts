@@ -91,7 +91,16 @@ describe("movement safety under changing reads", () => {
         const fiber = yield* Effect.forkChild(call(fixture))
         yield* TestClock.adjust("2 seconds")
         const result = yield* Fiber.join(fiber)
-        expect(result.outcome).toBe("incomplete")
+        expect(result.outcome).toBe(change === "incomplete-project" ? "indeterminate" : "incomplete")
+        if (change === "incomplete-project") expect(result).toHaveProperty("verification.status", "unavailable")
+        if (change === "project-changed") {
+          expect(result).toHaveProperty("verification.completeness", "incomplete")
+          expect(result).toHaveProperty("verification.consistency", "inconsistent")
+          expect(result).toHaveProperty(
+            "verification.tasks",
+            expect.arrayContaining([expect.objectContaining({ issueId: tree.child._id, projectId: "foreign" })])
+          )
+        }
         expect(result).not.toHaveProperty("changed", false)
         expect(fixture.writes).toHaveLength(5)
         expect(result).toHaveProperty("inspection", expect.stringContaining("Do not automatically repeat"))

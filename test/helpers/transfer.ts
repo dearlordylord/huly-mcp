@@ -131,15 +131,15 @@ export const transferFixture = () => {
       if (Number.isFinite(state.attributeTotal) && options?.total === true) result.total = state.attributeTotal
       return Effect.succeed(result)
     },
-    inspectTransferRecords: () => {
+    inspectTransferRecords: (issueId) => {
       state.inspected++
       if (state.failPostRead && state.sent > 0) return unavailable()
       return Effect.succeed(
         Schema.decodeUnknownSync(TransferInspectionSchema)({
           discovery: "complete",
           classes: [...new Set(records.map((record) => record._class))],
-          records: records.map((record) => ({ ...record })),
-          blockers: state.recordsBlockers,
+          records: issueId === IssueId.make(root._id) ? records.map((record) => ({ ...record })) : [],
+          blockers: issueId === IssueId.make(root._id) ? state.recordsBlockers : [],
           limitation: "Fixture inspects model-owned records; unsupported structure is not a complete inventory."
         })
       )

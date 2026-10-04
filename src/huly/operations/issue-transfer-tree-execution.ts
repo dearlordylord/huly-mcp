@@ -236,6 +236,8 @@ const finishVerification = Effect.fn("transfer.finishVerification")(function* (
     )
   }
   const observed = result.success
+  if (observed.status === "observed" && observed.consistency === "inconsistent")
+    return yield* stoppedResult("incomplete", observed.reason, prepared, destination, progress)
   if (observed.status !== "observed" || observed.completeness !== "complete")
     return yield* stoppedResult(
       "indeterminate",
@@ -244,7 +246,5 @@ const finishVerification = Effect.fn("transfer.finishVerification")(function* (
       destination,
       progress
     )
-  if (observed.consistency === "inconsistent")
-    return yield* stoppedResult("incomplete", observed.reason, prepared, destination, progress)
   return completedTransferTreeResult(client, prepared, destination, write)
 })

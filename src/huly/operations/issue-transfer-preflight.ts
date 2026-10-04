@@ -1,3 +1,4 @@
+import { movementNoParent } from "./issue-movement-hierarchy.js"
 import { inspectTransferAttributes } from "./issue-transfer-attribute-inspection.js"
 import { isDeepStrictEqual } from "node:util"
 import { resolveTransferTreeAttributes, type TransferTaskSnapshot } from "./issue-transfer-tree-attributes.js"
@@ -304,13 +305,28 @@ const inspectTransferContext = Effect.fn("transfer.inspectContext")(function* (
 
 const inspectSameProjectTask = Effect.fn("movement.inspectProtectedTask")(function* (
   client: HulyClient["Service"],
-  issue: MovementIssue
+  issue: MovementIssue,
+  destination: MovementProject,
+  satisfied: boolean
 ): Effect.fn.Return<
   { readonly protectedIssue: TransferIssue; readonly conflicts: ReadonlyArray<TransferConflict> },
   MovementError
 > {
   const raw = yield* client.findOne<Issue>(tracker.class.Issue, hulyQuery<Issue>({ _id: toRef<Issue>(issue._id) }))
-  return { protectedIssue: yield* parse(TransferIssueSchema, raw), conflicts: [] }
+  const protectedIssue = yield* parse(TransferIssueSchema, raw)
+  return {
+    protectedIssue,
+    conflicts:
+      satisfied && issue.identifier !== `${destination.identifier}-${protectedIssue.number}`
+        ? [
+            conflict(
+              issue,
+              "unsupported-structure",
+              "Satisfied destination identifier disagrees with the task number; inspect actual state before retry."
+            )
+          ]
+        : []
+  }
 })
 
 const inspectTransferTasks = Effect.fn("transfer.inspectTasks")(function* (
@@ -331,7 +347,7 @@ const inspectTransferTasks = Effect.fn("transfer.inspectTasks")(function* (
     const taskParent = issue._id === root._id ? parent : tree.find((candidate) => candidate._id === issue.attachedTo)
     const workflow = yield* Effect.result(
       source._id === destination._id
-        ? inspectSameProjectTask(client, issue)
+        ? inspectSameProjectTask(client, issue, destination, root.attachedTo === (parent?._id ?? movementNoParent))
         : inspectWorkflow(client, issue, taskParent, source, destination)
     )
     const records = yield* Effect.result(inspectRecords(issue._id, tree))
