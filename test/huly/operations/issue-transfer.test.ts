@@ -99,7 +99,9 @@ for (const mode of [
     Effect.gen(function* () {
       const f = transferFixture()
       f.state[mode] = true
-      const result = yield* call(f)
+      const fiber = yield* call(f).pipe(Effect.forkChild)
+      yield* TestClock.adjust("2 seconds")
+      const result = yield* Fiber.join(fiber)
       expect(result.outcome).toBe(
         mode === "failOrdering" ? "blocked" : mode === "refuseCommit" ? "incomplete" : "indeterminate"
       )

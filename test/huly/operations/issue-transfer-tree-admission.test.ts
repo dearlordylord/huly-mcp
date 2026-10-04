@@ -1,7 +1,8 @@
 import { type Doc, type DocumentQuery, type FindOptions } from "@hcengineering/core"
 import { it } from "@effect/vitest"
-import { Effect, Schema } from "effect"
+import { Effect, Fiber, Schema } from "effect"
 import { expect } from "vitest"
+import { TestClock } from "effect/testing"
 import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"
 import { UNKNOWN_TOTAL, IssueId } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
@@ -80,10 +81,13 @@ it.effect("post-write unknown closure size remains indeterminate rather than con
           return rows
         })
       )
-    const result = yield* parseMoveIssueParams(f.input).pipe(
+    const fiber = yield* parseMoveIssueParams(f.input).pipe(
       Effect.flatMap(moveIssue),
-      Effect.provide(HulyClient.testLayer({ ...f.operations, findAll }))
+      Effect.provide(HulyClient.testLayer({ ...f.operations, findAll })),
+      Effect.forkChild
     )
+    yield* TestClock.adjust("2 seconds")
+    const result = yield* Fiber.join(fiber)
     expect(result).toMatchObject({ outcome: "indeterminate", issueIds: [f.root._id, f.child._id, f.grandchild._id] })
     expect(f.state.allocated).toBe(3)
     expect(f.state.sent).toBe(1)
