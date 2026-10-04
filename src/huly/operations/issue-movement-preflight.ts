@@ -168,7 +168,7 @@ export const inspectMovementClosureState = Effect.fn("movement.inspectClosureSta
   const closure = yield* client.findAll<SdkIssue>(
     tracker.class.Issue,
     hulyQuery<SdkIssue>({ attachedTo: { $in: relevant.map((issue) => toRef<SdkIssue>(issue._id)) } }),
-    { limit: DISCOVERY_LIMIT }
+    { limit: DISCOVERY_LIMIT, total: true }
   )
   if (closure.total < 0 || closure.total !== closure.length || closure.length >= DISCOVERY_LIMIT)
     return { state: "unavailable", message: "Descendant discovery is incomplete." }

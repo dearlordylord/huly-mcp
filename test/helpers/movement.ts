@@ -1,5 +1,12 @@
 /* eslint-disable no-restricted-syntax -- Huly SDK fixture refs and generic injected ports are nominal; fixture casts bridge SDK types with no runtime constructors. */
-import { type Doc, type DocumentQuery, type FindResult, type Ref, toFindResult } from "@hcengineering/core"
+import {
+  type Doc,
+  type DocumentQuery,
+  type FindOptions,
+  type FindResult,
+  type Ref,
+  toFindResult
+} from "@hcengineering/core"
 import type { Issue, Project } from "@hcengineering/tracker"
 import { Effect, Schema } from "effect"
 
@@ -93,7 +100,11 @@ export interface MovementFixtureOptions {
 export const movementFixture = (issues: Array<Issue>, options: MovementFixtureOptions = {}) => {
   const projects = options.projects ?? [movementProject()]
   const writes: Array<{ id: Ref<Doc>; operations: unknown }> = []
-  const findAll: HulyClientOperations["findAll"] = <T extends Doc>(cls: unknown, query: DocumentQuery<T>) => {
+  const findAll: HulyClientOperations["findAll"] = <T extends Doc>(
+    cls: unknown,
+    query: DocumentQuery<T>,
+    findOptions?: FindOptions<T>
+  ) => {
     if (options.failVerification && writes.length > 0)
       return Effect.fail(new HulyAuthError({ message: "Read unavailable" }))
     const q = query as Record<string, unknown>
@@ -114,7 +125,8 @@ export const movementFixture = (issues: Array<Issue>, options: MovementFixtureOp
     if (cls === tracker.class.Project && options.projectSelectorTotal !== undefined)
       result.total = options.projectSelectorTotal
     if (q.space !== undefined && options.discoveryTotal !== undefined) result.total = options.discoveryTotal
-    if (q.attachedTo !== undefined && options.closureTotal !== undefined) result.total = options.closureTotal
+    if (q.attachedTo !== undefined)
+      result.total = findOptions?.total === true ? (options.closureTotal ?? selected.length) : -1
     if (q.space !== undefined && options.changeRootDuringRead) {
       for (const issue of result) issue.modifiedOn++
     }
