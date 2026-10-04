@@ -11,6 +11,9 @@ import { transferFixture } from "../../helpers/transfer.js"
 import { sdkFixture } from "../../helpers/huly-sdk.js"
 import { assertExists } from "../../../src/utils/assertions.js"
 
+const issueSnapshot = (input: unknown) => Schema.decodeUnknownSync(MovementIssueSchema)(input)
+const projectSnapshot = (input: unknown) => Schema.decodeUnknownSync(MovementProjectSchema)(input)
+
 const modes = [
   "archivedRestricted",
   "subtaskWithoutParent",
@@ -31,9 +34,8 @@ for (const mode of modes) {
   it.effect(`preflight refuses ${mode} without reserving a number`, () =>
     Effect.gen(function* () {
       const f = transferFixture()
-      const root = Schema.decodeUnknownSync(MovementIssueSchema)(f.root)
-      const parent =
-        mode === "subtaskWithoutParent" ? undefined : Schema.decodeUnknownSync(MovementIssueSchema)(f.parent)
+      const root = issueSnapshot(f.root)
+      const parent = mode === "subtaskWithoutParent" ? undefined : issueSnapshot(f.parent)
       if (mode === "archivedRestricted") {
         f.destination.archived = true
         f.destination.restricted = true
@@ -66,10 +68,10 @@ for (const mode of modes) {
       const inspected = yield* Effect.result(
         inspectTransferPlan(
           client,
-          mode === "brokenSourceAncestry" ? Schema.decodeUnknownSync(MovementIssueSchema)(f.root) : root,
-          mode === "brokenParentAncestry" ? Schema.decodeUnknownSync(MovementIssueSchema)(f.parent) : parent,
-          Schema.decodeUnknownSync(MovementProjectSchema)(f.source),
-          Schema.decodeUnknownSync(MovementProjectSchema)(f.destination),
+          mode === "brokenSourceAncestry" ? issueSnapshot(f.root) : root,
+          mode === "brokenParentAncestry" ? issueSnapshot(f.parent) : parent,
+          projectSnapshot(f.source),
+          projectSnapshot(f.destination),
           yield* parseMoveIssueParams(f.input)
         )
       )

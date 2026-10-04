@@ -12,6 +12,9 @@ import { verifyTransfer } from "../../../src/huly/operations/issue-transfer-veri
 import { sdkFixture } from "../../helpers/huly-sdk.js"
 import { transferFixture } from "../../helpers/transfer.js"
 
+const issueSnapshot = (input: unknown) => Schema.decodeUnknownSync(MovementIssueSchema)(input)
+const projectSnapshot = (input: unknown) => Schema.decodeUnknownSync(MovementProjectSchema)(input)
+
 const mutations = [
   "missingRoot",
   "wrongProject",
@@ -36,12 +39,12 @@ for (const mutation of mutations) {
       const f = transferFixture()
       const client = yield* HulyClient.pipe(Effect.provide(f.layer))
       const params = yield* parseMoveIssueParams(f.input)
-      const destination = Schema.decodeUnknownSync(MovementProjectSchema)(f.destination)
+      const destination = projectSnapshot(f.destination)
       const prepared = yield* inspectTransferPlan(
         client,
-        Schema.decodeUnknownSync(MovementIssueSchema)(f.root),
-        Schema.decodeUnknownSync(MovementIssueSchema)(f.parent),
-        Schema.decodeUnknownSync(MovementProjectSchema)(f.source),
+        issueSnapshot(f.root),
+        issueSnapshot(f.parent),
+        projectSnapshot(f.source),
         destination,
         params
       )
