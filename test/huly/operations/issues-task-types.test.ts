@@ -656,3 +656,53 @@ describe("issue write task type support", () => {
     })
   )
 })
+
+it.effect("refuses a task type with no statuses when creation requests its default", () =>
+  Effect.gen(function* () {
+    const captures: Captures = { addCollections: [], updates: [] }
+    const result = yield* Effect.result(
+      createIssue({
+        project: projectIdentifier("TEST"),
+        title: "Task type has no default status",
+        taskType: TaskTypeRefSchema.make("No Status")
+      }).pipe(
+        Effect.provide(
+          createLayer({
+            captures,
+            projectType: makeProjectType({ tasks: [noStatusTaskTypeId] }),
+            taskTypes: [makeTaskType({ _id: noStatusTaskTypeId, name: "No Status", statuses: [] })]
+          })
+        ),
+        withDiagnostics
+      )
+    )
+    expect(result._tag).toBe("Failure")
+    if (result._tag === "Failure") expect(result.failure.message).toContain("has no valid status")
+    expect(captures.addCollections).toEqual([])
+    expect(captures.updates).toEqual([])
+  })
+)
+
+it.effect("refuses legacy creation when project metadata and workflow expose no default status", () =>
+  Effect.gen(function* () {
+    const captures: Captures = { addCollections: [], updates: [] }
+    const { defaultIssueStatus: _defaultStatus, ...projectWithoutDefault } = makeProject()
+    const result = yield* Effect.result(
+      createIssue({ project: projectIdentifier("TEST"), title: "Legacy project has no default status" }).pipe(
+        Effect.provide(
+          createLayer({
+            captures,
+            project: sdkFixture<HulyProject>(projectWithoutDefault),
+            statuses: [],
+            modelStatuses: []
+          })
+        ),
+        withDiagnostics
+      )
+    )
+    expect(result._tag).toBe("Failure")
+    if (result._tag === "Failure") expect(result.failure.message).toContain("(default)")
+    expect(captures.addCollections).toEqual([])
+    expect(captures.updates).toEqual([])
+  })
+)
