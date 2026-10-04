@@ -7,6 +7,9 @@ import { test } from "node:test"
 
 import { inspectMovementFixture, verifyMovementFixtures } from "./verify-movement-fixtures.mjs"
 
+const jqCompileFailureExit = 3
+const missingAdapterAndDiscoveryFailures = 2
+
 for (const flag of ["--arg", "--argjson"]) {
   test(`rejects reserved jq label with ${flag}`, (t) => {
     const directory = mkdtempSync(join(tmpdir(), "movement-fixture-"))
@@ -14,7 +17,7 @@ for (const flag of ["--arg", "--argjson"]) {
     writeFileSync(join(directory, "bad.sh"), `value=$(jq -nc \\\n ${flag} label '1' '{value:$label}')\n`)
     assert.equal(verifyMovementFixtures(["bad.sh"], directory).length, 1)
     const jq = spawnSync("jq", ["-nc", flag, "label", "1", "{value:$label}"], { encoding: "utf8" })
-    assert.equal(jq.status, 3)
+    assert.equal(jq.status, jqCompileFailureExit)
   })
 }
 
@@ -88,5 +91,5 @@ for (const legacy of ['protocolVersion:"2024-11-05"', 'MCP_AUTO_EXIT=true', 'met
 
 test("movement fixtures require the common call and discovery adapters", () => {
   const failures = inspectMovementFixture("mcp() { node dist/index.cjs; }", "scripts/integration_test_issue_movement.sh")
-  assert.equal(failures.length, 2)
+  assert.equal(failures.length, missingAdapterAndDiscoveryFailures)
 })
