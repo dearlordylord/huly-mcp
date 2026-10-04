@@ -241,7 +241,11 @@ for (const change of ["payload-unavailable", "wrong-project", "wrong-owner"]) {
                       space: change === "wrong-project" ? f.source._id : f.destination._id,
                       attachedTo: change === "wrong-owner" ? f.child._id : f.root._id
                     }
-              return parseInspection({ ...inspection, records: [...inspection.records, current] })
+              return parseInspection({
+                ...inspection,
+                classes: [...inspection.classes, comment._class],
+                records: [...inspection.records, current]
+              })
             })
           )
       })
