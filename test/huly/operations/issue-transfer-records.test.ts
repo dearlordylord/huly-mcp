@@ -64,12 +64,7 @@ const richFixture = () => {
         Effect.map((inspection) => ({
           ...inspection,
           discovery: state.unavailableAfterWrite && f.state.sent > 0 ? "incomplete" : inspection.discovery,
-          classes: [
-            ...new Set([
-              ...inspection.classes,
-              ...(issueId === f.input.issue ? extra.map((record) => ObjectClassName.make(record._class)) : [])
-            ])
-          ],
+          classes: [...new Set([...inspection.classes, ...extra.map((record) => ObjectClassName.make(record._class))])],
           records: [...inspection.records, ...(issueId === f.input.issue ? extra : [])]
         }))
       )
