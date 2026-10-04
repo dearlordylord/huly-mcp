@@ -521,7 +521,9 @@ Preparation tracks detached quality-stage groups in private `<log>.custody`
 directories. A successful leader exit alone never proves cleanup. Each stage
 writes a schema-owned starting record before launch, registers its group after
 installing cleanup handlers and removes the record only after proving group
-absence. TERM/KILL escalation and group-absence checks are finite; missing close
+absence. The default termination grace is five seconds followed by at most two
+seconds of group-absence proof, within the outer ten-second cleanup allowance.
+TERM/KILL escalation and group-absence checks are finite; missing close
 or failed registration leaves custody unconfirmed. Any retained entry, including
 a malformed record, keeps the coordinator lock and prevents live-suite admission.
 Inspect the recorded owner/group and prove cleanup before removing custody;
