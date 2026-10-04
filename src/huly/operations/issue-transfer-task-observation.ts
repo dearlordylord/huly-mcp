@@ -38,28 +38,40 @@ export interface TaskObservation {
 }
 export const observeTransferTasks = Effect.fn("transfer.observeTasks")(function* (
   client: HulyClient["Service"],
-  issueIds: ReadonlyArray<TransferTreeWrite["rootId"]>
+  issueIds: ReadonlyArray<TransferTreeWrite["rootId"]>,
+  publish: (observation: TaskObservation) => Effect.Effect<void>
 ): Effect.fn.Return<TaskObservation> {
   const observed: Array<ObservedIssue> = []
   const absentIssueIds: Array<TransferTreeWrite["rootId"]> = []
   const limitations: Array<string> = []
   for (const issueId of issueIds) {
-    const read = yield* Effect.result(
-      client.findOne<Issue>(tracker.class.Issue, hulyQuery<Issue>({ _id: toRef<Issue>(issueId) }))
-    )
-    if (read._tag === "Failure") {
-      limitations.push(`Current task ${issueId} could not be read.`)
-      continue
-    }
-    if (read.success === undefined) {
-      absentIssueIds.push(issueId)
-      continue
-    }
-    const parsed = parseObservedIssue(read.success)
-    if (parsed._tag === "None") limitations.push(`Current payload of ${issueId} could not be parsed.`)
-    else observed.push(parsed.value)
+    const read = yield* observeTask(client, issueId)
+    if (read.status === "unavailable") limitations.push(read.reason)
+    else if (read.status === "absent") absentIssueIds.push(issueId)
+    else observed.push(read.issue)
+    yield* publish({ observed: [...observed], absentIssueIds: [...absentIssueIds], limitations: [...limitations] })
   }
   return { observed, absentIssueIds, limitations }
+})
+
+// Internal completed-read discriminant; absent requires a successful empty SDK response.
+type TaskRead =
+  | { readonly status: "available"; readonly issue: ObservedIssue }
+  | { readonly status: "absent" }
+  | { readonly status: "unavailable"; readonly reason: string }
+const observeTask = Effect.fn("transfer.observeTask")(function* (
+  client: HulyClient["Service"],
+  issueId: TransferTreeWrite["rootId"]
+): Effect.fn.Return<TaskRead> {
+  const read = yield* Effect.result(
+    client.findOne<Issue>(tracker.class.Issue, hulyQuery<Issue>({ _id: toRef<Issue>(issueId) }))
+  )
+  if (read._tag === "Failure") return { status: "unavailable", reason: `Current task ${issueId} could not be read.` }
+  if (read.success === undefined) return { status: "absent" }
+  const parsed = parseObservedIssue(read.success)
+  return parsed._tag === "None"
+    ? { status: "unavailable", reason: `Current payload of ${issueId} could not be parsed.` }
+    : { status: "available", issue: parsed.value }
 })
 
 export const observedTaskProblem = (

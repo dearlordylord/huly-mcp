@@ -15,7 +15,7 @@ import type { TransferPlan } from "./issue-transfer-preflight.js"
 import type { ObservedIssue } from "./issue-transfer-task-observation.js"
 
 // Internal inspection proof; public routes remain schema-owned actual observations.
-interface RecordObservation {
+export interface RecordObservation {
   readonly records: Extract<MovementUncertaintyEvidence["verification"], { readonly status: "observed" }>["records"]
   readonly problems: ReadonlyArray<string>
   readonly limitations: ReadonlyArray<string>
@@ -35,7 +35,8 @@ export const observeTransferRecords = Effect.fn("transfer.observeRecords")(funct
   client: HulyClient["Service"],
   prepared: TransferPlan,
   write: TransferTreeWrite,
-  observed: ReadonlyArray<ObservedIssue>
+  observed: ReadonlyArray<ObservedIssue>,
+  publish: (observation: RecordObservation) => Effect.Effect<void>
 ): Effect.fn.Return<RecordObservation> {
   const inspect = client.inspectTransferRecords
   if (inspect === undefined)
@@ -55,6 +56,7 @@ export const observeTransferRecords = Effect.fn("transfer.observeRecords")(funct
     )
     if (read._tag === "Failure") {
       limitations.push(`Record closure of ${issueId} could not be read.`)
+      yield* publish({ records: [...records], problems: [...problems], limitations: [...limitations] })
       continue
     }
     const task = prepared.tasks.find((value) => value.issue._id === issueId)
@@ -63,6 +65,7 @@ export const observeTransferRecords = Effect.fn("transfer.observeRecords")(funct
     records.push(...ownerProof.records)
     problems.push(...ownerProof.problems)
     limitations.push(...ownerProof.limitations)
+    yield* publish({ records: [...records], problems: [...problems], limitations: [...limitations] })
   }
   return { records, problems, limitations }
 })

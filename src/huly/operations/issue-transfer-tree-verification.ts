@@ -6,8 +6,13 @@ import type { HulyClient } from "../client.js"
 import { descendantsOf, hierarchyProblem, movementHierarchy } from "./issue-movement-hierarchy.js"
 import { inspectMovementClosureState, inspectMovementProject, type MovementError } from "./issue-movement-preflight.js"
 import type { TransferPlan } from "./issue-transfer-preflight.js"
-import { observeTransferTasks, observedTask, observedTaskProblem } from "./issue-transfer-task-observation.js"
-import { observeTransferRecords } from "./issue-transfer-record-observation.js"
+import {
+  observeTransferTasks,
+  observedTask,
+  observedTaskProblem,
+  type TaskObservation
+} from "./issue-transfer-task-observation.js"
+import { observeTransferRecords, type RecordObservation } from "./issue-transfer-record-observation.js"
 
 export type TransferTreeVerification = MovementUncertaintyEvidence["verification"]
 type Observation = Extract<TransferTreeVerification, { readonly status: "observed" }>
@@ -24,7 +29,8 @@ export const verifyTransferTree = Effect.fn("transfer.verifyTree")(function* (
   client: HulyClient["Service"],
   prepared: TransferPlan,
   destination: MovementProject,
-  write: TransferTreeWrite
+  write: TransferTreeWrite,
+  publish: (observation: TransferTreeVerification) => Effect.Effect<void> = () => Effect.void
 ): Effect.fn.Return<TransferTreeVerification, MovementError> {
   const source = yield* inspectMovementProject(client, prepared.plan.root)
   const target =
@@ -42,22 +48,48 @@ export const verifyTransferTree = Effect.fn("transfer.verifyTree")(function* (
   const observedIds = [
     ...new Set([...write.tasks.map((task) => task.issueId), ...currentTree.map((issue) => issue._id)])
   ]
-  const taskProof = yield* observeTransferTasks(client, observedIds)
-  const recordProof = yield* observeTransferRecords(client, prepared, write, taskProof.observed)
-  const closure = yield* observeClosure(client, hierarchy, prepared)
-  return projectVerification({
-    tasks: taskProof.observed.map(observedTask),
-    records: recordProof.records,
-    absentIssueIds: taskProof.absentIssueIds,
-    problems: [
-      ...(hierarchyProblem === undefined ? [] : [hierarchyProblem]),
-      ...taskProof.absentIssueIds.map((id) => `Inspected task ${id} is absent.`),
-      ...observedTaskProblem(taskProof.observed, write),
-      ...recordProof.problems,
-      ...closure.problems
-    ],
-    limitations: [...taskProof.limitations, ...recordProof.limitations, ...closure.limitations]
+  let taskProof: TaskObservation = { observed: [], absentIssueIds: [], limitations: [] }
+  let recordProof: RecordObservation = { records: [], problems: [], limitations: [] }
+  const progress = () =>
+    projectVerification(
+      makeProof(hierarchyProblem, taskProof, recordProof, write, {
+        problems: [],
+        limitations: ["Further verification observations remain unavailable."]
+      })
+    )
+  yield* publish(progress())
+  taskProof = yield* observeTransferTasks(client, observedIds, (observation) => {
+    taskProof = observation
+    return publish(progress())
   })
+  recordProof = yield* observeTransferRecords(client, prepared, write, taskProof.observed, (observation) => {
+    recordProof = observation
+    return publish(progress())
+  })
+  const closure = yield* observeClosure(client, hierarchy, prepared)
+  const result = projectVerification(makeProof(hierarchyProblem, taskProof, recordProof, write, closure))
+  yield* publish(result)
+  return result
+})
+
+const makeProof = (
+  hierarchyProblem: string | undefined,
+  taskProof: TaskObservation,
+  recordProof: RecordObservation,
+  write: TransferTreeWrite,
+  closure: { readonly problems: ReadonlyArray<string>; readonly limitations: ReadonlyArray<string> }
+): VerificationProof => ({
+  tasks: taskProof.observed.map(observedTask),
+  records: recordProof.records,
+  absentIssueIds: taskProof.absentIssueIds,
+  problems: [
+    ...(hierarchyProblem === undefined ? [] : [hierarchyProblem]),
+    ...taskProof.absentIssueIds.map((id) => `Inspected task ${id} is absent.`),
+    ...observedTaskProblem(taskProof.observed, write),
+    ...recordProof.problems,
+    ...closure.problems
+  ],
+  limitations: [...taskProof.limitations, ...recordProof.limitations, ...closure.limitations]
 })
 
 const observeClosure = Effect.fn("transfer.observeClosure")(function* (

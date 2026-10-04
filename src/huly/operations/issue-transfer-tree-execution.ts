@@ -1,3 +1,4 @@
+import { publishVerification, interruptVerification } from "./issue-transfer-verification-progress.js"
 import { isDeepStrictEqual } from "node:util"
 import type { Issue, Project } from "@hcengineering/tracker"
 import { SortingOrder } from "@hcengineering/core"
@@ -46,8 +47,20 @@ export const executeTransferTree = Effect.fn("transfer.executeTree")(function* (
     executeWithinBudget(client, prepared, destination, params, progress).pipe(Effect.timeout(TRANSFER_EXECUTION_BUDGET))
   )
   if (result._tag === "Success") return result.success
+  const execution = yield* Ref.get(progress.execution)
+  const verification =
+    execution?.phase === "verification"
+      ? yield* interruptVerification(
+          progress.verification,
+          "Movement deadline interrupted remaining verification reads."
+        )
+      : yield* Ref.get(progress.verification)
   return yield* stoppedResult(
-    "indeterminate",
+    execution?.phase === "verification" &&
+      verification.status === "observed" &&
+      verification.consistency === "inconsistent"
+      ? "incomplete"
+      : "indeterminate",
     "Movement deadline or response unavailable; inspect every stable ID before retry.",
     prepared,
     destination,
@@ -216,8 +229,10 @@ const finishVerification = Effect.fn("transfer.finishVerification")(function* (
   progress: ExecutionProgress
 ): Effect.fn.Return<MoveIssueResult> {
   const result = yield* Effect.result(
-    verifyTransferTree(client, prepared, destination, write).pipe(
-      Effect.tap((value) => Ref.set(progress.verification, value)),
+    verifyTransferTree(client, prepared, destination, write, (observed) =>
+      publishVerification(progress.verification, observed)
+    ).pipe(
+      Effect.tap((value) => publishVerification(progress.verification, value)),
       Effect.repeat({
         schedule: Schedule.spaced("200 millis"),
         times: 4,
@@ -226,9 +241,14 @@ const finishVerification = Effect.fn("transfer.finishVerification")(function* (
     )
   )
   if (result._tag === "Failure") {
-    yield* Ref.set(progress.verification, { status: "unavailable", reason: "Post-send verification read failed." })
+    const verification = yield* interruptVerification(
+      progress.verification,
+      "Post-send verification read failed or exceeded the deadline."
+    )
     return yield* stoppedResult(
-      "indeterminate",
+      verification.status === "observed" && verification.consistency === "inconsistent"
+        ? "incomplete"
+        : "indeterminate",
       "Verification reads unavailable; no automatic retry or rollback attempted.",
       prepared,
       destination,
