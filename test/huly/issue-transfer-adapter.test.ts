@@ -82,7 +82,7 @@ it.effect(
       const records = yield* inspectTransferRecords(f.client, IssueId.make("root"))
       expect(records.blockers).toEqual([])
       expect(records.records).toMatchObject([
-        { _id: "history", automaticHistory: true, history: { action: "create", createdBy: "author" } }
+        { _id: "history", kind: "history", history: { action: "create", createdBy: "author" } }
       ])
       const write = Schema.decodeUnknownSync(TransferWriteSchema)({ ...writeInput, records: records.records })
       expect(yield* Effect.promise(() => commitTransfer(f.client, write))).toBe("applied")

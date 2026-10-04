@@ -49,12 +49,12 @@ create "$DESTINATION" ''; PARENT="$CREATED"; PARENT_ID="$CREATED_ID"
 create "$DESTINATION" "$PARENT"; EXISTING_ID="$CREATED_ID"
 for transport in mcp cli; do
   create "$SOURCE" "$OLD"; ROOT="$CREATED"; ROOT_ID="$CREATED_ID"
-  create "$SOURCE" ''; COUNTERPART="$CREATED"
+  create "$SOURCE" ''; COUNTERPART="$CREATED"; COUNTERPART_ID="$CREATED_ID"
   mcp add_issue_relation "$(jq -nc --arg project "$SOURCE" --arg issueIdentifier "$ROOT" --arg targetIssue "$COUNTERPART" '{project:$project,issueIdentifier:$issueIdentifier,targetIssue:$targetIssue,relationType:"is-blocked-by"}')" >/dev/null
   mcp add_issue_relation "$(jq -nc --arg project "$SOURCE" --arg issueIdentifier "$COUNTERPART" --arg targetIssue "$ROOT" '{project:$project,issueIdentifier:$issueIdentifier,targetIssue:$targetIssue,relationType:"is-blocked-by"}')" >/dev/null
-  ARGS=$(jq -nc --arg root "$ROOT_ID" --arg old "$OLD_ID" --arg parent "$PARENT_ID" --arg existing "$EXISTING_ID" --arg source "$SOURCE" --arg target "$DESTINATION" '{issues:[$root,$old,$parent,$existing],projects:[$source,$target]}')
+  ARGS=$(jq -nc --arg root "$ROOT_ID" --arg old "$OLD_ID" --arg parent "$PARENT_ID" --arg existing "$EXISTING_ID" --arg counterpart "$COUNTERPART_ID" --arg source "$SOURCE" --arg target "$DESTINATION" '{issues:[$root,$old,$parent,$existing,$counterpart],projects:[$source,$target]}')
   BEFORE=$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$ARGS")
-  jq -e --arg root "$ROOT_ID" '.issues[] | select(.issue._id == $root) | .owned.records | any(.automaticHistory)' >/dev/null <<<"$BEFORE"
+  jq -e --arg root "$ROOT_ID" '.issues[] | select(.issue._id == $root) | .owned.records | any(.kind == "history")' >/dev/null <<<"$BEFORE"
   DEST=$(jq -nc --arg project "$DESTINATION" --arg parent "$PARENT_ID" '{project:$project,parent:$parent}')
   if [[ "$transport" == mcp ]]; then RESULT=$(mcp move_issue "$(jq -nc --arg issue "$ROOT_ID" --argjson destination "$DEST" '{issue:$issue,destination:$destination}')"); else RESULT=$("${CLI[@]}" issues move "$ROOT_ID" --destination "$DEST" --json); fi
   jq -e --arg old "$ROOT" --arg root "$ROOT_ID" --arg parent "$PARENT_ID" '.outcome == "completed" and .changed and .issueId == $root and .parentId == $parent and .tasks[0].previousIdentifier == $old and .tasks[0].identifier != $old and (.tasks[0].url | startswith("http"))' >/dev/null <<<"$RESULT"
@@ -65,6 +65,18 @@ for transport in mcp cli; do
     ($after.issue | del(.space,.identifier,.number,.rank,.attachedTo,.parents,.modifiedOn)) == ($old.issue | del(.space,.identifier,.number,.rank,.attachedTo,.parents,.modifiedOn)) and
     $after.issue.attachedTo == $parent and
     all($old.owned.records[]; . as $record | any($after.owned.records[]; ._id == $record._id and .history == $record.history and .modifiedBy == $record.modifiedBy and .modifiedOn == $record.modifiedOn and .space == $after.issue.space))' >/dev/null <<<"$AFTER"
+  jq -e --argjson before "$BEFORE" --arg root "$ROOT_ID" --arg old "$OLD_ID" --arg parent "$PARENT_ID" --arg existing "$EXISTING_ID" --arg counterpart "$COUNTERPART_ID" '
+    (.issues[] | select(.issue._id == $old) | .issue) as $sourceParent |
+    (.issues[] | select(.issue._id == $parent) | .issue) as $targetParent |
+    ($before.issues[] | select(.issue._id == $parent) | .issue) as $previousParent |
+    $sourceParent.subIssues == 0 and $sourceParent.childInfo == [] and
+    $targetParent.subIssues == ($previousParent.subIssues + 1) and
+    ($targetParent.childInfo | length) == (($previousParent.childInfo | length) + 1) and
+    any($targetParent.childInfo[]; .childId == $root and .estimation == 2 and .reportedTime == 0) and
+    all($previousParent.childInfo[]; . as $child | any($targetParent.childInfo[]; . == $child)) and
+    (.issues[] | select(.issue._id == $existing) | .issue) == ($before.issues[] | select(.issue._id == $existing) | .issue) and
+    (.issues[] | select(.issue._id == $counterpart) | .issue | del(.modifiedOn)) == ($before.issues[] | select(.issue._id == $counterpart) | .issue | del(.modifiedOn)) and
+    (.issues[] | select(.issue._id == $root) | .issue.parents | map(.parentId)) == [$parent]' >/dev/null <<<"$AFTER"
   READ=$("${CLI[@]}" issues get "$SOURCE" "$ROOT_ID" --json)
   jq -e --arg project "$DESTINATION" --arg parent "$PARENT" '.project == $project and .parentIssue == $parent' >/dev/null <<<"$READ"
   REPEAT=$(mcp move_issue "$(jq -nc --arg issue "$ROOT_ID" --argjson destination "$DEST" '{issue:$issue,destination:$destination}')")

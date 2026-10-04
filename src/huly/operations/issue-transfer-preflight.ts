@@ -207,7 +207,10 @@ const inspectWorkflow = Effect.fn("transfer.inspectWorkflow")(function* (
   source: MovementProject,
   destination: MovementProject,
   params: MoveIssueParams
-) {
+): Effect.fn.Return<
+  { readonly protectedIssue: TransferIssue; readonly conflicts: ReadonlyArray<TransferConflict> },
+  MovementError
+> {
   const raw = yield* client.findOne<Issue>(tracker.class.Issue, hulyQuery<Issue>({ _id: toRef<Issue>(root._id) }))
   const protectedIssue = yield* parse(TransferIssueSchema, raw)
   const sourceData = yield* parse(

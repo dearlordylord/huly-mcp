@@ -824,7 +824,12 @@ describe("Issues Coverage - listIssues parent and summary branches", () => {
         parentTitle: "Parent",
         space: "project-1" as Ref<Space>
       }
-      const issue = makeIssue({ identifier: "TEST-2", parents: [parentInfo], subIssues: 3 })
+      const issue = makeIssue({
+        identifier: "TEST-2",
+        attachedTo: parentInfo.parentId,
+        parents: [parentInfo],
+        subIssues: 3
+      })
       const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
       const testLayer = createTestLayerWithMocks({ projects: [project], issues: [issue], statuses })
@@ -1539,7 +1544,14 @@ describe("Issues Coverage - getIssue detail branches", () => {
         parentTitle: "Parent",
         space: "project-1" as Ref<Space>
       }
-      const issue = makeIssue({ identifier: "TEST-2", number: 2, parents: [parentInfo], subIssues: 2, estimation: 8 })
+      const issue = makeIssue({
+        identifier: "TEST-2",
+        number: 2,
+        attachedTo: parentInfo.parentId,
+        parents: [parentInfo],
+        subIssues: 2,
+        estimation: 8
+      })
       const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
 
       const testLayer = createTestLayerWithMocks({ projects: [project], issues: [issue], statuses })

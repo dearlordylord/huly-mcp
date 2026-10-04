@@ -15,7 +15,7 @@ import {
   movementNoParent,
   type MovementHierarchy
 } from "./issue-movement-hierarchy.js"
-import { inspectMovementClosure, inspectMovementProject } from "./issue-movement-preflight.js"
+import { inspectMovementClosure, inspectMovementProject, type MovementError } from "./issue-movement-preflight.js"
 import type { TransferPlan } from "./issue-transfer-preflight.js"
 import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
@@ -25,7 +25,7 @@ export const verifyTransfer = Effect.fn("transfer.verify")(function* (
   prepared: TransferPlan,
   destination: MovementProject,
   write: TransferWrite
-) {
+): Effect.fn.Return<TransferPlan["plan"]["root"] | undefined, MovementError> {
   const { plan } = prepared
   const source = yield* inspectMovementProject(client, plan.root)
   const target = yield* inspectMovementProject(client, { ...plan.root, space: destination._id })
@@ -49,14 +49,14 @@ const preservedIssueMatches = Effect.fn("transfer.verifyPreservation")(function*
   client: HulyClient["Service"],
   prepared: TransferPlan,
   write: TransferWrite
-) {
+): Effect.fn.Return<boolean, MovementError> {
   const { plan } = prepared
   const current = yield* client.findOne<Issue>(
     tracker.class.Issue,
     hulyQuery<Issue>({ _id: toRef<Issue>(plan.root._id) })
   )
   const parsed = Schema.decodeUnknownOption(TransferIssueSchema)(current)
-  if (parsed._tag === "None") return undefined
+  if (parsed._tag === "None") return false
   const { number: _oldNumber, rank: _oldRank, ...previous } = prepared.protectedIssue
   const { number, rank, ...preserved } = parsed.value
   return (
@@ -68,15 +68,10 @@ const preservedIssueMatches = Effect.fn("transfer.verifyPreservation")(function*
 })
 
 const recordsMatch = (previous: TransferInspection, current: TransferInspection, destination: MovementProject) =>
+  current.discovery === "complete" &&
   current.blockers.length === 0 &&
   previous.records.every((old) =>
-    current.records.some(
-      (record) =>
-        record._id === old._id &&
-        record.space === destination._id &&
-        record.attachedTo === old.attachedTo &&
-        record._class === old._class
-    )
+    current.records.some((record) => isDeepStrictEqual(record, { ...old, space: destination._id }))
   ) &&
   current.records.every((record) => record.space === destination._id)
 
@@ -93,7 +88,7 @@ const verifyRecords = Effect.fn("transfer.verifyRecords")(function* (
   client: HulyClient["Service"],
   prepared: TransferPlan,
   destination: MovementProject
-) {
+): Effect.fn.Return<boolean, MovementError> {
   if (client.inspectTransferRecords === undefined) return false
   return recordsMatch(prepared.records, yield* client.inspectTransferRecords(prepared.plan.root._id), destination)
 })
@@ -104,7 +99,7 @@ const combinedHierarchy = (source: MovementHierarchy | undefined, target: Moveme
 export const movementNoopProblem = Effect.fn("movement.inspectNoop")(function* (
   client: HulyClient["Service"],
   plan: TransferPlan["plan"]
-) {
+): Effect.fn.Return<string | undefined, MovementError> {
   if (!canInspectNoop(client, plan)) return undefined
   const inspect = client.inspectTransferRecords
   if (inspect === undefined) return undefined
@@ -118,11 +113,18 @@ export const movementNoopProblem = Effect.fn("movement.inspectNoop")(function* (
     if (issue.identifier !== `${plan.source.identifier}-${parsed.value.number}`)
       return "Inconsistent issue number/identifier; not a successful no-op."
     const records = yield* inspect(issue._id)
-    if (records.records.some((record) => record.space !== issue.space))
-      return "Owned records remain in another project; not a successful no-op."
+    const problem = ownedNoopProblem(records, issue)
+    if (problem !== undefined) return problem
   }
   return undefined
 })
 
 const canInspectNoop = (client: HulyClient["Service"], plan: TransferPlan["plan"]) =>
   plan.root.attachedTo === (plan.parent?._id ?? movementNoParent) && client.inspectTransferRecords !== undefined
+
+const ownedNoopProblem = (records: TransferInspection, issue: TransferPlan["plan"]["root"]) => {
+  if (records.discovery === "incomplete") return "Incomplete owned-record discovery; not a successful no-op."
+  return records.records.some((record) => record.space !== issue.space)
+    ? "Owned records remain in another project; not a successful no-op."
+    : undefined
+}

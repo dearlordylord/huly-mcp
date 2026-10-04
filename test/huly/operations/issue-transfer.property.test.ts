@@ -1,5 +1,4 @@
-import { it } from "vitest"
-import { expect } from "vitest"
+import { it, expect } from "vitest"
 import { Effect } from "effect"
 import * as fc from "fast-check"
 import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"

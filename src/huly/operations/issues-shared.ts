@@ -358,12 +358,16 @@ export const findIssueInProject = (
         tracker.class.Issue,
         hulyQuery<HulyIssue>({ space: project._id, identifier: fullIdentifier })
       )) ??
-      (number !== null
-        ? yield* client.findOne<HulyIssue>(tracker.class.Issue, hulyQuery<HulyIssue>({ space: project._id, number }))
+      (number === null
+        ? undefined
         : yield* client.findOne<HulyIssue>(
             tracker.class.Issue,
-            hulyQuery<HulyIssue>({ space: project._id, _id: toRef<HulyIssue>(IssueIdentifier.make(identifierStr)) })
-          ))
+            hulyQuery<HulyIssue>({ space: project._id, number })
+          )) ??
+      (yield* client.findOne<HulyIssue>(
+        tracker.class.Issue,
+        hulyQuery<HulyIssue>({ space: project._id, _id: toRef<HulyIssue>(IssueIdentifier.make(identifierStr)) })
+      ))
     if (issue === undefined) {
       return yield* new IssueNotFoundError({ identifier: identifierStr, project: project.identifier })
     }

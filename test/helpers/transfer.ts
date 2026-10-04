@@ -66,7 +66,7 @@ export const transferFixture = () => {
         objectClass: ObjectClassName.make(String(tracker.class.Issue)),
         action: "create"
       },
-      automaticHistory: true
+      kind: "history"
     }
   ]
   const state = {
@@ -80,6 +80,9 @@ export const transferFixture = () => {
     failPostRead: false,
     ignoreCommit: false,
     corruptHistory: false,
+    corruptHistoryPayload: false,
+    corruptHistoryAuthor: false,
+    corruptHistoryTime: false,
     corruptNumber: false,
     corruptContent: false,
     failOrdering: false,
@@ -112,6 +115,7 @@ export const transferFixture = () => {
       if (state.failPostRead && state.sent > 0) return unavailable()
       return Effect.succeed(
         Schema.decodeUnknownSync(TransferInspectionSchema)({
+          discovery: "complete",
           records: records.map((record) => ({ ...record })),
           blockers: state.recordsBlockers,
           limitation: "Fixture inspects model-owned records; unsupported structure is not a complete inventory."
@@ -138,6 +142,10 @@ export const transferFixture = () => {
         if (state.corruptNumber) root.number++
         if (state.corruptContent) root.description = sdkFixture("Changed content")
         if (!state.corruptHistory) for (const record of records) record.space = write.destinationId
+        if (state.corruptHistoryPayload) for (const record of records) record.history.action = "remove"
+        if (state.corruptHistoryAuthor)
+          for (const record of records) record.modifiedBy = NonEmptyString.make("changed author")
+        if (state.corruptHistoryTime) for (const record of records) record.modifiedOn = Timestamp.make(2)
         initializeHierarchy(issues)
       }
       if (state.failCommit) return unavailable()

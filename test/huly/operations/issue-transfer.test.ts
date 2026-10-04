@@ -112,7 +112,15 @@ for (const mode of [
   )
 }
 
-for (const mode of ["ignoreCommit", "corruptHistory", "corruptNumber", "corruptContent"] as const) {
+for (const mode of [
+  "ignoreCommit",
+  "corruptHistory",
+  "corruptHistoryPayload",
+  "corruptHistoryAuthor",
+  "corruptHistoryTime",
+  "corruptNumber",
+  "corruptContent"
+] as const) {
   it.effect(`bounded verification refuses completed on ${mode}`, () =>
     Effect.gen(function* () {
       const f = transferFixture()

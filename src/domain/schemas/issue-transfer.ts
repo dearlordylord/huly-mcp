@@ -2,7 +2,7 @@ import { SocialIdentityId } from "./person-administration.js"
 import { Schema } from "effect"
 import { DocId, IssueId, NonEmptyString, ObjectClassName, PositiveInteger, Timestamp } from "./shared.js"
 
-const HistoryValueSchema = Schema.Union([Schema.String, Schema.Number, Schema.Null])
+export const AutomaticHistoryClass = ObjectClassName.make("activity:class:DocUpdateMessage")
 export const TransferHistorySchema = Schema.Struct({
   objectId: DocId,
   objectClass: ObjectClassName,
@@ -11,31 +11,32 @@ export const TransferHistorySchema = Schema.Struct({
   createdBy: Schema.optionalKey(NonEmptyString),
   createdOn: Schema.optionalKey(Timestamp),
   updateCollection: Schema.optionalKey(Schema.String),
-  attributeUpdates: Schema.optionalKey(
-    Schema.Struct({
-      attrKey: Schema.String,
-      attrClass: ObjectClassName,
-      set: Schema.Array(HistoryValueSchema),
-      added: Schema.Array(HistoryValueSchema),
-      removed: Schema.Array(HistoryValueSchema),
-      isMixin: Schema.Boolean,
-      // The SDK allows arbitrary serialized historical attribute values.
-      prevValue: Schema.optionalKey(Schema.Json)
-    })
-  )
+  // Encoded snapshot of parsed SDK historical updates; these values are never rewritten.
+  attributeUpdates: Schema.optionalKey(Schema.String)
 })
-export const TransferRecordSchema = Schema.Struct({
+const RecordFields = {
   _id: DocId,
-  _class: ObjectClassName,
   space: DocId,
   attachedTo: DocId,
   modifiedOn: Timestamp,
-  modifiedBy: SocialIdentityId,
-  history: Schema.optionalKey(TransferHistorySchema),
-  automaticHistory: Schema.Boolean
-})
+  modifiedBy: SocialIdentityId
+}
+export const TransferRecordSchema = Schema.Union([
+  Schema.Struct({
+    ...RecordFields,
+    kind: Schema.Literal("history"),
+    _class: Schema.Literal(AutomaticHistoryClass),
+    history: TransferHistorySchema
+  }),
+  Schema.Struct({
+    ...RecordFields,
+    kind: Schema.Literal("unsupported"),
+    _class: ObjectClassName.check(Schema.makeFilter((value) => value !== AutomaticHistoryClass))
+  })
+])
 export type TransferRecord = Schema.Schema.Type<typeof TransferRecordSchema>
 export const TransferInspectionSchema = Schema.Struct({
+  discovery: Schema.Literals(["complete", "incomplete"]),
   records: Schema.Array(TransferRecordSchema),
   blockers: Schema.Array(Schema.String),
   limitation: Schema.String

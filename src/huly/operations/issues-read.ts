@@ -241,14 +241,17 @@ const findIssueForRead = (
       tracker.class.Issue,
       hulyQuery<HulyIssue>({ space: project._id, identifier: fullIdentifier })
     )
+    const byNumber =
+      byIdentifier !== undefined || number === null
+        ? undefined
+        : yield* client.findOne<HulyIssue>(tracker.class.Issue, hulyQuery<HulyIssue>({ space: project._id, number }))
     const issue =
       byIdentifier ??
-      (number === null
-        ? yield* client.findOne<HulyIssue>(
-            tracker.class.Issue,
-            hulyQuery<HulyIssue>({ _id: toRef<HulyIssue>(params.identifier) })
-          )
-        : yield* client.findOne<HulyIssue>(tracker.class.Issue, hulyQuery<HulyIssue>({ space: project._id, number })))
+      byNumber ??
+      (yield* client.findOne<HulyIssue>(
+        tracker.class.Issue,
+        hulyQuery<HulyIssue>({ _id: toRef<HulyIssue>(params.identifier) })
+      ))
     if (issue === undefined) {
       return yield* new IssueNotFoundError({ identifier: params.identifier, project: params.project })
     }
