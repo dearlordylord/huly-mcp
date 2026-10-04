@@ -193,6 +193,7 @@ it.effect("writes only planned attributes and conditions each replacement or cle
         })
         expect(yield* Effect.promise(() => commitTransfer(f.client, write))).toBe("applied")
         expect(f.conditions).toContainEqual({ _id: "root", [field]: "expected" })
+        if (to !== null) expect(f.conditions).toContainEqual({ _id: to, space: "destination" })
         expect(f.updates[0]?.[3]).toMatchObject({ [field]: to })
         const other = field === "component" ? "milestone" : "component"
         expect(f.updates[0]?.[3]).not.toHaveProperty(other)

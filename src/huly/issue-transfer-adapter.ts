@@ -1,4 +1,4 @@
-import type { Issue } from "@hcengineering/tracker"
+import type { Component, Issue, Milestone, Project } from "@hcengineering/tracker"
 import type { AttachedDoc, Doc, DocumentUpdate, TxOperations } from "@hcengineering/core"
 import { Effect, Schema } from "effect"
 import {
@@ -130,11 +130,7 @@ export const commitTransfer = async (
       modifiedOn: write.modifiedOn
     })
   )
-  for (const change of write.attributeChanges ?? [])
-    apply.match(
-      tracker.class.Issue,
-      hulyQuery<Issue>({ _id: toRef(write.issueId), [change.field]: toRef(change.from) })
-    )
+  matchTransferAttributes(apply, write)
   for (const record of write.records) {
     apply.match(
       toClassRef<AttachedDoc>(record._class),
@@ -181,4 +177,24 @@ const attributeUpdates = (write: TransferWrite) => {
     else updates.milestone = change.to === null ? null : toRef(change.to)
   }
   return updates
+}
+
+const matchTransferAttributes = (apply: ReturnType<TxOperations["apply"]>, write: TransferWrite) => {
+  for (const change of write.attributeChanges ?? []) {
+    apply.match(
+      tracker.class.Issue,
+      hulyQuery<Issue>({ _id: toRef(write.issueId), [change.field]: toRef(change.from) })
+    )
+    if (change.to === null) continue
+    if (change.field === "component")
+      apply.match(
+        tracker.class.Component,
+        hulyQuery<Component>({ _id: toRef<Component>(change.to), space: toRef<Project>(write.destinationId) })
+      )
+    else
+      apply.match(
+        tracker.class.Milestone,
+        hulyQuery<Milestone>({ _id: toRef<Milestone>(change.to), space: toRef<Project>(write.destinationId) })
+      )
+  }
 }

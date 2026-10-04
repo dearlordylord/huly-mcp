@@ -1,3 +1,4 @@
+import { transferRetryCall } from "./issue-transfer-retry.js"
 import type { Issue, Project } from "@hcengineering/tracker"
 import { SortingOrder } from "@hcengineering/core"
 import { makeRank } from "@hcengineering/rank"
@@ -56,7 +57,7 @@ export const transferIssue = Effect.fn("transferIssue")(function* (
       changed: false,
       reason: `${prepared.conflicts.map((entry) => entry.reason).join(" ")} ${prepared.limitation}`,
       discovery: prepared.discovery ?? "incomplete",
-      nextCall: { ...params, issue: IssueIdentifier.make(root._id) },
+      nextCall: transferRetryCall(params, root._id, prepared.conflicts),
       conflicts: prepared.conflicts,
       destinationId: destination._id,
       issueIds: [root._id],

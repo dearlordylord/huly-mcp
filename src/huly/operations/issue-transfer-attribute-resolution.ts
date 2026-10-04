@@ -1,19 +1,27 @@
 import type { MoveIssueParams } from "../../domain/schemas/issue-movement.js"
 import type { MovementIssue } from "../../domain/schemas/issue-movement-state.js"
 import type { TransferConflict, TransferIssue } from "../../domain/schemas/issue-transfer.js"
-import type {
-  TransferAttributeChange,
-  TransferAttributeField,
-  TransferAttributeValue
+import {
+  MAX_SUPPORTED_ATTRIBUTE_VALUES,
+  type TransferAttributeChange,
+  type TransferComponentValue,
+  type TransferMilestoneValue
 } from "../../domain/schemas/issue-transfer-attributes.js"
 
 // Parsed internal snapshots; resolution never performs I/O or mutates the task.
-export interface AttributeInventory {
-  readonly field: TransferAttributeField
-  readonly source: ReadonlyArray<TransferAttributeValue>
-  readonly destination: ReadonlyArray<TransferAttributeValue>
-  readonly complete: boolean
-}
+export type AttributeInventory =
+  | {
+      readonly field: "component"
+      readonly source: ReadonlyArray<TransferComponentValue>
+      readonly destination: ReadonlyArray<TransferComponentValue>
+      readonly complete: boolean
+    }
+  | {
+      readonly field: "milestone"
+      readonly source: ReadonlyArray<TransferMilestoneValue>
+      readonly destination: ReadonlyArray<TransferMilestoneValue>
+      readonly complete: boolean
+    }
 export const resolveTransferAttributes = (
   root: MovementIssue,
   issue: TransferIssue,
@@ -66,25 +74,51 @@ const resolveField = (
   const { destination, field, source } = inventory
   const from = issue[field] ?? null
   const sourceName = source.find((value) => value._id === from)?.label
-  const conflict: ConflictFactory = (code, reason) => ({
-    code,
-    issueId: root._id,
-    identifier: root.identifier,
-    field,
-    from,
-    ...(sourceName === undefined ? {} : { sourceName }),
-    candidates: destination,
-    clearingAllowed: true,
-    reason
-  })
+  const conflict: ConflictFactory = (code, reason) => attributeConflict(root, inventory, from, sourceName, code, reason)
   if (from === null && resolution === undefined) return undefined
+  const stale = staleDecision(inventory, from, resolution, conflict)
+  if (stale !== undefined) return stale
   if (!inventory.complete)
     return conflict(
       "discovery",
-      `Incomplete ${field} inventory; the 1,000-value per-project response limit or invalid/truncated SDK data prevents a uniqueness proof and complete candidates. No writes permitted.`
+      `Incomplete ${field} inventory; the ${MAX_SUPPORTED_ATTRIBUTE_VALUES}-value per-project response limit or invalid/truncated SDK data prevents a uniqueness proof and complete candidates. No writes permitted.`
     )
   if (resolution !== undefined) return resolveExplicit(root, inventory, from, resolution, conflict)
   return resolveAutomatic(root, inventory, from, sourceName, conflict)
+}
+
+const attributeConflict = (
+  root: MovementIssue,
+  inventory: AttributeInventory,
+  from: TransferIssue["component"],
+  sourceName: string | undefined,
+  code: Parameters<ConflictFactory>[0],
+  reason: string
+): TransferConflict => {
+  const identity = { issueId: root._id, identifier: root.identifier, reason }
+  if (from == null) {
+    return inventory.field === "component"
+      ? {
+          ...identity,
+          code: "stale-resolution",
+          from: null,
+          clearingAllowed: false,
+          field: inventory.field,
+          candidates: inventory.destination
+        }
+      : {
+          ...identity,
+          code: "stale-resolution",
+          from: null,
+          clearingAllowed: false,
+          field: inventory.field,
+          candidates: inventory.destination
+        }
+  }
+  const current = { ...identity, code, from, ...(sourceName === undefined ? {} : { sourceName }) }
+  return inventory.field === "component"
+    ? { ...current, clearingAllowed: true, field: inventory.field, candidates: inventory.destination }
+    : { ...current, clearingAllowed: true, field: inventory.field, candidates: inventory.destination }
 }
 
 const resolveExplicit = (
@@ -94,34 +128,23 @@ const resolveExplicit = (
   resolution: Resolution,
   conflict: ConflictFactory
 ): AttributeDecision => {
-  if (resolution.from !== from)
-    return conflict(
-      "stale-resolution",
-      `Stale ${inventory.field} resolution: expected ${resolution.from}; current value is ${from ?? "null/unset"}. Rebuild consent from current state.`
-    )
+  if (resolution.to === null)
+    return { issueId: root._id, field: inventory.field, from: resolution.from, to: null, reason: "explicit-clear" }
   const replacement = inventory.destination.find((value) => value._id === resolution.to)
-  if (resolution.to !== null && replacement === undefined)
+  if (replacement === undefined)
     return conflict(
       "invalid-resolution",
       `Replacement ${resolution.to} is not a valid destination ${inventory.field}. Use a candidate ID or null.`
     )
   if (resolution.to === from) return undefined
-  return explicitChange(root, inventory.field, resolution.from, replacement, resolution)
+  return {
+    issueId: root._id,
+    field: inventory.field,
+    from: resolution.from,
+    to: replacement._id,
+    reason: "explicit-replacement"
+  }
 }
-
-const explicitChange = (
-  root: MovementIssue,
-  field: TransferAttributeField,
-  from: NonNullable<TransferIssue["component"]>,
-  replacement: TransferAttributeValue | undefined,
-  resolution: Resolution
-): TransferAttributeChange => ({
-  issueId: root._id,
-  field,
-  from,
-  to: replacement?._id ?? null,
-  reason: resolution.to === null ? "explicit-clear" : "explicit-replacement"
-})
 
 const resolveAutomatic = (
   root: MovementIssue,
@@ -140,3 +163,22 @@ const resolveAutomatic = (
     `Unresolved ${inventory.field}. Retry the original destination with resolutions [{issueId:'${root._id}',field:'${inventory.field}',from:'${from}',to:<candidate stable ID or null>}]. Matching is literal and unique; create missing values separately if desired.`
   )
 }
+
+const staleGuidance = (
+  field: AttributeInventory["field"],
+  expected: Resolution["from"],
+  from: TransferIssue["component"]
+) =>
+  from == null
+    ? `Stale ${field} resolution: expected ${expected}; current value is null/unset. Omit this resolution on retry; absent fields require no consent and from cannot be null. nextCall omits the obsolete decision.`
+    : `Stale ${field} resolution: expected ${expected}; current value is ${from}. nextCall omits the obsolete decision. If still needed, add fresh consent with this current from ID and a valid destination to ID or null.`
+
+const staleDecision = (
+  inventory: AttributeInventory,
+  from: TransferIssue["component"],
+  resolution: Resolution | undefined,
+  conflict: ConflictFactory
+): TransferConflict | undefined =>
+  resolution !== undefined && resolution.from !== from
+    ? conflict("stale-resolution", staleGuidance(inventory.field, resolution.from, from))
+    : undefined

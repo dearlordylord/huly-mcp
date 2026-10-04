@@ -21,3 +21,30 @@ Approved automatic/explicit deltas travel through the transfer plan to condition
 ## Remaining acceptance evidence
 
 The final candidate must pass `pnpm check-all`, fresh independent Standards/Spec reviews, and root-owned combined MCP/CLI local Huly certification. Do not interpret intermediate focused tests as final acceptance or atomicity/isolation evidence. The inherited SDK conditional batch contract is cooperative; scopes do not establish global isolation.
+
+## All 14 acceptance criteria
+
+| Criterion | Implementation / evidence |
+| --- | --- |
+| Independent of 308; preserve integrated ownership | Existing leaf/unsupported-record admission retained; attribute changes are additive to records and protected payload. Existing 307 operation/adapter tests remain green at focused checkpoints. |
+| Complete conflicts/candidates; exact labels | Direct SDK snapshots with total/limit, class/space/schema/duplicate checks. Operation tests exercise case, leading whitespace, duplicate names and six discovery failure modes. |
+| Explicit → valid ID → exact unique name → conflict | `issue-transfer-attribute-resolution.ts`; explicit-clear overrides valid-ID preservation; valid-ID tests include ambiguous names and explicit equal-reference no-change. |
+| Aggregate workflow/component/milestone conflicts before writes | Transfer preflight merges workflow, attribute and ownership conflicts; three simultaneous conflict categories tested with zero allocations/sends. |
+| Stable IDs, expected value, source label, detailed candidates and instructions | Schema-owned attribute conflict branch; candidates expose component lead or milestone status/date. Published-schema MCP/CLI retry tests and final executable fixture. |
+| Dangling IDs explicit replacement/null; absent fields need no match | Dangling two-field retry test replaces component and selectively clears milestone. Null/unset are no matching requirement; null/unset stale consent tests remain blocked. |
+| Exact task/field/from/to consent | Published command schema shares the field schema; resolver and property test verify scoped consent. |
+| Reject duplicate/out-of-tree/invalid/stale | Focused public cases, generated scoped-consent property, class/space/invalid discovery tests; adapter also conditions destination target existence and membership for non-null writes. |
+| Rebuild each retry; no token | Shared operation rereads root/hierarchy/workflow/inventory on every invocation. Intervening current reference test and live fixture stale-state scenario. |
+| Same-project supplied resolutions reject before no-op | Existing shared destination parser rejects all supplied arrays, including empty; MCP/operation tests exercise no-op and omission instructions. |
+| Report all automatic/explicit changes | Schema-owned completion `attributeChanges`, with exact-name / explicit-replacement / explicit-clear reasons. Round-trip and automatic-match assertions. |
+| No creation/force/mapping/preview | Resolver only projects existing snapshots; tool descriptions explain separate creation and preserved workflow. |
+| Both MCP and CLI blocked→retry→completed | Real registered operation/published AJV schema + CLI parser tests; executable `integration_test_issue_attributes.sh` includes two simultaneous conflicts, exact matches, ambiguity, stale consent and selective clear. Live run is explicitly pending final combined certification. |
+| Task-scoped reusable resolver; full gates/local integration | Pure resolver takes one parsed task and snapshots; property tests prove exact consent scope. Full `pnpm check-all`, independent reviews and local Docker MCP/CLI suites remain pending scheduled/final certification. |
+
+## Independent review corrections
+
+The first Standards review of f1c0e037 identified representation gaps. Changes and candidates now retain field-specific schema variants: a clear has `to: null` and `reason: explicit-clear`; replacements require a non-null ID with `explicit-replacement` or `exact-name`. Component candidates require lead; milestones require status and targetDate, with distinct exact ObjectClassName values. Inventories preserve those candidate variants and branded project spaces. A single `MAX_SUPPORTED_ATTRIBUTE_VALUES` drives both the SDK query sentinel and resolver limitation text. SDK total metadata is parsed through Count before completeness decisions.
+
+The first Spec review identified an obsolete-resolution retry gap when a field becomes null/unset. Those conflicts now state that clearing is unavailable and explicitly instruct omission of the obsolete resolution. `nextCall` removes stale/invalid/duplicate/out-of-tree decisions while retaining valid decisions for other fields. The direct now-absent-reference retry test consumes the returned nextCall without undocumented rewriting. The retry still rereads state and does not auto-authorize changed-value loss.
+
+Additional adapter guards require approved non-null replacement documents to remain in the destination project at conditional commit. These guards are cooperative SDK conditions, retaining the inherited scoped batch limitations.

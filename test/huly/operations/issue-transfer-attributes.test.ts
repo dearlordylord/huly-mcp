@@ -210,3 +210,47 @@ it.effect(
       }
     })
 )
+
+it.effect("stale consent for now-absent reference returns a directly usable nextCall omitting obsolete decisions", () =>
+  Effect.gen(function* () {
+    for (const absent of [null, undefined]) {
+      const f = transferFixture()
+      if (absent === undefined) Reflect.deleteProperty(f.root, "component")
+      const blocked = yield* call(f, {
+        ...f.input,
+        resolutions: [{ issueId: f.root._id, field: "component", from: "old", to: null }]
+      })
+      expect(blocked).toMatchObject({
+        outcome: "blocked",
+        conflicts: [{ code: "stale-resolution", from: null, clearingAllowed: false }],
+        nextCall: { resolutions: [] }
+      })
+      if (blocked.outcome !== "blocked") throw new Error("Expected stale consent")
+      expect(yield* call(f, blocked.nextCall)).toMatchObject({ outcome: "completed", attributeChanges: [] })
+    }
+  })
+)
+
+it.effect("candidate payloads retain required distinguishing fields and exclude unrelated candidate details", () =>
+  Effect.gen(function* () {
+    const f = transferFixture()
+    f.root.component = sdkFixture("missing-component")
+    f.root.milestone = sdkFixture("missing-milestone")
+    value(f, "component-choice", "component", "Choice")
+    value(f, "milestone-choice", "milestone", "Choice")
+    const blocked = yield* call(f)
+    expect(blocked).toMatchObject({
+      outcome: "blocked",
+      conflicts: [
+        { field: "component", candidates: [{ _id: "component-choice", lead: null }] },
+        { field: "milestone", candidates: [{ _id: "milestone-choice", status: 0, targetDate: 0 }] }
+      ]
+    })
+    if (blocked.outcome !== "blocked" || blocked.conflicts === undefined) throw new Error("Expected candidates")
+    for (const entry of blocked.conflicts) {
+      if (!("field" in entry)) continue
+      expect(entry.candidates[0]).not.toHaveProperty(entry.field === "component" ? "status" : "lead")
+    }
+    expect(Schema.decodeUnknownSync(MoveIssueResultSchema)(blocked)).toEqual(blocked)
+  })
+)

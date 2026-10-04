@@ -1,4 +1,8 @@
-import { TransferAttributeChangeSchema, TransferAttributeConflictFields } from "./issue-transfer-attributes.js"
+import {
+  TransferAttributeChangeSchema,
+  TransferComponentConflictFields,
+  TransferMilestoneConflictFields
+} from "./issue-transfer-attributes.js"
 import { SocialIdentityId } from "./person-administration.js"
 import { Schema } from "effect"
 import {
@@ -104,12 +108,24 @@ export const TransferKindSchema = Schema.Struct({
 export const TransferSequenceSchema = Schema.Struct({ object: Schema.Struct({ sequence: PositiveInteger }) })
 
 const ConflictFields = { issueId: IssueId, identifier: IssueIdentifier, reason: Schema.String }
+const CurrentAttributeConflictFields = {
+  ...ConflictFields,
+  from: DocId,
+  sourceName: Schema.optionalKey(Schema.String),
+  clearingAllowed: Schema.Literal(true),
+  code: Schema.Literals(["attribute", "stale-resolution", "invalid-resolution", "discovery"])
+}
+const AbsentAttributeConflictFields = {
+  ...ConflictFields,
+  from: Schema.Null,
+  clearingAllowed: Schema.Literal(false),
+  code: Schema.Literal("stale-resolution")
+}
 export const TransferConflictSchema = Schema.Union([
-  Schema.Struct({
-    ...ConflictFields,
-    ...TransferAttributeConflictFields,
-    code: Schema.Literals(["attribute", "stale-resolution", "invalid-resolution", "discovery"])
-  }),
+  Schema.Struct({ ...CurrentAttributeConflictFields, ...TransferComponentConflictFields }),
+  Schema.Struct({ ...CurrentAttributeConflictFields, ...TransferMilestoneConflictFields }),
+  Schema.Struct({ ...AbsentAttributeConflictFields, ...TransferComponentConflictFields }),
+  Schema.Struct({ ...AbsentAttributeConflictFields, ...TransferMilestoneConflictFields }),
   Schema.Struct({
     ...ConflictFields,
     code: Schema.Literals([
