@@ -34,7 +34,8 @@ const scenarios = [
   "different-created-author",
   "different-created-time",
   "different-update-collection",
-  "unexpected-prev-value"
+  "unexpected-prev-value",
+  "operator-history"
 ] as const
 type HistoryScenario = (typeof scenarios)[number]
 
@@ -60,9 +61,22 @@ for (const scenario of scenarios) {
                 objectSpace: task.sourceId,
                 modifiedOn: 1,
                 modifiedBy: "author",
-                operations: scenario === "array-delta" ? { parents: task.finalParents } : { attachedTo: task.parentId },
+                operations:
+                  scenario === "operator-history"
+                    ? { $unset: { component: true } }
+                    : scenario === "array-delta"
+                      ? { parents: task.finalParents }
+                      : { attachedTo: task.parentId },
                 historyAttributes: [
-                  { attrKey: scenario === "array-delta" ? "parents" : "attachedTo", attrClass: "tracker:class:Issue" }
+                  {
+                    attrKey:
+                      scenario === "operator-history"
+                        ? "component"
+                        : scenario === "array-delta"
+                          ? "parents"
+                          : "attachedTo",
+                    attrClass: scenario === "operator-history" ? "tracker:class:Component" : "tracker:class:Issue"
+                  }
                 ]
               }))
             )
@@ -115,13 +129,20 @@ const makeHistory = (transaction: MovementTransactionReceipt, destinationId: Doc
       createdBy: scenario === "different-created-author" ? "other-author" : transaction.modifiedBy,
       ...(scenario === "different-update-collection" ? { updateCollection: "subIssues" } : {}),
       attributeUpdates: JSON.stringify({
-        attrKey: scenario === "array-delta" ? "parents" : "attachedTo",
-        attrClass: scenario === "different-attribute-class" ? "core:class:TypeString" : transaction.objectClass,
+        attrKey: scenario === "operator-history" ? "component" : scenario === "array-delta" ? "parents" : "attachedTo",
+        attrClass:
+          scenario === "operator-history"
+            ? "tracker:class:Component"
+            : scenario === "different-attribute-class"
+              ? "core:class:TypeString"
+              : transaction.objectClass,
         isMixin: false,
         set:
-          scenario === "array-delta"
-            ? transaction.operations["parents"]
-            : [scenario === "different-value" ? "unrelated-parent" : transaction.operations["attachedTo"]],
+          scenario === "operator-history"
+            ? []
+            : scenario === "array-delta"
+              ? transaction.operations["parents"]
+              : [scenario === "different-value" ? "unrelated-parent" : transaction.operations["attachedTo"]],
         added: [],
         removed: [],
         ...(scenario === "unexpected-prev-value" ? { prevValue: "unrelated-parent" } : {})
