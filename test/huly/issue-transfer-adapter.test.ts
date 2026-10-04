@@ -23,7 +23,7 @@ const adapterFixture = () => {
     createdOn: 1
   }
   const docs: Array<Record<string, unknown>> = [history]
-  const state = { refused: false, incomplete: false, failRead: false, invalidMetadata: false }
+  const state = { refused: false, incomplete: false, failRead: false, failNestedRead: false, invalidMetadata: false }
   const updates: Array<ReadonlyArray<unknown>> = []
   const conditions: Array<unknown> = []
   const scopes: Array<string | undefined> = []
@@ -50,7 +50,8 @@ const adapterFixture = () => {
       findDomain: (cls: unknown) => (cls === "unpersisted" ? undefined : "test")
     }),
     findAll: async (cls: unknown, query: Record<string, unknown>) => {
-      if (state.failRead) throw new Error("Unavailable read")
+      if (state.failRead || (state.failNestedRead && query.attachedTo === history._id))
+        throw new Error("Unavailable read")
       const result = findResult(
         docs
           .filter((doc) => doc._class === cls && doc.attachedTo === query.attachedTo)
@@ -148,7 +149,7 @@ it.effect("discovers unsupported attachments and nested history records; states 
   })
 )
 
-for (const mode of ["failRead", "invalidMetadata"] as const) {
+for (const mode of ["failRead", "failNestedRead", "invalidMetadata"] as const) {
   it.effect(`returns typed inspection failure for ${mode}`, () =>
     Effect.gen(function* () {
       const f = adapterFixture()
