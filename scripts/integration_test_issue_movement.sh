@@ -30,7 +30,10 @@ snapshot() {
   pnpm exec tsx scripts/integration-issue-movement-state.ts "$(jq -nc --arg project "$PROJECT" --argjson issues "$ids" '{project:$project,issues:$issues}')"
 }
 assert_result() {
-  jq -e --arg outcome "$2" '.outcome == $outcome' >/dev/null <<<"$1"
+  if ! jq -e --arg outcome "$2" '.outcome == $outcome' >/dev/null <<<"$1"; then
+    jq -c --arg expected "$2" '{expected:$expected,outcome,changed,reason,discovery,verificationStatus:.verification.status,verificationConsistency:.verification.consistency}' <<<"$1" >&2
+    return 1
+  fi
 }
 # Discovery proves the published destination contract, including invalid empty shapes.
 DISCOVERY=$(printf '%s\n%s\n' "$INIT" '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":2}' | timeout 30 env MCP_AUTO_EXIT=true HULY_TOOL_MODE=native node dist/index.cjs 2>/dev/null | jq -c 'select(.id == 2)')
