@@ -79,25 +79,11 @@ export const verifyTransferTree = Effect.fn("transfer.verifyTree")(function* (
       client.findOne<Issue>(tracker.class.Issue, hulyQuery<Issue>({ _id: toRef<Issue>(issueId) }))
     )
     if (read._tag === "Failure")
-      return {
-        status: "observed",
-        completeness: "incomplete",
-        consistency: "undetermined",
-        reason: `Current task ${issueId} could not be read.`,
-        tasks: observed.map(observedTask),
-        records: []
-      }
+      return partialObservation(observed, write, `Current task ${issueId} could not be read.`)
     if (read.success === undefined) continue
     const parsed = parseObservedIssue(read.success)
     if (parsed._tag === "None")
-      return {
-        status: "observed",
-        completeness: "incomplete",
-        consistency: "undetermined",
-        reason: `Current payload of ${issueId} could not be parsed.`,
-        tasks: observed.map(observedTask),
-        records: []
-      }
+      return partialObservation(observed, write, `Current payload of ${issueId} could not be parsed.`)
     observed.push(parsed.value)
   }
   const knownTaskProblem = taskProblem(observed, write)
@@ -136,16 +122,37 @@ export const verifyTransferTree = Effect.fn("transfer.verifyTree")(function* (
       }
 })
 
+const partialObservation = (
+  observed: ReadonlyArray<ObservedIssue>,
+  write: TransferTreeWrite,
+  limitation: string
+): Observation => {
+  const problem = observedTaskProblem(observed, write)
+  return {
+    status: "observed",
+    completeness: "incomplete",
+    consistency: problem === undefined ? "undetermined" : "inconsistent",
+    reason: problem === undefined ? limitation : `${problem} ${limitation}`,
+    tasks: observed.map(observedTask),
+    records: []
+  }
+}
 const taskProblem = (observed: ReadonlyArray<ObservedIssue>, write: TransferTreeWrite): string | undefined => {
-  for (const task of write.tasks) {
-    const current = observed.find((issue) => issue.hierarchy._id === task.issueId)
-    if (current === undefined) return `Inspected task ${task.issueId} is absent.`
+  const absent = write.tasks.find((task) => !observed.some((issue) => issue.hierarchy._id === task.issueId))
+  return absent === undefined ? observedTaskProblem(observed, write) : `Inspected task ${absent.issueId} is absent.`
+}
+const observedTaskProblem = (observed: ReadonlyArray<ObservedIssue>, write: TransferTreeWrite): string | undefined => {
+  for (const current of observed) {
+    const task = write.tasks.find((task) => task.issueId === current.hierarchy._id)
+    if (task === undefined) continue
     if (!destinationMatches(current.hierarchy, task))
       return `Task ${task.issueId} differs from its planned destination or ancestry.`
-    const protectedIssue = current.protectedIssue
     const expected = { ...task.expectedIssue, number: task.number, rank: task.rank }
     for (const change of task.attributeChanges ?? []) expected[change.field] = change.to
-    if (!isDeepStrictEqual(expected, protectedIssue) || current.hierarchy.title !== task.expectedHierarchy.title)
+    if (
+      !isDeepStrictEqual(expected, current.protectedIssue) ||
+      current.hierarchy.title !== task.expectedHierarchy.title
+    )
       return `Protected payload of ${task.issueId} differs from approved final values.`
   }
   return undefined

@@ -1,3 +1,4 @@
+import { HulyAuthError } from "../../../src/huly/errors-base.js"
 import { it } from "@effect/vitest"
 import { Effect, Fiber, Schema } from "effect"
 import { TestClock } from "effect/testing"
@@ -333,6 +334,56 @@ describe("public movement uncertainty and concurrent state", () => {
       expect(f.state.sent).toBe(1)
     })
   )
+
+  for (const failure of ["read-outage", "malformed", "missing"]) {
+    it.effect(`a parsed task contradiction survives a later ${failure} without inventing unread state`, () =>
+      Effect.gen(function* () {
+        const f = transferTreeFixture()
+        const commit = assertExists(f.operations.commitTransferTree)
+        const findOne = assertExists(f.operations.findOne)
+        const result = yield* run(f, {
+          ...f.operations,
+          commitTransferTree: (write) =>
+            commit(write).pipe(
+              Effect.tap(() =>
+                Effect.sync(() => {
+                  f.root.title = "Concurrent root edit"
+                })
+              )
+            ),
+          findOne: (cls, query, options) =>
+            findOne(cls, query, options).pipe(
+              Effect.flatMap((row) => {
+                if (f.state.sent > 0 && String(query._id) === String(f.child._id)) {
+                  if (failure === "read-outage")
+                    return Effect.fail(new HulyAuthError({ message: "Later task read unavailable" }))
+                  if (failure === "missing") return Effect.succeed(undefined)
+                  if (row !== undefined) Reflect.set(row, "description", 123)
+                }
+                return Effect.succeed(row)
+              })
+            )
+        })
+        expect(result.outcome).toBe("incomplete")
+        expect(result).toHaveProperty("verification.consistency", "inconsistent")
+        expect(result).toHaveProperty(
+          "verification.tasks",
+          expect.arrayContaining([expect.objectContaining({ issueId: f.root._id, projectId: f.destination._id })])
+        )
+        if (failure !== "missing") {
+          expect(result).toHaveProperty("verification.completeness", "incomplete")
+          expect(result).toHaveProperty(
+            "verification.tasks",
+            expect.not.arrayContaining([expect.objectContaining({ issueId: f.child._id })])
+          )
+          expect(result).toHaveProperty("verification.reason", expect.stringContaining("could not"))
+        }
+        expect(f.root.title).toBe("Concurrent root edit")
+        expect(f.state.sent).toBe(1)
+        expect(f.state.allocated).toBe(3)
+      })
+    )
+  }
 
   it.effect("a subsequent user edit survives verification failure without rollback or new reservations", () =>
     Effect.gen(function* () {
