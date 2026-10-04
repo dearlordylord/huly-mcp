@@ -119,6 +119,7 @@ const main = async () => {
   controls.on("line", (line) => {
     const command = Schema.decodeUnknownSync(Schema.fromJsonString(GatewayControl))(line)
     barrier.control(command)
+    if (command.command === "arm") emit({ event: "armed", point: command.point, action: command.action })
     if (command.command === "close") { controls.close(); server.closeAllConnections(); server.close() }
   })
   controls.on("close", () => { barrier.control({ command: "close" }); server.closeAllConnections(); server.close() })

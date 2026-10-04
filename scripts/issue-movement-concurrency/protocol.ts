@@ -16,6 +16,7 @@ export type GatewayControl = Schema.Schema.Type<typeof GatewayControl>
 export const GatewayArguments = Schema.Struct({ upstream: UrlString })
 export const GatewayEvent = Schema.Union([
   Schema.Struct({ event: Schema.Literal("ready"), url: UrlString }),
+  Schema.Struct({ event: Schema.Literal("armed"), point: GatewayPoint, action: GatewayAction }),
   Schema.Struct({ event: Schema.Literal("barrier"), point: GatewayPoint, action: GatewayAction }),
   Schema.Struct({ event: Schema.Literal("forwarded"), point: GatewayPoint, status: PositiveInteger, attempt: PositiveInteger }),
   Schema.Struct({ event: Schema.Literal("retry-suppressed"), point: GatewayPoint, attempt: PositiveInteger }),
