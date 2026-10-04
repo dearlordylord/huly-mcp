@@ -26,6 +26,14 @@ move() {
     else "${CLI[@]}" issues move "$issue" --destination "$destination" --json; fi
   fi
 }
+assert_document_unchanged() {
+  local current
+  current=$(mcp get_document "$(jq -nc --arg teamspace "$TEAMSPACE" --arg document "$DOCUMENT" '{teamspace:$teamspace,document:$document}')")
+  if [[ "$(jq -Sc . <<<"$DOC_BEFORE")" != "$(jq -Sc . <<<"$current")" ]]; then
+    jq -nc --argjson before "$DOC_BEFORE" --argjson after "$current" '{expected:"independent-document-unchanged",changedKeys:((($before|keys)+($after|keys)|unique)|map(. as $key|select($before[$key]!=$after[$key])))}' >&2
+    exit 1
+  fi
+}
 cleanup() {
   local original_status=$? cleanup_status=0
   if ! node scripts/run-bundled.mjs scripts/integration-issue-transfer-records.ts "$(jq -nc --argjson ids "$FIXTURE_RECORD_IDS" '{mode:"cleanup",recordIds:$ids}')"; then
@@ -55,7 +63,6 @@ done
 TEAMSPACE=$(mcp create_teamspace '{"name":"Independent tree reference fixture"}' | jq -r .id)
 DOC=$(mcp create_document "$(jq -nc --arg teamspace "$TEAMSPACE" '{teamspace:$teamspace,title:"Independent tree document",content:"Retain my location and content."}')")
 DOCUMENT=$(jq -r .id <<<"$DOC"); DOC_URL=$(jq -r .url <<<"$DOC")
-DOC_BEFORE=$(mcp get_document "$(jq -nc --arg teamspace "$TEAMSPACE" --arg document "$DOCUMENT" '{teamspace:$teamspace,document:$document}')")
 SC=$(mcp create_component "$(jq -nc --arg project "$SOURCE" '{project:$project,label:"Source tree attribute"}')" | jq -r .id)
 TC=$(mcp create_component "$(jq -nc --arg project "$TARGET" '{project:$project,label:"Explicit child replacement"}')" | jq -r .id)
 SM=$(mcp create_milestone "$(jq -nc --arg project "$SOURCE" '{project:$project,label:"Exact tree milestone",targetDate:1893456000000}')" | jq -r .id)
@@ -93,6 +100,7 @@ for TRANSPORT in mcp cli; do
   IDS=$(jq -nc --arg root "$ROOT" --arg child "$CHILD" --arg grandchild "$GRANDCHILD" --arg op "$OLD_PARENT" --arg oa "$OLD_ANCESTOR" --arg np "$NEW_PARENT" --arg na "$NEW_ANCESTOR" '[$root,$child,$grandchild,$op,$oa,$np,$na]')
   STATE=$(jq -nc --argjson issues "$IDS" --arg source "$SOURCE" --arg target "$TARGET" '{issues:$issues,projects:[$source,$target]}')
   BEFORE=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$STATE")
+  DOC_BEFORE=$(mcp get_document "$(jq -nc --arg teamspace "$TEAMSPACE" --arg document "$DOCUMENT" '{teamspace:$teamspace,document:$document}')")
   BLOCKED=$(move "$CALL")
   jq -e --arg root "$ROOT" --arg child "$CHILD" '.outcome=="blocked" and .changed==false and .discovery=="complete" and ([.conflicts[]|select(.code=="attribute")|.issueId]|sort)==([$root,$child]|sort)' >/dev/null <<<"$BLOCKED"
   [[ "$(jq -Sc . <<<"$BEFORE")" == "$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$STATE" | jq -Sc .)" ]]
@@ -105,12 +113,14 @@ for TRANSPORT in mcp cli; do
   BEFORE=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$STATE")
   COMPLETED=$(move "$FINAL")
   jq -e --arg root "$ROOT" --arg child "$CHILD" --arg grandchild "$GRANDCHILD" --arg added "$ADDED" --arg milestone "$TM" '.outcome=="completed" and (.tasks|length)==4 and ([.tasks[].issueId]|sort)==([$root,$child,$grandchild,$added]|sort) and ([.tasks[].identifier]|unique|length)==4 and any(.attributeChanges[];.issueId==$root and .to==null and .reason=="explicit-clear") and any(.attributeChanges[];.issueId==$grandchild and .to==$milestone and .reason=="exact-name")' >/dev/null <<<"$COMPLETED"
+  assert_document_unchanged
   AFTER_ARGS=$(jq -nc --argjson args "$STATE" --argjson before "$BEFORE" --arg destination "$TARGET" '$args + {migrationEvidence:{destinationSpace:($before.projects[]|select(.identifier==$destination)|._id),beforeRecordIds:[$before.issues[].owned.records[]._id]}}')
   AFTER=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$AFTER_ARGS")
   jq -L scripts -e --argjson before "$BEFORE" --argjson moved "$COMPLETED" 'include "issue-transfer-record-preservation"; .migrationTransactions as $transactions | all($moved.tasks[]; . as $task | ($before.issues[]|select(.issue._id==$task.issueId)) as $old | (.issues[]|select(.issue._id==$task.issueId)) as $new | $new.issue.identifier==$task.identifier and $new.issue.attachedTo==($task.parentId // "tracker:ids:NoParent") and ($new.issue|del(.space,.identifier,.number,.rank,.attachedTo,.parents,.modifiedOn,.component,.milestone))==($old.issue|del(.space,.identifier,.number,.rank,.attachedTo,.parents,.modifiedOn,.component,.milestone)) and all($old.owned.records[]; . as $record | any($new.owned.records[]; ._id==$record._id and preserved_record($record; .; $transactions) and .space==$new.issue.space)))' >/dev/null <<<"$AFTER"
   jq -e --arg op "$OLD_PARENT" --arg oa "$OLD_ANCESTOR" --arg np "$NEW_PARENT" --arg na "$NEW_ANCESTOR" --arg root "$ROOT" --arg child "$CHILD" --arg gc "$GRANDCHILD" --arg added "$ADDED" 'all(.issues[]|select(.issue._id==$op or .issue._id==$oa); .issue.subIssues==(if .issue._id==$op then 0 else 1 end) and (.issue.childInfo|all(.childId!=$root and .childId!=$child and .childId!=$gc and .childId!=$added))) and all(.issues[]|select(.issue._id==$np or .issue._id==$na); (.issue.childInfo|map(.childId)|contains([$root,$child,$gc,$added])))' >/dev/null <<<"$AFTER"
   NOOP=$(jq -c 'del(.resolutions)' <<<"$FINAL")
   jq -e '.outcome=="no-op" and .changed==false and (.tasks|length)==4' >/dev/null <<<"$(move "$NOOP")"
+  assert_document_unchanged
   echo "PASS: $TRANSPORT complete four-task tree, new-child scoped consent, nested data, history, references, mappings and ancestor aggregates"
 done
-[[ "$(jq -Sc . <<<"$DOC_BEFORE")" == "$(mcp get_document "$(jq -nc --arg teamspace "$TEAMSPACE" --arg document "$DOCUMENT" '{teamspace:$teamspace,document:$document}')" | jq -Sc .)" ]]
+assert_document_unchanged

@@ -20,6 +20,14 @@ mcp() {
   jq -e '.result.isError != true and .error == null' >/dev/null <<<"$response"
   jq -r '.result.content[0].text' <<<"$response"
 }
+assert_document_unchanged() {
+  local current
+  current=$(mcp get_document "$(jq -nc --arg teamspace "$TEAMSPACE" --arg document "$DOCUMENT" '{teamspace:$teamspace,document:$document}')")
+  if [[ "$(jq -Sc . <<<"$DOC_BEFORE")" != "$(jq -Sc . <<<"$current")" ]]; then
+    jq -nc --argjson before "$DOC_BEFORE" --argjson after "$current" '{expected:"independent-document-unchanged",changedKeys:((($before|keys)+($after|keys)|unique)|map(. as $key|select($before[$key]!=$after[$key])))}' >&2
+    exit 1
+  fi
+}
 cleanup() {
   local original_status=$? cleanup_status=0
   if ! node scripts/run-bundled.mjs scripts/integration-issue-transfer-records.ts "$(jq -nc --argjson ids "$FIXTURE_RECORD_IDS" '{mode:"cleanup",recordIds:$ids}')"; then
@@ -49,7 +57,6 @@ TEAMSPACE=$(mcp create_teamspace '{"name":"Disposable leaf transfer references"}
 DOC_RESULT=$(mcp create_document "$(jq -nc --arg teamspace "$TEAMSPACE" '{teamspace:$teamspace,title:"Independent transfer reference",content:"This document must stay independent."}')")
 DOCUMENT=$(jq -r .id <<<"$DOC_RESULT")
 DOC_URL=$(jq -r .url <<<"$DOC_RESULT")
-DOC_BEFORE=$(mcp get_document "$(jq -nc --arg teamspace "$TEAMSPACE" --arg document "$DOCUMENT" '{teamspace:$teamspace,document:$document}')")
 create() {
   local project="$1" parent="$2" result
   result=$(mcp create_issue "$(jq -nc --arg project "$project" --arg parent "$parent" --arg url "$DOC_URL" '{project:$project,title:"Leaf transfer fixture",description:("Independent [document](" + $url + ")"),estimation:2} + (if $parent == "" then {} else {parentIssue:$parent} end)')")
@@ -84,6 +91,7 @@ for transport in mcp cli; do
   # A restricted destination refuses before all movement effects, including allocation.
   node scripts/run-bundled.mjs scripts/integration-issue-transfer-permissions.ts "$(jq -nc --arg project "$DESTINATION" '{project:$project,restricted:true}')" >/dev/null
   PERMISSION_BEFORE=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$ARGS")
+  DOC_BEFORE=$(mcp get_document "$(jq -nc --arg teamspace "$TEAMSPACE" --arg document "$DOCUMENT" '{teamspace:$teamspace,document:$document}')")
   PERMISSION_DEST=$(jq -nc --arg project "$DESTINATION" --arg parent "$PARENT_ID" '{project:$project,parent:$parent}')
   if [[ "$transport" == mcp ]]; then PERMISSION_RESULT=$(mcp move_issue "$(jq -nc --arg issue "$ROOT_ID" --argjson destination "$PERMISSION_DEST" '{issue:$issue,destination:$destination}')"); else PERMISSION_RESULT=$("${CLI[@]}" issues move "$ROOT_ID" --destination "$PERMISSION_DEST" --json); fi
   jq -e '.outcome == "blocked" and .changed == false and (.reason | contains("Restricted project permissions"))' >/dev/null <<<"$PERMISSION_RESULT"
@@ -97,6 +105,7 @@ for transport in mcp cli; do
     jq -c '{expected:"completed",outcome,changed,reason,discovery,verificationStatus:.verification.status,verificationConsistency:.verification.consistency}' <<<"$RESULT" >&2
     exit 1
   fi
+  assert_document_unchanged
   AFTER_ARGS=$(jq -nc --argjson args "$ARGS" --argjson before "$BEFORE" --arg destination "$DESTINATION" '$args + {migrationEvidence:{destinationSpace:($before.projects[]|select(.identifier==$destination)|._id),beforeRecordIds:[$before.issues[].owned.records[]._id]}}')
   AFTER=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$AFTER_ARGS")
   jq -L scripts -e --argjson before "$BEFORE" --arg root "$ROOT_ID" --arg parent "$PARENT_ID" '
@@ -155,6 +164,7 @@ for transport in mcp cli; do
   BLOCKED=$(mcp move_issue "$(jq -nc --arg issue "$REFUSED_ID" --arg project "$DESTINATION" '{issue:$issue,destination:{project:$project}}')")
   jq -e '.outcome == "blocked" and .changed == false and (.reason | contains("Unsupported owned record"))' >/dev/null <<<"$BLOCKED"
   [[ "$(jq -Sc . <<<"$REFUSED_BEFORE")" == "$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$REFUSED_ARGS" | jq -Sc .)" ]]
+  assert_document_unchanged
   echo "PASS: $transport rich leaf, nested files, labels/time, immutable history, independent/dangling references, aggregates, no-op and unknown-class refusal"
 done
-[[ "$(jq -Sc . <<<"$DOC_BEFORE")" == "$(mcp get_document "$(jq -nc --arg teamspace "$TEAMSPACE" --arg document "$DOCUMENT" '{teamspace:$teamspace,document:$document}')" | jq -Sc .)" ]]
+assert_document_unchanged
