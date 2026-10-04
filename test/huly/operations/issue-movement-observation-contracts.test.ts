@@ -2,6 +2,10 @@ import { it } from "@effect/vitest"
 import { Effect, Fiber, Schema } from "effect"
 import { TestClock } from "effect/testing"
 import { expect } from "vitest"
+import { MovementIssueSchema, MovementProjectSchema } from "../../../src/domain/schemas/issue-movement-state.js"
+import type { TransferTreeWrite } from "../../../src/domain/schemas/issue-transfer-tree.js"
+import { inspectTransferPlan } from "../../../src/huly/operations/issue-transfer-preflight.js"
+import { verifyTransferTree } from "../../../src/huly/operations/issue-transfer-tree-verification.js"
 import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"
 import { MoveIssueResultSchema } from "../../../src/domain/schemas/issues-results.js"
 import { TransferInspectionSchema } from "../../../src/domain/schemas/issue-transfer.js"
@@ -13,6 +17,8 @@ import { moveIssue } from "../../../src/huly/operations/issue-movement.js"
 import { assertExists } from "../../../src/utils/assertions.js"
 import { transferTreeFixture } from "../../helpers/transfer-tree.js"
 
+const parseIssue = (input: unknown) => Schema.decodeUnknownSync(MovementIssueSchema)(input)
+const parseProject = (input: unknown) => Schema.decodeUnknownSync(MovementProjectSchema)(input)
 const parseInspection = (input: unknown) => Schema.decodeUnknownSync(TransferInspectionSchema)(input)
 const parseResult = (input: unknown) => Schema.decodeUnknownSync(MoveIssueResultSchema)(input)
 const run = Effect.fn("test.observationContracts")(function* (
@@ -257,6 +263,48 @@ for (const change of ["payload-unavailable", "wrong-project", "wrong-owner"]) {
         }
       })
       expect(result).toHaveProperty("verification.reason", expect.stringContaining("Protected payload"))
+      expect(f.state.sent).toBe(1)
+      expect(f.state.allocated).toBe(3)
+    })
+  )
+}
+
+for (const capability of ["available", "unavailable"]) {
+  it.effect(`read-only tree verification with ${capability} record inspection needs no progress publisher`, () =>
+    Effect.gen(function* () {
+      const f = transferTreeFixture()
+      const client = yield* HulyClient.pipe(Effect.provide(f.layer))
+      const destination = parseProject(f.destination)
+      const prepared = yield* inspectTransferPlan(
+        client,
+        parseIssue(f.root),
+        parseIssue(f.parent),
+        parseProject(f.source),
+        destination,
+        yield* parseMoveIssueParams(f.input)
+      )
+      if ("conflicts" in prepared) throw new Error("Expected admitted fixture")
+      const writes: Array<TransferTreeWrite> = []
+      const commit = assertExists(f.operations.commitTransferTree)
+      expect(
+        (yield* run(f, {
+          ...f.operations,
+          commitTransferTree: (write) =>
+            Effect.sync(() => {
+              writes.push(write)
+            }).pipe(Effect.andThen(commit(write)))
+        })).outcome
+      ).toBe("completed")
+      const { inspectTransferRecords: _inspect, ...withoutInspection } = f.operations
+      const reader = yield* HulyClient.pipe(
+        Effect.provide(HulyClient.testLayer(capability === "available" ? f.operations : withoutInspection))
+      )
+      const verification = yield* verifyTransferTree(reader, prepared, destination, assertExists(writes[0]))
+      expect(verification).toMatchObject({
+        status: "observed",
+        completeness: capability === "available" ? "complete" : "incomplete",
+        consistency: capability === "available" ? "consistent" : "undetermined"
+      })
       expect(f.state.sent).toBe(1)
       expect(f.state.allocated).toBe(3)
     })
