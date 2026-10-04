@@ -153,6 +153,7 @@ export const recordAdapterFixture = (
         return edges
       },
       isDerived,
+      isMixin: () => false,
       getDescendants: () => classes,
       findDomain: (cls: string) => (cls === "unpersisted" ? undefined : "test")
     }),
