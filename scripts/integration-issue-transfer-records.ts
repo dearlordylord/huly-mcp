@@ -1,6 +1,6 @@
 // Fixture setup only. Root runs this after the complete 306–311 candidate is integrated.
 import type { Employee, SocialIdentity } from "@hcengineering/contact"
-import { ToDoPriority } from "@hcengineering/time"
+import { ToDoPriority, type ToDo } from "@hcengineering/time"
 import type { ActivityReference } from "@hcengineering/activity"
 import type { Doc } from "@hcengineering/core"
 import type { Document } from "@hcengineering/document"
@@ -37,19 +37,23 @@ const main = async () => {
           hulyQuery<SocialIdentity>({ _id: toSocialIdentityRef(client.user) })
         )
       )
-      const id = await client.createDoc(time.class.ToDo, toRef(issue.space), {
-        attachedTo: toRef<Doc>(issue._id),
-        attachedToClass: tracker.class.Issue,
-        collection: "todos",
-        title: "Unsupported transfer ownership fixture",
-        doneOn: null,
-        description: "",
-        user: toRef<Employee>(identity.attachedTo),
-        visibility: "public",
-        workslots: 0,
-        priority: ToDoPriority.NoPriority,
-        rank: "0|hzzzzz:"
-      })
+      const id = await client.addCollection<Issue, ToDo>(
+        time.class.ToDo,
+        toRef(issue.space),
+        toRef<Issue>(issue._id),
+        tracker.class.Issue,
+        "todos",
+        {
+          title: "Unsupported transfer ownership fixture",
+          doneOn: null,
+          description: "",
+          user: toRef<Employee>(identity.attachedTo),
+          visibility: "public",
+          workslots: 0,
+          priority: ToDoPriority.NoPriority,
+          rank: "0|hzzzzz:"
+        }
+      )
       process.stdout.write(`${JSON.stringify(parseResult({ recordIds: [id] }))}\n`)
       return
     }
@@ -61,27 +65,35 @@ const main = async () => {
     )
     const recordIds: Array<string> = []
     for (const target of [independent, { ...independent, _id: DocId.make(`${args.issue}-dangling-target`) }]) {
-      // createDoc preserves dangling target fixtures without SDK addCollection's read-after-write resolution.
+      // TxOperations.addCollection sends the collection transaction without resolving its parent.
       recordIds.push(
-        await client.createDoc<ActivityReference>(activity.class.ActivityReference, toRef(issue.space), {
-          attachedTo: toRef<Doc>(target._id),
-          attachedToClass: toClassRef<Doc>(target._class),
-          collection: "references",
-          srcDocId: toRef<Doc>(issue._id),
-          srcDocClass: tracker.class.Issue,
-          message: "Independent reference payload remains unchanged"
-        })
+        await client.addCollection<Doc, ActivityReference>(
+          activity.class.ActivityReference,
+          toRef(issue.space),
+          toRef<Doc>(target._id),
+          toClassRef<Doc>(target._class),
+          "references",
+          {
+            srcDocId: toRef<Doc>(issue._id),
+            srcDocClass: tracker.class.Issue,
+            message: "Independent reference payload remains unchanged"
+          }
+        )
       )
     }
     recordIds.push(
-      await client.createDoc<ActivityReference>(activity.class.ActivityReference, toRef(independent.space), {
-        attachedTo: toRef<Doc>(issue._id),
-        attachedToClass: tracker.class.Issue,
-        collection: "references",
-        srcDocId: toRef<Doc>(independent._id),
-        srcDocClass: toClassRef<Doc>(independent._class),
-        message: "Incoming independent reference stays in its original space"
-      })
+      await client.addCollection<Issue, ActivityReference>(
+        activity.class.ActivityReference,
+        toRef(independent.space),
+        toRef<Issue>(issue._id),
+        tracker.class.Issue,
+        "references",
+        {
+          srcDocId: toRef<Doc>(independent._id),
+          srcDocClass: toClassRef<Doc>(independent._class),
+          message: "Incoming independent reference stays in its original space"
+        }
+      )
     )
     process.stdout.write(`${JSON.stringify(parseResult({ recordIds }))}\n`)
   } finally {
