@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
-import { readFileSync, mkdtempSync, mkdirSync, statSync, rmSync, symlinkSync } from "node:fs"
+import { readFileSync, mkdtempSync, mkdirSync, chmodSync, statSync, rmSync, symlinkSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { test } from "node:test"
@@ -90,6 +90,7 @@ test("rejects public or symlink evidence directories and preserves default behav
   try {
     const publicDirectory = join(directory, "public")
     mkdirSync(publicDirectory, { mode: 0o755 })
+    chmodSync(publicDirectory, 0o755)
     assert.equal(retain(publicDirectory, "SECRET_MARKER").status, 1)
     const link = join(directory, "link")
     symlinkSync(directory, link)
