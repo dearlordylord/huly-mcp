@@ -141,3 +141,66 @@ it.effect("a same-project batch rejected before send remains unchanged without r
     expect(f.state.sent).toBe(0)
   })
 )
+
+it.effect("duplicate record ownership across task closures refuses before allocation", () =>
+  Effect.gen(function* () {
+    const f = transferTreeFixture()
+    const inspect = assertExists(f.operations.inspectTransferRecords)
+    const record = assertExists(f.records[0])
+    const result = yield* run(f, {
+      ...f.operations,
+      inspectTransferRecords: (id, tree) =>
+        inspect(id, tree).pipe(
+          Effect.map((inspection) =>
+            id === f.child._id
+              ? parseInspection({ ...inspection, records: [{ ...record, attachedTo: f.child._id }] })
+              : inspection
+          )
+        )
+    })
+    expect(result).toMatchObject({ outcome: "blocked", changed: false })
+    expect(result).toHaveProperty("reason", expect.stringContaining("record"))
+    expect(f.state.allocated).toBe(0)
+    expect(f.state.sent).toBe(0)
+  })
+)
+
+it.effect("record discovery outage during initial preflight cannot admit a partial plan", () =>
+  Effect.gen(function* () {
+    const f = transferTreeFixture()
+    const inspect = assertExists(f.operations.inspectTransferRecords)
+    const result = yield* run(f, {
+      ...f.operations,
+      inspectTransferRecords: (id, tree) =>
+        id === f.child._id
+          ? Effect.fail(new HulyAuthError({ message: "Child ownership inventory unavailable" }))
+          : inspect(id, tree)
+    })
+    expect(result).toMatchObject({ outcome: "blocked", changed: false })
+    expect(f.state.allocated).toBe(0)
+    expect(f.state.sent).toBe(0)
+  })
+)
+
+it.effect("post-allocation project inventory outage retains confirmed reservations without sending the batch", () =>
+  Effect.gen(function* () {
+    const f = transferTreeFixture()
+    const findAll = assertExists(f.operations.findAll)
+    const result = yield* run(f, {
+      ...f.operations,
+      findAll: (cls, query, options) =>
+        f.state.allocated > 0 && query.space !== undefined
+          ? Effect.fail(new HulyAuthError({ message: "Project inventory unavailable after reservation" }))
+          : findAll(cls, query, options)
+    })
+    expect(result).toMatchObject({
+      outcome: "indeterminate",
+      execution: {
+        commit: "not-sent",
+        reservations: expect.arrayContaining([{ status: "confirmed", issueId: f.root._id }])
+      }
+    })
+    expect(f.state.allocated).toBe(3)
+    expect(f.state.sent).toBe(0)
+  })
+)
