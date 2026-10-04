@@ -24,7 +24,7 @@ it.effect("a batch with no selected root refuses without queuing any document up
     const adapter = recordAdapterFixture(true)
     const result = yield* Effect.promise(() =>
       commitTransferTree(adapter.client, { ...write, rootId: IssueId.make("missing-root") })
-    )
+    ).pipe(Effect.flatMap(Effect.fromResult))
     expect(result).toBe("condition-not-met")
     expect(adapter.updates).toEqual([])
     expect(adapter.conditions).toEqual([])
@@ -55,7 +55,9 @@ it.effect("guards absent and already-valid destination references independently 
       { _id: "valid-component", _class: tracker.class.Component, space: destination._id },
       { _id: "valid-milestone", _class: tracker.class.Milestone, space: destination._id }
     )
-    expect(yield* Effect.promise(() => commitTransferTree(adapter.client, write))).toBe("applied")
+    expect(
+      yield* Effect.promise(() => commitTransferTree(adapter.client, write)).pipe(Effect.flatMap(Effect.fromResult))
+    ).toBe("applied")
     expect(adapter.conditions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ _id: f.root._id, component: { $exists: false }, milestone: { $exists: false } }),
@@ -65,6 +67,8 @@ it.effect("guards absent and already-valid destination references independently 
     )
     const root = adapter.docs.find((doc) => doc._id === f.root._id)
     if (root !== undefined) root.component = null
-    expect(yield* Effect.promise(() => commitTransferTree(adapter.client, write))).toBe("condition-not-met")
+    expect(
+      yield* Effect.promise(() => commitTransferTree(adapter.client, write)).pipe(Effect.flatMap(Effect.fromResult))
+    ).toBe("condition-not-met")
   })
 )
