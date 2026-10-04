@@ -1,9 +1,10 @@
 import { Schema } from "effect"
-import { DocId, ObjectClassName, ProjectIdentifier } from "../src/domain/schemas/shared.js"
+import { DocId, ObjectClassName } from "../src/domain/schemas/shared.js"
 
 export const TreeCleanupInput = Schema.Struct({
   issueIds: Schema.Array(DocId),
-  projects: Schema.Array(ProjectIdentifier),
+  projectIds: Schema.Array(DocId),
+  unresolvedCreation: Schema.Boolean,
   documentIds: Schema.Array(DocId),
   teamspaceIds: Schema.Array(DocId),
   recordIds: Schema.Array(DocId)
@@ -18,7 +19,11 @@ export const CleanupLocation = Schema.Struct({
   collection: Schema.optionalKey(Schema.String)
 })
 export type CleanupLocation = Schema.Schema.Type<typeof CleanupLocation>
-export const CleanupRows = Schema.Struct({ rows: Schema.Array(CleanupLocation), total: Schema.Int })
+export const CleanupRows = Schema.Union([
+  Schema.Struct({ status: Schema.Literal("observed"), rows: Schema.Array(CleanupLocation), total: Schema.Int }),
+  Schema.Struct({ status: Schema.Literal("unavailable") })
+])
+export const CleanupRemoval = Schema.Struct({ status: Schema.Literals(["acknowledged", "unavailable"]) })
 export const CleanupKind = Schema.Literals([
   "issue",
   "component",
@@ -33,19 +38,32 @@ export type CleanupKind = Schema.Schema.Type<typeof CleanupKind>
 export const CleanupReceipt = Schema.Struct({
   kind: CleanupKind,
   acknowledged: Schema.Int,
-  absenceConfirmed: Schema.Boolean,
   status: Schema.Literals(["absence-confirmed", "unresolved"])
 })
 export const CleanupResult = Schema.Struct({ complete: Schema.Boolean, receipts: Schema.Array(CleanupReceipt) })
-// Internal injected operations; all SDK rows are parsed by the adapter before crossing this port.
+// Internal injected operations return schema-owned observations; expected SDK failures never reject.
 export interface TreeCleanupPorts {
-  readonly read: (
-    kind: CleanupKind,
-    input: TreeCleanupInput,
-    projectIds: ReadonlyArray<DocId>
-  ) => Promise<Schema.Schema.Type<typeof CleanupRows>>
-  readonly remove: (kind: CleanupKind, record: CleanupLocation) => Promise<void>
+  readonly read: (kind: CleanupKind, input: TreeCleanupInput) => Promise<Schema.Schema.Type<typeof CleanupRows>>
+  readonly remove: (kind: CleanupKind, record: CleanupLocation) => Promise<Schema.Schema.Type<typeof CleanupRemoval>>
 }
+export const requestedIds = (kind: CleanupKind, input: TreeCleanupInput): ReadonlyArray<DocId> => {
+  switch (kind) {
+    case "issue":
+      return input.issueIds
+    case "project":
+      return input.projectIds
+    case "document":
+      return input.documentIds
+    case "teamspace":
+      return input.teamspaceIds
+    default:
+      return input.recordIds
+  }
+}
+const inScope = (kind: CleanupKind, input: TreeCleanupInput, row: CleanupLocation) =>
+  kind === "component" || kind === "milestone"
+    ? input.projectIds.includes(row.space)
+    : requestedIds(kind, input).includes(row._id)
 const kinds: ReadonlyArray<CleanupKind> = [
   "reference",
   "todo",
@@ -56,50 +74,36 @@ const kinds: ReadonlyArray<CleanupKind> = [
   "teamspace",
   "project"
 ]
-const completeRows = (result: Schema.Schema.Type<typeof CleanupRows>) => result.total === result.rows.length
-
-const cleanupGroup = async (
+const admittedRows = (
   kind: CleanupKind,
   input: TreeCleanupInput,
-  projectIds: ReadonlyArray<DocId>,
-  ports: TreeCleanupPorts
+  observation: Schema.Schema.Type<typeof CleanupRows>
 ) => {
-  let acknowledged = 0
-  try {
-    const before = await ports.read(kind, input, projectIds)
-    if (!completeRows(before)) return { kind, acknowledged, absenceConfirmed: false, status: "unresolved" }
-    const seen = new Set<DocId>()
-    for (const record of before.rows) {
-      if (seen.has(record._id)) return { kind, acknowledged, absenceConfirmed: false, status: "unresolved" }
-      seen.add(record._id)
-      try {
-        await ports.remove(kind, record)
-        acknowledged++
-      } catch {
-        /* Final independent observation decides absence. */
-      }
-    }
-    const after = await ports.read(kind, input, projectIds)
-    const absent = completeRows(after) && after.rows.length === 0
-    return { kind, acknowledged, absenceConfirmed: absent, status: absent ? "absence-confirmed" : "unresolved" }
-  } catch {
-    return { kind, acknowledged, absenceConfirmed: false, status: "unresolved" }
-  }
+  if (observation.status === "unavailable") return undefined
+  return observation.total === observation.rows.length &&
+    observation.rows.every((row) => inScope(kind, input, row)) &&
+    new Set(observation.rows.map((row) => row._id)).size === observation.rows.length
+    ? observation.rows
+    : undefined
 }
-
+const cleanupGroup = async (kind: CleanupKind, input: TreeCleanupInput, ports: TreeCleanupPorts) => {
+  let acknowledged = 0
+  const before = await ports.read(kind, input)
+  const rows = admittedRows(kind, input, before)
+  if (rows === undefined) return { kind, acknowledged, status: "unresolved" }
+  for (const row of rows) {
+    const removal = await ports.remove(kind, row)
+    if (removal.status === "acknowledged") acknowledged++
+  }
+  const after = await ports.read(kind, input)
+  const absent = after.status === "observed" && after.total === 0 && after.rows.length === 0
+  return { kind, acknowledged, status: absent ? "absence-confirmed" : "unresolved" }
+}
 export const cleanupTree = async (input: TreeCleanupInput, ports: TreeCleanupPorts) => {
-  const projects = await ports.read("project", input, [])
-  if (!completeRows(projects) || projects.rows.length !== new Set(input.projects).size)
-    return Schema.decodeUnknownSync(CleanupResult)({ complete: false, receipts: [] })
   const receipts = []
-  for (const kind of kinds)
-    receipts.push(
-      await cleanupGroup(
-        kind,
-        input,
-        projects.rows.map((row) => row._id),
-        ports
-      )
-    )
-  return Schema.decodeUnknownSync(CleanupResult)({ complete: receipts.every((row) => row.absenceConfirmed), receipts })
+  for (const kind of kinds) receipts.push(await cleanupGroup(kind, input, ports))
+  return Schema.decodeUnknownSync(CleanupResult)({
+    complete: !input.unresolvedCreation && receipts.every((row) => row.status === "absence-confirmed"),
+    receipts
+  })
 }

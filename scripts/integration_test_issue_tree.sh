@@ -7,7 +7,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/test-telemetry-env.sh" || exit 1
 CLI=(node packages/huly-cli/dist/index.cjs)
 printf -v SOURCE 'T%04X' "$RANDOM"
 printf -v TARGET 'U%04X' "$RANDOM"
-ISSUES=(); PROJECTS=(); TEAMSPACE=''; DOCUMENT=''
+ISSUES=(); PROJECTS=(); PROJECT_IDS=(); UNRESOLVED_CREATION=false; TEAMSPACE=''; DOCUMENT=''
 tree_mcp_reply() {
   local tool="$1" response="$2" text
   if [[ -z "$response" ]]; then
@@ -78,7 +78,7 @@ assert_document_unchanged() {
 cleanup() {
   local original_status=$? cleanup_status=0
   local cleanup_input
-  cleanup_input=$(jq -nc --argjson issues "$(printf '%s\n' "${ISSUES[@]}" | jq -Rsc 'split("\n")|map(select(length>0))')" --argjson projects "$(printf '%s\n' "${PROJECTS[@]}" | jq -Rsc 'split("\n")|map(select(length>0))')" --arg document "$DOCUMENT" --arg teamspace "$TEAMSPACE" --argjson records "$FIXTURE_RECORD_IDS" '{issueIds:$issues,projects:$projects,documentIds:([$document]|map(select(length>0))),teamspaceIds:([$teamspace]|map(select(length>0))),recordIds:$records}') || cleanup_status=1
+  cleanup_input=$(jq -nc --argjson issues "$(printf '%s\n' "${ISSUES[@]}" | jq -Rsc 'split("\n")|map(select(length>0))')" --argjson projects "$(printf '%s\n' "${PROJECT_IDS[@]}" | jq -Rsc 'split("\n")|map(select(length>0))')" --arg document "$DOCUMENT" --arg teamspace "$TEAMSPACE" --argjson records "$FIXTURE_RECORD_IDS" --argjson unresolved "$UNRESOLVED_CREATION" '{mode:"cleanup",input:{issueIds:$issues,projectIds:$projects,unresolvedCreation:$unresolved,documentIds:([$document]|map(select(length>0))),teamspaceIds:([$teamspace]|map(select(length>0))),recordIds:$records}}') || cleanup_status=1
   if [[ "$cleanup_status" == 0 ]]; then
     # One finite cleanup process. Its public receipt distinguishes acknowledgement from observed absence.
     timeout --signal=KILL 120 node scripts/run-bundled.mjs scripts/integration-issue-tree-cleanup.ts "$cleanup_input" || cleanup_status=1
@@ -91,23 +91,33 @@ cleanup() {
 FIXTURE_RECORD_IDS='[]'
 trap cleanup EXIT
 for project in "$SOURCE" "$TARGET"; do
+  UNRESOLVED_CREATION=true
   mcp create_project "$(jq -nc --arg identifier "$project" '{identifier:$identifier,name:("Complete tree " + $identifier)}')" >/dev/null
   PROJECTS+=("$project")
+  UNRESOLVED_CREATION=true
+  captured_project=$(node scripts/run-bundled.mjs scripts/integration-issue-tree-cleanup.ts "$(jq -nc --arg project "$project" '{mode:"capture-project",identifier:$project,name:("Complete tree " + $project)}')" | jq -er '.projectId | select(type=="string" and length>0)')
+  PROJECT_IDS+=("$captured_project")
+  UNRESOLVED_CREATION=false
 done
-TEAMSPACE=$(mcp create_teamspace '{"name":"Independent tree reference fixture"}' | jq -r .id)
+UNRESOLVED_CREATION=true
+TEAMSPACE=$(mcp create_teamspace '{"name":"Independent tree reference fixture"}' | jq -er '.id | select(type=="string" and length>0)')
 DOC=$(mcp create_document "$(jq -nc --arg teamspace "$TEAMSPACE" '{teamspace:$teamspace,title:"Independent tree document",content:"Retain my location and content."}')")
-DOCUMENT=$(jq -r .id <<<"$DOC"); DOC_URL=$(jq -r .url <<<"$DOC")
+DOCUMENT=$(jq -er ' .id | select(type=="string" and length>0)' <<<"$DOC"); DOC_URL=$(jq -r .url <<<"$DOC")
+UNRESOLVED_CREATION=false
 SC=$(mcp create_component "$(jq -nc --arg project "$SOURCE" '{project:$project,label:"Source tree attribute"}')" | jq -r .id)
 TC=$(mcp create_component "$(jq -nc --arg project "$TARGET" '{project:$project,label:"Explicit child replacement"}')" | jq -r .id)
 SM=$(mcp create_milestone "$(jq -nc --arg project "$SOURCE" '{project:$project,label:"Exact tree milestone",targetDate:1893456000000}')" | jq -r .id)
 TM=$(mcp create_milestone "$(jq -nc --arg project "$TARGET" '{project:$project,label:"Exact tree milestone",targetDate:1893456000000}')" | jq -r .id)
 create() {
-  CREATED=$(mcp create_issue "$(jq -nc --arg project "$1" --arg parent "$2" --arg title "$3" --arg url "$DOC_URL" '{project:$project,title:$title,estimation:2,description:("Preserved independent [document](" + $url + ")")} + (if $parent=="" then {} else {parentIssue:$parent} end)')" | jq -r .issueId)
+  UNRESOLVED_CREATION=true
+  CREATED=$(mcp create_issue "$(jq -nc --arg project "$1" --arg parent "$2" --arg title "$3" --arg url "$DOC_URL" '{project:$project,title:$title,estimation:2,description:("Preserved independent [document](" + $url + ")")} + (if $parent=="" then {} else {parentIssue:$parent} end)')" | jq -er '.issueId | select(type=="string" and length>0)')
   ISSUES+=("$CREATED")
+  UNRESOLVED_CREATION=false
 }
 component() { mcp set_issue_component "$(jq -nc --arg project "$SOURCE" --arg identifier "$1" --arg component "$SC" '{project:$project,identifier:$identifier,component:$component}')" >/dev/null; }
 rich_records() {
   local issue="$1" comment space
+  UNRESOLVED_CREATION=true
   comment=$(mcp add_comment "$(jq -nc --arg project "$SOURCE" --arg issueIdentifier "$issue" '{project:$project,issueIdentifier:$issueIdentifier,body:"Each descendant retains nested supporting data"}')" | jq -r .commentId)
   space=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$(jq -nc --arg issue "$issue" --arg source "$SOURCE" --arg target "$TARGET" '{issues:[$issue],projects:[$source,$target]}')" | jq -r '.issues[0].issue.space')
   mcp add_attachment "$(jq -nc --arg objectId "$comment" --arg space "$space" '{objectId:$objectId,objectClass:"chunter:class:ChatMessage",space:$space,filename:"nested.txt",contentType:"text/plain",data:"dHJlZS1ibG9i"}')" >/dev/null
@@ -116,6 +126,7 @@ rich_records() {
   mcp log_time "$(jq -nc --arg project "$SOURCE" --arg identifier "$issue" '{project:$project,identifier:$identifier,value:1.25,description:"Per-task preserved report"}')" >/dev/null
   RECORD_RESULT=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-records.ts "$(jq -nc --arg issue "$issue" --arg document "$DOCUMENT" '{issue:$issue,document:$document,mode:"references"}')")
   FIXTURE_RECORD_IDS=$(jq -nc --argjson before "$FIXTURE_RECORD_IDS" --argjson result "$RECORD_RESULT" '$before + $result.recordIds')
+  UNRESOLVED_CREATION=false
 }
 for TRANSPORT in mcp cli; do
   create "$SOURCE" '' "Source grandparent $TRANSPORT"; OLD_ANCESTOR="$CREATED"
