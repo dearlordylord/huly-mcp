@@ -82,7 +82,7 @@ it.effect(
       })
       const fiber = yield* inspectTransferRecords(observed.client, IssueId.make("root"), limits).pipe(Effect.forkChild)
       yield* Deferred.await(started)
-      if (cls !== firstClasses[0]) expect(observed.calls).toEqual(firstClasses)
+      expect(observed.calls).toEqual(firstClasses)
       for (const cls of firstClasses.toReversed()) {
         const gate = gates.get(cls)
         const done = finished.get(cls)
@@ -90,7 +90,7 @@ it.effect(
           yield* Deferred.succeed(gate, undefined)
           yield* Deferred.await(done)
         }
-        expect(observed.calls).toEqual(firstClasses)
+        if (cls !== firstClasses[0]) expect(observed.calls).toEqual(firstClasses)
       }
       const inspection = yield* Fiber.join(fiber)
       expect(state.maximum).toBe(4)
