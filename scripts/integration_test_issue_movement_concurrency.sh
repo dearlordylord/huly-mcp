@@ -9,6 +9,7 @@ TSX=(node node_modules/tsx/dist/cli.mjs)
 printf -v SOURCE 'C%04X' "$RANDOM"
 printf -v DESTINATION 'R%04X' "$RANDOM"
 PROJECTS=()
+declare -A COMPONENTS
 INIT='{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"two-client-movement-certification","version":"1.0"}},"id":1}'
 mcp() {
   local request response
@@ -34,7 +35,7 @@ jq -nc --argjson server "$VERSION" --arg build "$HULY_SERVER_BUILD" '{server:$se
 for project in "$SOURCE" "$DESTINATION"; do
   mcp create_project "$(jq -nc --arg identifier "$project" '{identifier:$identifier,name:("Disposable movement concurrency " + $identifier)}')" >/dev/null
   PROJECTS+=("$project")
-  "${CLI[@]}" components create "$project" 'Concurrent component' --json >/dev/null
+  COMPONENTS[$project]=$("${CLI[@]}" components create "$project" 'Concurrent component' --json | jq -er .id)
 done
 create() {
   local result
@@ -87,9 +88,21 @@ for transport in mcp cli; do
       "${CLI[@]}" issues get "$SOURCE" "$NEW_CHILD" --json | jq -e --arg id "$NEW_CHILD" --arg parent "$(jq -r .mutation.after.identifier <<<"$RESULT")" '.issueId == $id and .parentIssue == $parent' >/dev/null
     elif [[ "$KIND" == ancestry ]]; then
       jq -e '.mutation.result.outcome == "completed" and .mutation.after.parentIssue != null' >/dev/null <<<"$RESULT"
+      EXPECTED_PARENT="$SOURCE_PARENT"; [[ "$EXPECTED" == destination ]] && EXPECTED_PARENT="$DESTINATION_PARENT"
+      jq -e --arg root "$ROOT_ID" --arg parent "$EXPECTED_PARENT" '.issues[] | select(.issue._id == $root) | .issue.attachedTo == $parent' >/dev/null <<<"$AFTER"
+    elif [[ "$KIND" == attribute ]]; then
+      jq -e --arg root "$ROOT_ID" --arg component "${COMPONENTS[$PROJECT]}" '.issues[] | select(.issue._id == $root) | .issue.component == $component' >/dev/null <<<"$AFTER"
     fi
     # Baseline descendant-owned IDs must survive every race and interruption.
-    jq -e --argjson before "$BEFORE" 'all($before.issues[]; . as $old | any(.issues[]; .issue._id == $old.issue._id and all($old.owned.records[]; . as $record | any(.owned.records[]; ._id == $record._id and .snapshot == $record.snapshot))))' >/dev/null <<<"$AFTER"
+    jq -e --argjson before "$BEFORE" '. as $after | all($before.issues[]; . as $old | any($after.issues[]; . as $current | .issue._id == $old.issue._id and all($old.owned.records[]; . as $record | any($current.owned.records[]; ._id == $record._id and .snapshot == $record.snapshot))))' >/dev/null <<<"$AFTER"
+    # Single-send sequence evidence is measured independently, not inferred from a gateway response.
+    EXPECTED_INCREMENT=3
+    [[ "$NAME" == before-allocation-send ]] && EXPECTED_INCREMENT=0
+    [[ "$NAME" == allocated-reply-lost ]] && EXPECTED_INCREMENT=1
+    jq -e --argjson before "$BEFORE" --arg destination "$DESTINATION" --argjson increment "$EXPECTED_INCREMENT" '(.projects[] | select(.identifier == $destination) | .sequence) == (($before.projects[] | select(.identifier == $destination) | .sequence) + $increment)' >/dev/null <<<"$AFTER"
+    if [[ "$NAME" == allocated-reply-lost || "$NAME" == successful-batch-reply-lost ]]; then
+      jq -e '.observation.result.outcome == "indeterminate" and all(.gatewayEvents[]; .event != "retry-suppressed")' >/dev/null <<<"$RESULT"
+    fi
     jq -nc --arg transport "$transport" --arg name "$NAME" --argjson result "$RESULT" '{transport:$transport,case:$name,evidence:$result}'
   done < <("${TSX[@]}" scripts/issue-movement-concurrency/matrix.ts)
 done
