@@ -2,6 +2,7 @@ import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { test, expect } from "vitest"
+import type { MovementObserverStatus } from "../../src/mcp/movement-stage-observer.js"
 import { Schema } from "effect"
 import { Milliseconds, runBoundedCommand } from "../../scripts/run-bounded-command.js"
 import {
@@ -21,6 +22,7 @@ for (const isError of [false, true]) {
       `
       const readline=require('node:readline'); const fs=require('node:fs');
       if(process.env.INTEGRATION_FIXTURE_VALUE!=='typed-private-value'||process.env.LAZY_ENVS!=='true')process.exit(1);
+      process.stderr.write('PRIVATE_RAW_DIAGNOSTIC_DO_NOT_FORWARD\\n{"observerStatus":"not-an-enum"}\\n{"observerStatus":"recorded","private":"PRIVATE_RAW_DIAGNOSTIC_DO_NOT_FORWARD"}\\n{"observerStatus":"unavailable"}\\n');
       let ended=false; process.stdin.on('end',()=>{ended=true});
       readline.createInterface({input:process.stdin}).on('line',line=>{
         const req=JSON.parse(line); if(req.id===undefined)return;
@@ -32,11 +34,13 @@ for (const isError of [false, true]) {
     `
     )
     try {
+      const observerStatuses: Array<MovementObserverStatus> = []
       const events: Array<IntegrationMcpPhase> = []
       const clock = { value: 0 }
       const reply = await integrationMcpCall(
         ["move_issue", "{}"],
         {
+          publishObserverStatus: (status) => observerStatuses.push(status),
           command: process.execPath,
           args: [server],
           environment: {
@@ -55,6 +59,8 @@ for (const isError of [false, true]) {
           }
         }
       )
+      expect(observerStatuses).toEqual([{ observerStatus: "recorded" }, { observerStatus: "unavailable" }])
+      expect(JSON.stringify(observerStatuses)).not.toContain("PRIVATE_RAW_DIAGNOSTIC_DO_NOT_FORWARD")
       expect(events.map((event) => event.phase)).toEqual([
         "connect-start",
         "connect-ready",

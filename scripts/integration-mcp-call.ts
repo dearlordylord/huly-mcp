@@ -1,3 +1,5 @@
+import { MovementObserverStatusSchema, type MovementObserverStatus } from "../src/mcp/movement-stage-observer.js"
+import { makeMovementStatusReader } from "./integration-mcp-observer-status.js"
 import { Client } from "@modelcontextprotocol/client"
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"
 import {
@@ -94,6 +96,7 @@ export interface ProcessOptions {
   readonly command: string
   readonly args: ReadonlyArray<string>
   readonly environment: NodeJS.ProcessEnv
+  readonly publishObserverStatus?: (status: MovementObserverStatus) => void
   readonly prior?: Schema.Schema.Type<typeof NativeDiscoverySchema>
 }
 const EnvelopeSchema = Schema.Struct({
@@ -116,13 +119,21 @@ export const makeIntegrationMcpSession = (options: ProcessOptions) => {
     env: Object.fromEntries(Object.entries(environment).map(([key, value]) => [key, Redacted.value(value)])),
     stderr: "pipe"
   })
-  // Never forward server diagnostics, which can contain credential-bearing integration failures.
-  transport.stderr?.on("data", () => {})
+  const publishStatus = (status: MovementObserverStatus) => {
+    if (options.publishObserverStatus !== undefined) options.publishObserverStatus(status)
+    else process.stderr.write(Schema.encodeSync(Schema.fromJsonString(MovementObserverStatusSchema))(status) + "\n")
+  }
+  const statusReader = makeMovementStatusReader(publishStatus, () => {
+    process.stderr.write(
+      Schema.encodeSync(Schema.fromJsonString(MovementObserverStatusSchema))({ observerStatus: "unavailable" }) + "\n"
+    )
+  })
+  transport.stderr?.on("data", statusReader.accept)
   const client = new Client(
     { name: "hulymcp-integration-call", version: "1.0.0" },
     { versionNegotiation: { mode: { pin: "2026-07-28" } } }
   )
-  return { client, transport }
+  return { client, transport, closeDiagnostics: statusReader.close }
 }
 export const integrationMcpCall = async (
   input: unknown,
@@ -213,7 +224,7 @@ const withNativeClient = async <A>(
         elapsedMilliseconds: IntegrationElapsedMilliseconds.make(telemetry.now() - started)
       })
     )
-  const { client, transport } = makeIntegrationMcpSession(options)
+  const { client, transport, closeDiagnostics } = makeIntegrationMcpSession(options)
   let phase: "connect" | "list" | "call" | "reply" | "close" = "connect"
   let connecting: Promise<void> | undefined
   const exchange = async () => {
@@ -249,6 +260,8 @@ const withNativeClient = async <A>(
       emit("closed")
     } catch {
       throw new IntegrationMcpCallError("close")
+    } finally {
+      closeDiagnostics()
     }
   }
   return exchange().then(

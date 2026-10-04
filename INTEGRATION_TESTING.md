@@ -661,3 +661,40 @@ qualification selection, not the movement API, coverage thresholds, permissions,
 or truthfulness requirements.
 
 Cross-project pre-send inspection consumes the remaining shared 30-second execution budget after fresh admission and sequence allocation; it does not start a separate ten-second allowance. Initial discovery and pre-allocation inspection retain their ten-second bounds. The full fresh pre-send guard must succeed before a task batch is sent. Expiry preserves confirmed reservations and a not-sent task batch; no mutation is replayed.
+
+### Native movement stage evidence
+
+When a movement deadline fails without identifying its slow stage, enable the
+native observer for the next distinguishing run. Before preparing native
+discovery, create a private report directory and export
+`HULY_MOVEMENT_STAGE_REPORT_DIRECTORY` with its canonical absolute path. The
+directory must already exist, belong to the current user, have mode `0700`, and
+contain no symlink in its canonical path. Keep that same environment value for
+discovery preparation and every suite, including proxy subprocesses: changing
+it invalidates the prepared discovery identity. The observer is disabled when
+the variable is absent.
+
+Each native `move_issue` request writes an exclusive mode `0600` file named
+`movement-<process-id>-<request-ordinal>.json`. Reports contain only allowlisted
+stage names, Effect outcomes and clock-derived elapsed milliseconds; they
+contain no issue identifiers, span attributes, raw errors or credentials.
+Decode report content with `MovementStageReportSchema` from
+`src/mcp/movement-stage-observer.ts`. A successful Effect span can return a
+blocked domain result: establish movement completion from the actual tool
+reply and preservation assertions, independently of stage outcomes.
+
+Reporting has a one-second write budget and preserves the original operation
+result when reporting fails. Its schema-owned status is `recorded` or
+`unavailable`. A timed-out filesystem promise may finish later, so a later
+report file does not overturn an unavailable status or establish completed
+filesystem cleanup. Empty, malformed or unavailable reports provide no
+diagnostic coverage and cannot turn a failed movement into a passing one.
+
+Before and after each suite, capture report filenames and retain hashes for
+new files. Recheck every attempted suite's report hashes in the final audit,
+including failed suites. Fingerprint the observer, report parser and collector
+sources with the qualification inputs; treat the growing report directory as
+output rather than a changing input. Collect evidence only after verifying
+the suite process has terminated. Keep report validation finite and separate
+from the underlying suite outcome. Preserve this evidence before choosing a
+repair; do not infer a deadline's cause from a different read-only profile.
