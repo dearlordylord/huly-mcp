@@ -24,7 +24,7 @@ export const ownedRecord = (
   ...payload
 })
 const parseClassName = Schema.decodeUnknownSync(ObjectClassName)
-const parents = new Map(
+const parents = new Map<ObjectClassName, ObjectClassName>(
   Schema.decodeUnknownSync(Schema.Array(Schema.Tuple([ObjectClassName, ObjectClassName])))([
     ["tracker:class:CustomIssue", String(tracker.class.Issue)],
     [String(chunter.class.ThreadMessage), String(chunter.class.ChatMessage)],
@@ -68,7 +68,7 @@ export const recordAdapterFixture = (
   requireMatches = false,
   additionalParents: ReadonlyMap<ObjectClassName, ObjectClassName> = new Map()
 ) => {
-  const modelParents = new Map([...parents, ...additionalParents])
+  const modelParents = new Map<ObjectClassName, ObjectClassName>([...parents, ...additionalParents])
   const isDerived = (cls: unknown, parent: unknown) =>
     derived(parseClassName(cls), parseClassName(parent), modelParents)
   const history = ownedRecord("history", String(activity.class.DocUpdateMessage), "root", "docUpdateMessages", {
