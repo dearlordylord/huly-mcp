@@ -564,6 +564,15 @@ MOVEMENT_STOP_UTC=$(date -u -d '+20 minutes' '+%Y-%m-%dT%H:%M:%SZ')
 pnpm integration:movement --run --deadline "$MOVEMENT_STOP_UTC" --state-dir .movement-certification
 ```
 
+The twenty-minute delivery budget above records the original campaign constraint.
+The user subsequently removed that overall limit for completion of #306–311.
+Keep the expired campaign unchanged. For this authorized continuation, use a
+separate evidence directory and serial suite execution with finite per-suite
+hang guards, worktree ownership, input fingerprints, retained logs and verified
+process custody. A per-suite timeout diagnoses a stalled run; it does not
+reinstate the removed overall delivery budget or authorize mutation retries.
+All five feature suites and the quality gate remain required.
+
 Do not recompute `MOVEMENT_STOP_UTC` for a retry. The persisted campaign rejects
 extension and expiry. A retained custody lock means cleanup is unconfirmed:
 inspect its owner and descendants before removing it; never delete it merely to
