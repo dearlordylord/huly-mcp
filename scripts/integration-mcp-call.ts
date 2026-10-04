@@ -1,5 +1,6 @@
 import { Client } from "@modelcontextprotocol/client"
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"
+import { NativeDiscoverySchema, normalizeIntegrationEnvironment } from "./integration-mcp-prior.js"
 import { Clock, Effect, Redacted, Schema } from "effect"
 
 const CONNECT_TIMEOUT_MILLISECONDS_VALUE = 10_000
@@ -85,16 +86,70 @@ const boundedPhase = <A>(
   })
 }
 // Internal process adapter seam; protocol input and output remain schema-owned.
-interface ProcessOptions {
+export interface ProcessOptions {
   readonly command: string
   readonly args: ReadonlyArray<string>
   readonly environment: NodeJS.ProcessEnv
+  readonly prior?: Schema.Schema.Type<typeof NativeDiscoverySchema>
 }
 const EnvelopeSchema = Schema.Struct({
   jsonrpc: Schema.Literal("2.0"),
   id: Schema.Literal(RESPONSE_ID),
   result: ReplySchema
 })
+export const makeIntegrationMcpSession = (options: ProcessOptions) => {
+  const environment =
+    options.prior === undefined
+      ? Schema.decodeUnknownSync(EnvironmentSchema)(
+          Object.fromEntries(
+            Object.entries({ ...options.environment, LAZY_ENVS: "true" }).filter((entry) => entry[1] !== undefined)
+          )
+        )
+      : normalizeIntegrationEnvironment(options.environment)
+  const transport = new StdioClientTransport({
+    command: options.command,
+    args: [...options.args],
+    env: Object.fromEntries(Object.entries(environment).map(([key, value]) => [key, Redacted.value(value)])),
+    stderr: "pipe"
+  })
+  // Never forward server diagnostics, which can contain credential-bearing integration failures.
+  transport.stderr?.on("data", () => {})
+  const client = new Client(
+    { name: "hulymcp-integration-call", version: "1.0.0" },
+    { versionNegotiation: { mode: { pin: "2026-07-28" } } }
+  )
+  return { client, transport }
+}
+export const captureIntegrationMcpDiscovery = async (
+  options: ProcessOptions,
+  timers: IntegrationMcpTimers = realTimers
+) => {
+  const { client, transport } = makeIntegrationMcpSession({
+    ...options,
+    environment: { ...options.environment, HULY_TOOL_MODE: "native", LAZY_ENVS: "true" }
+  })
+  let connecting: Promise<void> | undefined
+  try {
+    await boundedPhase(
+      "connect",
+      CONNECT_TIMEOUT_MILLISECONDS,
+      timers,
+      (signal) =>
+        (connecting = client.connect(transport, {
+          signal,
+          timeout: CONNECT_TIMEOUT_MILLISECONDS,
+          maxTotalTimeout: CONNECT_TIMEOUT_MILLISECONDS
+        }))
+    )
+    if (client.getNegotiatedProtocolVersion() !== "2026-07-28") throw new IntegrationMcpCallError("connect")
+    const raw: unknown = client.getDiscoverResult()
+    return Schema.decodeUnknownSync(NativeDiscoverySchema)(raw)
+  } finally {
+    await transport.close()
+    await connecting?.catch(() => {})
+    await client.close()
+  }
+}
 export const integrationMcpCall = async (
   input: unknown,
   options: ProcessOptions,
@@ -111,23 +166,7 @@ export const integrationMcpCall = async (
     )
   const parsed = Schema.decodeUnknownOption(InputSchema)(input)
   if (parsed._tag === "None") throw new IntegrationMcpCallError("input")
-  const environment = Schema.decodeUnknownSync(EnvironmentSchema)(
-    Object.fromEntries(
-      Object.entries({ ...options.environment, LAZY_ENVS: "true" }).filter((entry) => entry[1] !== undefined)
-    )
-  )
-  const transport = new StdioClientTransport({
-    command: options.command,
-    args: [...options.args],
-    env: Object.fromEntries(Object.entries(environment).map(([key, value]) => [key, Redacted.value(value)])),
-    stderr: "pipe"
-  })
-  // Never forward server diagnostics, which can contain credential-bearing integration failures.
-  transport.stderr?.on("data", () => {})
-  const client = new Client(
-    { name: "hulymcp-integration-call", version: "1.0.0" },
-    { versionNegotiation: { mode: { pin: "2026-07-28" } } }
-  )
+  const { client, transport } = makeIntegrationMcpSession(options)
   let phase: "connect" | "list" | "call" | "reply" | "close" = "connect"
   let connecting: Promise<void> | undefined
   const exchange = async () => {
@@ -139,10 +178,12 @@ export const integrationMcpCall = async (
       (signal) =>
         (connecting = client.connect(transport, {
           signal,
+          ...(options.prior === undefined ? {} : { prior: { kind: "modern", discover: options.prior } }),
           timeout: CONNECT_TIMEOUT_MILLISECONDS,
           maxTotalTimeout: CONNECT_TIMEOUT_MILLISECONDS
         }))
     )
+    if (client.getNegotiatedProtocolVersion() !== "2026-07-28") throw new IntegrationMcpCallError("connect")
     emit("connect-ready")
     phase = "list"
     emit("list-start")
