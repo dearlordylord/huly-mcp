@@ -35,7 +35,7 @@ const readModel = <A>(read: () => A): Effect.Effect<A, HulyDataInvalidError> =>
   })
 
 const CollectionTypeSchema = Schema.Struct({ of: ObjectClassName })
-const DEFAULT_LIMITS = { records: 10_000, queries: 10_000, depth: 32, result: 10_001 }
+export const DEFAULT_RECORD_DISCOVERY_LIMITS = { records: 10_000, queries: 10_000, depth: 32, result: 10_001 }
 // Internal traversal policy; no serialized payload crosses this seam.
 export interface RecordDiscoveryLimits {
   readonly records: number
@@ -43,11 +43,11 @@ export interface RecordDiscoveryLimits {
   readonly depth: number
   readonly result: number
 }
-interface Visit {
+export interface Visit {
   readonly owner: RecordOwner
   readonly path: ReadonlyArray<DocId>
 }
-interface DiscoveryState {
+export interface DiscoveryState {
   readonly tree: ReadonlyMap<string, MovementIssue>
   readonly records: Map<DocId, TransferRecord>
   readonly queue: Array<Visit>
@@ -56,7 +56,7 @@ interface DiscoveryState {
   queries: number
   incomplete: boolean
 }
-const refuse = (state: DiscoveryState, reason: string) => {
+export const refuse = (state: DiscoveryState, reason: string) => {
   state.incomplete = true
   state.blockers.add(reason)
 }
@@ -64,25 +64,31 @@ const refuse = (state: DiscoveryState, reason: string) => {
 export const inspectTransferRecords = Effect.fn("transfer.inspectRecords")(function* (
   client: TxOperations,
   issueId: TransferWrite["issueId"],
-  limits: RecordDiscoveryLimits = DEFAULT_LIMITS,
+  limits: RecordDiscoveryLimits = DEFAULT_RECORD_DISCOVERY_LIMITS,
   tree: ReadonlyArray<MovementIssue> = []
 ): Effect.fn.Return<TransferInspection, HulyClientError | HulyDataInvalidError> {
   const root = yield* inspectRuntimeRoot(client, issueId)
-  const state: DiscoveryState = {
-    tree: new Map(tree.map((issue) => [issue._id, issue])),
-    records: new Map(),
-    classes: new Set(),
-    queue: [{ owner: root, path: [root._id] }],
-    blockers: new Set(),
-    queries: 0,
-    incomplete: false
-  }
+  const state = makeDiscoveryState(root, tree)
   while (state.queue.length > 0 && !state.incomplete) {
     const visit = state.queue.shift()
     if (visit === undefined) break
     yield* inspectOwner(client, state, visit, limits)
   }
-  return yield* parseTransferBoundary(TransferInspectionSchema, {
+  return yield* discoveryInspection(state)
+})
+
+export const makeDiscoveryState = (root: RecordOwner, tree: ReadonlyArray<MovementIssue>): DiscoveryState => ({
+  tree: new Map(tree.map((issue) => [issue._id, issue])),
+  records: new Map(),
+  classes: new Set(),
+  queue: [{ owner: root, path: [root._id] }],
+  blockers: new Set(),
+  queries: 0,
+  incomplete: false
+})
+
+export const discoveryInspection = (state: DiscoveryState) =>
+  parseTransferBoundary(TransferInspectionSchema, {
     discovery: state.incomplete ? "incomplete" : "complete",
     records: [...state.records.values()],
     classes: [...state.classes],
@@ -90,7 +96,6 @@ export const inspectTransferRecords = Effect.fn("transfer.inspectRecords")(funct
     limitation:
       "Model-derived recursive ownership discovery; audited comments/threads, attachments/photos/embeddings, labels, time reports, activity/replies/reactions and immutable history. ActivityReference routing follows its source; incoming independent references and referenced documents remain in place. Unknown classes/collection edges or exhausted limits refuse before writes."
   })
-})
 
 const inspectOwner = Effect.fn("transfer.inspectOwner")(function* (
   client: TxOperations,
@@ -98,6 +103,32 @@ const inspectOwner = Effect.fn("transfer.inspectOwner")(function* (
   visit: Visit,
   limits: RecordDiscoveryLimits
 ): Effect.fn.Return<void, HulyClientError | HulyDataInvalidError> {
+  const { collections, representatives } = yield* prepareOwnerClasses(client, state, visit)
+  yield* inspectClassCollections(client, state, visit, limits, collections, representatives)
+  if (state.incomplete) return
+  if (!admitQuery(state, limits)) return
+  const refs = yield* Effect.tryPromise({
+    try: () =>
+      client.findAll<ActivityReference>(
+        activity.class.ActivityReference,
+        hulyQuery<ActivityReference>({ srcDocId: toRef<Doc>(visit.owner._id) }),
+        { limit: limits.result, total: true }
+      ),
+    catch: (cause) => makeOperationConnectionError("findAll", cause)
+  })
+  const total = yield* parseTransferBoundary(ListTotal, refs.total)
+  if (
+    !completeResult(state, refs.length, total, limits, ObjectClassName.make(String(activity.class.ActivityReference)))
+  )
+    return
+  for (const row of refs) yield* inspectRow(client, state, visit, row, collections, limits, true)
+})
+
+export const prepareOwnerClasses = Effect.fn("transfer.prepareOwnerClasses")(function* (
+  client: TxOperations,
+  state: DiscoveryState,
+  visit: Visit
+) {
   const hierarchy = client.getHierarchy()
   const collections = yield* ownerCollections(client, visit.owner)
   const classes = new Set([
@@ -117,24 +148,7 @@ const inspectOwner = Effect.fn("transfer.inspectOwner")(function* (
       isDerived: (cls, ancestor) => hierarchy.isDerived(toClassRef<Doc>(cls), toClassRef<Doc>(ancestor))
     })
   )
-  yield* inspectClassCollections(client, state, visit, limits, collections, representatives)
-  if (state.incomplete) return
-  if (!admitQuery(state, limits)) return
-  const refs = yield* Effect.tryPromise({
-    try: () =>
-      client.findAll<ActivityReference>(
-        activity.class.ActivityReference,
-        hulyQuery<ActivityReference>({ srcDocId: toRef<Doc>(visit.owner._id) }),
-        { limit: limits.result, total: true }
-      ),
-    catch: (cause) => makeOperationConnectionError("findAll", cause)
-  })
-  const total = yield* parseTransferBoundary(ListTotal, refs.total)
-  if (
-    !completeResult(state, refs.length, total, limits, ObjectClassName.make(String(activity.class.ActivityReference)))
-  )
-    return
-  for (const row of refs) yield* inspectRow(client, state, visit, row, collections, limits, true)
+  return { collections, representatives }
 })
 
 const admitClassWindow = (
@@ -177,7 +191,7 @@ const inspectClassCollections = Effect.fn("transfer.inspectClassCollections")(fu
   }
 })
 
-const admitQuery = (state: DiscoveryState, limits: RecordDiscoveryLimits) => {
+export const admitQuery = (state: DiscoveryState, limits: RecordDiscoveryLimits) => {
   if (state.queries >= limits.queries) {
     refuse(state, "Owned-record query limit exhausted.")
     return false
@@ -185,7 +199,7 @@ const admitQuery = (state: DiscoveryState, limits: RecordDiscoveryLimits) => {
   state.queries++
   return true
 }
-const completeResult = (
+export const completeResult = (
   state: DiscoveryState,
   length: number,
   total: ListTotal,
@@ -199,7 +213,7 @@ const completeResult = (
   return true
 }
 
-const inspectRow = Effect.fn("transfer.inspectRecordEdge")(function* (
+export const inspectRow = Effect.fn("transfer.inspectRecordEdge")(function* (
   client: TxOperations,
   state: DiscoveryState,
   visit: Visit,
