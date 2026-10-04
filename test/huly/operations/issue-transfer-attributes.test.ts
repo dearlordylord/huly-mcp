@@ -254,3 +254,35 @@ it.effect("candidate payloads retain required distinguishing fields and exclude 
     expect(Schema.decodeUnknownSync(MoveIssueResultSchema)(blocked)).toEqual(blocked)
   })
 )
+
+it.effect(
+  "stale-null nextCall retains valid consent for the other field and removes duplicate/out-of-tree decisions",
+  () =>
+    Effect.gen(function* () {
+      const f = transferFixture()
+      f.root.milestone = sdkFixture("milestone-current")
+      const result = yield* call(f, {
+        ...f.input,
+        resolutions: [
+          { issueId: f.root._id, field: "component", from: "component-old", to: null },
+          { issueId: f.root._id, field: "milestone", from: "milestone-current", to: null }
+        ]
+      })
+      expect(result).toMatchObject({
+        outcome: "blocked",
+        nextCall: { resolutions: [{ field: "milestone", from: "milestone-current" }] }
+      })
+      if (result.outcome !== "blocked") throw new Error("Expected stale consent")
+      expect(yield* call(f, result.nextCall)).toMatchObject({
+        outcome: "completed",
+        attributeChanges: [{ field: "milestone", reason: "explicit-clear" }]
+      })
+      const fresh = transferFixture()
+      const duplicate = { issueId: fresh.root._id, field: "component", from: "old", to: null }
+      const bad = yield* call(fresh, {
+        ...fresh.input,
+        resolutions: [duplicate, duplicate, { ...duplicate, issueId: "outside" }]
+      })
+      expect(bad).toMatchObject({ outcome: "blocked", nextCall: { resolutions: [] } })
+    })
+)

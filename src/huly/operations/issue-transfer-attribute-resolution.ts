@@ -71,11 +71,11 @@ const resolveField = (
   inventory: AttributeInventory,
   resolution: Resolution | undefined
 ): AttributeDecision => {
-  const { destination, field, source } = inventory
+  const { field, source } = inventory
   const from = issue[field] ?? null
   const sourceName = source.find((value) => value._id === from)?.label
   const conflict: ConflictFactory = (code, reason) => attributeConflict(root, inventory, from, sourceName, code, reason)
-  if (from === null && resolution === undefined) return undefined
+  if (from === null) return absentDecision(inventory, resolution, conflict)
   const stale = staleDecision(inventory, from, resolution, conflict)
   if (stale !== undefined) return stale
   if (!inventory.complete)
@@ -149,11 +149,11 @@ const resolveExplicit = (
 const resolveAutomatic = (
   root: MovementIssue,
   inventory: AttributeInventory,
-  from: TransferIssue["component"],
+  from: NonNullable<TransferIssue["component"]>,
   sourceName: string | undefined,
   conflict: ConflictFactory
 ): AttributeDecision => {
-  if (from == null || inventory.destination.some((value) => value._id === from)) return undefined
+  if (inventory.destination.some((value) => value._id === from)) return undefined
   const matches = sourceName === undefined ? [] : inventory.destination.filter((value) => value.label === sourceName)
   const match = matches.length === 1 ? matches[0] : undefined
   if (match !== undefined)
@@ -182,3 +182,12 @@ const staleDecision = (
   resolution !== undefined && resolution.from !== from
     ? conflict("stale-resolution", staleGuidance(inventory.field, resolution.from, from))
     : undefined
+
+const absentDecision = (
+  inventory: AttributeInventory,
+  resolution: Resolution | undefined,
+  conflict: ConflictFactory
+): AttributeDecision =>
+  resolution === undefined
+    ? undefined
+    : conflict("stale-resolution", staleGuidance(inventory.field, resolution.from, null))

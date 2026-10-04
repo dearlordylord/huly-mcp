@@ -46,6 +46,8 @@ export const transferIssue = Effect.fn("transferIssue")(function* (
     return {
       outcome: "blocked",
       changed: false,
+      discovery: "incomplete",
+      destinationId: destination._id,
       reason: `Pre-write inspection failed: ${preparedResult.failure.message}`,
       issueIds: [root._id],
       inspection
@@ -79,6 +81,8 @@ const executeTransfer = Effect.fn("transfer.execute")(function* (
     return {
       outcome: "blocked",
       changed: false,
+      discovery: "incomplete",
+      destinationId: destination._id,
       reason: "Transfer commit adapter unavailable.",
       issueIds: [root._id],
       inspection
@@ -92,6 +96,8 @@ const executeTransfer = Effect.fn("transfer.execute")(function* (
     return {
       outcome: "blocked",
       changed: false,
+      discovery: "incomplete",
+      destinationId: destination._id,
       reason: "Destination ordering inspection failed before writes.",
       issueIds: [root._id],
       inspection

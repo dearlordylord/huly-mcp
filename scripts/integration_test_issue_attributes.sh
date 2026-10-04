@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Execute only during final combined 306–311 certification, after build and integration preflight.
 set -euo pipefail
-source "$(dirname "${BASH_SOURCE[0]}")/test-telemetry-env.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/test-telemetry-env.sh" || exit 1
 CLI=(node packages/huly-cli/dist/index.cjs)
 printf -v SOURCE 'A%04X' "$RANDOM"
 printf -v TARGET 'B%04X' "$RANDOM"
