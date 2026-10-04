@@ -32,7 +32,7 @@ export const moveIssue = Effect.fn("moveIssue")(function* (
   if (root === undefined) return refusal("Issue selector must match exactly one issue.")
   const selected = yield* selectMovementContext(client, root, params)
   if (selected.status === "refused") return refusal(selected.reason, root)
-  const { parent, source, destination } = selected
+  const { destination, parent, source } = selected
   if (satisfiedConsent(root, parent, source, destination, params))
     return refusal(
       "Destination is already satisfied. Omit resolutions and inspect the complete tree for a verified no-op; supplied consent must not be reused.",

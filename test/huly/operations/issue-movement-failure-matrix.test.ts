@@ -19,6 +19,10 @@ import { transferTreeFixture } from "../../helpers/transfer-tree.js"
 
 const parseResult = (input: unknown) => Schema.decodeUnknownSync(MoveIssueResultSchema)(input)
 const parseInspection = (input: unknown) => Schema.decodeUnknownSync(TransferInspectionSchema)(input)
+const queryScalarMatches = (input: unknown, expected: string) => {
+  const scalar = Schema.decodeUnknownOption(Schema.String)(input)
+  return scalar._tag === "Some" && scalar.value === expected
+}
 const unavailable = (phase: MovementTransportError["phase"]) =>
   new MovementTransportError({ phase, reason: NonEmptyString.make("Injected single-send transport failure.") })
 const run = Effect.fn("test.movementFailure")(function* (
@@ -355,7 +359,7 @@ describe("public movement uncertainty and concurrent state", () => {
           findOne: (cls, query, options) =>
             findOne(cls, query, options).pipe(
               Effect.flatMap((row) => {
-                if (f.state.sent > 0 && String(query._id) === String(f.child._id)) {
+                if (f.state.sent > 0 && queryScalarMatches(query._id, f.child._id)) {
                   if (failure === "read-outage")
                     return Effect.fail(new HulyAuthError({ message: "Later task read unavailable" }))
                   if (failure === "missing") return Effect.succeed(undefined)
@@ -397,8 +401,8 @@ describe("public movement uncertainty and concurrent state", () => {
             findOne(cls, query, options).pipe(
               Effect.flatMap((row) => {
                 if (f.state.sent === 0) return Effect.succeed(row)
-                if (String(query._id) === String(f.root._id)) return Effect.succeed(undefined)
-                if (String(query._id) === String(f.child._id)) {
+                if (queryScalarMatches(query._id, f.root._id)) return Effect.succeed(undefined)
+                if (queryScalarMatches(query._id, f.child._id)) {
                   if (later === "read-outage")
                     return Effect.fail(new HulyAuthError({ message: "Child read unavailable" }))
                   if (row !== undefined) Reflect.set(row, "description", 123)
@@ -440,7 +444,7 @@ describe("public movement uncertainty and concurrent state", () => {
             )
           ),
         findOne: (cls, query, options) =>
-          f.state.sent > 0 && String(query._id) === String(f.root._id)
+          f.state.sent > 0 && queryScalarMatches(query._id, f.root._id)
             ? Effect.fail(new HulyAuthError({ message: "Root read unavailable" }))
             : findOne(cls, query, options)
       })
@@ -551,9 +555,9 @@ describe("public movement uncertainty and concurrent state", () => {
               ),
             findOne: (cls, query, options) => {
               if (f.state.sent > 0) {
-                if (fact === "absence" && String(query._id) === String(f.root._id)) return Effect.succeed(undefined)
-                if (fact === "hierarchy" && String(query._id) === String(f.root._id)) return Effect.never
-                if ((fact === "task" || fact === "absence") && String(query._id) === String(f.child._id))
+                if (fact === "absence" && queryScalarMatches(query._id, f.root._id)) return Effect.succeed(undefined)
+                if (fact === "hierarchy" && queryScalarMatches(query._id, f.root._id)) return Effect.never
+                if ((fact === "task" || fact === "absence") && queryScalarMatches(query._id, f.child._id))
                   return Effect.never
               }
               return findOne(cls, query, options)
@@ -629,7 +633,7 @@ describe("public movement uncertainty and concurrent state", () => {
             findAll: (cls, query, options) =>
               findAll(cls, query, options).pipe(
                 Effect.map((rows) => {
-                  if (f.state.sent > 0 && String(query.space) === String(f.source._id)) {
+                  if (f.state.sent > 0 && queryScalarMatches(query.space, f.source._id)) {
                     state.passes++
                     if (state.passes === 2) f.old.subIssues++
                   }
@@ -637,7 +641,7 @@ describe("public movement uncertainty and concurrent state", () => {
                 })
               ),
             findOne: (cls, query, options) => {
-              if (f.state.sent > 0 && String(query._id) === String(f.root._id))
+              if (f.state.sent > 0 && queryScalarMatches(query._id, f.root._id))
                 return state.passes === 1 ? Effect.succeed(undefined) : Effect.never
               return findOne(cls, query, options)
             }

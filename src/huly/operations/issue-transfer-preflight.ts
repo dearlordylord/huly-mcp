@@ -1,6 +1,5 @@
 import { inspectTransferWorkflow } from "./issue-transfer-workflow.js"
 import { parseTransferSnapshot, transferConflict } from "./issue-transfer-preflight-values.js"
-import { movementNoParent } from "./issue-movement-hierarchy.js"
 import { inspectTransferAttributes } from "./issue-transfer-attribute-inspection.js"
 import { isDeepStrictEqual } from "node:util"
 import { resolveTransferTreeAttributes, type TransferTaskSnapshot } from "./issue-transfer-tree-attributes.js"
@@ -22,7 +21,13 @@ import type { HulyClient } from "../client.js"
 import { tracker } from "../huly-plugins.js"
 import { toRef } from "./sdk-boundary.js"
 import { hulyQuery } from "./query-helpers.js"
-import { ancestorsOf, hierarchyProblem, movementHierarchy, type MovementHierarchy } from "./issue-movement-hierarchy.js"
+import {
+  ancestorsOf,
+  hierarchyProblem,
+  movementHierarchy,
+  movementNoParent,
+  type MovementHierarchy
+} from "./issue-movement-hierarchy.js"
 import {
   inspectMovementClosure,
   inspectMovementProject,
@@ -218,7 +223,7 @@ export const inspectTransferPlan = Effect.fn("transfer.inspectPlan")(function* (
     }
   const context = yield* inspectTransferContext(client, root, parent, destination)
   if ("conflicts" in context) return context
-  const { hierarchy, tree, relevant } = context
+  const { hierarchy, relevant, tree } = context
   const closureProblem =
     context.discoveryReasons.length === 0 ? yield* inspectMovementClosure(client, hierarchy, relevant) : undefined
   const preserveSameProjectAttributes = source._id === destination._id && params.resolutions === undefined
@@ -252,7 +257,7 @@ const projectTransferInspection = (
   attributes: ReturnType<typeof resolveTransferTreeAttributes>,
   conflicts: ReadonlyArray<TransferConflict>
 ): TransferPlan | TransferRefusal => {
-  const { tree, relevant } = context
+  const { relevant, tree } = context
   const capacityProblem = transferCapacityProblem(tasks, conflicts)
   if (capacityProblem !== undefined)
     return {
