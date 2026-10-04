@@ -15,6 +15,7 @@ import { transferFixture } from "../../helpers/transfer.js"
 
 const issueSnapshot = (input: unknown) => Schema.decodeUnknownSync(MovementIssueSchema)(input)
 const projectSnapshot = (input: unknown) => Schema.decodeUnknownSync(MovementProjectSchema)(input)
+const writeSnapshot = (input: unknown) => Schema.decodeUnknownSync(TransferWriteSchema)(input)
 
 const mutations = [
   "missingRoot",
@@ -58,7 +59,7 @@ for (const mutation of mutations) {
       if ("conflicts" in prepared) return
       const moved = yield* moveIssue(params).pipe(Effect.provide(f.layer))
       expect(moved.outcome).toBe("completed")
-      const write = Schema.decodeUnknownSync(TransferWriteSchema)({
+      const write = writeSnapshot({
         issueId: f.root._id,
         sourceId: f.source._id,
         destinationId: f.destination._id,
