@@ -53,6 +53,18 @@ for transport in mcp cli; do
   mcp add_issue_relation "$(jq -nc --arg project "$SOURCE" --arg issueIdentifier "$ROOT" --arg targetIssue "$COUNTERPART" '{project:$project,issueIdentifier:$issueIdentifier,targetIssue:$targetIssue,relationType:"is-blocked-by"}')" >/dev/null
   mcp add_issue_relation "$(jq -nc --arg project "$SOURCE" --arg issueIdentifier "$COUNTERPART" --arg targetIssue "$ROOT" '{project:$project,issueIdentifier:$issueIdentifier,targetIssue:$targetIssue,relationType:"is-blocked-by"}')" >/dev/null
   ARGS=$(jq -nc --arg root "$ROOT_ID" --arg old "$OLD_ID" --arg parent "$PARENT_ID" --arg existing "$EXISTING_ID" --arg counterpart "$COUNTERPART_ID" --arg source "$SOURCE" --arg target "$DESTINATION" '{issues:[$root,$old,$parent,$existing,$counterpart],projects:[$source,$target]}')
+  # Rich leaf ownership fixture is exercised through both movement transports.
+  COMMENT=$(mcp add_comment "$(jq -nc --arg project "$SOURCE" --arg issueIdentifier "$ROOT" '{project:$project,issueIdentifier:$issueIdentifier,body:"Owned comment with nested files"}')" | jq -r .commentId)
+  REPLY=$(mcp add_activity_reply "$(jq -nc --arg messageId "$COMMENT" '{messageId:$messageId,body:"Nested thread preserves object refs"}')" | jq -r .replyId)
+  mcp add_reaction "$(jq -nc --arg messageId "$COMMENT" '{messageId:$messageId,emoji:":thumbsup:"}')" >/dev/null
+  mcp add_issue_label "$(jq -nc --arg project "$SOURCE" --arg identifier "$ROOT" '{project:$project,identifier:$identifier,label:"Transfer ownership certification"}')" >/dev/null
+  mcp log_time "$(jq -nc --arg project "$SOURCE" --arg identifier "$ROOT" '{project:$project,identifier:$identifier,value:1.25,description:"Stable report payload"}')" >/dev/null
+  ISSUE_FILE=$(mcp add_issue_attachment "$(jq -nc --arg project "$SOURCE" --arg identifier "$ROOT" '{project:$project,identifier:$identifier,filename:"issue.txt",contentType:"text/plain",data:"cHJlc2VydmVkIGJsb2I="}')" | jq -r .attachmentId)
+  # The state helper supplies the SDK project ID; public get_issue is a presentation projection.
+  SOURCE_SPACE=$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$ARGS" | jq -r --arg root "$ROOT_ID" '.issues[] | select(.issue._id == $root) | .issue.space')
+  NESTED_FILE=$(mcp add_attachment "$(jq -nc --arg objectId "$COMMENT" --arg space "$SOURCE_SPACE" '{objectId:$objectId,objectClass:"chunter:class:ChatMessage",space:$space,filename:"comment.txt",contentType:"text/plain",data:"cHJlc2VydmVkIGJsb2I="}')" | jq -r .attachmentId)
+  REPLY_FILE=$(mcp add_attachment "$(jq -nc --arg objectId "$REPLY" --arg space "$SOURCE_SPACE" '{objectId:$objectId,objectClass:"chunter:class:ThreadMessage",space:$space,filename:"reply.txt",contentType:"text/plain",data:"cHJlc2VydmVkIGJsb2I="}')" | jq -r .attachmentId)
+  pnpm exec tsx scripts/integration-issue-transfer-records.ts "$(jq -nc --arg issue "$ROOT_ID" --arg document "$DOCUMENT" '{issue:$issue,document:$document,mode:"references"}')" >/dev/null
   BEFORE=$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$ARGS")
   jq -e --arg root "$ROOT_ID" '.issues[] | select(.issue._id == $root) | .owned.records | any(.kind == "history")' >/dev/null <<<"$BEFORE"
   DEST=$(jq -nc --arg project "$DESTINATION" --arg parent "$PARENT_ID" '{project:$project,parent:$parent}')
@@ -64,7 +76,8 @@ for transport in mcp cli; do
     ($before.issues[] | select(.issue._id == $root)) as $old |
     ($after.issue | del(.space,.identifier,.number,.rank,.attachedTo,.parents,.modifiedOn)) == ($old.issue | del(.space,.identifier,.number,.rank,.attachedTo,.parents,.modifiedOn)) and
     $after.issue.attachedTo == $parent and
-    all($old.owned.records[]; . as $record | any($after.owned.records[]; ._id == $record._id and .history == $record.history and .modifiedBy == $record.modifiedBy and .modifiedOn == $record.modifiedOn and .space == $after.issue.space))' >/dev/null <<<"$AFTER"
+    $after.incomingReferences == $old.incomingReferences and
+    all($old.owned.records[]; . as $record | any($after.owned.records[]; ._id == $record._id and (del(.space) == ($record | del(.space))) and .space == $after.issue.space))' >/dev/null <<<"$AFTER"
   jq -e --argjson before "$BEFORE" --arg root "$ROOT_ID" --arg old "$OLD_ID" --arg parent "$PARENT_ID" --arg existing "$EXISTING_ID" --arg counterpart "$COUNTERPART_ID" '
     (.issues[] | select(.issue._id == $old) | .issue) as $sourceParent |
     (.issues[] | select(.issue._id == $parent) | .issue) as $targetParent |
@@ -72,7 +85,7 @@ for transport in mcp cli; do
     $sourceParent.subIssues == 0 and $sourceParent.childInfo == [] and
     $targetParent.subIssues == ($previousParent.subIssues + 1) and
     ($targetParent.childInfo | length) == (($previousParent.childInfo | length) + 1) and
-    any($targetParent.childInfo[]; .childId == $root and .estimation == 2 and .reportedTime == 0) and
+    any($targetParent.childInfo[]; .childId == $root and .estimation == 2 and .reportedTime == 1.25) and
     all($previousParent.childInfo[]; . as $child | any($targetParent.childInfo[]; . == $child)) and
     (.issues[] | select(.issue._id == $existing) | .issue) == ($before.issues[] | select(.issue._id == $existing) | .issue) and
     (.issues[] | select(.issue._id == $counterpart) | .issue | del(.modifiedOn)) == ($before.issues[] | select(.issue._id == $counterpart) | .issue | del(.modifiedOn)) and
@@ -82,14 +95,22 @@ for transport in mcp cli; do
   REPEAT=$(mcp move_issue "$(jq -nc --arg issue "$ROOT_ID" --argjson destination "$DEST" '{issue:$issue,destination:$destination}')")
   jq -e '.outcome == "no-op" and .changed == false' >/dev/null <<<"$REPEAT"
   [[ "$(jq -Sc . <<<"$AFTER")" == "$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$ARGS" | jq -Sc .)" ]]
-  # Ordinary comments are unsupported in slice 307; refusal must leave sequence and records untouched.
+  # Ordinary destination callers can still read comments/history and download unchanged blobs.
+  mcp get_activity_message "$(jq -nc --arg messageId "$COMMENT" '{messageId:$messageId}')" | jq -e --arg id "$COMMENT" '.id == $id' >/dev/null
+  mcp list_comments "$(jq -nc --arg project "$DESTINATION" --arg issueIdentifier "$ROOT_ID" '{project:$project,issueIdentifier:$issueIdentifier}')" | jq -e --arg id "$COMMENT" 'any(.[]; .id == $id)' >/dev/null
+  mcp get_time_report "$(jq -nc --arg project "$DESTINATION" --arg identifier "$ROOT_ID" '{project:$project,identifier:$identifier}')" | jq -e '.totalTime == 1.25' >/dev/null
+  for attachment in "$ISSUE_FILE" "$NESTED_FILE" "$REPLY_FILE"; do
+    DOWNLOAD=$(mcp download_attachment "$(jq -nc --arg attachmentId "$attachment" '{attachmentId:$attachmentId}')" | jq -r .url)
+    [[ "$(curl --fail --silent "$DOWNLOAD")" == 'preserved blob' ]]
+  done
+  # A real unaudited attached class still refuses before sequence or record writes.
   create "$SOURCE" ''; REFUSED_ID="$CREATED_ID"
-  mcp add_comment "$(jq -nc --arg project "$SOURCE" --arg issueIdentifier "$CREATED" '{project:$project,issueIdentifier:$issueIdentifier,body:"Owned comment: refuse before writes"}')" >/dev/null
+  pnpm exec tsx scripts/integration-issue-transfer-records.ts "$(jq -nc --arg issue "$REFUSED_ID" --arg document "$DOCUMENT" '{issue:$issue,document:$document,mode:"unsupported"}')" >/dev/null
   REFUSED_ARGS=$(jq -nc --arg issue "$REFUSED_ID" --arg source "$SOURCE" --arg target "$DESTINATION" '{issues:[$issue],projects:[$source,$target]}')
   REFUSED_BEFORE=$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$REFUSED_ARGS")
   BLOCKED=$(mcp move_issue "$(jq -nc --arg issue "$REFUSED_ID" --arg project "$DESTINATION" '{issue:$issue,destination:{project:$project}}')")
   jq -e '.outcome == "blocked" and .changed == false and (.reason | contains("Unsupported owned record"))' >/dev/null <<<"$BLOCKED"
   [[ "$(jq -Sc . <<<"$REFUSED_BEFORE")" == "$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$REFUSED_ARGS" | jq -Sc .)" ]]
-  echo "PASS: $transport compatible leaf, history, stable recovery, independent reference, relations, no-op and pre-write owned-record refusal"
+  echo "PASS: $transport rich leaf, nested files, labels/time, immutable history, independent/dangling references, aggregates, no-op and unknown-class refusal"
 done
 [[ "$(jq -Sc . <<<"$DOC_BEFORE")" == "$(mcp get_document "$(jq -nc --arg teamspace "$TEAMSPACE" --arg document "$DOCUMENT" '{teamspace:$teamspace,document:$document}')" | jq -Sc .)" ]]

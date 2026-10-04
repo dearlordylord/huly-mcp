@@ -1,9 +1,10 @@
+import type { ActivityReference } from "@hcengineering/activity"
 import type { Issue, Project } from "@hcengineering/tracker"
 import { Effect, Schema } from "effect"
 import { MovementIssueSchema } from "../src/domain/schemas/issue-movement-state.js"
-import { TransferIssueSchema } from "../src/domain/schemas/issue-transfer.js"
+import { TransferIssueSchema, TransferProjectSchema } from "../src/domain/schemas/issue-transfer.js"
 import { DocId, IssueId, ProjectIdentifier, Count } from "../src/domain/schemas/shared.js"
-import { tracker } from "../src/huly/huly-plugins.js"
+import { activity, tracker } from "../src/huly/huly-plugins.js"
 import { inspectTransferRecords } from "../src/huly/issue-transfer-adapter.js"
 import { hulyQuery } from "../src/huly/operations/query-helpers.js"
 import { toRef } from "../src/huly/operations/sdk-boundary.js"
@@ -13,7 +14,12 @@ const Arguments = Schema.fromJsonString(
   Schema.Struct({ issues: Schema.Array(IssueId), projects: Schema.Array(ProjectIdentifier) })
 )
 const IssueSnapshot = Schema.Struct({ ...MovementIssueSchema.fields, ...TransferIssueSchema.fields })
-const ProjectSnapshot = Schema.Struct({ _id: DocId, identifier: ProjectIdentifier, sequence: Count })
+const ProjectSnapshot = Schema.Struct({
+  ...TransferProjectSchema.fields,
+  _id: DocId,
+  identifier: ProjectIdentifier,
+  sequence: Count
+})
 const parseSnapshot = <A>(schema: Schema.ConstraintDecoder<A>, input: unknown): A =>
   Schema.decodeUnknownSync(schema)(input)
 
@@ -26,7 +32,17 @@ const run = async () => {
         const raw = await client.findOne<Issue>(tracker.class.Issue, hulyQuery<Issue>({ _id: toRef<Issue>(id) }))
         const issue = parseSnapshot(IssueSnapshot, raw)
         const owned = await Effect.runPromise(inspectTransferRecords(client, id))
-        return { issue, owned }
+        const references = await client.findAll<ActivityReference>(
+          activity.class.ActivityReference,
+          hulyQuery<ActivityReference>({ attachedTo: toRef(id) }),
+          { limit: 10_001 }
+        )
+        if (references.total > references.length || references.length >= 10_001)
+          throw new Error("Incomplete incoming reference snapshot")
+        const incomingReferences = references
+          .filter((reference) => reference.srcDocId !== id)
+          .map((reference) => parseSnapshot(Schema.Json, reference))
+        return { issue, owned, incomingReferences }
       })
     )
     const projects = await Promise.all(

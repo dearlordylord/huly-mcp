@@ -154,8 +154,14 @@ describe("destination movement", () => {
 
   it.effect("refuses ambiguous issue and project identifiers", () =>
     Effect.gen(function* () {
-      const fixture = movementFixture([movementIssue("root"), movementIssue("other", { identifier: "TEST-root" })])
-      expectBlocked(yield* call({ issue: "TEST-root", destination: { parent: null } }, fixture), fixture)
+      const fixture = movementFixture([
+        movementIssue("root"),
+        movementIssue("other", { identifier: movementIssue("root").identifier })
+      ])
+      expectBlocked(
+        yield* call({ issue: movementIssue("root").identifier, destination: { parent: null } }, fixture),
+        fixture
+      )
       const ambiguous = movementFixture([movementIssue("root")], {
         projects: [movementProject(), movementProject("other")]
       })

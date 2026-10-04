@@ -1,0 +1,138 @@
+import { it } from "@effect/vitest"
+import { Effect, Fiber, Schema } from "effect"
+import { TestClock } from "effect/testing"
+import { expect } from "vitest"
+import { TransferSupportedRecordSchema } from "../../../src/domain/schemas/issue-transfer.js"
+import { HulyClient } from "../../../src/huly/client.js"
+import { moveIssue } from "../../../src/huly/operations/issues.js"
+import { activity, attachment, chunter, tags, tracker } from "../../../src/huly/huly-plugins.js"
+import { transferFixture } from "../../helpers/transfer.js"
+import { ownedRecord, attachmentPayload } from "../../helpers/transfer-records.js"
+
+const richFixture = () => {
+  const f = transferFixture()
+  let extra = Schema.decodeUnknownSync(Schema.Array(TransferSupportedRecordSchema))(
+    [
+      ownedRecord("comment", String(chunter.class.ChatMessage), f.root._id, "comments", {
+        message: "original",
+        kind: "owned",
+        ownerId: f.root._id,
+        ownerClass: tracker.class.Issue,
+        snapshot: "comment payload"
+      }),
+      ownedRecord("file", String(attachment.class.Attachment), "comment", "attachments", {
+        ...attachmentPayload,
+        kind: "owned",
+        ownerId: "comment",
+        ownerClass: chunter.class.ChatMessage,
+        snapshot: "blob payload"
+      }),
+      ownedRecord("label", String(tags.class.TagReference), f.root._id, "labels", {
+        kind: "owned",
+        ownerId: f.root._id,
+        ownerClass: tracker.class.Issue,
+        snapshot: "tag payload"
+      }),
+      ownedRecord("report", String(tracker.class.TimeSpendReport), f.root._id, "reports", {
+        kind: "owned",
+        ownerId: f.root._id,
+        ownerClass: tracker.class.Issue,
+        snapshot: "time payload"
+      }),
+      ownedRecord("outgoing", String(activity.class.ActivityReference), "independent", "references", {
+        kind: "owned",
+        ownerId: f.root._id,
+        ownerClass: tracker.class.Issue,
+        snapshot: "independent link"
+      })
+    ].map((row) => ({ ...row, space: f.source._id }))
+  )
+  const state = { corrupt: false }
+  const layer = HulyClient.testLayer({
+    ...f.operations,
+    inspectTransferRecords: () => {
+      const inspect = f.operations.inspectTransferRecords
+      if (inspect === undefined) return Effect.die("Fixture inspection is required")
+      return inspect(f.input.issue).pipe(
+        Effect.map((inspection) => ({ ...inspection, records: [...inspection.records, ...extra] }))
+      )
+    },
+    commitTransfer: (write) => {
+      const commit = f.operations.commitTransfer
+      if (commit === undefined) return Effect.die("Fixture commit is required")
+      return commit(write).pipe(
+        Effect.map((result) => {
+          extra = extra.map((record) => ({
+            ...record,
+            space: write.destinationId,
+            ...(state.corrupt ? { snapshot: "changed" } : {})
+          }))
+          return result
+        })
+      )
+    }
+  })
+  return { f, state, layer, read: () => extra }
+}
+
+it.effect(
+  "shared operation moves all owned stable IDs while preserving content and independent target references",
+  () =>
+    Effect.gen(function* () {
+      const fixture = richFixture()
+      const before = fixture.read()
+      const result = yield* moveIssue(fixture.f.input).pipe(Effect.provide(fixture.layer))
+      expect(result).toMatchObject({ outcome: "completed", changed: true })
+      expect(fixture.read()).toEqual(before.map((record) => ({ ...record, space: fixture.f.destination._id })))
+      expect(fixture.read().find((record) => record._id === "outgoing")?.attachedTo).toBe("independent")
+    })
+)
+
+it.effect("post-write payload inconsistency reports stable records and valid published inspection calls", () =>
+  Effect.gen(function* () {
+    const fixture = richFixture()
+    fixture.state.corrupt = true
+    const task = yield* Effect.forkChild(moveIssue(fixture.f.input).pipe(Effect.provide(fixture.layer)))
+    yield* TestClock.adjust("2 seconds")
+    const result = yield* Fiber.join(task)
+    expect(result).toMatchObject({
+      outcome: "incomplete",
+      recordIds: expect.arrayContaining(["comment", "file", "report", "outgoing"])
+    })
+    if (result.outcome === "incomplete") {
+      expect(result.inspection).toContain("list_activity")
+      expect(result.inspection).toContain("list_comments")
+      expect(result.inspection).toContain("get_time_report")
+    }
+  })
+)
+
+it.effect("no-op rejects unknown semantic blockers before repeated writes", () =>
+  Effect.gen(function* () {
+    const f = transferFixture()
+    yield* moveIssue(f.input).pipe(Effect.provide(f.layer))
+    f.state.recordsBlockers.push("Unsupported collection edge on nested owned record")
+    expect(yield* moveIssue(f.input).pipe(Effect.provide(f.layer))).toMatchObject({
+      outcome: "blocked",
+      changed: false
+    })
+    expect(f.state.allocated).toBe(1)
+    expect(f.state.sent).toBe(1)
+  })
+)
+
+it.effect("no-op refuses unavailable ownership inspection instead of claiming verified success", () =>
+  Effect.gen(function* () {
+    const f = transferFixture()
+    yield* moveIssue(f.input).pipe(Effect.provide(f.layer))
+    const { inspectTransferRecords: _inspect, ...ports } = f.operations
+    const layer = HulyClient.testLayer(ports)
+    expect(yield* moveIssue(f.input).pipe(Effect.provide(layer))).toMatchObject({
+      outcome: "blocked",
+      changed: false,
+      reason: expect.stringContaining("inspection unavailable")
+    })
+    expect(f.state.allocated).toBe(1)
+    expect(f.state.sent).toBe(1)
+  })
+)

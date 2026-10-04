@@ -28,7 +28,10 @@ const RecordFields = {
   space: DocId,
   attachedTo: DocId,
   modifiedOn: Timestamp,
-  modifiedBy: SocialIdentityId
+  modifiedBy: SocialIdentityId,
+  attachedToClass: Schema.optionalKey(ObjectClassName),
+  collection: Schema.optionalKey(Schema.String),
+  snapshot: Schema.optionalKey(Schema.String)
 }
 export const TransferHistoryRecordSchema = Schema.Struct({
   ...RecordFields,
@@ -37,7 +40,20 @@ export const TransferHistoryRecordSchema = Schema.Struct({
   history: TransferHistorySchema
 })
 export type TransferHistoryRecord = Schema.Schema.Type<typeof TransferHistoryRecordSchema>
+export const TransferOwnedRecordSchema = Schema.Struct({
+  ...RecordFields,
+  kind: Schema.Literal("owned"),
+  _class: ObjectClassName,
+  attachedToClass: ObjectClassName,
+  collection: Schema.String,
+  snapshot: Schema.String,
+  ownerId: DocId,
+  ownerClass: ObjectClassName
+})
+export const TransferSupportedRecordSchema = Schema.Union([TransferHistoryRecordSchema, TransferOwnedRecordSchema])
+export type TransferSupportedRecord = Schema.Schema.Type<typeof TransferSupportedRecordSchema>
 export const TransferRecordSchema = Schema.Union([
+  TransferOwnedRecordSchema,
   TransferHistoryRecordSchema,
   Schema.Struct({
     ...RecordFields,
@@ -48,6 +64,7 @@ export const TransferRecordSchema = Schema.Union([
 export type TransferRecord = Schema.Schema.Type<typeof TransferRecordSchema>
 export const TransferInspectionSchema = Schema.Struct({
   discovery: Schema.Literals(["complete", "incomplete"]),
+  classes: Schema.optionalKey(Schema.Array(ObjectClassName)),
   records: Schema.Array(TransferRecordSchema),
   blockers: Schema.Array(Schema.String),
   limitation: Schema.String
@@ -63,7 +80,8 @@ export const TransferWriteSchema = Schema.Struct({
   number: PositiveInteger,
   identifier: IssueIdentifier,
   rank: NonEmptyString,
-  records: Schema.Array(TransferHistoryRecordSchema)
+  records: Schema.Array(TransferSupportedRecordSchema),
+  recordClasses: Schema.optionalKey(Schema.Array(ObjectClassName))
 })
 export type TransferWrite = Schema.Schema.Type<typeof TransferWriteSchema>
 
