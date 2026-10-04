@@ -26,3 +26,36 @@ test("malformed result fails with fixed diagnostic only", () => {
   assert.equal(result.status, 1)
   assert.equal(result.stderr.trim(), "FAIL: tree completion result is not JSON")
 })
+for (const [status, consistency, reason, category] of [
+  ["observed", "inconsistent", "Protected payload of SECRET_MARKER differs from approved final values.", "protected-task-payload"],
+  ["unavailable", null, "Complete post-write project inventory is unavailable.", "project-inventory-unavailable"],
+  ["observed", "undetermined", "Movement deadline interrupted remaining verification reads.", "verification-deadline-interrupted"],
+  ["observed", "undetermined", "SECRET_MARKER arbitrary unknown cause", "unclassified"]
+]) {
+  test(`records safe verification category ${category}`, () => {
+    const result = run(JSON.stringify({ outcome: "incomplete", reason: "SECRET_MARKER", tasks: [], execution: { phase: "verification", commit: "acknowledged", reservations: [{ status: "confirmed", issueId: "SECRET_MARKER", number: 1 }, { status: "uncertain", issueId: "SECRET_MARKER" }] }, verification: status === "unavailable" ? { status, reason } : { status, consistency, completeness: "incomplete", reason, tasks: [{ issueId: "SECRET_MARKER" }], records: [{ recordId: "SECRET_MARKER" }], absentIssueIds: [] } }))
+    assert.equal(result.status, 1)
+    const summary = JSON.parse(result.stderr)
+    assert.equal(summary.commitConfirmation, "acknowledged")
+    assert.equal(summary.verificationStatus, status)
+    assert.equal(summary.verificationConsistency, consistency)
+    assert.equal(summary.verificationCompleteness, status === "unavailable" ? null : "incomplete")
+    assert.equal(summary.observedTaskCount, status === "unavailable" ? null : 1)
+    assert.equal(summary.observedRecordCount, status === "unavailable" ? null : 1)
+    assert.equal(summary.confirmedAbsentTaskCount, status === "unavailable" ? null : 0)
+    assert.equal(summary.confirmedReservationCount, 1)
+    assert.equal(summary.uncertainReservationCount, 1)
+    assert.equal(summary.verificationReasonCategory, category)
+    assert.equal(summary.reasonCategory, "unclassified")
+    assert.ok(!result.stderr.includes("SECRET_MARKER"))
+  })
+}
+test("unrecognized enum values cannot leak through the summary", () => {
+  const result = run(JSON.stringify({ outcome: "SECRET_MARKER", execution: { commit: "SECRET_MARKER", phase: "SECRET_MARKER" }, verification: { status: "SECRET_MARKER", consistency: "SECRET_MARKER", completeness: "SECRET_MARKER" } }))
+  assert.equal(result.status, 1)
+  const summary = JSON.parse(result.stderr)
+  assert.equal(summary.outcome, "invalid")
+  assert.equal(summary.commitConfirmation, null)
+  assert.equal(summary.verificationStatus, null)
+  assert.ok(!result.stderr.includes("SECRET_MARKER"))
+})

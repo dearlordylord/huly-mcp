@@ -63,7 +63,45 @@ assert_tree_completion() {
   local result="$1"
   shift
   if ! jq -e "$@" >/dev/null 2>/dev/null <<<"$result"; then
-    jq -nc --argjson result "$result" '{expected:"complete-tree-mapping",outcome:(if (["completed","blocked","no-op","incomplete","indeterminate"]|index($result.outcome))!=null then $result.outcome else "invalid" end),changed:(if ($result.changed|type)=="boolean" then $result.changed else null end),taskCount:(if ($result.tasks|type)=="array" then ($result.tasks|length) else null end),executionPhase:(if (["allocation","commit","verification"]|index($result.execution.phase))!=null then $result.execution.phase else null end),reservationCount:(if ($result.execution.reservations|type)=="array" then ($result.execution.reservations|length) else null end)}' >&2 2>/dev/null || printf 'FAIL: tree completion result is not JSON\n' >&2
+    jq -nc --argjson result "$result" '
+      def allowed($value; $values): if ($values|index($value))!=null then $value else null end;
+      def count_array($value): if ($value|type)=="array" then ($value|length) else null end;
+      # Categories describe audited producer prefixes, never arbitrary reason text.
+      def reason_category($value):
+        if ($value|type)!="string" then "unclassified"
+        elif $value=="Complete post-write project inventory is unavailable." then "project-inventory-unavailable"
+        elif $value=="Descendant closure could not be read completely." then "descendant-closure-unavailable"
+        elif $value=="Observed descendant closure differs from the complete planned tree." then "descendant-closure-mismatch"
+        elif $value|startswith("Movement deadline or response unavailable;") then "movement-deadline-or-unavailable"
+        elif $value|startswith("Movement deadline interrupted remaining verification reads.") then "verification-deadline-interrupted"
+        elif $value|startswith("Post-send verification read failed or exceeded the deadline.") then "verification-read-or-deadline"
+        elif $value|startswith("Verification reads unavailable;") then "verification-unavailable"
+        elif $value|startswith("Earlier observed discrepancies remain unresolved by subsequent incomplete reads:") then "earlier-discrepancy-retained"
+        elif $value|startswith("Protected payload of ") then "protected-task-payload"
+        elif $value|startswith("Observed protected payload or ownership of record ") then "protected-record-payload"
+        elif $value|startswith("Own migration metadata of record ") then "record-metadata-authentication"
+        elif $value|startswith("Current task ") then "current-task-observation"
+        elif $value|startswith("Current payload of ") then "current-task-payload-observation"
+        elif $value|startswith("Record closure of ") then "record-closure-observation"
+        else "unclassified" end;
+      {expected:"complete-tree-mapping",
+       outcome:(allowed($result.outcome; ["completed","blocked","no-op","incomplete","indeterminate"]) // "invalid"),
+       changed:(if ($result.changed|type)=="boolean" then $result.changed else null end),
+       taskCount:count_array($result.tasks),
+       executionPhase:allowed($result.execution.phase; ["allocation","commit","verification"]),
+       commitConfirmation:allowed($result.execution.commit; ["not-sent","sent","refused","reply-lost","acknowledged"]),
+       reservationCount:count_array($result.execution.reservations),
+       confirmedReservationCount:(if ($result.execution.reservations|type)=="array" then ([$result.execution.reservations[]|select(.status=="confirmed")]|length) else null end),
+       uncertainReservationCount:(if ($result.execution.reservations|type)=="array" then ([$result.execution.reservations[]|select(.status=="uncertain")]|length) else null end),
+       verificationStatus:allowed($result.verification.status; ["not-attempted","unavailable","observed"]),
+       verificationCompleteness:allowed($result.verification.completeness; ["complete","incomplete"]),
+       verificationConsistency:allowed($result.verification.consistency; ["consistent","inconsistent","undetermined"]),
+       observedTaskCount:count_array($result.verification.tasks),
+       observedRecordCount:count_array($result.verification.records),
+       confirmedAbsentTaskCount:count_array($result.verification.absentIssueIds),
+       reasonCategory:reason_category($result.reason),
+       verificationReasonCategory:reason_category($result.verification.reason)}
+    ' >&2 2>/dev/null || printf 'FAIL: tree completion result is not JSON\n' >&2
     return 1
   fi
 }
