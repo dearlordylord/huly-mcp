@@ -14,6 +14,9 @@ const Arguments = Schema.fromJsonString(
 )
 const IssueSnapshot = Schema.Struct({ ...MovementIssueSchema.fields, ...TransferIssueSchema.fields })
 const ProjectSnapshot = Schema.Struct({ _id: DocId, identifier: ProjectIdentifier, sequence: Count })
+const parseSnapshot = <A>(schema: Schema.ConstraintDecoder<A>, input: unknown): A =>
+  Schema.decodeUnknownSync(schema)(input)
+
 const run = async () => {
   const args = Schema.decodeUnknownSync(Arguments)(process.argv[2])
   const { client } = await connectIntegrationHuly()
@@ -21,14 +24,15 @@ const run = async () => {
     const issues = await Promise.all(
       args.issues.map(async (id) => {
         const raw = await client.findOne<Issue>(tracker.class.Issue, hulyQuery<Issue>({ _id: toRef<Issue>(id) }))
-        const issue = Schema.decodeUnknownSync(IssueSnapshot)(raw)
+        const issue = parseSnapshot(IssueSnapshot, raw)
         const owned = await Effect.runPromise(inspectTransferRecords(client, id))
         return { issue, owned }
       })
     )
     const projects = await Promise.all(
       args.projects.map(async (identifier) =>
-        Schema.decodeUnknownSync(ProjectSnapshot)(
+        parseSnapshot(
+          ProjectSnapshot,
           await client.findOne<Project>(tracker.class.Project, hulyQuery<Project>({ identifier }))
         )
       )
