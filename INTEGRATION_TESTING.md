@@ -517,6 +517,12 @@ they are not evidence of improved product latency.
 
 ## Bounded movement qualification
 
+The current process qualification has an open detached-stage cleanup blocker;
+see [the campaign retrospective](docs/postmortems/issue-305-integration-churn.md#bounded-campaign-outcome).
+A successful preparation leader exit alone does not prove its detached quality
+stage groups stopped. Resolve and review that custody boundary before claiming
+the coordinator provides complete descendant cleanup.
+
 For #305–311, use all five movement fixtures. The coordinator runs attributes,
 tree and concurrency before movement and rich transfer, putting unresolved
 feature boundaries ahead of previously passing checks. They own feature integration through MCP and CLI. The
