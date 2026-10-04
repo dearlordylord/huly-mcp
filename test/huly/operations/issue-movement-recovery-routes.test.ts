@@ -2,7 +2,7 @@ import { it } from "@effect/vitest"
 import { Effect, Deferred, Fiber, Schema } from "effect"
 import { TestClock } from "effect/testing"
 import { expect } from "vitest"
-import { UNKNOWN_TOTAL } from "../../../src/domain/schemas/shared.js"
+import { PositiveInteger, UNKNOWN_TOTAL } from "../../../src/domain/schemas/shared.js"
 import { MovementUncertaintyEvidenceSchema } from "../../../src/domain/schemas/issue-movement-uncertainty.js"
 import { MoveIssueResultSchema } from "../../../src/domain/schemas/issues-results.js"
 import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"
@@ -20,45 +20,57 @@ import { withDiagnostics } from "../../helpers/diagnostics.js"
 const parseEvidence = (input: unknown) => Schema.decodeUnknownSync(MovementUncertaintyEvidenceSchema)(input)
 const parseResult = (input: unknown) => Schema.decodeUnknownSync(MoveIssueResultSchema)(input)
 
-it.effect("an observed contradiction with no absent tasks preserves executable stable-ID reads across projects", () =>
-  Effect.gen(function* () {
-    const { destination, fixture, prepared } = treePlanFixture()
-    const evidence = parseEvidence({
-      destination: { projectId: destination._id, parentId: prepared.plan.parent?._id ?? null },
-      discovery: { status: "complete" },
-      execution: { phase: "verification", commit: "acknowledged", reservations: [] },
-      verification: {
-        status: "observed",
-        completeness: "complete",
-        consistency: "inconsistent",
-        reason: "Tasks are still in their source project after acknowledgement.",
-        tasks: prepared.tasks.map(({ issue, protectedIssue }) => ({
-          issueId: issue._id,
-          projectId: issue.space,
-          parentId: issue.attachedTo,
-          identifier: issue.identifier,
-          number: protectedIssue.number
-        })),
-        records: []
+it.effect(
+  "pure failure projection with confirmed reservations preserves executable stable-ID reads across projects",
+  () =>
+    Effect.gen(function* () {
+      const { destination, fixture, prepared } = treePlanFixture()
+      // Synthetic projection input; the fixture performs only the published recovery reads.
+      const initialSequence = fixture.state.sequence
+      const evidence = parseEvidence({
+        destination: { projectId: destination._id, parentId: prepared.plan.parent?._id ?? null },
+        discovery: { status: "complete" },
+        execution: {
+          phase: "verification",
+          commit: "acknowledged",
+          reservations: prepared.plan.tree.map((issue, index) => ({
+            status: "confirmed",
+            issueId: issue._id,
+            number: PositiveInteger.make(initialSequence + index + 1)
+          }))
+        },
+        verification: {
+          status: "observed",
+          completeness: "complete",
+          consistency: "inconsistent",
+          reason: "Tasks are still in their source project after acknowledgement.",
+          tasks: prepared.tasks.map(({ issue, protectedIssue }) => ({
+            issueId: issue._id,
+            projectId: issue.space,
+            parentId: issue.attachedTo,
+            identifier: issue.identifier,
+            number: protectedIssue.number
+          })),
+          records: []
+        }
+      })
+      const result = parseResult(
+        movementFailureResult("incomplete", "Observed destination contradiction.", prepared.plan, destination, evidence)
+      )
+      expect(result).toMatchObject({ outcome: "incomplete", issueIds: prepared.plan.tree.map((issue) => issue._id) })
+      if (result.outcome !== "incomplete" && result.outcome !== "indeterminate") return
+      const calls = [...result.inspection.matchAll(/MCP get_issue (\{[^}]+\})/g)]
+      expect(calls).toHaveLength(prepared.plan.tree.length)
+      for (const call of calls) {
+        const input: unknown = JSON.parse(assertExists(call[1]))
+        const params = yield* parseGetIssueParams(input)
+        const current = yield* getIssue(params).pipe(Effect.provide(fixture.layer), withDiagnostics)
+        expect(current.issueId).toBe(params.identifier)
+        expect(current.project).toBe(fixture.source.identifier)
       }
+      expect(fixture.state.allocated).toBe(0)
+      expect(fixture.state.sent).toBe(0)
     })
-    const result = parseResult(
-      movementFailureResult("incomplete", "Observed destination contradiction.", prepared.plan, destination, evidence)
-    )
-    expect(result).toMatchObject({ outcome: "incomplete", issueIds: prepared.plan.tree.map((issue) => issue._id) })
-    if (result.outcome !== "incomplete" && result.outcome !== "indeterminate") return
-    const calls = [...result.inspection.matchAll(/MCP get_issue (\{[^}]+\})/g)]
-    expect(calls).toHaveLength(prepared.plan.tree.length)
-    for (const call of calls) {
-      const input: unknown = JSON.parse(assertExists(call[1]))
-      const params = yield* parseGetIssueParams(input)
-      const current = yield* getIssue(params).pipe(Effect.provide(fixture.layer), withDiagnostics)
-      expect(current.issueId).toBe(params.identifier)
-      expect(current.project).toBe(fixture.source.identifier)
-    }
-    expect(fixture.state.allocated).toBe(0)
-    expect(fixture.state.sent).toBe(0)
-  })
 )
 
 it.effect(
