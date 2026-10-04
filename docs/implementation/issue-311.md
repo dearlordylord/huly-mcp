@@ -1,0 +1,41 @@
+# Issue 311 preparation
+
+Initial base: `9c07d6297fcb5dd404d764c2f77224aa80455268`, isolated branch `overseer/issue-311`. This is source preparation only: no live write, compiler, test or quality gate has run. Integration branch remains unchanged. All twelve criteria remain pending implementation, review and final combined certification.
+
+## Disposable live transport boundary
+
+`scripts/issue-movement-concurrency/gateway.ts` starts a loopback HTTP gateway from a schema-parsed upstream URL argument. It forwards ordinary Huly HTTP traffic; bootstrap JSON rewrites only `ACCOUNTS_URL` and workspace `endpoint` routing. Movement runs through the unchanged built MCP or CLI with `HULY_URL` pointing at this gateway. The second client uses the ordinary upstream URL, bypassing the gateway, and independently connects to ordinary Huly. No SDK replacement, module patch or server extension is involved.
+
+Gateway stdin accepts schema-owned NDJSON controls: arm one precise point/action, release a paused request, or close. Stdout emits schema-owned metadata events only. Authorization headers pass directly to the upstream adapter and are never emitted. Response bodies, login credentials, tokens and request payloads are not logged. Routes exist only for the explicit upstream and discovery endpoint URLs. The gateway binds loopback and is disposable.
+
+Points are `allocation-before`, `allocation-after`, `commit-before`, `commit-after`, and `verification-read`. Allocation detection parses the actual project sequence increment transaction. Commit detection parses the scoped `TxApplyIf` envelope. A forwarded event certifies HTTP response receipt, **not** successful transaction application; ordinary Huly's response and independent inspection establish application. The gateway does not split a batch, fabricate a commit result, retry a write, or assert atomicity. Installed api-client transport retries non-rate-limit failures up to three times. A dropped write response therefore arms suppression of subsequent matching write attempts before forwarding, and emits retry-suppressed metadata with attempt counts. This fixture proves one upstream send with a lost response; it does not remove or conceal production SDK retry behavior. Production no-reallocation guarantees and actual ordinary-server transaction-ID deduplication remain unresolved source/live obligations. Use a fresh gateway for each case; suppression is deliberately scoped to the single movement fixture.
+
+Run a fresh gateway for each scenario so verification-read classification cannot leak across movements. Pause actions require a controller deadline and unconditional cleanup/release. Persistent failures are reserved for all bounded verification attempts; they must not become silent retries of movement. The gateway's source is not yet tested and compressed/bootstrap routing must be checked before certification.
+
+## Final executable scenario matrix
+
+For each MCP and CLI case, create disposable compatible source/destination projects, a three-level tree, destination work and supported owned records. Record the exact running ordinary-server version separately. Save schema-parsed state before and after with fresh independent clients, plus schema-valid public stable-ID `get_issue` / `huly issues get` reads. Clean fixtures by stable IDs.
+
+At `allocation-before`, pause and let the independent client add a child, add a comment, add a time report, change an attribute or reparent the root. At `commit-before`, repeat each edit after sequence reservation. At `commit-after`, pause, apply a subsequent user edit, and release: never erase that edit or resume automatically. Every added object must retain its stable ID/content and its actual observed ownership.
+
+Failure cases use transport refusal before allocation, dropped allocation response, conditional refusal induced by a real changed guarded snapshot, dropped successful commit response, and persistent failed verification reads. An interrupted public process is inspected through fresh stable-ID reads; absence of a public result is a transport observation, never fabricated `changed:false`. Sending a batch then losing its reply is indeterminate until independently inspected. A server HTTP reply alone is not proof of global atomicity.
+
+A partial execution test must be induced by ordinary supported behavior and confirmed by observed state. Do not split the transaction at the gateway or label a synthetic prefix as real server evidence. If no real partial case is reachable, document that limit and retain application DI tests for truthful classification of observed inconsistency.
+
+Before the first move-related write, confirmed refusal may return blocked/changed:false. After any sequence reservation, known effects and possible gaps must be reported. Confirmed inconsistent state is incomplete; unavailable response/state is indeterminate. No case may reallocate, roll back over later edits or invent lost historical identifier mappings. A consistent repeated tree destination without resolutions verifies no-op; supplied resolutions still reject before no-op.
+
+## Planned additive production evidence
+
+After accepted 307/308/309/310 integration, extend schema-owned incomplete/indeterminate results with actual destination IDs, discovery completeness and verification completeness. Proposed discovery variants: complete known task IDs, or incomplete known IDs plus limitation. Proposed verification variants: not attempted, unavailable with reason, or observed actual tasks/owned-record IDs with consistency evidence. Actual task observations include stable ID, current project, parent, identifier and number; no old mapping is reconstructed after a lost reply. All known inspected tree IDs remain in failures.
+
+Coordinate with the 310 worker's typed consistent/inconsistent/unavailable verification and complete tree ID list. Scope serialization applies only to cooperating same-scope requests. Plain writes, other scopes, conditional-read-to-persistence races and edits after verification remain outside global isolation. Public descriptions must state those windows precisely.
+
+## Remaining work
+
+Finish the public MCP/CLI scenario controller and disposable fixture setup, production evidence schemas/core rechecks, deterministic application tests, actual two-client outcomes and server trigger/version evidence. Run the unchanged quality gate only in a root-scheduled slot. Live suite execution belongs to root after all six slices are integrated.
+
+## Single-send production boundary preparation
+
+Root authorized a movement-only transport after installed SDK source and pinned ordinary-server pipeline evidence showed repeated writes are possible: api-client's retry loop can resend the same transaction on transport, HTTP or body-decode failure, and logging duplicate transaction IDs does not prevent subsequent domain mutation. `src/huly/movement-transaction-transport.ts` constructs a public `TxOperations` over an ordinary-client delegating wrapper and a schema-owned single-send REST transaction port. Reads/model/account/search/domain delegate; writes issue exactly one POST with a bounded timeout, no redirect and no application retry. Redacted credentials unwrap only inside that adapter. Unsupported/malformed outbound movement writes fail before send; unavailable or malformed replies fail with after-send uncertainty. Supported writes include project sequence increments, scoped conditional movement batches and same-project issue updates.
+
+The module and dependency-injected tests are authored but have not been compiled or executed. Bootstrap selection and operation wiring remain pending combined 310 integration: movement sequence allocation, cross-project batches and same-project movement updates must all select the wrapper while unrelated tools retain their established client. Owning ordinary-client lifetime remains bootstrap's responsibility; the wrapper does not independently close it. Native SDK condition/batch behavior is preserved, without assuming global isolation or deduplication.
