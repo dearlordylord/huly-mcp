@@ -1,10 +1,12 @@
+import { HulyDataInvalidError } from "../../../src/huly/errors-base.js"
+import { MovementTransactionsSchema } from "../../../src/huly/issue-movement-transactions.js"
 import { it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import { expect } from "vitest"
 import { MovementIssueSchema, MovementProjectSchema } from "../../../src/domain/schemas/issue-movement-state.js"
 import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"
 import { TransferInspectionSchema } from "../../../src/domain/schemas/issue-transfer.js"
-import { DocId, ObjectClassName } from "../../../src/domain/schemas/shared.js"
+import { DocId, ObjectClassName, Timestamp } from "../../../src/domain/schemas/shared.js"
 import { HulyClient } from "../../../src/huly/client.js"
 import { moveIssue } from "../../../src/huly/operations/issue-movement.js"
 import { inspectTransferPlan } from "../../../src/huly/operations/issue-transfer-preflight.js"
@@ -14,6 +16,7 @@ import { assertExists } from "../../../src/utils/assertions.js"
 import { sdkFixture } from "../../helpers/huly-sdk.js"
 import { transferFixture } from "../../helpers/transfer.js"
 
+const parseMovementTransactions = (input: unknown) => Schema.decodeUnknownSync(MovementTransactionsSchema)(input)
 const issueSnapshot = (input: unknown) => Schema.decodeUnknownSync(MovementIssueSchema)(input)
 const projectSnapshot = (input: unknown) => Schema.decodeUnknownSync(MovementProjectSchema)(input)
 
@@ -146,3 +149,72 @@ for (const mutation of mutations) {
     })
   )
 }
+
+it.effect("legacy verifier without batch context refuses invalid persisted migration evidence", () =>
+  Effect.gen(function* () {
+    const f = transferFixture()
+    const record = assertExists(f.records[0])
+    const snapshot = { modifiedOn: record.modifiedOn, modifiedBy: record.modifiedBy, content: "preserved" }
+    record.snapshot = JSON.stringify(snapshot)
+    const client = yield* HulyClient.pipe(Effect.provide(f.layer))
+    const params = yield* parseMoveIssueParams(f.input)
+    const destination = projectSnapshot(f.destination)
+    const prepared = yield* inspectTransferPlan(
+      client,
+      issueSnapshot(f.root),
+      issueSnapshot(f.parent),
+      projectSnapshot(f.source),
+      destination,
+      params
+    )
+    if ("conflicts" in prepared) throw new Error("Expected compatible prepared move")
+    const writes: Array<TransferTreeWrite> = []
+    const commit = assertExists(f.operations.commitTransferTree)
+    const result = yield* moveIssue(params).pipe(
+      Effect.provide(
+        HulyClient.testLayer({
+          ...f.operations,
+          commitTransferTree: (write) => {
+            writes.push(write)
+            return commit(write)
+          }
+        })
+      )
+    )
+    expect(result.outcome).toBe("completed")
+    const transactions = parseMovementTransactions([
+      {
+        target: "record",
+        txId: "legacy-own-record-tx",
+        transactionClass: "core:class:TxUpdateDoc",
+        objectId: record._id,
+        objectClass: record._class,
+        objectSpace: f.source._id,
+        modifiedOn: record.modifiedOn,
+        modifiedBy: record.modifiedBy,
+        operations: { space: destination._id }
+      }
+    ])
+    record.modifiedOn = Timestamp.make(20)
+    record.snapshot = JSON.stringify({ ...snapshot, modifiedOn: record.modifiedOn })
+    const observedClient = yield* HulyClient.pipe(
+      Effect.provide(
+        HulyClient.testLayer({
+          ...f.operations,
+          inspectMovementTransactions: () =>
+            Effect.fail(new HulyDataInvalidError({ operation: "move_issue", entity: "persisted transactions" }))
+        })
+      )
+    )
+    const verification = yield* verifyTransferTree(
+      observedClient,
+      prepared,
+      destination,
+      assertExists(writes[0]),
+      () => Effect.void,
+      transactions
+    )
+    expect(verification).toMatchObject({ status: "observed", completeness: "incomplete", consistency: "undetermined" })
+    expect(f.state.sent).toBe(1)
+  })
+)
