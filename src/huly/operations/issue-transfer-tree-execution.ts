@@ -64,15 +64,16 @@ const executeWithinBudget = Effect.fn("transfer.executeWithinBudget")(function* 
 ): Effect.fn.Return<MoveIssueResult, MovementError> {
   const admission = yield* inspectAdmission(client, prepared, destination, params)
   if (admission.status === "blocked") return transferTreeRefusal(admission.reason, prepared, destination)
-  const sameProject = destination._id === prepared.plan.source._id
-  const allocation = sameProject
-    ? { status: "allocated" as const, numbers: prepared.tasks.map((task) => task.protectedIssue.number) }
-    : yield* allocateTransferTree(
-        client,
-        destination,
-        prepared.tasks.map((task) => task.issue._id),
-        progress.execution
-      )
+  const sameProject = admission.mode === "same-project"
+  const allocation =
+    admission.mode === "same-project"
+      ? { status: "allocated" as const, numbers: prepared.tasks.map((task) => task.protectedIssue.number) }
+      : yield* allocateTransferTree(
+          admission.allocate,
+          destination,
+          prepared.tasks.map((task) => task.issue._id),
+          progress.execution
+        )
   if (allocation.status !== "allocated")
     return yield* stoppedResult(
       allocation.status === "refused" ? "incomplete" : "indeterminate",
@@ -116,13 +117,18 @@ const executeWithinBudget = Effect.fn("transfer.executeWithinBudget")(function* 
   return yield* commitAndVerify(client, prepared, destination, write, progress, admission.commit)
 })
 
-type Admission =
+type ReadyAdmission = {
+  readonly status: "ready"
+  readonly commit: NonNullable<HulyClient["Service"]["commitTransferTree"]>
+} & (
+  | { readonly mode: "same-project"; readonly lastRank: undefined }
   | {
-      readonly status: "ready"
+      readonly mode: "cross-project"
       readonly lastRank: string | undefined
-      readonly commit: NonNullable<HulyClient["Service"]["commitTransferTree"]>
+      readonly allocate: NonNullable<HulyClient["Service"]["allocateMovementNumber"]>
     }
-  | { readonly status: "blocked"; readonly reason: string }
+)
+type Admission = ReadyAdmission | { readonly status: "blocked"; readonly reason: string }
 const inspectAdmission = Effect.fn("transfer.inspectAdmission")(function* (
   client: HulyClient["Service"],
   prepared: TransferPlan,
@@ -135,23 +141,31 @@ const inspectAdmission = Effect.fn("transfer.inspectAdmission")(function* (
       status: "blocked",
       reason: "Complete scoped tree adapter is unavailable; no allocation or task writes performed."
     }
+  const admission = yield* Effect.result(
+    reinspect(client, prepared, destination, params).pipe(Effect.timeout(TRANSFER_DISCOVERY_BUDGET))
+  )
+  if (admission._tag === "Failure" || !admission.success)
+    return {
+      status: "blocked",
+      reason:
+        "Task, ownership or hierarchy snapshots changed before allocation; inspect stable IDs and rebuild the call."
+    }
+  if (destination._id === prepared.plan.source._id)
+    return { status: "ready", mode: "same-project", lastRank: undefined, commit }
+  const allocate = client.allocateMovementNumber
+  if (allocate === undefined)
+    return {
+      status: "blocked",
+      reason: "Single-send sequence adapter is unavailable; no allocation or task writes performed."
+    }
   const last = yield* Effect.result(
     client.findOne<Issue>(tracker.class.Issue, hulyQuery<Issue>({ space: toRef<Project>(destination._id) }), {
       sort: { rank: SortingOrder.Descending }
     })
   )
-  if (last._tag === "Failure")
-    return { status: "blocked", reason: "Destination ordering inspection failed before writes." }
-  const admission = yield* Effect.result(
-    reinspect(client, prepared, destination, params).pipe(Effect.timeout(TRANSFER_DISCOVERY_BUDGET))
-  )
-  return admission._tag === "Failure" || !admission.success
-    ? {
-        status: "blocked",
-        reason:
-          "Task, ownership or hierarchy snapshots changed before allocation; inspect stable IDs and rebuild the call."
-      }
-    : { status: "ready", lastRank: last.success?.rank, commit }
+  return last._tag === "Failure"
+    ? { status: "blocked", reason: "Destination ordering inspection failed before writes." }
+    : { status: "ready", mode: "cross-project", lastRank: last.success?.rank, commit, allocate }
 })
 
 const commitAndVerify = Effect.fn("transfer.commitAndVerify")(function* (

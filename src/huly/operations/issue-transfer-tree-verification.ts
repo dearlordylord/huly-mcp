@@ -6,7 +6,7 @@ import {
   MovementObservedRecordSchema,
   type MovementUncertaintyEvidence
 } from "../../domain/schemas/issue-movement-uncertainty.js"
-import { TransferIssueSchema, type TransferRecord } from "../../domain/schemas/issue-transfer.js"
+import { TransferIssueSchema, type TransferRecord, type TransferIssue } from "../../domain/schemas/issue-transfer.js"
 import type { TransferTreeWrite } from "../../domain/schemas/issue-transfer-tree.js"
 import type { HulyClient } from "../client.js"
 import { tracker } from "../huly-plugins.js"
@@ -20,9 +20,27 @@ import { movementNoParent } from "./issue-movement-hierarchy.js"
 export type TransferTreeVerification = MovementUncertaintyEvidence["verification"]
 const ObservedIssueSchema = Schema.Struct({ ...MovementIssueSchema.fields, ...TransferIssueSchema.fields })
 const parseObservedIssue = (input: unknown) => Schema.decodeUnknownOption(ObservedIssueSchema)(input)
-const parseProtectedIssue = (input: unknown) => Schema.decodeUnknownOption(TransferIssueSchema)(input)
 type ObservedIssue = Schema.Schema.Type<typeof ObservedIssueSchema>
 type Observation = Extract<TransferTreeVerification, { readonly status: "observed" }>
+const protectedProjection = (issue: ObservedIssue): TransferIssue => {
+  const {
+    _id: _id,
+    space: _space,
+    identifier: _identifier,
+    title: _title,
+    attachedTo: _attachedTo,
+    attachedToClass: _attachedToClass,
+    collection: _collection,
+    modifiedOn: _modifiedOn,
+    subIssues: _subIssues,
+    estimation: _estimation,
+    reportedTime: _reportedTime,
+    parents: _parents,
+    childInfo: _childInfo,
+    ...protectedIssue
+  } = issue
+  return protectedIssue
+}
 
 const observedTask = (issue: ObservedIssue): Observation["tasks"][number] => ({
   issueId: issue._id,
@@ -134,14 +152,10 @@ const taskProblem = (observed: ReadonlyArray<ObservedIssue>, write: TransferTree
     if (current === undefined) return `Inspected task ${task.issueId} is absent.`
     if (!destinationMatches(current, task))
       return `Task ${task.issueId} differs from its planned destination or ancestry.`
-    const parsed = parseProtectedIssue(current)
+    const protectedIssue = protectedProjection(current)
     const expected = { ...task.expectedIssue, number: task.number, rank: task.rank }
     for (const change of task.attributeChanges ?? []) expected[change.field] = change.to
-    if (
-      parsed._tag === "None" ||
-      !isDeepStrictEqual(expected, parsed.value) ||
-      current.title !== task.expectedHierarchy.title
-    )
+    if (!isDeepStrictEqual(expected, protectedIssue) || current.title !== task.expectedHierarchy.title)
       return `Protected payload of ${task.issueId} differs from approved final values.`
   }
   return undefined

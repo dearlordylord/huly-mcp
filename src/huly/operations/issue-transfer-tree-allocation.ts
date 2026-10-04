@@ -1,4 +1,3 @@
-import type { Project } from "@hcengineering/tracker"
 import { Effect, Ref, Schema } from "effect"
 import type { MovementProject } from "../../domain/schemas/issue-movement-state.js"
 import type { MovementUncertaintyEvidence } from "../../domain/schemas/issue-movement-uncertainty.js"
@@ -6,8 +5,6 @@ import { TransferSequenceSchema } from "../../domain/schemas/issue-transfer.js"
 import type { IssueId, PositiveInteger } from "../../domain/schemas/shared.js"
 import type { HulyClient } from "../client.js"
 import { MovementTransportError } from "../movement-transaction-transport.js"
-import { core, tracker } from "../huly-plugins.js"
-import { toRef } from "./sdk-boundary.js"
 
 export type MovementExecutionProgress = Ref.Ref<MovementUncertaintyEvidence["execution"] | undefined>
 // Internal allocation proof; a missing response never supplies an invented number.
@@ -21,7 +18,7 @@ export type TransferTreeAllocation =
 const parseSequence = (input: unknown) => Schema.decodeUnknownOption(TransferSequenceSchema)(input)
 
 export const allocateTransferTree = Effect.fn("transfer.allocateTree")(function* (
-  client: HulyClient["Service"],
+  allocate: NonNullable<HulyClient["Service"]["allocateMovementNumber"]>,
   destination: MovementProject,
   issueIds: ReadonlyArray<IssueId>,
   execution: MovementExecutionProgress
@@ -34,17 +31,7 @@ export const allocateTransferTree = Effect.fn("transfer.allocateTree")(function*
       commit: "not-sent",
       reservations: [...reservations, { status: "uncertain", issueId }]
     })
-    const allocated = yield* Effect.result(
-      client.allocateMovementNumber === undefined
-        ? client.updateDoc(
-            tracker.class.Project,
-            core.space.Space,
-            toRef<Project>(destination._id),
-            { $inc: { sequence: 1 } },
-            true
-          )
-        : client.allocateMovementNumber(destination._id)
-    )
+    const allocated = yield* Effect.result(allocate(destination._id))
     if (allocated._tag === "Failure") {
       const refused = allocated.failure instanceof MovementTransportError && allocated.failure.phase === "before-send"
       if (refused)

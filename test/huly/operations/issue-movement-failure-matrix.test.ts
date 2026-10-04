@@ -396,3 +396,14 @@ it.effect("same-project scoped movement preserves all numbers, identifiers and r
     expect(f.grandchild.attachedTo).toBe(f.child._id)
   })
 )
+
+it.effect("cross-project admission refuses a missing single-send sequence port before generic SDK writes", () =>
+  Effect.gen(function* () {
+    const f = transferTreeFixture()
+    const { allocateMovementNumber: _allocation, ...operations } = f.operations
+    const result = yield* run(f, operations)
+    expect(result).toMatchObject({ outcome: "blocked", changed: false })
+    expect(f.state.allocated).toBe(0)
+    expect(f.state.sent).toBe(0)
+  })
+)
