@@ -13,9 +13,12 @@ import { ownedRecord, attachmentPayload } from "../../helpers/transfer-records.j
 
 const move = (input: unknown) => parseMoveIssueParams(input).pipe(Effect.flatMap(moveIssue))
 
+const parseSupportedRecords = (input: unknown) =>
+  Schema.decodeUnknownSync(Schema.Array(TransferSupportedRecordSchema))(input)
+
 const richFixture = () => {
   const f = transferFixture()
-  let extra = Schema.decodeUnknownSync(Schema.Array(TransferSupportedRecordSchema))(
+  let extra = parseSupportedRecords(
     [
       ownedRecord("comment", String(chunter.class.ChatMessage), f.root._id, "comments", {
         message: "original",
