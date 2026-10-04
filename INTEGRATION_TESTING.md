@@ -595,3 +595,5 @@ This workflow adopts the finite-work controls in sibling Dalph’s
 `docs/development/workflow.md` and Hapsland’s `docs/testing-matrix.md`. It changes
 qualification selection, not the movement API, coverage thresholds, permissions,
 or truthfulness requirements.
+
+Cross-project pre-send inspection consumes the remaining shared 30-second execution budget after fresh admission and sequence allocation; it does not start a separate ten-second allowance. Initial discovery and pre-allocation inspection retain their ten-second bounds. The full fresh pre-send guard must succeed before a task batch is sent. Expiry preserves confirmed reservations and a not-sent task batch; no mutation is replayed.

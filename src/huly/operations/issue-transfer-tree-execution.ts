@@ -143,9 +143,7 @@ const executePlannedWrite = Effect.fn("transfer.executePlannedWrite")(function* 
       return yield* finishVerification(client, prepared, destination, write, progress)
     return yield* commitAndVerify(client, prepared, destination, write, progress, admission.commit)
   }
-  const presend = yield* Effect.result(
-    reinspect(client, prepared, destination, params).pipe(Effect.timeout(TRANSFER_DISCOVERY_BUDGET))
-  )
+  const presend = yield* Effect.result(reinspect(client, prepared, destination, params))
   if (presend._tag === "Failure")
     return yield* stoppedResult("indeterminate", presendFailureReason(presend.failure), prepared, destination, progress)
   if (presend.success === undefined) {

@@ -1,5 +1,5 @@
 import { HulyAuthError } from "../../../src/huly/errors-base.js"
-import { TRANSFER_DISCOVERY_BUDGET } from "../../../src/huly/operations/issue-transfer-tree.js"
+import { TRANSFER_EXECUTION_BUDGET } from "../../../src/huly/operations/issue-transfer-tree.js"
 import { type Doc, type DocumentQuery, type FindOptions } from "@hcengineering/core"
 import { it } from "@effect/vitest"
 import { Effect, Fiber, Schema } from "effect"
@@ -189,16 +189,66 @@ for (const failure of ["timeout", "read-unavailable"] as const) {
         Effect.provide(HulyClient.testLayer({ ...f.operations, findAll })),
         Effect.forkChild
       )
-      yield* TestClock.adjust(TRANSFER_DISCOVERY_BUDGET)
+      yield* TestClock.adjust(TRANSFER_EXECUTION_BUDGET)
       const result = yield* Fiber.join(fiber)
       expect(result).toMatchObject({ outcome: "indeterminate", execution: { phase: "allocation", commit: "not-sent" } })
       if (result.outcome !== "indeterminate") throw new Error("Expected an indeterminate pre-send result")
       expect(result.reason).toContain(
-        failure === "timeout" ? "Pre-send inspection exceeded its deadline" : "Pre-send inspection unavailable"
+        failure === "timeout" ? "Movement deadline or response unavailable" : "Pre-send inspection unavailable"
       )
       expect(result.reason).not.toContain("Untrusted failure detail")
       expect(f.state.allocated).toBe(3)
       expect(f.state.sent).toBe(0)
+    })
+  )
+}
+
+for (const allocationDelay of ["0 seconds", "24 seconds"] as const) {
+  it.effect(`pre-send inspection shares the execution deadline after ${allocationDelay} allocation`, () =>
+    Effect.gen(function* () {
+      const f = transferTreeFixture()
+      const inspect = assertExists(f.operations.inspectTransferRecords)
+      const allocate = assertExists(f.operations.allocateMovementNumber)
+      const inspectTransferRecords: HulyClientOperations["inspectTransferRecords"] = (issueId, tree) =>
+        inspect(issueId, tree).pipe(
+          Effect.delay(
+            f.state.allocated === 3 && f.state.sent === 0 && issueId === IssueId.make(f.root._id)
+              ? allocationDelay === "0 seconds"
+                ? "12 seconds"
+                : "8 seconds"
+              : "0 seconds"
+          )
+        )
+      const allocateMovementNumber: HulyClientOperations["allocateMovementNumber"] = (destinationId) =>
+        Effect.sleep(f.state.allocated === 0 ? allocationDelay : "0 seconds").pipe(
+          Effect.flatMap(() => allocate(destinationId))
+        )
+      const fiber = yield* parseMoveIssueParams(f.input).pipe(
+        Effect.flatMap(moveIssue),
+        Effect.provide(HulyClient.testLayer({ ...f.operations, inspectTransferRecords, allocateMovementNumber })),
+        Effect.forkChild
+      )
+      yield* TestClock.adjust(TRANSFER_EXECUTION_BUDGET)
+      const result = yield* Fiber.join(fiber)
+      if (allocationDelay === "0 seconds") {
+        expect(result.outcome).toBe("completed")
+        expect(f.state.sent).toBe(1)
+      } else {
+        expect(result).toMatchObject({
+          outcome: "indeterminate",
+          execution: {
+            phase: "allocation",
+            commit: "not-sent",
+            reservations: [
+              { status: "confirmed", issueId: f.root._id },
+              { status: "confirmed", issueId: f.child._id },
+              { status: "confirmed", issueId: f.grandchild._id }
+            ]
+          }
+        })
+        expect(f.state.sent).toBe(0)
+      }
+      expect(f.state.allocated).toBe(3)
     })
   )
 }
