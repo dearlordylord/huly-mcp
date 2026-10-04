@@ -8,13 +8,16 @@ import { TransferIssueSchema } from "../../../src/domain/schemas/issue-transfer.
 import { MovementIssueSchema } from "../../../src/domain/schemas/issue-movement-state.js"
 import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"
 
+const parseSnapshot = <A>(schema: Schema.ConstraintDecoder<A>, input: unknown): A =>
+  Schema.decodeUnknownSync(schema)(input)
+
 it("discard consent cannot authorize another task or a different current reference", async () => {
   await fc.assert(
     fc.asyncProperty(fc.uuid(), fc.uuid(), fc.boolean(), async (current, other, wrongTask) => {
       fc.pre(current !== other)
       const f = transferFixture()
-      const root = Schema.decodeUnknownSync(MovementIssueSchema)(f.root)
-      const issue = Schema.decodeUnknownSync(TransferIssueSchema)({ ...f.root, component: current, milestone: other })
+      const root = parseSnapshot(MovementIssueSchema, f.root)
+      const issue = parseSnapshot(TransferIssueSchema, { ...f.root, component: current, milestone: other })
       const params = await Effect.runPromise(
         parseMoveIssueParams({
           ...f.input,
