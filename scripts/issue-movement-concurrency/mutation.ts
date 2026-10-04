@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { IssueSchema } from "../../src/domain/schemas/issues.js"
-import type { ScenarioArguments } from "./scenario-contract.js"
+import { MutationResultSchema, type ScenarioArguments } from "./scenario-contract.js"
 import { runPublic } from "./public-process.js"
 
 export const readStableIssue = async (args: ScenarioArguments, signal: AbortSignal) => {
@@ -24,7 +24,7 @@ export const readStableIssue = async (args: ScenarioArguments, signal: AbortSign
 export const runMutation = async (args: ScenarioArguments, signal: AbortSignal) => {
   const before = await readStableIssue(args, signal)
   const parent = args.mutationParents[before.project]
-  const replacements = new Map([
+  const replacements = new Map<string, string>([
     ["@PROJECT", before.project],
     ["@IDENTIFIER", before.identifier],
     ["@ISSUE_ID", before.issueId]
@@ -35,9 +35,12 @@ export const runMutation = async (args: ScenarioArguments, signal: AbortSignal) 
   const argv = args.mutationArgs.map((argument) => replacements.get(argument) ?? argument)
   const result =
     args.mutationKind === "none"
-      ? null
-      : Schema.decodeUnknownSync(Schema.fromJsonString(Schema.JsonObject))(
-          await runPublic(["packages/huly-cli/dist/index.cjs", ...argv, "--json"], args.upstream, signal)
-        )
-  return { kind: args.mutationKind, before, result }
+      ? { kind: "none" }
+      : {
+          kind: args.mutationKind,
+          result: Schema.decodeUnknownSync(Schema.fromJsonString(Schema.JsonObject))(
+            await runPublic(["packages/huly-cli/dist/index.cjs", ...argv, "--json"], args.upstream, signal)
+          )
+        }
+  return { before, action: Schema.decodeUnknownSync(MutationResultSchema)(result) }
 }

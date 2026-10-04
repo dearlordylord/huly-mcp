@@ -32,8 +32,9 @@ const main = async () => {
     return `${state.base}/route/${key}`
   }
   type Json = Schema.Schema.Type<typeof Schema.Json>
+  const isJsonArray = (json: Json): json is Schema.JsonArray => Array.isArray(json)
   const rewriteDiscovery = (json: Json): Json => {
-    if (Array.isArray(json)) return json.map(rewriteDiscovery)
+    if (isJsonArray(json)) return json.map(rewriteDiscovery)
     if (json === null || typeof json !== "object") return json
     return Object.fromEntries(
       Object.entries(json).map(([key, value]) => [
