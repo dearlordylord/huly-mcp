@@ -5,7 +5,7 @@ import { MovementIssueSchema, MovementProjectSchema } from "../../../src/domain/
 import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"
 import { HulyClient } from "../../../src/huly/client.js"
 import { inspectTransferPlan } from "../../../src/huly/operations/issue-transfer-preflight.js"
-import { task } from "../../../src/huly/huly-plugins.js"
+import { task, tracker } from "../../../src/huly/huly-plugins.js"
 import { DocId } from "../../../src/domain/schemas/shared.js"
 import { transferFixture } from "../../helpers/transfer.js"
 import { sdkFixture } from "../../helpers/huly-sdk.js"
@@ -28,7 +28,9 @@ const modes = [
   "changedRoot",
   "brokenSourceAncestry",
   "brokenParentAncestry",
-  "missingAdapter"
+  "missingAdapter",
+  "rawRootChanged",
+  "closureChanged"
 ]
 for (const mode of modes) {
   it.effect(`preflight refuses ${mode} without reserving a number`, () =>
@@ -55,14 +57,33 @@ for (const mode of modes) {
       if (mode === "brokenParentAncestry") f.parent.attachedTo = sdkFixture("missing-destination-parent")
       const originalFindOne = f.operations.findOne
       assertExists(originalFindOne)
+      const originalFindAll = f.operations.findAll
+      assertExists(originalFindAll)
       const { inspectTransferRecords: _inspect, ...withoutInspector } = f.operations
       const layer = HulyClient.testLayer({
         ...(mode === "missingAdapter" ? withoutInspector : f.operations),
+        findAll: (cls, query, options) =>
+          originalFindAll(cls, query, options).pipe(
+            Effect.map((rows) => {
+              if (mode === "closureChanged" && Reflect.get(query, "attachedTo") !== undefined)
+                rows.total = rows.length + 1
+              return rows
+            })
+          ),
         findOne: (cls, query, options) =>
           (mode === "missingWorkflow" && cls === task.class.ProjectType) ||
           (mode === "missingKind" && cls === task.class.TaskType)
             ? Effect.succeed(undefined)
-            : originalFindOne(cls, query, options)
+            : originalFindOne(cls, query, options).pipe(
+                Effect.map((row) =>
+                  mode === "rawRootChanged" &&
+                  cls === tracker.class.Issue &&
+                  Reflect.get(query, "_id") === f.root._id &&
+                  row !== undefined
+                    ? { ...row, modifiedOn: row.modifiedOn + 1 }
+                    : row
+                )
+              )
       })
       const client = yield* HulyClient.pipe(Effect.provide(layer))
       const inspected = yield* Effect.result(

@@ -9,6 +9,7 @@ import { HulyClient } from "../../../src/huly/client.js"
 import { moveIssue } from "../../../src/huly/operations/issue-movement.js"
 import { inspectTransferPlan } from "../../../src/huly/operations/issue-transfer-preflight.js"
 import { verifyTransfer } from "../../../src/huly/operations/issue-transfer-verification.js"
+import { assertExists } from "../../../src/utils/assertions.js"
 import { sdkFixture } from "../../helpers/huly-sdk.js"
 import { transferFixture } from "../../helpers/transfer.js"
 
@@ -30,7 +31,10 @@ const mutations = [
   "incompleteRecords",
   "recordBlockers",
   "missingHistory",
-  "foreignRecord"
+  "foreignRecord",
+  "incompleteSource",
+  "incompleteTarget",
+  "closureChange"
 ]
 
 for (const mutation of mutations) {
@@ -88,8 +92,22 @@ for (const mutation of mutations) {
         limitation: "Test inventory"
       })
       const { inspectTransferRecords: _inspector, ...withoutInspector } = f.operations
+      const originalFindAll = f.operations.findAll
+      assertExists(originalFindAll)
       const observed = HulyClient.testLayer({
         ...withoutInspector,
+        findAll: (cls, query, options) =>
+          originalFindAll(cls, query, options).pipe(
+            Effect.map((rows) => {
+              if (
+                (mutation === "incompleteSource" && Reflect.get(query, "space") === f.source._id) ||
+                (mutation === "incompleteTarget" && Reflect.get(query, "space") === f.destination._id) ||
+                (mutation === "closureChange" && Reflect.get(query, "attachedTo") !== undefined)
+              )
+                rows.total = rows.length + 1
+              return rows
+            })
+          ),
         ...(mutation === "missingInspector" ? {} : { inspectTransferRecords: () => Effect.succeed(inspection) })
       })
       const observedClient = yield* HulyClient.pipe(Effect.provide(observed))
