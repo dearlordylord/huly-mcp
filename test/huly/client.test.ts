@@ -31,10 +31,13 @@ import { TestClock } from "effect/testing"
 import { beforeEach, expect } from "vitest"
 import { HulyConfigService } from "../../src/config/config.js"
 import { SocialIdentityId } from "../../src/domain/schemas/person-administration.js"
+import { TransferTreeWriteSchema } from "../../src/domain/schemas/issue-transfer-tree.js"
+import { transferTreeFixture } from "../helpers/transfer-tree.js"
 import { TransferWriteSchema } from "../../src/domain/schemas/issue-transfer.js"
 import { PersonMergeReferenceImpactSchema } from "../../src/domain/schemas/person-merge.js"
 import {
   Email,
+  DocId,
   IssueId,
   HulyTransactionScope,
   PersonId as DomainPersonId,
@@ -62,6 +65,7 @@ import { mockFn } from "../helpers/mock-fn.js"
 
 // --- Mock setup ---
 
+const parseTreeWrite = (input: unknown) => Schema.decodeUnknownSync(TransferTreeWriteSchema)(input)
 const decodePersonMergeReferenceImpact = Schema.decodeSync(PersonMergeReferenceImpactSchema)
 const mockFindAll = mockFn()
 const mockFindOne = mockFn()
@@ -69,6 +73,7 @@ const mockFindAllInModel = mockFn()
 const mockCreateDoc = mockFn()
 const mockUpdateDoc = mockFn()
 const mockUpdate = mockFn()
+const mockUpdateCollection = mockFn()
 const mockAddCollection = mockFn()
 const mockRemoveCollection = mockFn()
 const mockRemoveDoc = mockFn()
@@ -115,6 +120,7 @@ const mockTxOperations = {
   updateDoc: mockUpdateDoc,
   update: mockUpdate,
   addCollection: mockAddCollection,
+  updateCollection: mockUpdateCollection,
   removeCollection: mockRemoveCollection,
   removeDoc: mockRemoveDoc,
   apply: mockApply,
@@ -138,6 +144,7 @@ const clearAllMockFns = () => {
   mockUpdateDoc.mockClear()
   mockUpdate.mockClear()
   mockAddCollection.mockClear()
+  mockUpdateCollection.mockClear()
   mockRemoveCollection.mockClear()
   mockRemoveDoc.mockClear()
   mockApply.mockClear()
@@ -314,6 +321,124 @@ describe("HulyClient Service", () => {
       expect(requests).toHaveLength(2)
     }).pipe(Effect.provide(layer), Effect.scoped)
   })
+
+  it.effect("routes a guarded tree batch through the movement port without using ordinary apply", () => {
+    const f = transferTreeFixture()
+    const requests: Array<Schema.JsonObject> = []
+    const sdk: HulySdkDependencies = {
+      ...testSdk,
+      movementHttp: {
+        send: (request) =>
+          Effect.sync(() => {
+            requests.push(Schema.decodeUnknownSync(Schema.fromJsonString(Schema.JsonObject))(request.body))
+            return { status: PositiveInteger.make(200), body: JSON.stringify({ success: true, serverTime: 0 }) }
+          })
+      }
+    }
+    const layer = HulyClient.layerWithDependencies.pipe(
+      Layer.provide(Layer.merge(testConfigLayer, Layer.succeed(HulySdk, sdk)))
+    )
+    const write = parseTreeWrite({
+      rootId: f.root._id,
+      ancestors: [],
+      tasks: [
+        {
+          issueId: f.root._id,
+          sourceId: f.source._id,
+          destinationId: f.destination._id,
+          previousParent: f.root.attachedTo,
+          parentId: f.parent._id,
+          modifiedOn: f.root.modifiedOn,
+          number: 12,
+          identifier: "OTHER-12",
+          rank: f.root.rank,
+          records: [],
+          recordClasses: [],
+          expectedIssue: f.root,
+          expectedHierarchy: f.root,
+          finalParents: []
+        }
+      ]
+    })
+    return Effect.gen(function* () {
+      const client = yield* HulyClient
+      expect(yield* assertExists(client.commitTransferTree)(write)).toBe("applied")
+      expect(requests).toHaveLength(1)
+      expect(requests[0]).toMatchObject({ _class: "core:class:TxApplyIf" })
+      expect(mockApply.mock.calls).toHaveLength(0)
+    }).pipe(Effect.provide(layer), Effect.scoped)
+  })
+
+  it.effect("reserves movement numbers through one HTTP send while exposing parsed account memberships", () => {
+    const requests: Array<Schema.JsonObject> = []
+    const sdk: HulySdkDependencies = {
+      ...testSdk,
+      createRestClient: mockFn().mockImplementation(() => ({
+        getAccount: () =>
+          Promise.resolve({
+            uuid: "00000000-0000-4000-8000-000000000000",
+            primarySocialId: "social-member",
+            socialIds: ["social-member", "social-secondary"]
+          })
+      })),
+      movementHttp: {
+        send: (request) =>
+          Effect.sync(() => {
+            requests.push(Schema.decodeUnknownSync(Schema.fromJsonString(Schema.JsonObject))(request.body))
+            return { status: PositiveInteger.make(200), body: JSON.stringify({ object: { sequence: 12 } }) }
+          })
+      }
+    }
+    const layer = HulyClient.layerWithDependencies.pipe(
+      Layer.provide(Layer.merge(testConfigLayer, Layer.succeed(HulySdk, sdk)))
+    )
+    return Effect.gen(function* () {
+      const client = yield* HulyClient
+      expect(yield* assertExists(client.allocateMovementNumber)(DocId.make("destination"))).toMatchObject({
+        object: { sequence: 12 }
+      })
+      expect(requests).toHaveLength(1)
+      expect(requests[0]).toMatchObject({
+        _class: "core:class:TxUpdateDoc",
+        objectId: "destination",
+        operations: { $inc: { sequence: 1 } },
+        retrieve: true
+      })
+      expect(mockUpdateDoc.mock.calls).toHaveLength(0)
+      expect(assertExists(client.getSocialIds)()).toEqual(["social-member", "social-secondary"])
+    }).pipe(Effect.provide(layer), Effect.scoped)
+  })
+
+  it.effect("updates an attached record through the ordinary SDK and releases its connection once", () =>
+    Effect.gen(function* () {
+      mockUpdateCollection.mockResolvedValue({ id: "record-update" })
+      const program = Effect.gen(function* () {
+        const client = yield* HulyClient
+        return yield* client.updateCollection(
+          chunter.class.ChatMessage,
+          toRef("project"),
+          toRef("comment"),
+          toRef("issue"),
+          tracker.class.Issue,
+          "comments",
+          { message: "Updated comment" },
+          true
+        )
+      }).pipe(Effect.provide(liveClientLayer), Effect.scoped)
+      expect(yield* program).toEqual({ id: "record-update" })
+      expect(mockUpdateCollection.mock.calls).toContainEqual([
+        chunter.class.ChatMessage,
+        "project",
+        "comment",
+        "issue",
+        tracker.class.Issue,
+        "comments",
+        { message: "Updated comment" },
+        true
+      ])
+      expect(mockClose.mock.calls).toHaveLength(1)
+    })
+  )
 
   it.effect("wires model-owned transfer discovery through the live client dependency seam", () =>
     Effect.gen(function* () {
