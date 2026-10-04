@@ -64,7 +64,7 @@ for (const scenario of scenarios) {
       ])
       const intent = assertExists(transactions[0])
       const { modifiedOn: _queuedTime, ...rawIntent } = intent
-      let persisted = parseInspection({
+      const initialInspection = parseInspection({
         discovery: scenario === "missing-transaction" ? "incomplete" : "complete",
         transactions:
           scenario === "missing-transaction"
@@ -81,11 +81,13 @@ for (const scenario of scenarios) {
                 }
               ]
       })
-      if (scenario === "duplicate-evidence")
-        persisted = parseInspection({
-          ...persisted,
-          transactions: [...persisted.transactions, assertExists(persisted.transactions[0])]
-        })
+      const persisted =
+        scenario === "duplicate-evidence"
+          ? parseInspection({
+              ...initialInspection,
+              transactions: [...initialInspection.transactions, assertExists(initialInspection.transactions[0])]
+            })
+          : initialInspection
       f.state.failCommit = scenario === "reply-lost"
       const operations = {
         ...f.operations,
