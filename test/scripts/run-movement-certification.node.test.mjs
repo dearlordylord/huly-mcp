@@ -122,7 +122,8 @@ test('modified historical log refuses reuse rather than inventing passed evidenc
 test('changed suite inputs during child execution never create reusable pass evidence', async () => {
   const f = await fixture()
   try {
-    await writeFile(path.join(f.root, `scripts/integration_test_${suites[0]}.sh`), '#!/bin/bash\necho changed >> scripts/integration_test_issue_movement.sh\nexit 0\n')
+    const changedScript = `scripts/integration_test_${suites[0]}.sh`
+    await writeFile(path.join(f.root, changedScript), `#!/bin/bash\necho changed >> ${changedScript}\nexit 0\n`)
     const result = await runCertification(f)
     assert.equal(result.exit, 1)
     const receipt = JSON.parse((await readFile(path.join(f.stateDir, 'receipts.jsonl'), 'utf8')).trim())
