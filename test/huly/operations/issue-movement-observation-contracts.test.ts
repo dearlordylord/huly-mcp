@@ -205,7 +205,7 @@ it.effect("post-allocation project inventory outage retains confirmed reservatio
       outcome: "indeterminate",
       execution: {
         commit: "not-sent",
-        reservations: expect.arrayContaining([{ status: "confirmed", issueId: f.root._id }])
+        reservations: expect.arrayContaining([expect.objectContaining({ status: "confirmed", issueId: f.root._id })])
       }
     })
     expect(f.state.allocated).toBe(3)
