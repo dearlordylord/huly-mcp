@@ -560,6 +560,35 @@ it has no single-suite selection flag. Do not invent one. The package
 `pnpm integration:movement` command still performs its full preparation before
 its suite inventory.
 
+For repeated fixture calls on the same immutable build and environment, prepare
+one read-only native discovery prior in an owned private directory:
+
+```bash
+prior_directory=$(mktemp -d)
+node scripts/run-bundled.mjs scripts/integration-mcp-call-main.ts --prepare-prior "$prior_directory"
+export HULY_INTEGRATION_MCP_PRIOR="$prior_directory/native-discovery.json"
+```
+
+Preparation captures ordinary native discovery once; each later helper call
+still owns a fresh stdio session and uses an explicit tool definition. The cache
+is schema-parsed, private, and bound to the exact executable, bundle and
+environment identity. An invalid or stale prior fails before invocation; it does
+not authorize replaying a mutation. Keep the prior private and include its hash
+in the coordinator's input audit.
+
+When the authorized coordinator provides `MOVEMENT_PRIVATE_EVIDENCE_DIR` (an
+owned, normalized 0700 directory), the tree fixture atomically retains a 0600
+`tree-ledger.json`. It records known project, issue, component, milestone,
+document, teamspace and reference IDs plus acknowledged comment, attachment and
+time-report IDs before subsequent effects. Stage/tool intent and conservative
+unresolved-creation flags remain evidence limitations. Label tools do not return
+tag-reference IDs, and a failing reference helper may have unobservable partial
+IDs. The ledger preserves those limitations without inventing IDs. Ledger failure
+keeps a failing exit status while existing known-ID cleanup is still attempted.
+The current cleanup receipt proves absence only for its explicitly inspected
+resource kinds; retaining nested IDs does not prove their absence or authorize
+broader deletion.
+
 The authorized no-overall-deadline continuation may run the unresolved tree
 fixture first, then the fresh ordinary `pnpm check-all` and the remaining four
 suites on the same frozen candidate. A passing early tree receipt keeps its

@@ -23,6 +23,12 @@ test("failure records safe outcome and count without payload or identifiers", ()
   assert.equal(summary.reservationCount, 1)
   assert.ok(!result.stderr.includes("SECRET_MARKER"))
 })
+test("audited pre-allocation deadline is projected without exposing raw reason", () => {
+  const result = run(JSON.stringify({ outcome: "blocked", changed: false, reason: "Pre-allocation inspection exceeded its deadline; no allocation or task writes performed." }))
+  assert.equal(result.status, 1)
+  assert.equal(JSON.parse(result.stderr).reasonCategory, "pre-allocation-timeout")
+  assert.ok(!result.stderr.includes("no allocation or task writes performed"))
+})
 test("malformed result fails with fixed diagnostic only", () => {
   const result = run("SECRET_MARKER")
   assert.equal(result.status, 1)
@@ -93,4 +99,18 @@ test("rejects public or symlink evidence directories and preserves default behav
     assert.equal(disabled.stdout, "")
     assert.equal(disabled.stderr, "")
   } finally { rmSync(directory, { recursive: true }) }
+})
+
+test("ledger failure still attempts known-resource cleanup and preserves original failure", () => {
+  const cleanup = source.slice(source.indexOf("\ncleanup() {"), source.indexOf("FIXTURE_RECORD_IDS='[]'"))
+  for (const originalStatus of [0, 7]) {
+    const result = spawnSync("bash", ["-c", `${cleanup}
+ISSUES=(known-issue); PROJECT_IDS=(known-project); DOCUMENT=''; TEAMSPACE=''; FIXTURE_RECORD_IDS='[]'; UNRESOLVED_CREATION=false
+ledger_failure() { return 1; }
+cleanup_acknowledged() { jq -e '.input.issueIds==["known-issue"] and .input.projectIds==["known-project"]' >/dev/null <<<"$1" || return 1; printf 'known-cleanup-attempted\\n'; }
+(exit "$1")
+cleanup ledger_failure cleanup_acknowledged`, "cleanup-test", String(originalStatus)], { encoding: "utf8", timeout: 5000, killSignal: "SIGKILL" })
+    assert.equal(result.status, originalStatus === 0 ? 1 : originalStatus)
+    assert.equal(result.stdout.trim(), "known-cleanup-attempted")
+  }
 })
