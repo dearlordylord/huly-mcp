@@ -3,6 +3,7 @@ import { Effect } from "effect"
 import type { ObjectClassName } from "../domain/schemas/shared.js"
 import { makeOperationConnectionError } from "./errors-base.js"
 import type { RecordOwner } from "./issue-transfer-records.js"
+import type { RecordDiscoveryLimits } from "./issue-transfer-discovery.js"
 import { hulyQuery } from "./operations/query-helpers.js"
 import { toClassRef, toRef } from "./operations/sdk-boundary.js"
 
@@ -12,7 +13,7 @@ export const readAttachedClassWindow = Effect.fn("transfer.readClassWindow")(fun
   client: TxOperations,
   owner: RecordOwner,
   classes: ReadonlyArray<ObjectClassName>,
-  resultLimit: number
+  resultLimit: RecordDiscoveryLimits["result"]
 ) {
   return yield* Effect.forEach(
     classes,

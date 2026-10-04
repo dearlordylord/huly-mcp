@@ -30,17 +30,33 @@ const observedClient = (
   reply: (cls: ObjectClassName, rows: FindResult<Doc>) => Promise<FindResult<Doc>> = async (_cls, rows) => rows
 ) => {
   const calls: Array<ObjectClassName> = []
+  const reads = new Set<Promise<FindResult<Doc>>>()
   const client = sdkFixture<TxOperations>({
     findOne: (...args: Parameters<TxOperations["findOne"]>) => f.client.findOne(...args),
     getHierarchy: () => f.client.getHierarchy(),
-    findAll: async (cls: unknown, query: DocumentQuery<Doc>, options?: FindOptions<Doc>) => {
+    findAll: (cls: unknown, query: DocumentQuery<Doc>, options?: FindOptions<Doc>) => {
       const parsedClass = Schema.decodeUnknownSync(ObjectClassName)(cls)
       calls.push(parsedClass)
-      return reply(parsedClass, await f.client.findAll<Doc>(toClassRef<Doc>(parsedClass), query, options))
+      const read = f.client
+        .findAll<Doc>(toClassRef<Doc>(parsedClass), query, options)
+        .then((rows) => reply(parsedClass, rows))
+      reads.add(read)
+      return read
     }
   })
-  return { client, calls }
+  return { client, calls, reads }
 }
+
+const closeWindow = (
+  fiber: Fiber.Fiber<unknown, unknown>,
+  gates: Iterable<Deferred.Deferred<void>>,
+  reads: ReadonlySet<Promise<FindResult<Doc>>>
+) =>
+  Fiber.interrupt(fiber).pipe(
+    Effect.andThen(Effect.forEach(gates, (gate) => Deferred.succeed(gate, undefined), { discard: true })),
+    Effect.andThen(Effect.promise(() => Promise.allSettled([...reads]))),
+    Effect.asVoid
+  )
 
 it.effect(
   "allows four reads per window, waits before admitting more and processes reverse replies in class order",
@@ -81,6 +97,7 @@ it.effect(
         }
       })
       const fiber = yield* inspectTransferRecords(observed.client, IssueId.make("root"), limits).pipe(Effect.forkChild)
+      yield* Effect.addFinalizer(() => closeWindow(fiber, gates.values(), observed.reads))
       yield* Deferred.await(started)
       expect(observed.calls).toEqual(firstClasses)
       for (const cls of firstClasses.toReversed()) {
@@ -168,7 +185,7 @@ it.effect("finishes the admitted window and retains typed sanitized read failure
     const fourthReleased = yield* Deferred.make<void>()
     const finished = yield* Deferred.make<void>()
     const completed: Array<ObjectClassName> = []
-    const { calls, client } = observedClient(f, async (cls, rows) => {
+    const { calls, client, reads } = observedClient(f, async (cls, rows) => {
       if (cls === String(attachment.class.Attachment))
         throw new SdkCollectionReadFailure({ message: "HTTP error 503 private-token" })
       if (cls === String(tags.class.TagReference)) {
@@ -183,6 +200,7 @@ it.effect("finishes the admitted window and retains typed sanitized read failure
       Effect.tap(() => Deferred.succeed(finished, undefined)),
       Effect.forkChild
     )
+    yield* Effect.addFinalizer(() => closeWindow(fiber, [fourthReleased], reads))
     yield* Deferred.await(fourthStarted)
     expect(yield* Deferred.isDone(finished)).toBe(false)
     yield* Deferred.succeed(fourthReleased, undefined)
@@ -194,6 +212,36 @@ it.effect("finishes the admitted window and retains typed sanitized read failure
     }
     expect(calls).toHaveLength(4)
     expect(completed).toContain(String(tags.class.TagReference))
+    expect(f.scopes).toEqual([])
+    expect(f.updates).toEqual([])
+  })
+)
+
+it.effect("interruption admits no later window and scoped fixture cleanup drains non-abortable SDK promises", () =>
+  Effect.gen(function* () {
+    const f = fixture()
+    const gate = yield* Deferred.make<void>()
+    const started = yield* Deferred.make<void>()
+    const state = { active: 0 }
+    const observed = observedClient(f, async (_cls, rows) => {
+      state.active++
+      if (state.active === 4) await Effect.runPromise(Deferred.succeed(started, undefined))
+      try {
+        await Effect.runPromise(Deferred.await(gate))
+        return rows
+      } finally {
+        state.active--
+      }
+    })
+    const fiber = yield* inspectTransferRecords(observed.client, IssueId.make("root"), limits).pipe(Effect.forkChild)
+    yield* Effect.addFinalizer(() => closeWindow(fiber, [gate], observed.reads))
+    yield* Deferred.await(started)
+    yield* Fiber.interrupt(fiber)
+    expect(state.active).toBe(4)
+    expect(observed.calls).toHaveLength(4)
+    yield* closeWindow(fiber, [gate], observed.reads)
+    expect(state.active).toBe(0)
+    expect(observed.calls).toHaveLength(4)
     expect(f.scopes).toEqual([])
     expect(f.updates).toEqual([])
   })
