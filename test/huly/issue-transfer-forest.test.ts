@@ -5,8 +5,9 @@ import { expect } from "vitest"
 import { MovementIssueSchema } from "../../src/domain/schemas/issue-movement-state.js"
 import { movementIssue } from "../helpers/movement.js"
 import type { Issue } from "@hcengineering/tracker"
-import { DocId, IssueId, ObjectClassName } from "../../src/domain/schemas/shared.js"
-import { inspectTransferForest } from "../../src/huly/issue-transfer-forest.js"
+import { DocId, IssueId, ObjectClassName, UNKNOWN_TOTAL } from "../../src/domain/schemas/shared.js"
+import { OWNER_CLASS_READ_CONCURRENCY } from "../../src/huly/issue-transfer-class-reads.js"
+import { FOREST_OWNER_BATCH_SIZE, inspectTransferForest } from "../../src/huly/issue-transfer-forest.js"
 import { inspectTransferRecords } from "../../src/huly/issue-transfer-discovery.js"
 import type { TransferForestEntry } from "../../src/huly/issue-transfer-forest-state.js"
 import { activity, attachment, chunter, tracker } from "../../src/huly/huly-plugins.js"
@@ -77,7 +78,7 @@ const forestFixture = () => {
           )
         )
         if (owners.length > 1 && state.truncateGrouped) result.total = result.length + 1
-        if (owners.length > 1 && state.unknownGroupedTotal) result.total = -1
+        if (owners.length > 1 && state.unknownGroupedTotal) result.total = UNKNOWN_TOTAL
         return result
       })
       reads.add(read)
@@ -251,7 +252,8 @@ it.effect("keeps at most four SDK collection requests active for a multi-owner f
         const read = f.client.findAll(...args).then(async (rows) => {
           state.active++
           state.maximum = Math.max(state.maximum, state.active)
-          if (state.active === 4) await Effect.runPromise(Deferred.succeed(started, undefined))
+          if (state.active === OWNER_CLASS_READ_CONCURRENCY)
+            await Effect.runPromise(Deferred.succeed(started, undefined))
           try {
             await Effect.runPromise(Deferred.await(release))
             return rows
@@ -272,8 +274,8 @@ it.effect("keeps at most four SDK collection requests active for a multi-owner f
       )
     )
     yield* Deferred.await(started)
-    expect(state.active).toBe(4)
-    expect(f.calls).toHaveLength(4)
+    expect(state.active).toBe(OWNER_CLASS_READ_CONCURRENCY)
+    expect(f.calls).toHaveLength(OWNER_CLASS_READ_CONCURRENCY)
     expect(f.calls.every((call) => call.owners.length === roots.length)).toBe(true)
     yield* Deferred.succeed(release, undefined)
     yield* Fiber.join(fiber)
@@ -326,7 +328,9 @@ it.effect("awaits terminal owner publication before a later root batch can hang"
       )
     )
     yield* Deferred.await(started)
-    expect(new Set(published.map((entry) => entry.ownerId))).toEqual(new Set(requested.slice(0, 4)))
+    expect(new Set(published.map((entry) => entry.ownerId))).toEqual(
+      new Set(requested.slice(0, FOREST_OWNER_BATCH_SIZE))
+    )
     yield* Deferred.succeed(release, undefined)
     const result = yield* Fiber.join(fiber)
     expect(result.map((entry) => entry.ownerId)).toEqual(requested)
