@@ -126,8 +126,8 @@ export const movementFixture = (issues: Array<Issue>, options: MovementFixtureOp
     if (cls === tracker.class.Project && options.projectSelectorTotal !== undefined)
       result.total = options.projectSelectorTotal
     if (q.space !== undefined && options.discoveryTotal !== undefined) result.total = options.discoveryTotal
-    if (q.attachedTo !== undefined)
-      result.total = findOptions?.total === true ? (options.closureTotal ?? selected.length) : UNKNOWN_TOTAL
+    if (q.attachedTo !== undefined && options.closureTotal !== undefined) result.total = options.closureTotal
+    if (findOptions?.total !== true) result.total = UNKNOWN_TOTAL
     if (q.space !== undefined && options.changeRootDuringRead) {
       for (const issue of result) issue.modifiedOn++
     }

@@ -34,19 +34,24 @@ export interface MovementPlan {
   readonly relevant: ReadonlyArray<Issue>
 }
 
+// Internal SDK result metadata check; record payloads are parsed separately below.
+const completeDiscovery = (result: { readonly total: number; readonly length: number }) =>
+  result.total === result.length && result.length < DISCOVERY_LIMIT
+
 export const selectMovementIssue = Effect.fn("movement.selectIssue")(function* (
   client: HulyClient["Service"],
   selector: IssueIdentifier
 ): Effect.fn.Return<Issue | undefined, MovementError> {
   const matches = yield* client.findAll<SdkIssue>(tracker.class.Issue, hulyQuery<SdkIssue>({ identifier: selector }), {
-    limit: DISCOVERY_LIMIT
+    limit: DISCOVERY_LIMIT,
+    total: true
   })
   const stableMatches = yield* client.findAll<SdkIssue>(
     tracker.class.Issue,
     hulyQuery<SdkIssue>({ _id: toRef<SdkIssue>(selector) }),
-    { limit: DISCOVERY_LIMIT }
+    { limit: DISCOVERY_LIMIT, total: true }
   )
-  if (matches.total > matches.length || stableMatches.total > stableMatches.length) return undefined
+  if (!completeDiscovery(matches) || !completeDiscovery(stableMatches)) return undefined
   const unique = new Map([...matches, ...stableMatches].map((issue) => [issue._id, issue]))
   const selected = unique.size === 1 ? [...unique.values()][0] : undefined
   return selected?._id === toRef<SdkIssue>(selector) || selected?.identifier === selector
@@ -61,14 +66,14 @@ export const selectMovementProject = Effect.fn("movement.selectProject")(functio
   const matches = yield* client.findAll<SdkProject>(
     tracker.class.Project,
     hulyQuery<SdkProject>({ identifier: selector }),
-    { limit: DISCOVERY_LIMIT }
+    { limit: DISCOVERY_LIMIT, total: true }
   )
   const stableMatches = yield* client.findAll<SdkProject>(
     tracker.class.Project,
     hulyQuery<SdkProject>({ _id: toRef<SdkProject>(selector) }),
-    { limit: DISCOVERY_LIMIT }
+    { limit: DISCOVERY_LIMIT, total: true }
   )
-  if (matches.total > matches.length || stableMatches.total > stableMatches.length) return undefined
+  if (!completeDiscovery(matches) || !completeDiscovery(stableMatches)) return undefined
   const unique = new Map([...matches, ...stableMatches].map((project) => [project._id, project]))
   const selected = unique.size === 1 ? [...unique.values()][0] : undefined
   return selected?._id === toRef<SdkProject>(selector) || selected?.identifier === selector
@@ -83,9 +88,9 @@ export const inspectMovementProject = Effect.fn("movement.inspectProject")(funct
   const issues = yield* client.findAll<SdkIssue>(
     tracker.class.Issue,
     hulyQuery<SdkIssue>({ space: toRef<SdkProject>(root.space) }),
-    { limit: DISCOVERY_LIMIT }
+    { limit: DISCOVERY_LIMIT, total: true }
   )
-  if (issues.length >= DISCOVERY_LIMIT || issues.total > issues.length) return undefined
+  if (!completeDiscovery(issues)) return undefined
   if (new Set(issues.map((issue) => issue._id)).size !== issues.length) return undefined
   return movementHierarchy(yield* Effect.forEach(issues, parseIssueState))
 })
