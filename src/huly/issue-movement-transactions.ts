@@ -1,6 +1,9 @@
 import { type Effect, Schema } from "effect"
 import { SocialIdentityId } from "../domain/schemas/person-administration.js"
-import { DocId, IssueId, ObjectClassName, Timestamp } from "../domain/schemas/shared.js"
+import { DocId, IssueId, NonEmptyString, ObjectClassName, Timestamp } from "../domain/schemas/shared.js"
+
+export const MovementHistoryAttributeSchema = Schema.Struct({ attrKey: NonEmptyString, attrClass: ObjectClassName })
+export type MovementHistoryAttribute = Schema.Schema.Type<typeof MovementHistoryAttributeSchema>
 
 export const MovementTransactionReceiptSchema = Schema.Struct({
   txId: DocId,
@@ -10,7 +13,8 @@ export const MovementTransactionReceiptSchema = Schema.Struct({
   objectSpace: DocId,
   modifiedOn: Timestamp,
   modifiedBy: SocialIdentityId,
-  operations: Schema.JsonObject
+  operations: Schema.JsonObject,
+  historyAttributes: Schema.Array(MovementHistoryAttributeSchema)
 })
 export type MovementTransactionReceipt = Schema.Schema.Type<typeof MovementTransactionReceiptSchema>
 export const MovementTransactionsSchema = Schema.Array(MovementTransactionReceiptSchema)
