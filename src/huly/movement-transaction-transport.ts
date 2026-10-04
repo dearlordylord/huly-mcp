@@ -92,22 +92,23 @@ type TransportReply = Schema.Schema.Type<typeof TransportReplySchema>
 export interface MovementHttpPort {
   readonly send: (request: TransportRequest) => Effect.Effect<TransportReply, MovementTransportError>
 }
+export const makeMovementRequestUrl = (endpoint: URL, workspace: NonEmptyString) =>
+  Effect.try({
+    try: () => {
+      const url = Schema.decodeUnknownSync(MovementEndpointSchema)(endpoint.href)
+      url.protocol = url.protocol === "ws:" ? "http:" : url.protocol === "wss:" ? "https:" : url.protocol
+      url.pathname = `${url.pathname.replace(/\/+$/, "")}/api/v1/tx/${encodeURIComponent(workspace)}`
+      return url
+    },
+    catch: () =>
+      new MovementTransportError({
+        phase: "before-send",
+        reason: NonEmptyString.make("Movement HTTP endpoint is invalid; no request sent.")
+      })
+  })
 export const movementHttpPort: MovementHttpPort = {
   send: Effect.fn("movement.singleSendHttp")(function* (request) {
-    const url = yield* Effect.try({
-      try: () => {
-        const endpoint = Schema.decodeUnknownSync(MovementEndpointSchema)(request.endpoint.href)
-        endpoint.protocol =
-          endpoint.protocol === "ws:" ? "http:" : endpoint.protocol === "wss:" ? "https:" : endpoint.protocol
-        endpoint.pathname = `${endpoint.pathname.replace(/\/+$/, "")}/api/v1/tx/${encodeURIComponent(request.workspace)}`
-        return endpoint
-      },
-      catch: () =>
-        new MovementTransportError({
-          phase: "before-send",
-          reason: NonEmptyString.make("Movement HTTP endpoint is invalid; no request sent.")
-        })
-    })
+    const url = yield* makeMovementRequestUrl(request.endpoint, request.workspace)
     return yield* Effect.tryPromise({
       try: async (signal) => {
         const response = await fetch(url, {
