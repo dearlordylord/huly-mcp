@@ -39,9 +39,10 @@ test("rejects actual Bash syntax errors", (t) => {
 const treeSource = readFileSync(new URL("./integration_test_issue_tree.sh", import.meta.url), "utf8")
 const treeHelpers = treeSource.slice(treeSource.indexOf("tree_mcp_pipeline_status() {"), treeSource.indexOf("\nmcp() {"))
 assert.ok(treeHelpers.includes("tree_mcp_reply() {"))
+const treeHelperTimeoutMs = 5000
 const secretMarker = "PRIVATE_PAYLOAD_MUST_NOT_BE_LOGGED"
 const envelope = (text, result = {}) => JSON.stringify({ jsonrpc: "2.0", id: 2, result: { content: [{ type: "text", text }], ...result } })
-const runReply = (response) => spawnSync("bash", ["-c", `${treeHelpers}\nvalue=$(tree_mcp_reply move_issue "$1") || exit $?\nprintf '%s' "$value"`, "fixture-test", response], { encoding: "utf8" })
+const runReply = (response) => spawnSync("bash", ["-c", `${treeHelpers}\nvalue=$(tree_mcp_reply move_issue "$1") || exit $?\nprintf '%s' "$value"`, "fixture-test", response], { encoding: "utf8", timeout: treeHelperTimeoutMs })
 
 for (const [name, response, expected] of [
   ["object", envelope('{"outcome":"blocked"}'), '{"outcome":"blocked"}'],
@@ -86,7 +87,7 @@ for (const [processStatus, jsonStatus, inputStatus, expected, phase] of [
   [0, 0, 1, 1, "json-stream"]
 ]) {
   test(`tree MCP pipeline propagates ${phase} failure inside command substitution`, () => {
-    const result = spawnSync("bash", ["-c", `${treeHelpers}\nvalue=$(tree_mcp_pipeline_status move_issue "$1" "$2" "$3") || exit $?\nprintf '%s' "$value"`, "fixture-test", String(processStatus), String(jsonStatus), String(inputStatus)], { encoding: "utf8" })
+    const result = spawnSync("bash", ["-c", `${treeHelpers}\nvalue=$(tree_mcp_pipeline_status move_issue "$1" "$2" "$3") || exit $?\nprintf '%s' "$value"`, "fixture-test", String(processStatus), String(jsonStatus), String(inputStatus)], { encoding: "utf8", timeout: treeHelperTimeoutMs })
     assert.equal(result.status, expected)
     assert.equal(result.stdout, "")
     assert.match(result.stderr, new RegExp(`phase=${phase}`))
