@@ -244,7 +244,19 @@ for (const lostReply of [false, true]) {
       if (rejected._tag === "Failure") expect(rejected.failure).toBe(callbackFailure)
       expect(sends).toHaveLength(beforeRejectedCallback)
       const rawBatch: unknown = sends[0]
-      const batch = Schema.decodeUnknownSync(Schema.Struct({ txes: Schema.Array(Schema.JsonObject) }))(rawBatch)
+      const batch = Schema.decodeUnknownSync(
+        Schema.Struct({
+          txes: Schema.Array(
+            Schema.Struct({
+              _id: DocId,
+              objectId: DocId,
+              operations: Schema.JsonObject,
+              modifiedOn: Count,
+              modifiedBy: NonEmptyString
+            })
+          )
+        })
+      )(rawBatch)
       for (const receipt of receipts) {
         const actual = batch.txes.find((tx) => tx._id === receipt.txId)
         expect(actual).toBeDefined()
