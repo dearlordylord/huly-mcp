@@ -48,6 +48,8 @@ it.effect("every uncertain tree failure retains known descendant record IDs and 
     for (const raw of results) {
       const result = parseResult(raw)
       expect(result).toMatchObject({ recordIds: [history._id, "child-history"] })
+      expect(["incomplete", "indeterminate"]).toContain(result.outcome)
+      if (result.outcome !== "incomplete" && result.outcome !== "indeterminate") return
       const calls = [
         ...result.inspection.matchAll(/MCP (list_activity|list_comments|list_attachments|get_time_report) (\{[^}]+\})/g)
       ]
