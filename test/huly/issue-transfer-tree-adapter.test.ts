@@ -1,4 +1,4 @@
-import { TxOperations, type Client, type Tx } from "@hcengineering/core"
+import { TxOperations, type Client, type Tx, type Hierarchy } from "@hcengineering/core"
 import { corePersonId, sdkFixture } from "../helpers/huly-sdk.js"
 import { type MovementTransactions } from "../../src/huly/issue-movement-transactions.js"
 import { HulyDataInvalidError } from "../../src/huly/errors-base.js"
@@ -196,6 +196,14 @@ for (const lostReply of [false, true]) {
       const failure = new MovementTransportError({ phase: "after-send", reason: NonEmptyString.make("Lost reply") })
       const ordinary = new TxOperations(
         sdkFixture<Client>({
+          getHierarchy: () =>
+            sdkFixture<Hierarchy>({
+              findAttribute: (_class: unknown, key: string) => ({
+                type: { _class: "core:class:TypeString" },
+                hidden: key === "childInfo"
+              }),
+              isDerived: () => false
+            }),
           tx: async (tx: Tx) => {
             expect(receipts.length).toBeGreaterThan(write.tasks.length)
             sends.push(tx)
@@ -244,6 +252,9 @@ for (const lostReply of [false, true]) {
         expect(actual?.operations).toEqual(receipt.operations)
         expect(actual?.modifiedOn).toBe(receipt.modifiedOn)
         expect(actual?.modifiedBy).toBe(receipt.modifiedBy)
+        expect(receipt.historyAttributes.every((attribute) => attribute.attrClass === "core:class:TypeString")).toBe(
+          true
+        )
       }
       if (lostReply) {
         expect(result._tag).toBe("Failure")

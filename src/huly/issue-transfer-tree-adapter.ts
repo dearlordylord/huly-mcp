@@ -1,4 +1,5 @@
 import { Result, Schema } from "effect"
+import { parseMovementHistoryAttributes } from "./issue-movement-history-attributes.js"
 import { HulyDataInvalidError } from "./errors-base.js"
 import { MovementTransactionsSchema, type MovementTransactions } from "./issue-movement-transactions.js"
 import type { Issue } from "@hcengineering/tracker"
@@ -40,8 +41,8 @@ export const commitTransferTree = async (
   await queueRemovedAncestorInformation(apply, write)
   await queueTransferRootCounts(apply, root)
   if (publishQueuedTransactions !== undefined) {
-    const parsed = parseQueuedTransactions(apply)
-    if (Result.isFailure(parsed)) return parsed
+    const parsed = parseQueuedTransactions(client, apply)
+    if (Result.isFailure(parsed)) return Result.fail(parsed.failure)
     await publishQueuedTransactions(parsed.success)
   }
   return Result.succeed((await apply.commit()).result ? "applied" : "condition-not-met")
@@ -100,6 +101,7 @@ const matchProtectedTask = (apply: ReturnType<TxOperations["apply"]>, task: Tran
 }
 
 const parseQueuedTransactions = (
+  client: TxOperations,
   apply: ReturnType<TxOperations["apply"]>
 ): Result.Result<MovementTransactions, HulyDataInvalidError> => {
   const input: unknown = apply.txes
@@ -114,7 +116,30 @@ const parseQueuedTransactions = (
       modifiedBy: tx.modifiedBy,
       operations: Reflect.get(tx, "operations")
     }))
-  return Schema.decodeUnknownResult(MovementTransactionsSchema)(input).pipe(
+  const raw = Schema.decodeUnknownResult(
+    Schema.Array(
+      Schema.Struct({
+        txId: Schema.Unknown,
+        transactionClass: Schema.Unknown,
+        objectId: Schema.Unknown,
+        objectClass: Schema.Unknown,
+        objectSpace: Schema.Unknown,
+        modifiedOn: Schema.Unknown,
+        modifiedBy: Schema.Unknown,
+        operations: Schema.JsonObject
+      })
+    )
+  )(input)
+  if (Result.isFailure(raw))
+    return Result.fail(new HulyDataInvalidError({ operation: "move_issue", entity: "queued movement transactions" }))
+  const receipts = []
+  for (const tx of raw.success) {
+    const attributes = parseMovementHistoryAttributes(client.getHierarchy(), tx.operations)
+    if (Result.isFailure(attributes)) return Result.fail(attributes.failure)
+    receipts.push({ ...tx, historyAttributes: attributes.success })
+  }
+  const receiptsInput: unknown = receipts
+  return Schema.decodeUnknownResult(MovementTransactionsSchema)(receiptsInput).pipe(
     Result.mapError(() => new HulyDataInvalidError({ operation: "move_issue", entity: "queued movement transactions" }))
   )
 }
