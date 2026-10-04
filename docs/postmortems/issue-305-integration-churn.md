@@ -115,6 +115,13 @@ setup IDs. Final acceptance still needs the five deployed suite receipts, the
 71-criterion audit, deployment/permission evidence and explicit inside-server
 interruption/global-isolation limitations. Do not infer these from a gate pass.
 
+Serialize owned heavy verification jobs. A reviewer can inspect source while a
+check runs, but do not launch another compiler, coverage run, bundler process test
+or live suite until the current owner reports its terminal handle and releases
+the slot. Record the handle and result before admitting the next job. A timeout
+during overlapping work is still a failed check; it does not justify increasing
+its deadline or claiming that contention caused it.
+
 The user's anti-churn retrospective request must remain part of handoff. Apply the
 Dalph-derived finite-work, discriminating-experiment and immutable-evidence
 techniques to future attempts without restarting Dalph. Judge them by recorded
