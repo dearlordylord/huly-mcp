@@ -2,18 +2,21 @@
 import type { Employee, SocialIdentity } from "@hcengineering/contact"
 import { ToDoPriority, type ToDo } from "@hcengineering/time"
 import type { ActivityReference } from "@hcengineering/activity"
-import type { Doc } from "@hcengineering/core"
+import type { AttachedDoc, Doc, TxOperations } from "@hcengineering/core"
 import type { Document } from "@hcengineering/document"
 import type { Issue } from "@hcengineering/tracker"
 import { Schema } from "effect"
 import { DocId, IssueId, ObjectClassName } from "../src/domain/schemas/shared.js"
-import { activity, contact, documentPlugin, time, tracker } from "../src/huly/huly-plugins.js"
+import { activity, contact, core, documentPlugin, time, tracker } from "../src/huly/huly-plugins.js"
 import { hulyQuery } from "../src/huly/operations/query-helpers.js"
 import { toClassRef, toRef, toSocialIdentityRef } from "../src/huly/operations/sdk-boundary.js"
 import { connectIntegrationHuly } from "./integration-huly-client.js"
 
 const Arguments = Schema.fromJsonString(
-  Schema.Struct({ issue: IssueId, document: DocId, mode: Schema.Literals(["references", "unsupported"]) })
+  Schema.Union([
+    Schema.Struct({ issue: IssueId, document: DocId, mode: Schema.Literals(["references", "unsupported"]) }),
+    Schema.Struct({ mode: Schema.Literal("cleanup"), recordIds: Schema.Array(DocId) })
+  ])
 )
 const Location = Schema.Struct({ _id: DocId, _class: ObjectClassName, space: DocId })
 const Result = Schema.Struct({ recordIds: Schema.Array(DocId) })
@@ -22,10 +25,48 @@ const parseIdentity = (input: unknown) => Schema.decodeUnknownSync(Identity)(inp
 const parseResult = (input: unknown) => Schema.decodeUnknownSync(Result)(input)
 const parseLocation = (input: unknown) => Schema.decodeUnknownSync(Location)(input)
 
+const AttachedLocation = Schema.Struct({
+  ...Location.fields,
+  attachedTo: DocId,
+  attachedToClass: ObjectClassName,
+  collection: Schema.String
+})
+const parseAttachedLocation = (input: unknown) => Schema.decodeUnknownSync(AttachedLocation)(input)
+
+const cleanupRecords = async (client: TxOperations, recordIds: ReadonlyArray<DocId>) => {
+  const failures: Array<unknown> = []
+  for (const id of recordIds) {
+    try {
+      const raw = await client.findOne<Doc>(core.class.Doc, hulyQuery<Doc>({ _id: toRef<Doc>(id) }))
+      if (raw === undefined) continue
+      const record = parseAttachedLocation(raw)
+      if (record._class !== activity.class.ActivityReference && record._class !== time.class.ToDo)
+        throw new Error(`Unexpected fixture record class for ${id}`)
+      await client.removeCollection<Doc, AttachedDoc>(
+        toClassRef<AttachedDoc>(record._class),
+        toRef(record.space),
+        toRef<AttachedDoc>(record._id),
+        toRef<Doc>(record.attachedTo),
+        toClassRef<Doc>(record.attachedToClass),
+        record.collection
+      )
+    } catch (cause) {
+      failures.push(cause)
+      process.stderr.write(`Fixture record cleanup failed for ${id}: ${String(cause)}\n`)
+    }
+  }
+  if (failures.length > 0) throw new Error(`Fixture record cleanup failed for ${failures.length} records`)
+}
+
 const main = async () => {
   const args = Schema.decodeUnknownSync(Arguments)(process.argv[2])
   const { client } = await connectIntegrationHuly()
+  const recordIds: Array<DocId> = []
   try {
+    if (args.mode === "cleanup") {
+      await cleanupRecords(client, args.recordIds)
+      return
+    }
     const issue = parseLocation(
       await client.findOne<Issue>(tracker.class.Issue, hulyQuery<Issue>({ _id: toRef<Issue>(args.issue) }))
     )
@@ -54,7 +95,8 @@ const main = async () => {
           rank: "0|hzzzzz:"
         }
       )
-      process.stdout.write(`${JSON.stringify(parseResult({ recordIds: [id] }))}\n`)
+      recordIds.push(DocId.make(id))
+      process.stdout.write(`${JSON.stringify(parseResult({ recordIds }))}\n`)
       return
     }
     const independent = parseLocation(
@@ -63,39 +105,49 @@ const main = async () => {
         hulyQuery<Document>({ _id: toRef<Document>(args.document) })
       )
     )
-    const recordIds: Array<string> = []
     for (const target of [independent, { ...independent, _id: DocId.make(`${args.issue}-dangling-target`) }]) {
       // TxOperations.addCollection sends the collection transaction without resolving its parent.
       recordIds.push(
-        await client.addCollection<Doc, ActivityReference>(
-          activity.class.ActivityReference,
-          toRef(issue.space),
-          toRef<Doc>(target._id),
-          toClassRef<Doc>(target._class),
-          "references",
-          {
-            srcDocId: toRef<Doc>(issue._id),
-            srcDocClass: tracker.class.Issue,
-            message: "Independent reference payload remains unchanged"
-          }
+        DocId.make(
+          await client.addCollection<Doc, ActivityReference>(
+            activity.class.ActivityReference,
+            toRef(issue.space),
+            toRef<Doc>(target._id),
+            toClassRef<Doc>(target._class),
+            "references",
+            {
+              srcDocId: toRef<Doc>(issue._id),
+              srcDocClass: tracker.class.Issue,
+              message: "Independent reference payload remains unchanged"
+            }
+          )
         )
       )
     }
     recordIds.push(
-      await client.addCollection<Issue, ActivityReference>(
-        activity.class.ActivityReference,
-        toRef(independent.space),
-        toRef<Issue>(issue._id),
-        tracker.class.Issue,
-        "references",
-        {
-          srcDocId: toRef<Doc>(independent._id),
-          srcDocClass: toClassRef<Doc>(independent._class),
-          message: "Incoming independent reference stays in its original space"
-        }
+      DocId.make(
+        await client.addCollection<Issue, ActivityReference>(
+          activity.class.ActivityReference,
+          toRef(independent.space),
+          toRef<Issue>(issue._id),
+          tracker.class.Issue,
+          "references",
+          {
+            srcDocId: toRef<Doc>(independent._id),
+            srcDocClass: toClassRef<Doc>(independent._class),
+            message: "Incoming independent reference stays in its original space"
+          }
+        )
       )
     )
     process.stdout.write(`${JSON.stringify(parseResult({ recordIds }))}\n`)
+  } catch (cause) {
+    try {
+      await cleanupRecords(client, recordIds)
+    } catch {
+      /* cleanupRecords reports every failure; preserve the original cause. */
+    }
+    throw cause
   } finally {
     await client.close()
   }

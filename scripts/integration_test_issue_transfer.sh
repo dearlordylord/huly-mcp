@@ -19,6 +19,11 @@ mcp() {
   jq -r '.result.content[0].text' <<<"$response"
 }
 cleanup() {
+  local original_status=$? cleanup_status=0
+  if ! node scripts/run-bundled.mjs scripts/integration-issue-transfer-records.ts "$(jq -nc --argjson ids "$FIXTURE_RECORD_IDS" '{mode:"cleanup",recordIds:$ids}')"; then
+    echo "FAIL: explicit fixture record cleanup" >&2
+    cleanup_status=1
+  fi
   rm -rf "$DOWNLOAD_DIR"
   for ((i=${#ISSUES[@]}-1; i>=0; i--)); do
     for project in "$SOURCE" "$DESTINATION"; do
@@ -28,7 +33,10 @@ cleanup() {
   if [[ -n "$DOCUMENT" ]]; then mcp delete_document "$(jq -nc --arg teamspace "$TEAMSPACE" --arg document "$DOCUMENT" '{teamspace:$teamspace,document:$document}')" >/dev/null || true; fi
   if [[ -n "$TEAMSPACE" ]]; then mcp delete_teamspace "$(jq -nc --arg teamspace "$TEAMSPACE" '{teamspace:$teamspace}')" >/dev/null || true; fi
   for project in "${PROJECTS[@]}"; do mcp delete_project "$(jq -nc --arg project "$project" '{project:$project}')" >/dev/null || true; done
+  if [[ "$original_status" -ne 0 ]]; then return "$original_status"; fi
+  return "$cleanup_status"
 }
+FIXTURE_RECORD_IDS='[]'
 trap cleanup EXIT
 for project in "$SOURCE" "$DESTINATION"; do
   mcp create_project "$(jq -nc --arg identifier "$project" '{identifier:$identifier,name:("Leaf transfer certification " + $identifier)}')" >/dev/null
@@ -67,7 +75,8 @@ for transport in mcp cli; do
   SOURCE_SPACE=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$ARGS" | jq -r --arg root "$ROOT_ID" '.issues[] | select(.issue._id == $root) | .issue.space')
   NESTED_FILE=$(mcp add_attachment "$(jq -nc --arg objectId "$COMMENT" --arg space "$SOURCE_SPACE" '{objectId:$objectId,objectClass:"chunter:class:ChatMessage",space:$space,filename:"comment.txt",contentType:"text/plain",data:"cHJlc2VydmVkIGJsb2I="}')" | jq -r .attachmentId)
   REPLY_FILE=$(mcp add_attachment "$(jq -nc --arg objectId "$REPLY" --arg space "$SOURCE_SPACE" '{objectId:$objectId,objectClass:"chunter:class:ThreadMessage",space:$space,filename:"reply.txt",contentType:"text/plain",data:"cHJlc2VydmVkIGJsb2I="}')" | jq -r .attachmentId)
-  node scripts/run-bundled.mjs scripts/integration-issue-transfer-records.ts "$(jq -nc --arg issue "$ROOT_ID" --arg document "$DOCUMENT" '{issue:$issue,document:$document,mode:"references"}')" >/dev/null
+  RECORD_RESULT=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-records.ts "$(jq -nc --arg issue "$ROOT_ID" --arg document "$DOCUMENT" '{issue:$issue,document:$document,mode:"references"}')")
+  FIXTURE_RECORD_IDS=$(jq -nc --argjson before "$FIXTURE_RECORD_IDS" --argjson result "$RECORD_RESULT" '$before + $result.recordIds')
   # Exercise the normal account against private/member-only destination permissions.
   # A restricted destination refuses before all movement effects, including allocation.
   node scripts/run-bundled.mjs scripts/integration-issue-transfer-permissions.ts "$(jq -nc --arg project "$DESTINATION" '{project:$project,restricted:true}')" >/dev/null
@@ -130,7 +139,8 @@ for transport in mcp cli; do
   done
   # A real unaudited attached class still refuses before sequence or record writes.
   create "$SOURCE" ''; REFUSED_ID="$CREATED_ID"
-  node scripts/run-bundled.mjs scripts/integration-issue-transfer-records.ts "$(jq -nc --arg issue "$REFUSED_ID" --arg document "$DOCUMENT" '{issue:$issue,document:$document,mode:"unsupported"}')" >/dev/null
+  RECORD_RESULT=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-records.ts "$(jq -nc --arg issue "$REFUSED_ID" --arg document "$DOCUMENT" '{issue:$issue,document:$document,mode:"unsupported"}')")
+  FIXTURE_RECORD_IDS=$(jq -nc --argjson before "$FIXTURE_RECORD_IDS" --argjson result "$RECORD_RESULT" '$before + $result.recordIds')
   REFUSED_ARGS=$(jq -nc --arg issue "$REFUSED_ID" --arg source "$SOURCE" --arg target "$DESTINATION" '{issues:[$issue],projects:[$source,$target]}')
   REFUSED_BEFORE=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$REFUSED_ARGS")
   BLOCKED=$(mcp move_issue "$(jq -nc --arg issue "$REFUSED_ID" --arg project "$DESTINATION" '{issue:$issue,destination:{project:$project}}')")

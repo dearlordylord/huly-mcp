@@ -25,6 +25,11 @@ move() {
   fi
 }
 cleanup() {
+  local original_status=$? cleanup_status=0
+  if ! node scripts/run-bundled.mjs scripts/integration-issue-transfer-records.ts "$(jq -nc --argjson ids "$FIXTURE_RECORD_IDS" '{mode:"cleanup",recordIds:$ids}')"; then
+    echo "FAIL: explicit fixture record cleanup" >&2
+    cleanup_status=1
+  fi
   for ((index=${#ISSUES[@]}-1; index>=0; index--)); do
     for project in "$SOURCE" "$TARGET"; do mcp delete_issue "$(jq -nc --arg project "$project" --arg identifier "${ISSUES[$index]}" '{project:$project,identifier:$identifier}')" >/dev/null 2>&1 || true; done
   done
@@ -35,7 +40,10 @@ cleanup() {
     for id in $(mcp list_milestones "$(jq -nc --arg project "$project" '{project:$project}')" | jq -r '.[].id'); do mcp delete_milestone "$(jq -nc --arg project "$project" --arg milestone "$id" '{project:$project,milestone:$milestone}')" >/dev/null || true; done
     mcp delete_project "$(jq -nc --arg project "$project" '{project:$project}')" >/dev/null || true
   done
+  if [[ "$original_status" -ne 0 ]]; then return "$original_status"; fi
+  return "$cleanup_status"
 }
+FIXTURE_RECORD_IDS='[]'
 trap cleanup EXIT
 for project in "$SOURCE" "$TARGET"; do
   mcp create_project "$(jq -nc --arg identifier "$project" '{identifier:$identifier,name:("Complete tree " + $identifier)}')" >/dev/null
@@ -62,7 +70,8 @@ rich_records() {
   mcp add_issue_attachment "$(jq -nc --arg project "$SOURCE" --arg identifier "$issue" '{project:$project,identifier:$identifier,filename:"task.txt",contentType:"text/plain",data:"dHJlZS1ibG9i"}')" >/dev/null
   mcp add_issue_label "$(jq -nc --arg project "$SOURCE" --arg identifier "$issue" '{project:$project,identifier:$identifier,label:"Complete tree certification"}')" >/dev/null
   mcp log_time "$(jq -nc --arg project "$SOURCE" --arg identifier "$issue" '{project:$project,identifier:$identifier,value:1.25,description:"Per-task preserved report"}')" >/dev/null
-  node scripts/run-bundled.mjs scripts/integration-issue-transfer-records.ts "$(jq -nc --arg issue "$issue" --arg document "$DOCUMENT" '{issue:$issue,document:$document,mode:"references"}')" >/dev/null
+  RECORD_RESULT=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-records.ts "$(jq -nc --arg issue "$issue" --arg document "$DOCUMENT" '{issue:$issue,document:$document,mode:"references"}')")
+  FIXTURE_RECORD_IDS=$(jq -nc --argjson before "$FIXTURE_RECORD_IDS" --argjson result "$RECORD_RESULT" '$before + $result.recordIds')
 }
 for TRANSPORT in mcp cli; do
   create "$SOURCE" '' "Source grandparent $TRANSPORT"; OLD_ANCESTOR="$CREATED"
