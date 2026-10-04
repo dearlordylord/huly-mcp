@@ -117,7 +117,7 @@ export const transferFixture = () => {
     return Effect.succeed(documentForTestClass<T>(found))
   }
   const attributeRows: Array<Doc> = []
-  const operations: Partial<HulyClientOperations> = {
+  const baseOperations: Partial<HulyClientOperations> = {
     ...fixture.operations,
     findOne,
     findAll: <T extends Doc>(cls: unknown, query: DocumentQuery<T>, options?: FindOptions<T>) => {
@@ -176,20 +176,23 @@ export const transferFixture = () => {
       return Effect.succeed("applied")
     }
   }
-  operations.allocateMovementNumber = (destinationId) =>
-    assertExists(operations.updateDoc)(
-      tracker.class.Project,
-      core.space.Space,
-      toRef(destinationId),
-      { $inc: { sequence: 1 } },
-      true
-    )
-  operations.commitTransferTree = (write) => {
-    const rootWrite = write.tasks.find((task) => task.issueId === write.rootId)
-    const commit = operations.commitTransfer
-    return write.tasks.length !== 1 || rootWrite === undefined || commit === undefined
-      ? Effect.succeed("condition-not-met")
-      : commit(rootWrite)
+  const operations: Partial<HulyClientOperations> = {
+    ...baseOperations,
+    allocateMovementNumber: (destinationId) =>
+      assertExists(baseOperations.updateDoc)(
+        tracker.class.Project,
+        core.space.Space,
+        toRef(destinationId),
+        { $inc: { sequence: 1 } },
+        true
+      ),
+    commitTransferTree: (write) => {
+      const rootWrite = write.tasks.find((task) => task.issueId === write.rootId)
+      const commit = baseOperations.commitTransfer
+      return write.tasks.length !== 1 || rootWrite === undefined || commit === undefined
+        ? Effect.succeed("condition-not-met")
+        : commit(rootWrite)
+    }
   }
   return {
     ...fixture,

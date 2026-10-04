@@ -177,12 +177,20 @@ const commitAndVerify = Effect.fn("transfer.commitAndVerify")(function* (
   commit: NonNullable<HulyClient["Service"]["commitTransferTree"]>
 ): Effect.fn.Return<MoveIssueResult, MovementError> {
   const reservations = (yield* Ref.get(progress.execution))?.reservations ?? []
-  yield* Ref.set(progress.execution, { phase: "commit", commit: "sent", reservations })
+  yield* Ref.set<MovementUncertaintyEvidence["execution"] | undefined>(progress.execution, {
+    phase: "commit",
+    commit: "sent",
+    reservations
+  })
   const committed = yield* Effect.result(commit(write))
   if (committed._tag === "Failure")
     return yield* failedCommit(client, prepared, destination, write, progress, committed.failure, reservations)
   if (committed.success === "condition-not-met") {
-    yield* Ref.set(progress.execution, { phase: "commit", commit: "refused", reservations })
+    yield* Ref.set<MovementUncertaintyEvidence["execution"] | undefined>(progress.execution, {
+      phase: "commit",
+      commit: "refused",
+      reservations
+    })
     yield* observeFailure(client, prepared, destination, write, progress)
     return yield* stoppedResult(
       "incomplete",
@@ -192,7 +200,11 @@ const commitAndVerify = Effect.fn("transfer.commitAndVerify")(function* (
       progress
     )
   }
-  yield* Ref.set(progress.execution, { phase: "verification", commit: "acknowledged", reservations })
+  yield* Ref.set<MovementUncertaintyEvidence["execution"] | undefined>(progress.execution, {
+    phase: "verification",
+    commit: "acknowledged",
+    reservations
+  })
   return yield* finishVerification(client, prepared, destination, write, progress)
 })
 

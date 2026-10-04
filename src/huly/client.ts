@@ -779,7 +779,7 @@ function createMarkupOps(
 const connectRestWithRetry = (
   config: ConnectionConfig,
   sdk: HulySdkDependencies,
-  timeoutMs: MovementTransportMilliseconds
+  timeoutMs: Schema.Schema.Type<typeof MovementTransportMilliseconds>
 ): Effect.Effect<RestConnection, ConnectionError> =>
   Effect.gen(function* () {
     const discovery = yield* connectionAttempt(async () => {

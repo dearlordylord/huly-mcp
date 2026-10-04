@@ -26,7 +26,7 @@ export const allocateTransferTree = Effect.fn("transfer.allocateTree")(function*
   const numbers: Array<PositiveInteger> = []
   const reservations: Array<MovementUncertaintyEvidence["execution"]["reservations"][number]> = []
   for (const issueId of issueIds) {
-    yield* Ref.set(execution, {
+    yield* Ref.set<MovementUncertaintyEvidence["execution"] | undefined>(execution, {
       phase: "allocation",
       commit: "not-sent",
       reservations: [...reservations, { status: "uncertain", issueId }]
@@ -35,7 +35,7 @@ export const allocateTransferTree = Effect.fn("transfer.allocateTree")(function*
     if (allocated._tag === "Failure") {
       const refused = allocated.failure instanceof MovementTransportError && allocated.failure.phase === "before-send"
       if (refused)
-        yield* Ref.set(
+        yield* Ref.set<MovementUncertaintyEvidence["execution"] | undefined>(
           execution,
           reservations.length === 0
             ? undefined
@@ -58,7 +58,11 @@ export const allocateTransferTree = Effect.fn("transfer.allocateTree")(function*
       }
     numbers.push(parsed.value.object.sequence)
     reservations.push({ status: "confirmed", issueId, number: parsed.value.object.sequence })
-    yield* Ref.set(execution, { phase: "allocation", commit: "not-sent", reservations: [...reservations] })
+    yield* Ref.set<MovementUncertaintyEvidence["execution"] | undefined>(execution, {
+      phase: "allocation",
+      commit: "not-sent",
+      reservations: [...reservations]
+    })
   }
   return { status: "allocated", numbers }
 })

@@ -179,7 +179,9 @@ describe("public movement uncertainty and concurrent state", () => {
                 parseInspection({
                   ...inspection,
                   records:
-                    f.state.allocated > 0 && id === f.root._id ? [...inspection.records, added] : inspection.records
+                    f.state.allocated > 0 && String(id) === String(f.root._id)
+                      ? [...inspection.records, added]
+                      : inspection.records
                 })
               )
             )
@@ -257,7 +259,7 @@ describe("public movement uncertainty and concurrent state", () => {
         commitTransferTree: (write) =>
           Effect.sync(() => {
             f.state.sent++
-            const root = assertExists(write.tasks.find((task) => task.issueId === f.root._id))
+            const root = assertExists(write.tasks.find((task) => String(task.issueId) === String(f.root._id)))
             Object.assign(f.root, {
               space: root.destinationId,
               identifier: root.identifier,
