@@ -123,7 +123,7 @@ export const transferFixture = () => {
           ? attributeRows
           : attributeRows.filter((row) => row._class === cls && row.space === query.space)
       )
-      if (Number.isFinite(state.attributeTotal)) result.total = state.attributeTotal
+      if (Number.isFinite(state.attributeTotal) && options?.total === true) result.total = state.attributeTotal
       return Effect.succeed(result)
     },
     inspectTransferRecords: () => {

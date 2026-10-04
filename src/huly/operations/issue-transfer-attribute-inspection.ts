@@ -26,24 +26,24 @@ export const inspectTransferAttributes = Effect.fn("transfer.inspectAttributes")
         ? yield* client.findAll<Component>(
             tracker.class.Component,
             hulyQuery<Component>({ space: toRef<Project>(source._id) }),
-            { limit: QUERY_LIMIT }
+            { limit: QUERY_LIMIT, total: true }
           )
         : yield* client.findAll<Milestone>(
             tracker.class.Milestone,
             hulyQuery<Milestone>({ space: toRef<Project>(source._id) }),
-            { limit: QUERY_LIMIT }
+            { limit: QUERY_LIMIT, total: true }
           )
     const destinationRows =
       field === "component"
         ? yield* client.findAll<Component>(
             tracker.class.Component,
             hulyQuery<Component>({ space: toRef<Project>(destination._id) }),
-            { limit: QUERY_LIMIT }
+            { limit: QUERY_LIMIT, total: true }
           )
         : yield* client.findAll<Milestone>(
             tracker.class.Milestone,
             hulyQuery<Milestone>({ space: toRef<Project>(destination._id) }),
-            { limit: QUERY_LIMIT }
+            { limit: QUERY_LIMIT, total: true }
           )
     inventories.push(makeInventory(field, sourceRows, destinationRows, source._id, destination._id))
   }
