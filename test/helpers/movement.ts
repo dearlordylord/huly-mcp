@@ -129,7 +129,7 @@ export const movementFixture = (issues: Array<Issue>, options: MovementFixtureOp
     options.onWrite?.(issues)
     return Effect.succeed({})
   }
-  return { issues, writes, layer: HulyClient.testLayer({ findAll, updateDoc }) }
+  return { issues, writes, operations: { findAll, updateDoc }, layer: HulyClient.testLayer({ findAll, updateDoc }) }
 }
 
 export const threeLevelMovementFixture = () => {

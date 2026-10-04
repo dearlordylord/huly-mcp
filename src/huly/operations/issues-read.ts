@@ -5,7 +5,7 @@
  */
 import type { Person, SocialIdentity } from "@hcengineering/contact"
 import { type Ref, SortingOrder, type Status, type WithLookup } from "@hcengineering/core"
-import { type Issue as HulyIssue } from "@hcengineering/tracker"
+import { type Issue as HulyIssue, type Project as HulyProject } from "@hcengineering/tracker"
 import { Effect, Option, Schema } from "effect"
 
 import type {
@@ -16,7 +16,7 @@ import type {
   ListIssuesParams
 } from "../../domain/schemas.js"
 import { IssueSummarySchema, parseIssue } from "../../domain/schemas/issues.js"
-import { IssueId, type ProjectIdentifier } from "../../domain/schemas/shared.js"
+import { IssueId, ProjectIdentifier } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import type { Diagnostics } from "../diagnostics.js"
 import type {
@@ -35,6 +35,7 @@ import { findIssueAssignee } from "./issue-assignee-resolution.js"
 import { creatorForIssue, loadIssueCreatorIndex } from "./issue-creators-read.js"
 import { issueIdsMatchingLabel, labelsForIssue, loadIssueLabelIndex } from "./issue-labels-read.js"
 import { loadIssueMilestoneIndex, milestoneForIssue } from "./issue-milestones-read.js"
+import { toRef } from "./sdk-boundary.js"
 import { topLevelIssueParent } from "./issues-parent.js"
 import {
   findIssueInProject,
@@ -210,7 +211,7 @@ const issueSummaryProjection = (
   milestoneIndex: Effect.Success<ReturnType<typeof loadIssueMilestoneIndex>>,
   creatorIndex: Effect.Success<ReturnType<typeof loadIssueCreatorIndex>>
 ) => {
-  const directParent = issue.parents.length > 0 ? issue.parents[issue.parents.length - 1] : undefined
+  const directParent = issue.parents.find((parent) => parent.parentId === issue.attachedTo)
   const milestone = milestoneForIssue(milestoneIndex, issue)
   const creator = creatorForIssue(creatorIndex, issue)
   return {
@@ -243,7 +244,10 @@ const findIssueForRead = (
     const issue =
       byIdentifier ??
       (number === null
-        ? undefined
+        ? yield* client.findOne<HulyIssue>(
+            tracker.class.Issue,
+            hulyQuery<HulyIssue>({ _id: toRef<HulyIssue>(params.identifier) })
+          )
         : yield* client.findOne<HulyIssue>(tracker.class.Issue, hulyQuery<HulyIssue>({ space: project._id, number })))
     if (issue === undefined) {
       return yield* new IssueNotFoundError({ identifier: params.identifier, project: params.project })
@@ -273,7 +277,7 @@ const issueDetailRelationshipFields = (
   milestone: ReturnType<typeof milestoneForIssue>,
   creator: ReturnType<typeof creatorForIssue>
 ) => {
-  const directParent = issue.parents.length > 0 ? issue.parents[issue.parents.length - 1] : undefined
+  const directParent = issue.parents.find((parent) => parent.parentId === issue.attachedTo)
   return {
     assigneeRef: person ? { id: person._id, name: person.name } : undefined,
     ...(creator === undefined ? {} : { creator }),
@@ -390,9 +394,10 @@ export const listIssues = (
  */
 export const getIssue = (params: GetIssueParams): Effect.Effect<Issue, GetIssueError, HulyClient | Diagnostics> =>
   Effect.gen(function* () {
-    const { client, project, statuses } = yield* findProjectWithStatuses(params.project)
-
-    const issue = yield* findIssueForRead(client, project, params)
+    const requested = yield* findProjectWithStatuses(params.project)
+    const { client } = requested
+    const issue = yield* findIssueForRead(client, requested.project, params)
+    const { project, statuses } = yield* actualIssueWorkflow(requested, issue)
     const statusName = resolveStatusName(statuses, issue.status)
     const person = yield* loadIssueAssignee(client, issue)
     const description = yield* loadIssueDescription(client, issue)
@@ -405,7 +410,7 @@ export const getIssue = (params: GetIssueParams): Effect.Effect<Issue, GetIssueE
 
     const projected = issueDetailProjection(
       issue,
-      params,
+      { ...params, project: ProjectIdentifier.make(project.identifier) },
       statusName,
       person,
       description,
@@ -419,3 +424,17 @@ export const getIssue = (params: GetIssueParams): Effect.Effect<Issue, GetIssueE
       )
     )
   })
+
+const actualIssueWorkflow = Effect.fn("getIssue.actualWorkflow")(function* (
+  requested: ProjectWorkflowData,
+  issue: HulyIssue
+) {
+  if (requested.project._id === issue.space) return requested
+  const project = yield* requested.client.findOne<HulyProject>(
+    tracker.class.Project,
+    hulyQuery<HulyProject>({ _id: issue.space })
+  )
+  if (project === undefined)
+    return yield* new IssueNotFoundError({ identifier: issue.identifier, project: requested.project.identifier })
+  return yield* findProjectWithStatuses(project.identifier)
+})

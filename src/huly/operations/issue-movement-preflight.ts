@@ -115,7 +115,7 @@ export const movementDestinationProblem = (
   if (parent !== undefined && project !== undefined && parent.space !== project._id)
     return "Project and parent disagree."
   const destinationSpace = movementSpace(root, parent, project)
-  if (destinationSpace !== root.space) return "Cross-project execution is unavailable in this slice."
+  if (destinationSpace !== root.space) return undefined
   return params.resolutions !== undefined
     ? "Resolutions are cross-project-only decisions. Omit resolutions for same-project movement, including no-ops."
     : undefined

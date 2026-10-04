@@ -1,5 +1,6 @@
 import { Schema } from "effect"
 
+import { TransferConflictSchema } from "./issue-transfer.js"
 import { IssueSchema, IssueSummarySchema } from "./issues.js"
 import { DocId, IssueId, IssueIdentifier, UrlString } from "./shared.js"
 
@@ -36,6 +37,8 @@ export const MoveIssueResultSchema = Schema.Union([
   Schema.Struct({ ...MovementCompletedFields, outcome: Schema.Literal("completed"), changed: Schema.Literal(true) }),
   Schema.Struct({ ...MovementCompletedFields, outcome: Schema.Literal("no-op"), changed: Schema.Literal(false) }),
   Schema.Struct({
+    conflicts: Schema.optionalKey(Schema.Array(TransferConflictSchema)),
+    destinationId: Schema.optionalKey(DocId),
     outcome: Schema.Literal("blocked"),
     changed: Schema.Literal(false),
     reason: Schema.String,

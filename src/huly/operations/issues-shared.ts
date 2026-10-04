@@ -6,7 +6,7 @@ import { Effect, Result, Schema, SchemaGetter } from "effect"
 
 import type { IssuePriority as IssuePriorityStr } from "../../domain/schemas/issues.js"
 import type { NonNegativeNumber } from "../../domain/schemas/shared.js"
-import { Count, IssueStatusId, PositiveNumber, StatusName } from "../../domain/schemas/shared.js"
+import { Count, IssueIdentifier, IssueStatusId, PositiveNumber, StatusName } from "../../domain/schemas/shared.js"
 import {
   StatusCategoryEntries,
   type StatusCategoryValue,
@@ -360,7 +360,10 @@ export const findIssueInProject = (
       )) ??
       (number !== null
         ? yield* client.findOne<HulyIssue>(tracker.class.Issue, hulyQuery<HulyIssue>({ space: project._id, number }))
-        : undefined)
+        : yield* client.findOne<HulyIssue>(
+            tracker.class.Issue,
+            hulyQuery<HulyIssue>({ space: project._id, _id: toRef<HulyIssue>(IssueIdentifier.make(identifierStr)) })
+          ))
     if (issue === undefined) {
       return yield* new IssueNotFoundError({ identifier: identifierStr, project: project.identifier })
     }

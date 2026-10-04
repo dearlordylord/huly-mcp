@@ -45,6 +45,7 @@ import { type PersonAdministrationLocator, SocialIdentityId } from "../domain/sc
 import type { PersonMergeReferenceImpact } from "../domain/schemas/person-merge.js"
 import {
   AccountUuid as ParsedAccountUuid,
+  type IssueId,
   type HulyConditionalWriteResult,
   type HulyTransactionScope,
   type PersonId as DomainPersonId,
@@ -82,6 +83,9 @@ import { acquireClosableClient } from "./scoped-client.js"
 import { classifyHulyUnavailableFailure, normalizeHulyOrigin } from "./unavailable-diagnostics.js"
 import { testWorkbenchUrlConfig, type WorkbenchUrlConfig } from "./url-builders.js"
 import { inspectNativePersonReferences, migrateNativePersonReferences } from "./person-reference-migration.js"
+
+import { commitTransfer, inspectTransferRecords } from "./issue-transfer-adapter.js"
+import type { TransferInspection, TransferWrite } from "../domain/schemas/issue-transfer.js"
 
 // --- Connection helpers ---
 
@@ -211,6 +215,10 @@ interface HulyClientContext {
 }
 
 export interface HulyClientOperations extends HulyClientContext {
+  readonly inspectTransferRecords?: (
+    issueId: IssueId
+  ) => Effect.Effect<TransferInspection, HulyClientError | HulyDataInvalidError>
+  readonly commitTransfer?: (write: TransferWrite) => Effect.Effect<HulyConditionalWriteResult, HulyClientError>
   readonly getAccountUuid: () => AccountUuid
   readonly getPrimarySocialId: () => PersonId
   readonly getSocialIds?: () => ReadonlyArray<PersonId>
@@ -401,6 +409,8 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
           Effect.tryPromise({ try: () => op(client), catch: (error) => makeOperationConnectionError(operation, error) })
 
         const operations: HulyClientOperations = {
+          inspectTransferRecords: (issueId) => inspectTransferRecords(client, issueId),
+          commitTransfer: (write) => withClient((client) => commitTransfer(client, write), "conditionalUpdateDoc"),
           getAccountUuid: () => accountUuid,
           getPrimarySocialId: () => primarySocialId,
           getSocialIds: () => socialIds,
