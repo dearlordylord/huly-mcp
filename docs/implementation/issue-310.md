@@ -65,3 +65,14 @@ old-only external ancestor entry is removed without replacing unrelated entries.
 The adapter batch simulation now parses and applies that actual scalar predicate.
 The remaining errors were fixture readonly construction, brand comparisons and
 the shared UNKNOWN_TOTAL import. No gate or live success is claimed.
+
+Scheduled 2c1c42df typecheck passed: 1089 files, zero strict Effect errors,
+warnings or messages. The seven-file focused run completed in 2.59s with 21
+passed and two failed. Its failures identified a parent-payload dependency that
+hid independently parsed descendant attributes and an incorrectly populated
+adapter fixture. The successor retains the child protected snapshot while adding
+an explicit unavailable-parent conflict; movement still refuses. The SDK-port
+fixture now contains every actual task/ancestor/owned-record snapshot, evaluates
+all match and notMatch conditions in strict mode, and checks that an actual
+changed grandchild timestamp refuses the batch. No test success is claimed for
+this successor until the scheduled rerun.

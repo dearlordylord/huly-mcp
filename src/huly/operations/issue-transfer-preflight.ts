@@ -217,17 +217,30 @@ const inspectWorkflow = Effect.fn("transfer.inspectWorkflow")(function* (
       hulyQuery<TaskType>({ _id: toRef<TaskType>(protectedIssue.kind) })
     )
   )
-  const parentIssue =
+  const parentObservation =
     parent === undefined
       ? undefined
-      : yield* parse(
-          TransferIssueSchema,
-          yield* client.findOne<Issue>(tracker.class.Issue, hulyQuery<Issue>({ _id: toRef<Issue>(parent._id) }))
+      : yield* Effect.result(
+          Effect.gen(function* () {
+            return yield* parse(
+              TransferIssueSchema,
+              yield* client.findOne<Issue>(tracker.class.Issue, hulyQuery<Issue>({ _id: toRef<Issue>(parent._id) }))
+            )
+          })
         )
+  const parentIssue = parentObservation?._tag === "Success" ? parentObservation.success : undefined
   const conflicts = [
     ...projectConflicts(client, root, sourceData, destinationData),
     ...availableWorkflowConflicts(root, parentIssue, protectedIssue, destinationData.type, workflow, kind)
   ]
+  if (parentObservation?._tag === "Failure")
+    conflicts.push(
+      conflict(
+        root,
+        "discovery",
+        "Parent protected payload is unavailable; this task's independently parsed attributes and workflow remain inspected."
+      )
+    )
   if (raw?.modifiedOn !== root.modifiedOn)
     conflicts.push(conflict(root, "discovery", "Root changed during inspection."))
   return { protectedIssue, conflicts }
