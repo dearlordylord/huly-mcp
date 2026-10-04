@@ -416,9 +416,9 @@ describe("HulyClient Service", () => {
         const client = yield* HulyClient
         return yield* client.updateCollection(
           chunter.class.ChatMessage,
-          toRef("project"),
-          toRef("comment"),
-          toRef("issue"),
+          toRef(DocId.make("project")),
+          toRef(DocId.make("comment")),
+          toRef(IssueId.make("issue")),
           tracker.class.Issue,
           "comments",
           { message: "Updated comment" },
