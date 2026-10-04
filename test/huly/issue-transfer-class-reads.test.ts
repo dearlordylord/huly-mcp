@@ -4,7 +4,7 @@ import { Deferred, Effect, Fiber, Schema } from "effect"
 import { expect } from "vitest"
 import { IssueId, ObjectClassName } from "../../src/domain/schemas/shared.js"
 import { HulyConnectionError, HulyDataInvalidError } from "../../src/huly/errors-base.js"
-import { attachment, chunter, tags, tracker } from "../../src/huly/huly-plugins.js"
+import { activity, attachment, chunter, tags, tracker } from "../../src/huly/huly-plugins.js"
 import { inspectTransferRecords } from "../../src/huly/issue-transfer-discovery.js"
 import { toClassRef } from "../../src/huly/operations/sdk-boundary.js"
 import { sdkFixture } from "../helpers/huly-sdk.js"
@@ -64,7 +64,7 @@ it.effect(
     Effect.gen(function* () {
       const firstClasses = [
         tracker.class.Issue,
-        chunter.class.ChatMessage,
+        activity.class.ActivityMessage,
         attachment.class.Attachment,
         tags.class.TagReference
       ].map((cls) => Schema.decodeUnknownSync(ObjectClassName)(String(cls)))
@@ -114,8 +114,10 @@ it.effect(
       expect(completions.slice(0, 4)).toEqual(firstClasses.toReversed())
       expect(inspection.discovery).toBe("complete")
       expect(inspection.blockers).toEqual([])
-      expect(inspection.records.map((record) => record._id)).toEqual(["comment", "file", "label", "history"])
-      expect(new Set(observed.calls)).toEqual(new Set(inspection.classes))
+      expect(inspection.records.map((record) => record._id)).toEqual(["history", "comment", "file", "label"])
+      expect(observed.calls.every((cls) => inspection.classes.includes(cls))).toBe(true)
+      expect(inspection.classes).toContain(String(chunter.class.ThreadMessage))
+      expect(observed.calls).not.toContain(String(chunter.class.ThreadMessage))
       expect(f.scopes).toEqual([])
       expect(f.updates).toEqual([])
     })
@@ -131,7 +133,7 @@ for (const queries of [0, 3, 4]) {
       expect(inspection.blockers).toContain("Owned-record query limit exhausted.")
       expect(calls).toHaveLength(queries)
       expect(inspection.records.map((record) => record._id)).toEqual(
-        queries === 0 ? [] : queries === 3 ? ["comment", "file"] : ["comment", "file", "label"]
+        queries === 0 ? [] : queries === 3 ? ["history", "comment", "file"] : ["history", "comment", "file", "label"]
       )
       expect(f.scopes).toEqual([])
       expect(f.updates).toEqual([])

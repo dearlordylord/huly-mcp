@@ -25,6 +25,7 @@ import {
 } from "./issue-transfer-records.js"
 import { hulyQuery } from "./operations/query-helpers.js"
 import { toClassRef, toRef } from "./operations/sdk-boundary.js"
+import { groupTransferClassQueries } from "./issue-transfer-class-groups.js"
 import { OWNER_CLASS_READ_CONCURRENCY, readAttachedClassWindow } from "./issue-transfer-class-reads.js"
 
 const readModel = <A>(read: () => A): Effect.Effect<A, HulyDataInvalidError> =>
@@ -108,7 +109,15 @@ const inspectOwner = Effect.fn("transfer.inspectOwner")(function* (
       )
     ))
   ])
-  yield* inspectClassCollections(client, state, visit, limits, collections, classes)
+  for (const cls of classes) state.classes.add(cls)
+  const representatives = yield* readModel(() =>
+    groupTransferClassQueries([...classes], {
+      isMixin: (cls) => hierarchy.isMixin(toClassRef<Doc>(cls)),
+      findDomain: (cls) => hierarchy.findDomain(toClassRef<Doc>(cls)),
+      isDerived: (cls, ancestor) => hierarchy.isDerived(toClassRef<Doc>(cls), toClassRef<Doc>(ancestor))
+    })
+  )
+  yield* inspectClassCollections(client, state, visit, limits, collections, representatives)
   if (state.incomplete) return
   if (!admitQuery(state, limits)) return
   const refs = yield* Effect.tryPromise({
@@ -149,9 +158,9 @@ const inspectClassCollections = Effect.fn("transfer.inspectClassCollections")(fu
   visit: Visit,
   limits: RecordDiscoveryLimits,
   collections: ReadonlyMap<string, ObjectClassName>,
-  classes: ReadonlySet<ObjectClassName>
+  classes: ReadonlyArray<ObjectClassName>
 ): Effect.fn.Return<void, HulyClientError | HulyDataInvalidError> {
-  for (const chunk of EffectArray.chunksOf([...classes], OWNER_CLASS_READ_CONCURRENCY)) {
+  for (const chunk of EffectArray.chunksOf(classes, OWNER_CLASS_READ_CONCURRENCY)) {
     const window = admitClassWindow(state, limits, chunk)
     const replies = yield* readAttachedClassWindow(client, visit.owner, window, limits.result)
     for (const { cls, result } of replies) {
