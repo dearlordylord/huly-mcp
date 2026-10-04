@@ -143,3 +143,27 @@ test('preparation cannot qualify source changed during its execution', async () 
     await assert.rejects(readFile(path.join(f.root, 'launches')), { code: 'ENOENT' })
   } finally { await rm(f.root, { recursive: true }) }
 })
+
+test('successful preparation with retained detached-stage custody cannot launch live suites or release the lock', async () => {
+  const f = await fixture()
+  try {
+    await writeFile(path.join(f.root, 'scripts/prepare.sh'), '#!/bin/bash\nprintf unconfirmed > "$MOVEMENT_CUSTODY_DIR/stage.json"\nexit 0\n')
+    const result = await runCertification({ ...f, prepare: 'scripts/prepare.sh' })
+    assert.equal(result.exit, 1)
+    await assert.rejects(readFile(path.join(f.root, 'launches')), { code: 'ENOENT' })
+    assert.match(await readFile(path.join(f.stateDir, 'prepare.log.custody/stage.json'), 'utf8'), /unconfirmed/)
+    assert.equal((await runCertification({ ...f, mode: 'plan' })).locked, true)
+  } finally { await rm(f.root, { recursive: true }) }
+})
+
+test('preparation cannot qualify a harness changed during its execution', async () => {
+  const f = await fixture()
+  try {
+    await writeFile(path.join(f.root, 'scripts/quality-helper.ts'), '// original\n')
+    await writeFile(path.join(f.root, 'scripts/prepare.sh'), '#!/bin/bash\nprintf -v target "scripts/%s.ts" quality-helper\necho changed >> "$target"\n')
+    const result = await runCertification({ ...f, prepare: 'scripts/prepare.sh' })
+    assert.equal(result.exit, 1)
+    assert.equal(result.drift, true)
+    await assert.rejects(readFile(path.join(f.root, 'launches')), { code: 'ENOENT' })
+  } finally { await rm(f.root, { recursive: true }) }
+})

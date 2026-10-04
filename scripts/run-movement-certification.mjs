@@ -61,6 +61,14 @@ const dependencies = async (root, initial) => {
   return [...files].sort((a, b) => a.localeCompare(b))
 }
 const byteFingerprint = async (root, files) => hash(JSON.stringify(await Promise.all(files.map(async file => [file, hash(await readFile(path.join(root, file)))]))))
+const preparationFingerprint = async root => {
+  const configurations = ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.json', 'vitest.config.ts',
+    '.oxlintrc.json', 'oxlint.complexity.json', '.jscpd.json', 'dprint.json']
+  const files = [...(await walk(path.join(root, 'scripts'))), ...(await walk(path.join(root, 'test')))].map(file => path.relative(root, file))
+  for (const configuration of configurations)
+    if (await optionalFile(path.join(root, configuration)) !== undefined) files.push(configuration)
+  return byteFingerprint(root, files.sort((a, b) => a.localeCompare(b)))
+}
 export const fingerprintSuite = async (root, suite, prepare, includeGenerated = true) => {
   const commonFiles = ['pnpm-lock.yaml', 'tsconfig.json', ...(await walk(path.join(root, 'src'))).map(file => path.relative(root, file)),
     ...(await walk(path.join(root, 'packages/huly-cli/src'))).map(file => path.relative(root, file)),
@@ -88,8 +96,13 @@ const groupAlive = pid => { try { process.kill(-pid, 0); return true } catch (er
 const signalGroup = (pid, signal) => { try { process.kill(-pid, signal) } catch (error) { if (error.code !== 'ESRCH') throw error } }
 export const boundedProcess = async (root, script, log, deadline, time = realTime) => {
   if (time.now() >= deadline) return { exit: TIMEOUT_EXIT, clean: true, launched: false }
+  const custodyDirectory = `${log}.custody`
+  await mkdir(custodyDirectory, { recursive: true, mode: 0o700 })
+  if ((await readdir(custodyDirectory)).length !== 0)
+    return { exit: 1, clean: false, launched: false, custodyDirectory }
   const output = await import('node:fs').then(fs => fs.openSync(log, 'a'))
-  const child = spawn('bash', [script], { cwd: root, detached: true, stdio: ['ignore', output, output] })
+  const child = spawn('bash', [script], { cwd: root, detached: true, stdio: ['ignore', output, output],
+    env: { ...process.env, MOVEMENT_CUSTODY_DIR: custodyDirectory } })
   let timedOut = false
   let interrupted = false
   let interruptionKill
@@ -107,9 +120,12 @@ export const boundedProcess = async (root, script, log, deadline, time = realTim
   }
   time.cancel(killed); time.cancel(interruptionKill)
   process.removeListener('SIGINT', interrupt); process.removeListener('SIGTERM', interrupt)
-  const clean = !groupAlive(child.pid)
+  // A vanished preparation group does not prove its detached quality stages stopped.
+  // Any retained record, including malformed/starting records, keeps custody fail-closed.
+  const clean = !groupAlive(child.pid) && (await readdir(custodyDirectory)).length === 0
   const fs = await import('node:fs'); fs.closeSync(output)
-  return { exit: timedOut ? TIMEOUT_EXIT : interrupted ? INTERRUPTED_EXIT : exit, clean, launched: true }
+  return { exit: timedOut ? TIMEOUT_EXIT : interrupted ? INTERRUPTED_EXIT : exit, clean, launched: true,
+    ...(clean ? {} : { custodyDirectory }) }
 }
 export const runCertification = async (options) => {
   const root = path.resolve(options.root), lock = path.join(root, '.movement-certification.lock')
@@ -149,11 +165,13 @@ const ownedCertification = async ({ deadline, diagnostic, mode, prepare, root, s
     const sourceBaseline = await fingerprintSuite(root, suites[0], prepare, false)
     if (prepare !== undefined) {
       await dependencies(root, prepare)
+      const preparationBaseline = await preparationFingerprint(root)
       ownership.clean = false
       const result = await boundedProcess(root, prepare, path.join(stateDir, 'prepare.log'), effectiveDeadline, time)
       clean = result.clean
       ownership.clean = clean
       if (result.exit !== 0 || !result.clean) return { exit: result.exit || 1, expired: result.exit === TIMEOUT_EXIT, plan: [] }
+      if (await preparationFingerprint(root) !== preparationBaseline) return { exit: 1, expired: false, plan: [], drift: true }
     }
     if ((await fingerprintSuite(root, suites[0], prepare, false)).fingerprint !== sourceBaseline.fingerprint) return { exit: 1, expired: false, plan: [], drift: true }
     const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
