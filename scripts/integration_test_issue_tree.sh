@@ -59,6 +59,14 @@ move() {
     else "${CLI[@]}" issues move "$issue" --destination "$destination" --json; fi
   fi
 }
+assert_tree_completion() {
+  local result="$1"
+  shift
+  if ! jq -e "$@" >/dev/null 2>/dev/null <<<"$result"; then
+    jq -nc --argjson result "$result" '{expected:"complete-tree-mapping",outcome:(if (["completed","blocked","no-op","incomplete","indeterminate"]|index($result.outcome))!=null then $result.outcome else "invalid" end),changed:(if ($result.changed|type)=="boolean" then $result.changed else null end),taskCount:(if ($result.tasks|type)=="array" then ($result.tasks|length) else null end),executionPhase:(if (["allocation","commit","verification"]|index($result.execution.phase))!=null then $result.execution.phase else null end),reservationCount:(if ($result.execution.reservations|type)=="array" then ($result.execution.reservations|length) else null end)}' 2>/dev/null >&2 || printf 'FAIL: tree completion result is not JSON\n' >&2
+    return 1
+  fi
+}
 assert_document_unchanged() {
   local current
   current=$(mcp get_document "$(jq -nc --arg teamspace "$TEAMSPACE" --arg document "$DOCUMENT" '{teamspace:$teamspace,document:$document}')")
@@ -148,7 +156,7 @@ for TRANSPORT in mcp cli; do
   IDS=$(jq -c --arg added "$ADDED" '.+[$added]' <<<"$IDS"); STATE=$(jq -c --argjson issues "$IDS" '.issues=$issues' <<<"$STATE")
   BEFORE=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$STATE")
   COMPLETED=$(move "$FINAL")
-  jq -e --arg root "$ROOT" --arg child "$CHILD" --arg grandchild "$GRANDCHILD" --arg added "$ADDED" --arg milestone "$TM" '.outcome=="completed" and (.tasks|length)==4 and ([.tasks[].issueId]|sort)==([$root,$child,$grandchild,$added]|sort) and ([.tasks[].identifier]|unique|length)==4 and any(.attributeChanges[];.issueId==$root and .to==null and .reason=="explicit-clear") and any(.attributeChanges[];.issueId==$grandchild and .to==$milestone and .reason=="exact-name")' >/dev/null <<<"$COMPLETED"
+  assert_tree_completion "$COMPLETED" --arg root "$ROOT" --arg child "$CHILD" --arg grandchild "$GRANDCHILD" --arg added "$ADDED" --arg milestone "$TM" '.outcome=="completed" and (.tasks|length)==4 and ([.tasks[].issueId]|sort)==([$root,$child,$grandchild,$added]|sort) and ([.tasks[].identifier]|unique|length)==4 and any(.attributeChanges[];.issueId==$root and .to==null and .reason=="explicit-clear") and any(.attributeChanges[];.issueId==$grandchild and .to==$milestone and .reason=="exact-name")' || exit 1
   assert_document_unchanged
   AFTER_ARGS=$(jq -nc --argjson args "$STATE" --argjson before "$BEFORE" --arg destination "$TARGET" '$args + {migrationEvidence:{destinationSpace:($before.projects[]|select(.identifier==$destination)|._id),beforeRecordIds:[$before.issues[].owned.records[]._id]}}')
   AFTER=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$AFTER_ARGS")
