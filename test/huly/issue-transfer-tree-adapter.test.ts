@@ -120,7 +120,13 @@ it.effect(
       )
       expect(write).toBeDefined()
       if (write === undefined) return
-      const adapter = recordAdapterFixture()
+      const adapter = recordAdapterFixture(true)
+      adapter.docs.splice(
+        0,
+        adapter.docs.length,
+        ...f.issues.map((issue) => ({ ...issue })),
+        ...f.records.map((record) => ({ ...record }))
+      )
       expect(yield* Effect.promise(() => commitTransferTree(adapter.client, write))).toBe("applied")
       const updates = adapter.updates.map((args) => parseUpdate({ id: args[2], update: args[3] }))
       const previous = f.issues.map((issue) => parseIssue(issue))
@@ -136,6 +142,11 @@ it.effect(
       expect(applyPersistedBatch(previous, updates, false).get(f.grandchild._id)?.parents).not.toEqual(
         write.tasks[2]?.finalParents
       )
+      // Conditional refusal is evaluated from the actual source snapshots.
+      const changed = adapter.docs.find((doc) => doc._id === f.grandchild._id)
+      expect(changed).toBeDefined()
+      if (changed !== undefined) changed.modifiedOn = f.grandchild.modifiedOn + 1
+      expect(yield* Effect.promise(() => commitTransferTree(adapter.client, write))).toBe("condition-not-met")
       const countUpdates = updates.filter((entry) => entry.update.$inc !== undefined)
       expect(countUpdates.map((entry) => entry.id)).toEqual([f.old._id, f.parent._id])
     })

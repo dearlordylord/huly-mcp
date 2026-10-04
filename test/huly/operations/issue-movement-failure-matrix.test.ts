@@ -179,7 +179,9 @@ describe("public movement uncertainty and concurrent state", () => {
                 parseInspection({
                   ...inspection,
                   records:
-                    f.state.allocated > 0 && id === f.root._id ? [...inspection.records, added] : inspection.records
+                    f.state.allocated > 0 && String(id) === String(f.root._id)
+                      ? [...inspection.records, added]
+                      : inspection.records
                 })
               )
             )
@@ -257,7 +259,7 @@ describe("public movement uncertainty and concurrent state", () => {
         commitTransferTree: (write) =>
           Effect.sync(() => {
             f.state.sent++
-            const root = assertExists(write.tasks.find((task) => task.issueId === f.root._id))
+            const root = assertExists(write.tasks.find((task) => String(task.issueId) === String(f.root._id)))
             Object.assign(f.root, {
               space: root.destinationId,
               identifier: root.identifier,
@@ -394,5 +396,16 @@ it.effect("same-project scoped movement preserves all numbers, identifiers and r
     expect(f.state.sent).toBe(1)
     expect(f.child.attachedTo).toBe(f.root._id)
     expect(f.grandchild.attachedTo).toBe(f.child._id)
+  })
+)
+
+it.effect("cross-project admission refuses a missing single-send sequence port before generic SDK writes", () =>
+  Effect.gen(function* () {
+    const f = transferTreeFixture()
+    const { allocateMovementNumber: _allocation, ...operations } = f.operations
+    const result = yield* run(f, operations)
+    expect(result).toMatchObject({ outcome: "blocked", changed: false })
+    expect(f.state.allocated).toBe(0)
+    expect(f.state.sent).toBe(0)
   })
 )

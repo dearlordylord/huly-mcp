@@ -44,7 +44,7 @@ export const observeFailure = Effect.fn("transfer.observeFailure")(function* (
   const observed = yield* Effect.result(
     verifyTransferTree(client, prepared, destination, write).pipe(Effect.timeout(TRANSFER_DISCOVERY_BUDGET))
   )
-  yield* Ref.set(
+  yield* Ref.set<TransferTreeVerification>(
     progress.verification,
     observed._tag === "Failure"
       ? { status: "unavailable", reason: "Current task/ownership/hierarchy state could not be read completely." }
@@ -62,9 +62,12 @@ export const failedCommit = Effect.fn("transfer.failedCommit")(function* (
   reservations: MovementUncertaintyEvidence["execution"]["reservations"]
 ): Effect.fn.Return<MoveIssueResult> {
   const noSend = error instanceof MovementTransportError && error.phase === "before-send"
-  const beforeSendState =
-    reservations.length === 0 ? undefined : ({ phase: "allocation", commit: "not-sent", reservations } as const)
-  yield* Ref.set(progress.execution, noSend ? beforeSendState : { phase: "commit", commit: "reply-lost", reservations })
+  const beforeSendState: MovementUncertaintyEvidence["execution"] | undefined =
+    reservations.length === 0 ? undefined : { phase: "allocation", commit: "not-sent", reservations }
+  yield* Ref.set<MovementUncertaintyEvidence["execution"] | undefined>(
+    progress.execution,
+    noSend ? beforeSendState : { phase: "commit", commit: "reply-lost", reservations }
+  )
   yield* observeFailure(client, prepared, destination, write, progress)
   return yield* stoppedResult(
     noSend ? "incomplete" : "indeterminate",

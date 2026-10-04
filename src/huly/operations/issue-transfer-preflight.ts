@@ -123,9 +123,33 @@ const projectConflicts = (
   return conflicts
 }
 
+// Internal observation proof: absence is distinct from a failed concrete-parent read.
+type TransferParentObservation =
+  | { readonly status: "absent" }
+  | { readonly status: "available"; readonly issue: TransferIssue }
+  | { readonly status: "unavailable" }
+
+const inspectTransferParent = Effect.fn("transfer.inspectParent")(function* (
+  client: HulyClient["Service"],
+  parent: MovementIssue | undefined
+): Effect.fn.Return<TransferParentObservation> {
+  if (parent === undefined) return { status: "absent" }
+  const observation = yield* Effect.result(
+    Effect.gen(function* () {
+      return yield* parse(
+        TransferIssueSchema,
+        yield* client.findOne<Issue>(tracker.class.Issue, hulyQuery<Issue>({ _id: toRef<Issue>(parent._id) }))
+      )
+    })
+  )
+  return observation._tag === "Success"
+    ? { status: "available", issue: observation.success }
+    : { status: "unavailable" }
+})
+
 const workflowConflicts = (
   root: MovementIssue,
-  parent: TransferIssue | undefined,
+  parent: TransferParentObservation,
   issue: TransferIssue,
   projectType: Schema.Schema.Type<typeof TransferProjectSchema>["type"],
   workflow: Schema.Schema.Type<typeof TransferWorkflowSchema>,
@@ -147,7 +171,9 @@ const workflowConflicts = (
         `Status ${issue.status} is unsupported for kind ${issue.kind}. Select a compatible destination; status cannot be cleared or converted.`
       )
     )
-  return [...conflicts, ...parentKindConflicts(root, parent, kind)]
+  return parent.status === "unavailable"
+    ? conflicts
+    : [...conflicts, ...parentKindConflicts(root, parent.status === "available" ? parent.issue : undefined, kind)]
 }
 
 const parentKindConflicts = (
@@ -167,7 +193,7 @@ const parentKindConflicts = (
 
 const availableWorkflowConflicts = (
   root: MovementIssue,
-  parent: TransferIssue | undefined,
+  parent: TransferParentObservation,
   issue: TransferIssue,
   projectType: Schema.Schema.Type<typeof TransferProjectSchema>["type"],
   workflow: Schema.Schema.Type<typeof TransferWorkflowSchema> | undefined,
@@ -217,17 +243,19 @@ const inspectWorkflow = Effect.fn("transfer.inspectWorkflow")(function* (
       hulyQuery<TaskType>({ _id: toRef<TaskType>(protectedIssue.kind) })
     )
   )
-  const parentIssue =
-    parent === undefined
-      ? undefined
-      : yield* parse(
-          TransferIssueSchema,
-          yield* client.findOne<Issue>(tracker.class.Issue, hulyQuery<Issue>({ _id: toRef<Issue>(parent._id) }))
-        )
+  const parentObservation = yield* inspectTransferParent(client, parent)
   const conflicts = [
     ...projectConflicts(client, root, sourceData, destinationData),
-    ...availableWorkflowConflicts(root, parentIssue, protectedIssue, destinationData.type, workflow, kind)
+    ...availableWorkflowConflicts(root, parentObservation, protectedIssue, destinationData.type, workflow, kind)
   ]
+  if (parentObservation.status === "unavailable")
+    conflicts.push(
+      conflict(
+        root,
+        "discovery",
+        "Parent protected payload is unavailable; this task's independently parsed attributes and workflow remain inspected."
+      )
+    )
   if (raw?.modifiedOn !== root.modifiedOn)
     conflicts.push(conflict(root, "discovery", "Root changed during inspection."))
   return { protectedIssue, conflicts }

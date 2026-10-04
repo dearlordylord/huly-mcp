@@ -1,12 +1,16 @@
 import { isDeepStrictEqual } from "node:util"
 import type { Issue } from "@hcengineering/tracker"
-import { Effect, Schema } from "effect"
-import { MovementIssueSchema, type MovementProject } from "../../domain/schemas/issue-movement-state.js"
+import { Effect, Option, Schema } from "effect"
+import {
+  MovementIssueSchema,
+  type MovementIssue,
+  type MovementProject
+} from "../../domain/schemas/issue-movement-state.js"
 import {
   MovementObservedRecordSchema,
   type MovementUncertaintyEvidence
 } from "../../domain/schemas/issue-movement-uncertainty.js"
-import { TransferIssueSchema, type TransferRecord } from "../../domain/schemas/issue-transfer.js"
+import { TransferIssueSchema, type TransferRecord, type TransferIssue } from "../../domain/schemas/issue-transfer.js"
 import type { TransferTreeWrite } from "../../domain/schemas/issue-transfer-tree.js"
 import type { HulyClient } from "../client.js"
 import { tracker } from "../huly-plugins.js"
@@ -18,13 +22,19 @@ import { toRef } from "./sdk-boundary.js"
 import { movementNoParent } from "./issue-movement-hierarchy.js"
 
 export type TransferTreeVerification = MovementUncertaintyEvidence["verification"]
-const ObservedIssueSchema = Schema.Struct({ ...MovementIssueSchema.fields, ...TransferIssueSchema.fields })
-const parseObservedIssue = (input: unknown) => Schema.decodeUnknownOption(ObservedIssueSchema)(input)
-const parseProtectedIssue = (input: unknown) => Schema.decodeUnknownOption(TransferIssueSchema)(input)
-type ObservedIssue = Schema.Schema.Type<typeof ObservedIssueSchema>
+// Internal paired observation: each schema owns its independent parsed projection.
+interface ObservedIssue {
+  readonly hierarchy: MovementIssue
+  readonly protectedIssue: TransferIssue
+}
+const parseObservedIssue = (input: unknown): Option.Option<ObservedIssue> =>
+  Option.gen(function* () {
+    const hierarchy = yield* Schema.decodeUnknownOption(MovementIssueSchema)(input)
+    const protectedIssue = yield* Schema.decodeUnknownOption(TransferIssueSchema)(input)
+    return { hierarchy, protectedIssue }
+  })
 type Observation = Extract<TransferTreeVerification, { readonly status: "observed" }>
-
-const observedTask = (issue: ObservedIssue): Observation["tasks"][number] => ({
+const observedTask = ({ hierarchy: issue }: ObservedIssue): Observation["tasks"][number] => ({
   issueId: issue._id,
   projectId: issue.space,
   parentId: issue.attachedTo === movementNoParent ? null : issue.attachedTo,
@@ -130,23 +140,19 @@ export const verifyTransferTree = Effect.fn("transfer.verifyTree")(function* (
 
 const taskProblem = (observed: ReadonlyArray<ObservedIssue>, write: TransferTreeWrite): string | undefined => {
   for (const task of write.tasks) {
-    const current = observed.find((issue) => issue._id === task.issueId)
+    const current = observed.find((issue) => issue.hierarchy._id === task.issueId)
     if (current === undefined) return `Inspected task ${task.issueId} is absent.`
-    if (!destinationMatches(current, task))
+    if (!destinationMatches(current.hierarchy, task))
       return `Task ${task.issueId} differs from its planned destination or ancestry.`
-    const parsed = parseProtectedIssue(current)
+    const protectedIssue = current.protectedIssue
     const expected = { ...task.expectedIssue, number: task.number, rank: task.rank }
     for (const change of task.attributeChanges ?? []) expected[change.field] = change.to
-    if (
-      parsed._tag === "None" ||
-      !isDeepStrictEqual(expected, parsed.value) ||
-      current.title !== task.expectedHierarchy.title
-    )
+    if (!isDeepStrictEqual(expected, protectedIssue) || current.hierarchy.title !== task.expectedHierarchy.title)
       return `Protected payload of ${task.issueId} differs from approved final values.`
   }
   return undefined
 }
-const destinationMatches = (current: ObservedIssue, task: TransferTreeWrite["tasks"][number]) =>
+const destinationMatches = (current: MovementIssue, task: TransferTreeWrite["tasks"][number]) =>
   current.space === task.destinationId &&
   current.identifier === task.identifier &&
   current.attachedTo === task.parentId &&
@@ -185,9 +191,16 @@ const inspectRecords = Effect.fn("transfer.observeRecords")(function* (
     return { status: "unavailable", observed: [], reason: "Owned-record verifier is unavailable." }
   const records: Array<Observation["records"][number]> = []
   const problems: Array<string> = []
-  const owners = [...new Set([...prepared.tasks.map((task) => task.issue._id), ...observed.map((issue) => issue._id)])]
+  const owners = [
+    ...new Set([...prepared.tasks.map((task) => task.issue._id), ...observed.map((issue) => issue.hierarchy._id)])
+  ]
   for (const issueId of owners) {
-    const read = yield* Effect.result(inspect(issueId, observed))
+    const read = yield* Effect.result(
+      inspect(
+        issueId,
+        observed.map((issue) => issue.hierarchy)
+      )
+    )
     if (read._tag === "Failure")
       return { status: "unavailable", observed: records, reason: `Record closure of ${issueId} could not be read.` }
     const current = read.success
@@ -200,8 +213,8 @@ const inspectRecords = Effect.fn("transfer.observeRecords")(function* (
     if (current.discovery === "incomplete")
       return { status: "unavailable", observed: records, reason: `Record closure of ${issueId} is incomplete.` }
     const task = prepared.tasks.find((value) => value.issue._id === issueId)
-    const issue = observed.find((value) => value._id === issueId)
-    if (task === undefined || !recordPayloadsMatch(task.records, current.records, issue?.space))
+    const issue = observed.find((value) => value.hierarchy._id === issueId)
+    if (task === undefined || !recordPayloadsMatch(task.records, current.records, issue?.hierarchy.space))
       problems.push(`Owned records of ${issueId} changed after inspection.`)
     if (current.blockers.length > 0) problems.push(...current.blockers)
   }

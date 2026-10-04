@@ -1,3 +1,5 @@
+import { assertExists } from "../../src/utils/assertions.js"
+import { toRef } from "../../src/huly/operations/sdk-boundary.js"
 import type { Doc, DocumentQuery, FindOptions } from "@hcengineering/core"
 import { IssuePriority, type Issue } from "@hcengineering/tracker"
 import { Effect, Schema } from "effect"
@@ -5,7 +7,7 @@ import { TransferInspectionSchema, type TransferWrite } from "../../src/domain/s
 import { DocId, IssueId, ObjectClassName, Timestamp, NonEmptyString } from "../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
 import { HulyAuthError } from "../../src/huly/errors-base.js"
-import { activity, task, tracker } from "../../src/huly/huly-plugins.js"
+import { activity, core, task, tracker } from "../../src/huly/huly-plugins.js"
 import { sdkFixture, documentForTestClass, findResultForTestClass } from "./huly-sdk.js"
 import { initializeHierarchy, movementFixture, movementIssue, movementProject } from "./movement.js"
 
@@ -115,7 +117,7 @@ export const transferFixture = () => {
     return Effect.succeed(documentForTestClass<T>(found))
   }
   const attributeRows: Array<Doc> = []
-  const operations: Partial<HulyClientOperations> = {
+  const baseOperations: Partial<HulyClientOperations> = {
     ...fixture.operations,
     findOne,
     findAll: <T extends Doc>(cls: unknown, query: DocumentQuery<T>, options?: FindOptions<T>) => {
@@ -174,12 +176,23 @@ export const transferFixture = () => {
       return Effect.succeed("applied")
     }
   }
-  operations.commitTransferTree = (write) => {
-    const rootWrite = write.tasks.find((task) => task.issueId === write.rootId)
-    const commit = operations.commitTransfer
-    return write.tasks.length !== 1 || rootWrite === undefined || commit === undefined
-      ? Effect.succeed("condition-not-met")
-      : commit(rootWrite)
+  const operations: Partial<HulyClientOperations> = {
+    ...baseOperations,
+    allocateMovementNumber: (destinationId) =>
+      assertExists(baseOperations.updateDoc)(
+        tracker.class.Project,
+        core.space.Space,
+        toRef(destinationId),
+        { $inc: { sequence: 1 } },
+        true
+      ),
+    commitTransferTree: (write) => {
+      const rootWrite = write.tasks.find((task) => task.issueId === write.rootId)
+      const commit = baseOperations.commitTransfer
+      return write.tasks.length !== 1 || rootWrite === undefined || commit === undefined
+        ? Effect.succeed("condition-not-met")
+        : commit(rootWrite)
+    }
   }
   return {
     ...fixture,
