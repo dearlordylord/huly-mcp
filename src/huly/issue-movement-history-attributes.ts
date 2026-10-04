@@ -29,8 +29,11 @@ export const parseMovementHistoryAttributes = (
           : [key]
       )
       .filter((key) => !key.startsWith("$"))
+    const keysInput: unknown = keys
+    const parsedKeys = Schema.decodeUnknownResult(Schema.Array(NonEmptyString))(keysInput)
+    if (Result.isFailure(parsedKeys)) return Result.fail(invalidMetadata())
     const attributes: MovementHistoryAttribute[] = []
-    for (const key of new Set(keys)) {
+    for (const key of new Set(parsedKeys.success)) {
       const raw: unknown = hierarchy.findAttribute(tracker.class.Issue, key)
       if (raw === undefined) continue
       const attribute = Schema.decodeUnknownResult(AttributeSchema)(raw)
@@ -48,12 +51,12 @@ export const parseMovementHistoryAttributes = (
 
 const parseHistoryAttribute = (
   hierarchy: Hierarchy,
-  key: string,
+  key: NonEmptyString,
   type: Schema.Schema.Type<typeof AttributeTypeSchema>
 ): Result.Result<MovementHistoryAttribute, HulyDataInvalidError> => {
   const attrClass =
     type.to ??
     (hierarchy.isDerived(toClassRef(type._class), core.class.ArrOf) ? type.of?._class : (type.of?.to ?? type._class))
-  const input: unknown = { attrKey: NonEmptyString.make(key), attrClass }
+  const input: unknown = { attrKey: key, attrClass }
   return Schema.decodeUnknownResult(MovementHistoryAttributeSchema)(input).pipe(Result.mapError(invalidMetadata))
 }
