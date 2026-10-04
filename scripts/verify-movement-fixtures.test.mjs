@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { test } from "node:test"
@@ -35,3 +35,60 @@ test("rejects actual Bash syntax errors", (t) => {
   writeFileSync(join(directory, "syntax.sh"), "if then\n")
   assert.deepEqual(verifyMovementFixtures(["syntax.sh"], directory), ["syntax.sh: Bash syntax check failed."])
 })
+
+const treeSource = readFileSync(new URL("./integration_test_issue_tree.sh", import.meta.url), "utf8")
+const treeHelpers = treeSource.slice(treeSource.indexOf("tree_mcp_pipeline_status() {"), treeSource.indexOf("\nmcp() {"))
+assert.ok(treeHelpers.includes("tree_mcp_reply() {"))
+const secretMarker = "PRIVATE_PAYLOAD_MUST_NOT_BE_LOGGED"
+const envelope = (text, result = {}) => JSON.stringify({ jsonrpc: "2.0", id: 2, result: { content: [{ type: "text", text }], ...result } })
+const runReply = (response) => spawnSync("bash", ["-c", `${treeHelpers}\nvalue=$(tree_mcp_reply move_issue "$1") || exit $?\nprintf '%s' "$value"`, "fixture-test", response], { encoding: "utf8" })
+
+for (const [name, response, expected] of [
+  ["object", envelope('{"outcome":"blocked"}'), '{"outcome":"blocked"}'],
+  ["false", envelope("false"), "false"]
+]) {
+  test(`tree MCP reply preserves valid ${name} JSON`, () => {
+    const result = runReply(response)
+    assert.equal(result.status, 0)
+    assert.equal(result.stdout, expected)
+  })
+}
+
+for (const [name, response] of [
+  ["empty", ""],
+  ["malformed envelope", secretMarker],
+  ["multiple envelopes", `${envelope("{}")}\n${envelope("{}")}`],
+  ["RPC error", JSON.stringify({ jsonrpc: "2.0", id: 2, error: { message: secretMarker } })],
+  ["tool error", envelope(secretMarker, { isError: true })],
+  ["non-JSON text", envelope(secretMarker)],
+  ["multiple JSON values", envelope("{} {}")],
+  ["multiple content blocks", envelope("{}", { content: [{ type: "text", text: "{}" }, { type: "text", text: secretMarker }] })],
+  ["content object", envelope("{}", { content: { text: secretMarker } })],
+  ["missing block type", envelope("{}", { content: [{ text: secretMarker }] })],
+  ["non-text block", envelope("{}", { content: [{ type: "image", text: secretMarker }] })],
+  ["empty content", envelope("{}", { content: [] })],
+  ["empty text", envelope("")],
+  ["nonboolean isError", envelope("{}", { isError: secretMarker })]
+]) {
+  test(`tree MCP reply fails closed for ${name} inside command substitution`, () => {
+    const result = runReply(response)
+    assert.equal(result.status, 1)
+    assert.equal(result.stdout, "")
+    assert.match(result.stderr, /FAIL: tree MCP tool=move_issue phase=/)
+    assert.ok(!result.stderr.includes(secretMarker))
+  })
+}
+
+for (const [processStatus, jsonStatus, inputStatus, expected, phase] of [
+  [124, 0, 0, 124, "timeout"],
+  [7, 0, 0, 7, "process-exit"],
+  [0, 4, 0, 1, "json-stream"],
+  [0, 0, 1, 1, "json-stream"]
+]) {
+  test(`tree MCP pipeline propagates ${phase} failure inside command substitution`, () => {
+    const result = spawnSync("bash", ["-c", `${treeHelpers}\nvalue=$(tree_mcp_pipeline_status move_issue "$1" "$2" "$3") || exit $?\nprintf '%s' "$value"`, "fixture-test", String(processStatus), String(jsonStatus), String(inputStatus)], { encoding: "utf8" })
+    assert.equal(result.status, expected)
+    assert.equal(result.stdout, "")
+    assert.match(result.stderr, new RegExp(`phase=${phase}`))
+  })
+}
