@@ -14,6 +14,7 @@ for (const isError of [false, true]) {
       server,
       `
       const readline=require('node:readline'); const fs=require('node:fs');
+      if(process.env.INTEGRATION_FIXTURE_VALUE!=='typed-private-value')process.exit(1);
       let ended=false; process.stdin.on('end',()=>{ended=true});
       readline.createInterface({input:process.stdin}).on('line',line=>{
         const req=JSON.parse(line); if(req.id===undefined)return;
@@ -28,7 +29,7 @@ for (const isError of [false, true]) {
       const reply = await integrationMcpCall(["move_issue", "{}"], {
         command: process.execPath,
         args: [server],
-        environment: {}
+        environment: { INTEGRATION_FIXTURE_VALUE: "typed-private-value", ABSENT_FIXTURE_VALUE: undefined }
       })
       expect(reply.result.isError).toBe(isError)
       if (isError) expect(reply.result.content[0].text).toBe("fixture failure")
@@ -64,3 +65,42 @@ test("actual bundled entry rejects missing arguments without launching Huly", as
     if (child.exitCode === null) child.kill("SIGKILL")
   }
 })
+
+test("invalid tool arguments fail at the boundary before any executable starts", async () => {
+  await expect(
+    integrationMcpCall(["move_issue", "[]"], { command: "/nonexistent-mcp-fixture", args: [], environment: {} })
+  ).rejects.toThrow("failed during input")
+})
+
+for (const scenario of ["unknown-tool", "malformed-reply"] as const) {
+  test(`${scenario} refuses without mutation retry and closes the real connection`, async () => {
+    const directory = await mkdtemp(join(tmpdir(), "hulymcp-negative-stdio-"))
+    const server = join(directory, "server.cjs")
+    const calls = join(directory, "calls")
+    const closed = join(directory, "closed")
+    await writeFile(
+      server,
+      `
+      const fs=require('node:fs');const readline=require('node:readline');
+      process.stdin.on('end',()=>fs.writeFileSync(${JSON.stringify(closed)},'closed'));
+      readline.createInterface({input:process.stdin}).on('line',line=>{
+        const req=JSON.parse(line);if(req.id===undefined)return;
+        const send=result=>process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:req.id,result})+'\\n');
+        if(req.method==='server/discover')send({supportedVersions:['2026-07-28'],capabilities:{tools:{}}});
+        else if(req.method==='tools/list')send({resultType:'complete',ttlMs:0,cacheScope:'private',tools:${JSON.stringify(scenario === "unknown-tool" ? [] : [{ name: "move_issue", inputSchema: { type: "object" } }])}});
+        else if(req.method==='tools/call'){fs.appendFileSync(${JSON.stringify(calls)},'call\\n');send({resultType:'complete',isError:false,content:[{type:'text',text:'not JSON'}]});}
+      });
+    `
+    )
+    try {
+      await expect(
+        integrationMcpCall(["move_issue", "{}"], { command: process.execPath, args: [server], environment: {} })
+      ).rejects.toThrow(`failed during ${scenario === "unknown-tool" ? "call" : "reply"}`)
+      expect(await readFile(closed, "utf8")).toBe("closed")
+      if (scenario === "unknown-tool") await expect(readFile(calls)).rejects.toMatchObject({ code: "ENOENT" })
+      else expect(await readFile(calls, "utf8")).toBe("call\n")
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+}
