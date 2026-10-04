@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Final certification only: run after slices 306–311 are integrated, through MCP and CLI.
 set -euo pipefail
-source "$(dirname "${BASH_SOURCE[0]}")/test-telemetry-env.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/test-telemetry-env.sh" || exit 1
 CLI=(node packages/huly-cli/dist/index.cjs)
 printf -v SOURCE 'S%04X' "$RANDOM"
 printf -v DESTINATION 'D%04X' "$RANDOM"
