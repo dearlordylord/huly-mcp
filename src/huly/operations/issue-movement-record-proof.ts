@@ -21,10 +21,22 @@ export const movementRecordProof = (
   persisted: MovementTransactionInspection | undefined
 ): MovementRecordProof => {
   if (isDeepStrictEqual(current, { ...expected, space: destinationId })) return "preserved"
+  if (!protectedRouteMatches(current, expected, destinationId)) return "changed"
+  if (!hasQueuedRecordIntent(queued, expected)) return "changed"
+  return changedMetadataProof(current, expected, destinationId, queued, persisted)
+}
+const changedMetadataProof = (
+  current: TransferSupportedRecord,
+  expected: TransferSupportedRecord,
+  destinationId: DocId,
+  queued: MovementTransactions,
+  persisted: MovementTransactionInspection | undefined
+): MovementRecordProof => {
   const before = parseSnapshot(expected.snapshot)
   const after = parseSnapshot(current.snapshot)
-  if (Option.isNone(before) || Option.isNone(after)) return "unavailable"
-  if (!protectedRecordMatches(current, expected, destinationId, before.value, after.value)) return "changed"
+  if (Option.isNone(before) || Option.isNone(after))
+    return current.snapshot === expected.snapshot ? "unavailable" : "changed"
+  if (!protectedSnapshotMatches(before.value, after.value)) return "changed"
   if (!snapshotMetadataMatches(after.value, current)) return "changed"
   return committedRecordTime(current, expected, destinationId, queued, persisted)
 }
@@ -48,21 +60,13 @@ const committedRecordTime = (
   if (!isDeepStrictEqual(identity, committedIdentity)) return "unavailable"
   return current.modifiedOn === serverTime && current.modifiedBy === transaction.modifiedBy ? "preserved" : "changed"
 }
-const protectedRecordMatches = (
-  current: TransferSupportedRecord,
-  expected: TransferSupportedRecord,
-  destinationId: DocId,
+const protectedSnapshotMatches = (
   before: Schema.Schema.Type<typeof Schema.JsonObject>,
   after: Schema.Schema.Type<typeof Schema.JsonObject>
 ): boolean => {
   const { modifiedBy: _beforeAuthor, modifiedOn: _beforeTime, ...beforePayload } = before
   const { modifiedBy: _afterAuthor, modifiedOn: _afterTime, ...afterPayload } = after
-  const { modifiedBy: _oldAuthor, modifiedOn: _oldTime, snapshot: _beforeSnapshot, ...beforeRoute } = expected
-  const { modifiedBy: _newAuthor, modifiedOn: _newTime, snapshot: _afterSnapshot, ...afterRoute } = current
-  return (
-    isDeepStrictEqual(beforePayload, afterPayload) &&
-    isDeepStrictEqual(afterRoute, { ...beforeRoute, space: destinationId })
-  )
+  return isDeepStrictEqual(beforePayload, afterPayload)
 }
 
 const queuedRecordMatches = (
@@ -85,3 +89,15 @@ const uniqueCommittedTransaction = (
   const matches = persisted.transactions.filter((value) => value.txId === intent.txId)
   return matches.length === 1 ? matches[0] : undefined
 }
+
+const protectedRouteMatches = (
+  current: TransferSupportedRecord,
+  expected: TransferSupportedRecord,
+  destinationId: DocId
+): boolean => {
+  const { modifiedBy: _oldAuthor, modifiedOn: _oldTime, snapshot: _beforeSnapshot, ...beforeRoute } = expected
+  const { modifiedBy: _newAuthor, modifiedOn: _newTime, snapshot: _afterSnapshot, ...afterRoute } = current
+  return isDeepStrictEqual(afterRoute, { ...beforeRoute, space: destinationId })
+}
+const hasQueuedRecordIntent = (queued: MovementTransactions, expected: TransferSupportedRecord): boolean =>
+  queued.some((value) => "target" in value && value.objectId === expected._id)

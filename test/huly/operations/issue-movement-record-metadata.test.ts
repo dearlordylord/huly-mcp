@@ -32,7 +32,8 @@ const scenarios = [
   "wrong-source",
   "later-edit",
   "changed-created",
-  "changed-content"
+  "changed-content",
+  "opaque-wrong-route"
 ] as const
 for (const scenario of scenarios) {
   it.effect(`owned-record migration metadata: ${scenario}`, () =>
@@ -46,7 +47,13 @@ for (const scenario of scenarios) {
         createdBy: "original-author",
         content: "protected"
       }
-      Object.assign(record, parseRecord({ ...record, snapshot: JSON.stringify(snapshot) }))
+      Object.assign(
+        record,
+        parseRecord({
+          ...record,
+          snapshot: scenario === "opaque-wrong-route" ? "opaque protected history" : JSON.stringify(snapshot)
+        })
+      )
       const commit = assertExists(f.operations.commitTransferTree)
       const params = yield* parseMoveIssueParams(f.input)
       const transactions = parseTransactions([
@@ -105,13 +112,17 @@ for (const scenario of scenarios) {
                   ...record,
                   modifiedOn: scenario === "later-edit" ? 21 : 20,
                   modifiedBy: intent.modifiedBy,
-                  snapshot: JSON.stringify({
-                    ...snapshot,
-                    modifiedOn: scenario === "later-edit" ? 21 : 20,
-                    modifiedBy: intent.modifiedBy,
-                    createdBy: scenario === "changed-created" ? "changed-creator" : snapshot.createdBy,
-                    content: scenario === "changed-content" ? "changed" : snapshot.content
-                  })
+                  collection: scenario === "opaque-wrong-route" ? "different-collection" : record.collection,
+                  snapshot:
+                    scenario === "opaque-wrong-route"
+                      ? "opaque protected history"
+                      : JSON.stringify({
+                          ...snapshot,
+                          modifiedOn: scenario === "later-edit" ? 21 : 20,
+                          modifiedBy: intent.modifiedBy,
+                          createdBy: scenario === "changed-created" ? "changed-creator" : snapshot.createdBy,
+                          content: scenario === "changed-content" ? "changed" : snapshot.content
+                        })
                 })
               )
             )
