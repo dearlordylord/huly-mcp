@@ -1,6 +1,13 @@
 import { TxOperations, type Client, type Tx } from "@hcengineering/core"
 import { Cause, Effect, Redacted, Schema } from "effect"
-import { DocId, NonEmptyString, ObjectClassName, PositiveInteger, Timestamp, UrlString } from "../domain/schemas/shared.js"
+import {
+  DocId,
+  NonEmptyString,
+  ObjectClassName,
+  PositiveInteger,
+  Timestamp,
+  UrlString
+} from "../domain/schemas/shared.js"
 import { TransferSequenceSchema } from "../domain/schemas/issue-transfer.js"
 
 export const MovementTransportMilliseconds = PositiveInteger.pipe(Schema.brand("MovementTransportMilliseconds"))
@@ -24,8 +31,12 @@ const MovementTransactionClasses = {
   issue: Schema.Literal("tracker:class:Issue")
 }
 const TransactionFields = {
-  _id: DocId, _class: ObjectClassName, space: DocId, objectSpace: DocId,
-  modifiedOn: Timestamp, modifiedBy: NonEmptyString
+  _id: DocId,
+  _class: ObjectClassName,
+  space: DocId,
+  objectSpace: DocId,
+  modifiedOn: Timestamp,
+  modifiedBy: NonEmptyString
 }
 const SequenceTransactionSchema = Schema.Struct({
   ...TransactionFields,
@@ -41,9 +52,7 @@ const ConditionalMovementSchema = Schema.Struct({
   scope: NonEmptyString,
   match: Schema.Array(Schema.Struct({ _class: ObjectClassName, query: Schema.JsonObject })),
   notMatch: Schema.Array(Schema.Struct({ _class: ObjectClassName, query: Schema.JsonObject })),
-  txes: Schema.Array(Schema.Struct({
-    ...TransactionFields, objectId: DocId, objectClass: ObjectClassName
-  }))
+  txes: Schema.Array(Schema.Struct({ ...TransactionFields, objectId: DocId, objectClass: ObjectClassName }))
 })
 const SameProjectUpdateSchema = Schema.Struct({
   ...TransactionFields,
@@ -55,18 +64,20 @@ const SameProjectUpdateSchema = Schema.Struct({
 const supportsSameProjectUpdate = Schema.decodeUnknownOption(SameProjectUpdateSchema)
 const supportsSequence = Schema.decodeUnknownOption(SequenceTransactionSchema)
 const supportsConditional = Schema.decodeUnknownOption(ConditionalMovementSchema)
-const MovementTransactionSchema = Schema.JsonObject.check(Schema.makeFilter((value) =>
-  supportsSequence(value)._tag === "Some" || supportsConditional(value)._tag === "Some" || supportsSameProjectUpdate(value)._tag === "Some"
-))
+const MovementTransactionSchema = Schema.JsonObject.check(
+  Schema.makeFilter(
+    (value) =>
+      supportsSequence(value)._tag === "Some" ||
+      supportsConditional(value)._tag === "Some" ||
+      supportsSameProjectUpdate(value)._tag === "Some"
+  )
+)
 const ConditionalReplySchema = Schema.Union([
   Schema.Struct({ success: Schema.Literal(false) }),
   Schema.Struct({ success: Schema.Literal(true), serverTime: Schema.Number })
 ])
 const TransportReplySchema = Schema.Struct({ status: PositiveInteger, body: Schema.String })
-const TransportRequestSchema = Schema.Struct({
-  ...MovementTransportConfigSchema.fields,
-  body: Schema.String
-})
+const TransportRequestSchema = Schema.Struct({ ...MovementTransportConfigSchema.fields, body: Schema.String })
 type TransportRequest = Schema.Schema.Type<typeof TransportRequestSchema>
 type TransportReply = Schema.Schema.Type<typeof TransportReplySchema>
 
@@ -88,7 +99,11 @@ export const movementHttpPort: MovementHttpPort = {
         })
         return Schema.decodeUnknownSync(TransportReplySchema)({ status: response.status, body: await response.text() })
       },
-      catch: () => new MovementTransportError({ phase: "after-send", reason: NonEmptyString.make("Movement write response unavailable; no transport retry was attempted.") })
+      catch: () =>
+        new MovementTransportError({
+          phase: "after-send",
+          reason: NonEmptyString.make("Movement write response unavailable; no transport retry was attempted.")
+        })
     })
   })
 }
@@ -101,21 +116,59 @@ export const sendMovementTransaction = Effect.fn("movement.sendTransaction")(fun
 ) {
   const json = yield* Effect.try({
     try: () => JSON.stringify(transaction),
-    catch: () => new MovementTransportError({ phase: "before-send", reason: NonEmptyString.make("Movement transaction could not be encoded; no request sent.") })
+    catch: () =>
+      new MovementTransportError({
+        phase: "before-send",
+        reason: NonEmptyString.make("Movement transaction could not be encoded; no request sent.")
+      })
   })
   const parsed = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(MovementTransactionSchema))(json).pipe(
-    Effect.mapError(() => new MovementTransportError({ phase: "before-send", reason: NonEmptyString.make("Unsupported or malformed movement transaction; no request sent.") }))
+    Effect.mapError(
+      () =>
+        new MovementTransportError({
+          phase: "before-send",
+          reason: NonEmptyString.make("Unsupported or malformed movement transaction; no request sent.")
+        })
+    )
   )
   const reply = yield* http.send({ ...config, body: JSON.stringify(parsed) }).pipe(
     Effect.timeout(config.timeoutMs),
-    Effect.mapError((cause) => cause instanceof MovementTransportError ? cause : new MovementTransportError({ phase: "after-send", reason: NonEmptyString.make("Movement write response timed out; effects require inspection. No retry attempted.") }))
+    Effect.mapError((cause) =>
+      cause instanceof MovementTransportError
+        ? cause
+        : new MovementTransportError({
+            phase: "after-send",
+            reason: NonEmptyString.make(
+              "Movement write response timed out; effects require inspection. No retry attempted."
+            )
+          })
+    )
   )
   if (reply.status < 200 || reply.status >= 300)
-    return yield* new MovementTransportError({ phase: "after-send", reason: NonEmptyString.make("Movement write returned a non-success HTTP response; effects require inspection. No retry attempted.") })
+    return yield* new MovementTransportError({
+      phase: "after-send",
+      reason: NonEmptyString.make(
+        "Movement write returned a non-success HTTP response; effects require inspection. No retry attempted."
+      )
+    })
   const response = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.JsonObject))(reply.body).pipe(
-    Effect.mapError(() => new MovementTransportError({ phase: "after-send", reason: NonEmptyString.make("Movement write response was malformed; effects require inspection. No retry attempted.") }))
+    Effect.mapError(
+      () =>
+        new MovementTransportError({
+          phase: "after-send",
+          reason: NonEmptyString.make(
+            "Movement write response was malformed; effects require inspection. No retry attempted."
+          )
+        })
+    )
   )
-  const invalidResponse = () => new MovementTransportError({ phase: "after-send", reason: NonEmptyString.make("Movement write result did not match its contract; effects require inspection. No retry attempted.") })
+  const invalidResponse = () =>
+    new MovementTransportError({
+      phase: "after-send",
+      reason: NonEmptyString.make(
+        "Movement write result did not match its contract; effects require inspection. No retry attempted."
+      )
+    })
   if (supportsSequence(parsed)._tag === "Some")
     return yield* Schema.decodeUnknownEffect(TransferSequenceSchema)(response).pipe(Effect.mapError(invalidResponse))
   if (supportsConditional(parsed)._tag === "Some")
@@ -132,11 +185,10 @@ export const makeMovementTxOperations = (
   const client: Client = {
     getHierarchy: () => ordinary.getHierarchy(),
     getModel: () => ordinary.getModel(),
-    getAccount: () => ordinary.getAccount(),
     findAll: (cls, query, options) => ordinary.findAll(cls, query, options),
     findOne: (cls, query, options) => ordinary.findOne(cls, query, options),
     searchFulltext: (query, options) => ordinary.searchFulltext(query, options),
-    domainRequest: (domain, params, options) => ordinary.domainRequest(domain, params, options),
+    domainRequest: (domain, params, options) => ordinary.client.domainRequest(domain, params, options),
     close: () => Promise.resolve(),
     tx: async (transaction) => {
       const exit = await Effect.runPromiseExit(sendMovementTransaction(transaction, config, http), { signal })

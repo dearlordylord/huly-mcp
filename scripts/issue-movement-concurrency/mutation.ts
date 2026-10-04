@@ -24,7 +24,7 @@ export const readStableIssue = async (args: ScenarioArguments, signal: AbortSign
 export const runMutation = async (args: ScenarioArguments, signal: AbortSignal) => {
   const before = await readStableIssue(args, signal)
   const parent = args.mutationParents[before.project]
-  const replacements = new Map([
+  const replacements = new Map<string, string>([
     ["@PROJECT", before.project],
     ["@IDENTIFIER", before.identifier],
     ["@ISSUE_ID", before.issueId]
