@@ -2,6 +2,10 @@ import { Schema } from "effect"
 import { MoveIssueParamsSchema } from "../../src/domain/schemas/issue-movement.js"
 import { MoveIssueResultSchema } from "../../src/domain/schemas/issues-results.js"
 import { IssueSchema } from "../../src/domain/schemas/issues.js"
+import { AddCommentResultSchema } from "../../src/domain/schemas/comments.js"
+import { SetIssueComponentResultSchema } from "../../src/domain/schemas/components.js"
+import { LogTimeResultSchema } from "../../src/domain/schemas/time.js"
+import { CreateIssueResultSchema } from "../../src/domain/schemas/issues-results.js"
 import {
   IssueId,
   NonEmptyString,
@@ -29,13 +33,16 @@ export const PublicObservation = Schema.Union([
   Schema.Struct({ status: Schema.Literal("result"), result: MoveIssueResultSchema }),
   Schema.Struct({ status: Schema.Literal("no-result"), reason: NonEmptyString })
 ])
+export const MutationResultSchema = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal("none") }),
+  Schema.Struct({ kind: Schema.Literal("child"), result: CreateIssueResultSchema }),
+  Schema.Struct({ kind: Schema.Literal("comment"), result: AddCommentResultSchema }),
+  Schema.Struct({ kind: Schema.Literal("time"), result: LogTimeResultSchema }),
+  Schema.Struct({ kind: Schema.Literal("attribute"), result: SetIssueComponentResultSchema }),
+  Schema.Struct({ kind: Schema.Literal("ancestry"), result: MoveIssueResultSchema })
+])
 export const ScenarioEvidence = Schema.Struct({
   observation: PublicObservation,
   gatewayEvents: Schema.Array(GatewayEvent),
-  mutation: Schema.Struct({
-    kind: ScenarioArguments.fields.mutationKind,
-    before: IssueSchema,
-    result: Schema.NullOr(Schema.JsonObject),
-    after: IssueSchema
-  })
+  mutation: Schema.Struct({ before: IssueSchema, action: MutationResultSchema, after: IssueSchema })
 })

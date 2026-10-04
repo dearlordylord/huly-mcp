@@ -77,17 +77,14 @@ for transport in mcp cli; do
     for id in "$ROOT_ID" "$CHILD_ID" "$GRANDCHILD_ID"; do
       "${CLI[@]}" issues get "$SOURCE" "$id" --json | jq -e --arg id "$id" --arg project "$PROJECT" '.issueId == $id and .project == $project' >/dev/null
     done
-    if [[ "$EXPECTED" == source ]]; then
-      jq -e '.observation.result.outcome != "completed"' >/dev/null <<<"$RESULT"
-    fi
     if [[ "$KIND" == comment || "$KIND" == time ]]; then
-      RECORD_ID=$(jq -er '.mutation.result.commentId // .mutation.result.reportId' <<<"$RESULT")
+      RECORD_ID=$(jq -er '.mutation.action.result.commentId // .mutation.action.result.reportId' <<<"$RESULT")
       jq -e --arg id "$RECORD_ID" --arg root "$ROOT_ID" '.issues[] | select(.issue._id == $root) | any(.owned.records[]; ._id == $id)' >/dev/null <<<"$AFTER"
     elif [[ "$KIND" == child ]]; then
-      NEW_CHILD=$(jq -er .mutation.result.issueId <<<"$RESULT")
+      NEW_CHILD=$(jq -er .mutation.action.result.issueId <<<"$RESULT")
       "${CLI[@]}" issues get "$SOURCE" "$NEW_CHILD" --json | jq -e --arg id "$NEW_CHILD" --arg parent "$(jq -r .mutation.after.identifier <<<"$RESULT")" '.issueId == $id and .parentIssue == $parent' >/dev/null
     elif [[ "$KIND" == ancestry ]]; then
-      jq -e '.mutation.result.outcome == "completed" and .mutation.after.parentIssue != null' >/dev/null <<<"$RESULT"
+      jq -e '.mutation.action.result.outcome == "completed" and .mutation.after.parentIssue != null' >/dev/null <<<"$RESULT"
       EXPECTED_PARENT="$SOURCE_PARENT"; [[ "$EXPECTED" == destination ]] && EXPECTED_PARENT="$DESTINATION_PARENT"
       jq -e --arg root "$ROOT_ID" --arg parent "$EXPECTED_PARENT" '.issues[] | select(.issue._id == $root) | .issue.attachedTo == $parent' >/dev/null <<<"$AFTER"
     elif [[ "$KIND" == attribute ]]; then
@@ -100,6 +97,10 @@ for transport in mcp cli; do
     [[ "$NAME" == before-allocation-send ]] && EXPECTED_INCREMENT=0
     [[ "$NAME" == allocated-reply-lost ]] && EXPECTED_INCREMENT=1
     jq -e --argjson before "$BEFORE" --arg destination "$DESTINATION" --argjson increment "$EXPECTED_INCREMENT" '(.projects[] | select(.identifier == $destination) | .sequence) == (($before.projects[] | select(.identifier == $destination) | .sequence) + $increment)' >/dev/null <<<"$AFTER"
+    DESTINATION_ID=$(jq -er --arg destination "$DESTINATION" '.projects[] | select(.identifier == $destination) | ._id' <<<"$AFTER")
+    PREVIOUS_SEQUENCE=$(jq -er --arg destination "$DESTINATION" '.projects[] | select(.identifier == $destination) | .sequence' <<<"$BEFORE")
+    IDS=$(jq -nc --arg root "$ROOT_ID" --arg child "$CHILD_ID" --arg grandchild "$GRANDCHILD_ID" '[$root,$child,$grandchild]')
+    jq -e --arg name "$NAME" --arg destinationId "$DESTINATION_ID" --argjson ids "$IDS" --argjson previousSequence "$PREVIOUS_SEQUENCE" --argjson after "$AFTER" -f scripts/issue-movement-concurrency/assert-outcome.jq >/dev/null <<<"$RESULT"
     if [[ "$NAME" == allocated-reply-lost || "$NAME" == successful-batch-reply-lost ]]; then
       jq -e '.observation.result.outcome == "indeterminate" and all(.gatewayEvents[]; .event != "retry-suppressed")' >/dev/null <<<"$RESULT"
     fi
