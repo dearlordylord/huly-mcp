@@ -19,3 +19,7 @@ CLAUDE.local.md
 .uml-viewer/
 # END UML-VIEWER
 .vitest-cache
+
+.movement-certification/
+
+.movement-certification.lock/

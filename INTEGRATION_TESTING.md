@@ -537,7 +537,24 @@ inside the same deadline. Inspect `pnpm integration:movement --plan`
 before running. After process preparation, the user’s delivery budget is twenty
 minutes including the final gate, queueing, diagnosis and live work. Never reset
 that budget for a new commit or subtask. Expiry is an incomplete outcome, never
-qualification. Do not relaunch an unchanged failed case without a named,
+qualification. Compute the stop time once before final preparation and retain the
+same state directory across repairs. In this Linux container:
+
+```bash
+set -a
+source .env.local
+set +a
+export HULY_URL="${HULY_URL/localhost/host.docker.internal}"
+MOVEMENT_STOP_UTC=$(date -u -d '+20 minutes' '+%Y-%m-%dT%H:%M:%SZ')
+pnpm integration:movement --run --deadline "$MOVEMENT_STOP_UTC" --state-dir .movement-certification
+```
+
+Do not recompute `MOVEMENT_STOP_UTC` for a retry. The persisted campaign rejects
+extension and expiry. A retained custody lock means cleanup is unconfirmed:
+inspect its owner and descendants before removing it; never delete it merely to
+force another launch. CI runs the fixture and process checks through `check-all`.
+
+Do not relaunch an unchanged failed case without a named,
 distinguishing diagnostic; after two non-advancing attempts, change the method.
 
 Before each expensive run, record expected duration, UTC stop time, failed
