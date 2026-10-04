@@ -1,9 +1,12 @@
 import { it } from "@effect/vitest"
-import { Effect, Schema } from "effect"
+import { Effect, Fiber, Schema } from "effect"
+import { TestClock } from "effect/testing"
 import { expect } from "vitest"
 import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"
 import { MoveIssueResultSchema } from "../../../src/domain/schemas/issues-results.js"
 import { moveIssue } from "../../../src/huly/operations/issue-movement.js"
+import { HulyClient } from "../../../src/huly/client.js"
+import { assertExists } from "../../../src/utils/assertions.js"
 import { tracker } from "../../../src/huly/huly-plugins.js"
 import { transferFixture } from "../../helpers/transfer.js"
 import { sdkFixture } from "../../helpers/huly-sdk.js"
@@ -74,13 +77,15 @@ it.effect("two conflicts return IDs and distinguishing candidates for a schema-v
 
 it.effect("literal unique names resolve automatically while case, whitespace and duplicates do not", () =>
   Effect.gen(function* () {
-    for (const labels of [["API"], ["api"], [" API"], ["API", "API"]]) {
-      const f = transferFixture()
-      f.root.component = sdkFixture("source")
-      value(f, "source", "component", "API", false)
-      labels.forEach((label, index) => value(f, `target-${index}`, "component", label))
-      const result = yield* call(f)
-      expect(result.outcome).toBe(labels.length === 1 && labels[0] === "API" ? "completed" : "blocked")
+    for (const field of ["component", "milestone"] satisfies Array<"component" | "milestone">) {
+      for (const labels of [["API"], ["api"], [" API"], ["API", "API"]]) {
+        const f = transferFixture()
+        f.root[field] = sdkFixture("source")
+        value(f, "source", field, "API", false)
+        labels.forEach((label, index) => value(f, `target-${index}`, field, label))
+        const result = yield* call(f)
+        expect(result.outcome).toBe(labels.length === 1 && labels[0] === "API" ? "completed" : "blocked")
+      }
     }
   })
 )
@@ -179,7 +184,7 @@ it.effect(
   "incomplete total and malformed class/space/value inventories refuse with discovery completeness before writes",
   () =>
     Effect.gen(function* () {
-      for (const scenario of ["total", "class", "space", "invalid", "limit", "duplicate"]) {
+      for (const scenario of ["total", "invalid-total", "class", "space", "invalid", "limit", "duplicate"]) {
         const f = transferFixture()
         f.root.component = sdkFixture("source")
         f.root.milestone = sdkFixture("missing")
@@ -187,6 +192,7 @@ it.effect(
         value(f, "source", "component", "API", false)
         value(f, "target", "component", "API")
         if (scenario === "total") f.state.attributeTotal = 50
+        if (scenario === "invalid-total") f.state.attributeTotal = -1
         if (scenario === "limit") {
           for (let index = 0; index < 1001; index++) value(f, `target-${index}`, "component", "API")
         }
@@ -213,20 +219,22 @@ it.effect(
 
 it.effect("stale consent for now-absent reference returns a directly usable nextCall omitting obsolete decisions", () =>
   Effect.gen(function* () {
-    for (const absent of [null, undefined]) {
-      const f = transferFixture()
-      if (absent === undefined) Reflect.deleteProperty(f.root, "component")
-      const blocked = yield* call(f, {
-        ...f.input,
-        resolutions: [{ issueId: f.root._id, field: "component", from: "old", to: null }]
-      })
-      expect(blocked).toMatchObject({
-        outcome: "blocked",
-        conflicts: [{ code: "stale-resolution", from: null, clearingAllowed: false }],
-        nextCall: { resolutions: [] }
-      })
-      if (blocked.outcome !== "blocked") throw new Error("Expected stale consent")
-      expect(yield* call(f, blocked.nextCall)).toMatchObject({ outcome: "completed", attributeChanges: [] })
+    for (const field of ["component", "milestone"] satisfies Array<"component" | "milestone">) {
+      for (const absent of [null, undefined]) {
+        const f = transferFixture()
+        if (absent === undefined) Reflect.deleteProperty(f.root, field)
+        const blocked = yield* call(f, {
+          ...f.input,
+          resolutions: [{ issueId: f.root._id, field, from: "old", to: null }]
+        })
+        expect(blocked).toMatchObject({
+          outcome: "blocked",
+          conflicts: [{ code: "stale-resolution", field, from: null, clearingAllowed: false }],
+          nextCall: { resolutions: [] }
+        })
+        if (blocked.outcome !== "blocked") throw new Error("Expected stale consent")
+        expect(yield* call(f, blocked.nextCall)).toMatchObject({ outcome: "completed", attributeChanges: [] })
+      }
     }
   })
 )
@@ -285,4 +293,37 @@ it.effect(
       })
       expect(bad).toMatchObject({ outcome: "blocked", nextCall: { resolutions: [] } })
     })
+)
+
+it.effect("verification cannot report completed when observed attributes differ from the approved final values", () =>
+  Effect.gen(function* () {
+    const f = transferFixture()
+    f.root.component = sdkFixture("source")
+    value(f, "source", "component", "API", false)
+    value(f, "approved", "component", "API")
+    const commit = assertExists(f.operations.commitTransfer)
+    const layer = HulyClient.testLayer({
+      ...f.operations,
+      commitTransfer: (write) =>
+        commit(write).pipe(
+          Effect.tap(() =>
+            Effect.sync(() => {
+              f.root.component = sdkFixture("unexpected")
+            })
+          )
+        )
+    })
+    const fiber = yield* parseMoveIssueParams(f.input).pipe(
+      Effect.flatMap(moveIssue),
+      Effect.provide(layer),
+      Effect.forkChild
+    )
+    yield* TestClock.adjust("2 seconds")
+    expect(yield* Fiber.join(fiber)).toMatchObject({
+      outcome: "incomplete",
+      reason: expect.stringContaining("inconsistent")
+    })
+    expect(f.state.sent).toBe(1)
+    expect(f.root.component).toBe("unexpected")
+  })
 )
