@@ -21,6 +21,7 @@ const LAST_BYTE_OFFSET = -1
 const LINE_FEED_BYTE = 10
 const MILLISECONDS_PER_SECOND = 1_000
 const GROUP_POLL_MILLISECONDS = 20
+const GROUP_CLEANUP_PROOF_MILLISECONDS = 2_000
 
 interface LineCounter {
   endsWithLineBreak: boolean
@@ -100,7 +101,7 @@ const proveStoppedGroup = async (
   const pid = child.pid
   if (groupStopped(pid)) return
   stop()
-  const deadline = cleanup.now() + grace + GROUP_POLL_MILLISECONDS
+  const deadline = cleanup.now() + grace + GROUP_CLEANUP_PROOF_MILLISECONDS
   while (!groupStopped(pid) && cleanup.now() < deadline) await cleanup.pause(GROUP_POLL_MILLISECONDS)
   if (!groupStopped(pid)) throw new Error(`${name} process-group cleanup is unconfirmed`)
 }
@@ -184,7 +185,7 @@ export const runBoundedCommand = ({
             child.stdout.destroy()
             child.stderr.destroy()
             reject(new Error(`${name} process-group cleanup is unconfirmed`))
-          }, GROUP_POLL_MILLISECONDS)
+          }, GROUP_CLEANUP_PROOF_MILLISECONDS)
         } catch (error) {
           /* v8 ignore start -- Unexpected escalation defects are forwarded unchanged. */
           reject(error)
