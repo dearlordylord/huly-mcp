@@ -4,11 +4,11 @@ import {
   AutomaticHistoryClass,
   TransferHistorySchema,
   TransferRecordSchema,
+  TransferOwnedClasses,
   type TransferRecord
 } from "../domain/schemas/issue-transfer.js"
 import { DocId, ObjectClassName, Timestamp } from "../domain/schemas/shared.js"
 import { HulyDataInvalidError } from "./errors-base.js"
-import { activity, attachment, chunter, tags, tracker } from "./huly-plugins.js"
 
 export const parseTransferBoundary = <A, R>(
   schema: Schema.ConstraintDecoder<A, R>,
@@ -46,49 +46,25 @@ const RawHistorySchema = Schema.Struct(historyFields)
 
 // Audited exact runtime classes. A new subclass does not inherit an ownership promise.
 const SupportedPayloadSchema = Schema.Union([
+  Schema.Struct({ _class: Schema.Literal(TransferOwnedClasses.Attachment), ...AttachmentPayload.fields }),
+  Schema.Struct({ _class: Schema.Literal(TransferOwnedClasses.Embedding), ...AttachmentPayload.fields }),
+  Schema.Struct({ _class: Schema.Literal(TransferOwnedClasses.Photo), ...AttachmentPayload.fields }),
+  Schema.Struct({ _class: Schema.Literal(TransferOwnedClasses.TagReference), ...TagPayload.fields }),
+  Schema.Struct({ _class: Schema.Literal(TransferOwnedClasses.TimeSpendReport), ...ReportPayload.fields }),
+  Schema.Struct({ _class: Schema.Literal(TransferOwnedClasses.ChatMessage), message: Schema.String }),
+  Schema.Struct({ _class: Schema.Literal(TransferOwnedClasses.ThreadMessage), ...ThreadPayload.fields }),
   Schema.Struct({
-    _class: Schema.Literal(ObjectClassName.make(String(attachment.class.Attachment))),
-    ...AttachmentPayload.fields
-  }),
-  Schema.Struct({
-    _class: Schema.Literal(ObjectClassName.make(String(attachment.class.Embedding))),
-    ...AttachmentPayload.fields
-  }),
-  Schema.Struct({
-    _class: Schema.Literal(ObjectClassName.make(String(attachment.class.Photo))),
-    ...AttachmentPayload.fields
-  }),
-  Schema.Struct({
-    _class: Schema.Literal(ObjectClassName.make(String(tags.class.TagReference))),
-    ...TagPayload.fields
-  }),
-  Schema.Struct({
-    _class: Schema.Literal(ObjectClassName.make(String(tracker.class.TimeSpendReport))),
-    ...ReportPayload.fields
-  }),
-  Schema.Struct({
-    _class: Schema.Literal(ObjectClassName.make(String(chunter.class.ChatMessage))),
-    message: Schema.String
-  }),
-  Schema.Struct({
-    _class: Schema.Literal(ObjectClassName.make(String(chunter.class.ThreadMessage))),
-    ...ThreadPayload.fields
-  }),
-  Schema.Struct({
-    _class: Schema.Literal(ObjectClassName.make(String(activity.class.Reaction))),
+    _class: Schema.Literal(TransferOwnedClasses.Reaction),
     emoji: Schema.String,
     createBy: Schema.String
   }),
-  Schema.Struct({ _class: Schema.Literal(ObjectClassName.make(String(activity.class.ActivityMessage))) }),
+  Schema.Struct({ _class: Schema.Literal(TransferOwnedClasses.ActivityMessage) }),
   Schema.Struct({
-    _class: Schema.Literal(ObjectClassName.make(String(activity.class.ActivityInfoMessage))),
+    _class: Schema.Literal(TransferOwnedClasses.ActivityInfoMessage),
     message: Schema.String,
     props: Schema.JsonObject
   }),
-  Schema.Struct({
-    _class: Schema.Literal(ObjectClassName.make(String(activity.class.ActivityReference))),
-    ...ReferenceSchema.fields
-  })
+  Schema.Struct({ _class: Schema.Literal(TransferOwnedClasses.ActivityReference), ...ReferenceSchema.fields })
 ])
 const supportedClasses = new Set(SupportedPayloadSchema.members.map((payload) => payload.fields._class.literal))
 const encodeSnapshot = (input: unknown) =>
@@ -104,7 +80,7 @@ export const parseTransferRecord = Effect.fn("transfer.parseRecord")(function* (
   const common = { ...document, ...ownership }
   if (ownership._class === AutomaticHistoryClass) {
     const raw = yield* parseTransferBoundary(RawHistorySchema, document)
-    const updates = Reflect.get(document, "attributeUpdates")
+    const updates = document["attributeUpdates"]
     const attributeUpdates = updates === undefined ? undefined : yield* encodeSnapshot(updates)
     const history = { ...raw, ...(attributeUpdates === undefined ? {} : { attributeUpdates }) }
     const snapshot = yield* encodeSnapshot({ ...content, ...raw })

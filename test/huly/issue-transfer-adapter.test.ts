@@ -77,7 +77,7 @@ it.effect("discovers nested attachments and refuses incomplete model results bef
   })
 )
 
-for (const mode of ["failRead", "invalidMetadata"] as const) {
+for (const mode of ["failRead", "invalidMetadata", "failModel"] as const) {
   it.effect(`returns typed inspection failure for ${mode}`, () =>
     Effect.gen(function* () {
       const f = adapterFixture()

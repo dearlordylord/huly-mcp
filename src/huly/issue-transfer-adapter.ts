@@ -92,8 +92,8 @@ const matchRecord = (apply: ReturnType<TxOperations["apply"]>, record: TransferS
       space: toRef(record.space),
       modifiedOn: record.modifiedOn,
       attachedTo: toRef(record.attachedTo),
-      ...(record.attachedToClass === undefined ? {} : { attachedToClass: toClassRef<Doc>(record.attachedToClass) }),
-      ...(record.collection === undefined ? {} : { collection: record.collection })
+      attachedToClass: toClassRef<Doc>(record.attachedToClass),
+      collection: record.collection
     })
   )
 }

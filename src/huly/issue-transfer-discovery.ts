@@ -25,6 +25,12 @@ import {
 import { hulyQuery } from "./operations/query-helpers.js"
 import { toClassRef, toRef } from "./operations/sdk-boundary.js"
 
+const readModel = <A>(read: () => A): Effect.Effect<A, HulyDataInvalidError> =>
+  Effect.try({
+    try: read,
+    catch: (cause) => new HulyDataInvalidError({ operation: "move_issue", entity: "record model", cause })
+  })
+
 const CollectionTypeSchema = Schema.Struct({ of: ObjectClassName })
 const DEFAULT_LIMITS = { records: 10_000, queries: 10_000, depth: 32, result: 10_001 }
 // Internal traversal policy; no serialized payload crosses this seam.
@@ -92,7 +98,9 @@ const inspectOwner = Effect.fn("transfer.inspectOwner")(function* (
     ...collections.values(),
     ...(yield* parseTransferBoundary(
       Schema.Array(ObjectClassName),
-      hierarchy.getDescendants(core.class.AttachedDoc).filter((cls) => hierarchy.findDomain(cls) !== undefined)
+      yield* readModel(() =>
+        hierarchy.getDescendants(core.class.AttachedDoc).filter((cls) => hierarchy.findDomain(cls) !== undefined)
+      )
     ))
   ])
   for (const cls of classes) {
@@ -168,7 +176,7 @@ const inspectRow = Effect.fn("transfer.inspectRecordEdge")(function* (
     state.blockers.add(`Unsupported reference subclass ${ownership._class} (${ownership._id}).`)
     return
   }
-  auditEdge(client, state, visit, ownership, owner, collections, reference)
+  yield* readModel(() => auditEdge(client, state, visit, ownership, owner, collections, reference))
   const record = yield* parseTransferRecord(row, owner)
   registerRecord(state, visit, record, limits)
 })
@@ -190,10 +198,10 @@ const ownerCollections = Effect.fn("transfer.modelCollections")(function* (
   owner: RecordOwner
 ): Effect.fn.Return<ReadonlyMap<string, ObjectClassName>, HulyDataInvalidError> {
   const hierarchy = client.getHierarchy()
-  const attributes = hierarchy.getAllAttributes(toClassRef<Doc>(owner._class))
+  const attributes = yield* readModel(() => hierarchy.getAllAttributes(toClassRef<Doc>(owner._class)))
   const collections = new Map<string, ObjectClassName>()
   for (const [key, attribute] of attributes) {
-    if (!hierarchy.isDerived(attribute.type._class, core.class.Collection)) continue
+    if (!(yield* readModel(() => hierarchy.isDerived(attribute.type._class, core.class.Collection)))) continue
     const collection = yield* parseTransferBoundary(CollectionTypeSchema, attribute.type)
     collections.set(key, collection.of)
   }

@@ -80,6 +80,7 @@ export const recordAdapterFixture = () => {
     invalidTotal: false,
     failRead: false,
     invalidMetadata: false,
+    failModel: false,
     duplicate: false,
     conflict: false
   }
@@ -115,6 +116,7 @@ export const recordAdapterFixture = () => {
     },
     getHierarchy: () => ({
       getAllAttributes: (cls: string) => {
+        if (state.failModel) throw new Error("Invalid model metadata")
         if (state.invalidMetadata) return new Map([["bad", { type: { _class: core.class.Collection } }]])
         const edges = new Map<string, unknown>([["scalar", { type: { _class: core.class.TypeString } }]])
         for (const [base, declared] of definitions) {

@@ -36,14 +36,31 @@ const RecordFields = {
 export const TransferHistoryRecordSchema = Schema.Struct({
   ...RecordFields,
   kind: Schema.Literal("history"),
+  attachedToClass: ObjectClassName,
+  collection: Schema.String,
+  snapshot: Schema.String,
   _class: Schema.Literal(AutomaticHistoryClass),
   history: TransferHistorySchema
 })
 export type TransferHistoryRecord = Schema.Schema.Type<typeof TransferHistoryRecordSchema>
+export const TransferOwnedClasses = {
+  Attachment: ObjectClassName.make("attachment:class:Attachment"),
+  Embedding: ObjectClassName.make("attachment:class:Embedding"),
+  Photo: ObjectClassName.make("attachment:class:Photo"),
+  TagReference: ObjectClassName.make("tags:class:TagReference"),
+  TimeSpendReport: ObjectClassName.make("tracker:class:TimeSpendReport"),
+  ChatMessage: ObjectClassName.make("chunter:class:ChatMessage"),
+  ThreadMessage: ObjectClassName.make("chunter:class:ThreadMessage"),
+  Reaction: ObjectClassName.make("activity:class:Reaction"),
+  ActivityMessage: ObjectClassName.make("activity:class:ActivityMessage"),
+  ActivityInfoMessage: ObjectClassName.make("activity:class:ActivityInfoMessage"),
+  ActivityReference: ObjectClassName.make("activity:class:ActivityReference")
+}
+export const TransferOwnedClassSchema = Schema.Literals(Object.values(TransferOwnedClasses))
 export const TransferOwnedRecordSchema = Schema.Struct({
   ...RecordFields,
   kind: Schema.Literal("owned"),
-  _class: ObjectClassName,
+  _class: TransferOwnedClassSchema,
   attachedToClass: ObjectClassName,
   collection: Schema.String,
   snapshot: Schema.String,

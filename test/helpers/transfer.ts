@@ -61,6 +61,9 @@ export const transferFixture = () => {
       _class: ObjectClassName.make(String(activity.class.DocUpdateMessage)),
       space: DocId.make(source._id),
       attachedTo: DocId.make(root._id),
+      attachedToClass: ObjectClassName.make(String(tracker.class.Issue)),
+      collection: "docUpdateMessages",
+      snapshot: "original history payload",
       modifiedOn: Timestamp.make(0),
       modifiedBy: NonEmptyString.make("author"),
       history: {
