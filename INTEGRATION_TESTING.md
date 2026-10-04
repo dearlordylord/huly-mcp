@@ -449,6 +449,10 @@ This matters for operations that make HTTP round-trips to Huly's collaborator se
 
 **For script authors**: closing stdin starts the EOF drain deadline. A `printf` pipeline is suitable only when the request finishes within that allowance. Keep stdin open until the matching response for longer workflows, then close it and verify process cleanup. Capture process status and stderr separately; a missing reply does not prove that a mutation was refused. Movement has separate initial-inspection and execution bounds, so its total request lifetime can exceed the EOF drain allowance.
 
+The tree fixture uses `scripts/integration-mcp-call-main.ts` through `scripts/run-bundled.mjs`. Its SDK client keeps stdin open until the matching reply and supplies the discovered tool definition to prevent automatic mutation retries. Stdout contains the reply envelope; stderr contains schema-owned phase names and elapsed milliseconds only. Preserve both streams separately when diagnosing a failed call. The phase sequence distinguishes connection, tool discovery, invocation, reply and close; `bundle-ready` starts after bundling, so bundling time requires the outer process owner's timestamps.
+
+The current tree command has a 45-second outer guard and the helper gives the invocation a separate 45-second allowance. These budgets do not compose: the outer guard also includes bundling, server startup, discovery and close. An outer exit 124 therefore cannot identify an operation deadline failure. Inspect the phase events and reconcile server state read-only before changing a budget; never repeat a mutation merely because its reply is missing. Keep setup, invocation and cleanup bounded separately when replacing this guard.
+
 **Implementation**: `src/mcp/server.ts` routes stdin EOF/close, SIGINT/SIGTERM, and programmatic stop through one idempotent shutdown coordinator. New requests are rejected after quiescing, and request completion notifications release the drain without polling timers.
 
 ## Eventual Consistency
