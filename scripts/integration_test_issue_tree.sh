@@ -104,10 +104,13 @@ for TRANSPORT in mcp cli; do
   BLOCKED=$(move "$CALL")
   jq -e --arg root "$ROOT" --arg child "$CHILD" '.outcome=="blocked" and .changed==false and .discovery=="complete" and ([.conflicts[]|select(.code=="attribute")|.issueId]|sort)==([$root,$child]|sort)' >/dev/null <<<"$BLOCKED"
   [[ "$(jq -Sc . <<<"$BEFORE")" == "$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$STATE" | jq -Sc .)" ]]
+  assert_document_unchanged
   RETRY=$(jq -c --arg root "$ROOT" --arg target "$TC" '.nextCall + {resolutions:[.conflicts[]|select(.code=="attribute")|{issueId,field,from,to:(if .issueId==$root then null else $target end)}]}' <<<"$BLOCKED")
   create "$SOURCE" "$ROOT" "New descendant $TRANSPORT"; ADDED="$CREATED"; component "$ADDED"; rich_records "$ADDED"
+  DOC_BEFORE=$(mcp get_document "$(jq -nc --arg teamspace "$TEAMSPACE" --arg document "$DOCUMENT" '{teamspace:$teamspace,document:$document}')")
   NEW_BLOCKED=$(move "$RETRY")
   jq -e --arg added "$ADDED" '.outcome=="blocked" and .changed==false and any(.conflicts[];.code=="attribute" and .issueId==$added)' >/dev/null <<<"$NEW_BLOCKED"
+  assert_document_unchanged
   FINAL=$(jq -c --arg target "$TC" '.nextCall + {resolutions:(.nextCall.resolutions + [.conflicts[]|select(.code=="attribute")|{issueId,field,from,to:$target}])}' <<<"$NEW_BLOCKED")
   IDS=$(jq -c --arg added "$ADDED" '.+[$added]' <<<"$IDS"); STATE=$(jq -c --argjson issues "$IDS" '.issues=$issues' <<<"$STATE")
   BEFORE=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$STATE")
