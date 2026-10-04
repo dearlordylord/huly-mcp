@@ -1,4 +1,4 @@
-import type { Doc, DocumentQuery, FindOptions } from "@hcengineering/core"
+import { UNKNOWN_TOTAL, type Doc, type DocumentQuery, type FindOptions } from "@hcengineering/core"
 import { it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import { expect } from "vitest"
@@ -87,5 +87,36 @@ it.effect("post-write unknown closure size remains indeterminate rather than con
     expect(result).toMatchObject({ outcome: "indeterminate", issueIds: [f.root._id, f.child._id, f.grandchild._id] })
     expect(f.state.allocated).toBe(3)
     expect(f.state.sent).toBe(1)
+  })
+)
+
+it.effect("unknown descendant totals preserve independently discovered attribute conflicts", () =>
+  Effect.gen(function* () {
+    const f = transferTreeFixture()
+    f.child.component = sdkFixture("missing-component")
+    const original = assertExists(f.operations.findAll)
+    const findAll: HulyClientOperations["findAll"] = <T extends Doc>(
+      cls: unknown,
+      query: DocumentQuery<T>,
+      options?: FindOptions<T>
+    ) =>
+      original<T>(sdkFixture(cls), query, options).pipe(
+        Effect.map((rows) => {
+          if (parseQuery(query)._tag === "Some") rows.total = UNKNOWN_TOTAL
+          return rows
+        })
+      )
+    const result = yield* parseMoveIssueParams(f.input).pipe(
+      Effect.flatMap(moveIssue),
+      Effect.provide(HulyClient.testLayer({ ...f.operations, findAll }))
+    )
+    expect(result).toMatchObject({ outcome: "blocked", changed: false, discovery: "incomplete" })
+    if (result.outcome !== "blocked") return
+    expect(result.issueIds).toEqual([f.root._id, f.child._id, f.grandchild._id])
+    expect(result.conflicts).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "attribute", issueId: f.child._id })])
+    )
+    expect(f.state.allocated).toBe(0)
+    expect(f.state.sent).toBe(0)
   })
 )
