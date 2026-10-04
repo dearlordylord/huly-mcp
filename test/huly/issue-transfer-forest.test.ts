@@ -51,11 +51,13 @@ const forestFixture = () => {
   const reads = new Set<Promise<unknown>>()
   const rootIds = new Set(roots)
   const failedRoots = new Set<IssueId>()
+  const rootReads: Array<IssueId> = []
   const hierarchy = f.client.getHierarchy()
   const client = sdkFixture<TxOperations>({
     getHierarchy: () => hierarchy,
     findOne: async (_cls: unknown, query: unknown) => {
       const id = Schema.decodeUnknownSync(RootQuerySchema)(query)._id
+      rootReads.push(id)
       if (failedRoots.has(id)) throw new ForestFixtureFailure({ reason: "private-token" })
       if (state.wrongRoot) return sdkFixture<Doc>({ _id: "unexpected-root", _class: tracker.class.Issue })
       return !state.missing && rootIds.has(id) ? sdkFixture<Doc>({ _id: id, _class: tracker.class.Issue }) : undefined
@@ -96,7 +98,7 @@ const forestFixture = () => {
       return read
     }
   })
-  return { ...f, modelState: f.state, calls, client, failedRoots, rootIds, reads, state }
+  return { ...f, modelState: f.state, calls, client, failedRoots, rootIds, rootReads, reads, state }
 }
 class ForestFixtureFailure extends Schema.TaggedError<ForestFixtureFailure>()("ForestFixtureFailure", {
   reason: Schema.String
