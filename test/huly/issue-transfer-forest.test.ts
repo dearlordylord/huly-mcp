@@ -52,7 +52,8 @@ const forestFixture = () => {
       return !state.missing && rootIds.has(id) ? sdkFixture<Doc>({ _id: id, _class: tracker.class.Issue }) : undefined
     },
     findAll: (cls: unknown, query: DocumentQuery<Doc>, _options?: FindOptions<Doc>) => {
-      const parsed = Schema.decodeUnknownSync(QuerySchema)(query)
+      const rawQuery: unknown = query
+      const parsed = Schema.decodeUnknownSync(QuerySchema)(rawQuery)
       const selector = parsed.attachedTo ?? parsed.srcDocId
       const owners = selector === undefined ? [] : typeof selector === "string" ? [selector] : selector.$in
       const objectClass = Schema.decodeUnknownSync(ObjectClassName)(cls)
@@ -300,7 +301,8 @@ it.effect("awaits terminal owner publication before a later root batch can hang"
       findAll: (...args: Parameters<TxOperations["findAll"]>) => f.client.findAll(...args),
       findOne: (...args: Parameters<TxOperations["findOne"]>) => {
         const read = f.client.findOne(...args).then(async (row) => {
-          if (Schema.decodeUnknownSync(RootQuerySchema)(args[1])._id === fifth) {
+          const rawRootQuery: unknown = args[1]
+          if (Schema.decodeUnknownSync(RootQuerySchema)(rawRootQuery)._id === fifth) {
             await Effect.runPromise(Deferred.succeed(started, undefined))
             await Effect.runPromise(Deferred.await(release))
           }
