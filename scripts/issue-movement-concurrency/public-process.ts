@@ -13,13 +13,17 @@ export const runPublic = (argv: ReadonlyArray<string>, url: UrlString, signal: A
     const chunks: Array<Buffer> = []
     child.stdout.on("data", (chunk: unknown) => {
       const parsed = Schema.decodeUnknownOption(Schema.Uint8Array)(chunk)
-      if (parsed._tag === "None") { child.kill(); reject(new Error("Public fixture returned invalid output bytes")) }
-      else chunks.push(Buffer.from(parsed.value))
+      if (parsed._tag === "None") {
+        child.kill()
+        reject(new Error("Public fixture returned invalid output bytes"))
+      } else chunks.push(Buffer.from(parsed.value))
     })
     child.on("error", () => reject(new Error("Public fixture process unavailable")))
     child.stdin.on("error", () => reject(new Error("Public fixture input unavailable")))
-    child.on("exit", (code) => code === 0
-      ? resolve(Buffer.concat(chunks).toString("utf8"))
-      : reject(new Error("Public fixture process returned no successful response")))
+    child.on("exit", (code) =>
+      code === 0
+        ? resolve(Buffer.concat(chunks).toString("utf8"))
+        : reject(new Error("Public fixture process returned no successful response"))
+    )
     child.stdin.end(input)
   })

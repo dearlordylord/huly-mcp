@@ -11,12 +11,54 @@ const CaseSchema = Schema.Struct({
 })
 const cases = Schema.decodeUnknownSync(Schema.Array(CaseSchema))([
   ...["child", "comment", "time", "attribute", "ancestry"].flatMap((mutationKind) => [
-    { name: `refuse-stale-${mutationKind}`, mutationKind, point: "commit-before", action: "pause", persistent: false, expectedLocation: "source" },
-    { name: `preserve-later-${mutationKind}`, mutationKind, point: "commit-after", action: "pause", persistent: false, expectedLocation: "destination" }
+    {
+      name: `refuse-stale-${mutationKind}`,
+      mutationKind,
+      point: "commit-before",
+      action: "pause",
+      persistent: false,
+      expectedLocation: "source"
+    },
+    {
+      name: `preserve-later-${mutationKind}`,
+      mutationKind,
+      point: "commit-after",
+      action: "pause",
+      persistent: false,
+      expectedLocation: "destination"
+    }
   ]),
-  { name: "before-allocation-send", mutationKind: "none", point: "allocation-before", action: "fail", persistent: true, expectedLocation: "source" },
-  { name: "allocated-reply-lost", mutationKind: "none", point: "allocation-after", action: "drop", persistent: true, expectedLocation: "source" },
-  { name: "successful-batch-reply-lost", mutationKind: "none", point: "commit-after", action: "drop", persistent: true, expectedLocation: "destination" },
-  { name: "verification-outage", mutationKind: "none", point: "verification-read", action: "fail", persistent: true, expectedLocation: "destination" }
+  {
+    name: "before-allocation-send",
+    mutationKind: "none",
+    point: "allocation-before",
+    action: "fail",
+    persistent: true,
+    expectedLocation: "source"
+  },
+  {
+    name: "allocated-reply-lost",
+    mutationKind: "none",
+    point: "allocation-after",
+    action: "drop",
+    persistent: true,
+    expectedLocation: "source"
+  },
+  {
+    name: "successful-batch-reply-lost",
+    mutationKind: "none",
+    point: "commit-after",
+    action: "drop",
+    persistent: true,
+    expectedLocation: "destination"
+  },
+  {
+    name: "verification-outage",
+    mutationKind: "none",
+    point: "verification-read",
+    action: "fail",
+    persistent: true,
+    expectedLocation: "destination"
+  }
 ])
 for (const entry of cases) process.stdout.write(`${JSON.stringify(entry)}\n`)

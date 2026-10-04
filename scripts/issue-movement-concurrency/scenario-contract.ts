@@ -2,7 +2,13 @@ import { Schema } from "effect"
 import { MoveIssueParamsSchema } from "../../src/domain/schemas/issue-movement.js"
 import { MoveIssueResultSchema } from "../../src/domain/schemas/issues-results.js"
 import { IssueSchema } from "../../src/domain/schemas/issues.js"
-import { IssueId, NonEmptyString, PositiveInteger, ProjectIdentifier, UrlString } from "../../src/domain/schemas/shared.js"
+import {
+  IssueId,
+  NonEmptyString,
+  PositiveInteger,
+  ProjectIdentifier,
+  UrlString
+} from "../../src/domain/schemas/shared.js"
 import { GatewayAction, GatewayEvent, GatewayPoint } from "./protocol.js"
 
 export const ScenarioArguments = Schema.Struct({

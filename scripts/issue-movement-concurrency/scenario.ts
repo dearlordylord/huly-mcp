@@ -157,10 +157,12 @@ const main = async (args: ScenarioArguments, signal: AbortSignal) => {
   }
 }
 const args = Schema.decodeUnknownSync(Schema.fromJsonString(ScenarioArguments))(process.argv[2])
-void Effect.runPromise(Effect.tryPromise({
-  try: (signal) => main(args, signal),
-  catch: () => new Error("Movement concurrency fixture failed; no workspace-state claim made.")
-}).pipe(Effect.timeout(args.timeoutMs))).catch(() => {
+void Effect.runPromise(
+  Effect.tryPromise({
+    try: (signal) => main(args, signal),
+    catch: () => new Error("Movement concurrency fixture failed; no workspace-state claim made.")
+  }).pipe(Effect.timeout(args.timeoutMs))
+).catch(() => {
   process.stderr.write("Movement concurrency fixture failed or exceeded its deadline; no workspace-state claim made.\n")
   process.exitCode = 1
 })
