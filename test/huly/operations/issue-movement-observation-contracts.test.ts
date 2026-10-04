@@ -102,6 +102,8 @@ for (const route of ["available", "unavailable"]) {
                       _class: "chunter:class:ChatMessage",
                       attachedTo: record.attachedTo,
                       space: record.space,
+                      modifiedOn: record.modifiedOn,
+                      modifiedBy: record.modifiedBy,
                       ...(route === "available"
                         ? { attachedToClass: record.attachedToClass, collection: record.collection }
                         : {})
@@ -204,3 +206,55 @@ it.effect("post-allocation project inventory outage retains confirmed reservatio
     expect(f.state.sent).toBe(0)
   })
 )
+
+for (const change of ["payload-unavailable", "wrong-project", "wrong-owner"]) {
+  it.effect(`a previously supported comment becoming ${change} reports actual ownership and payload limits`, () =>
+    Effect.gen(function* () {
+      const f = transferTreeFixture()
+      const inspect = assertExists(f.operations.inspectTransferRecords)
+      const comment = {
+        _id: "comment-1",
+        _class: "chunter:class:ChatMessage",
+        kind: "owned",
+        space: f.source._id,
+        attachedTo: f.root._id,
+        attachedToClass: "tracker:class:Issue",
+        collection: "comments",
+        modifiedOn: 1,
+        modifiedBy: "author",
+        snapshot: JSON.stringify({ message: "Original comment" }),
+        ownerId: f.root._id,
+        ownerClass: "tracker:class:Issue"
+      }
+      const result = yield* run(f, {
+        ...f.operations,
+        inspectTransferRecords: (id, tree) =>
+          inspect(id, tree).pipe(
+            Effect.map((inspection) => {
+              if (id !== f.root._id) return inspection
+              const current =
+                f.state.sent === 0
+                  ? comment
+                  : {
+                      ...comment,
+                      kind: "unsupported",
+                      space: change === "wrong-project" ? f.source._id : f.destination._id,
+                      attachedTo: change === "wrong-owner" ? f.child._id : f.root._id
+                    }
+              return parseInspection({ ...inspection, records: [...inspection.records, current] })
+            })
+          )
+      })
+      expect(result).toMatchObject({
+        outcome: change === "payload-unavailable" ? "indeterminate" : "incomplete",
+        verification: {
+          completeness: "incomplete",
+          consistency: change === "payload-unavailable" ? "undetermined" : "inconsistent"
+        }
+      })
+      expect(result).toHaveProperty("verification.reason", expect.stringContaining("Protected payload"))
+      expect(f.state.sent).toBe(1)
+      expect(f.state.allocated).toBe(3)
+    })
+  )
+}
