@@ -1,3 +1,5 @@
+import { HulyAuthError } from "../../../src/huly/errors-base.js"
+import { TRANSFER_DISCOVERY_BUDGET } from "../../../src/huly/operations/issue-transfer-tree.js"
 import { type Doc, type DocumentQuery, type FindOptions } from "@hcengineering/core"
 import { it } from "@effect/vitest"
 import { Effect, Fiber, Schema } from "effect"
@@ -170,3 +172,32 @@ it.effect("one malformed protected sibling retains other workflow, attribute and
     expect(f.state.sent).toBe(0)
   })
 )
+
+for (const failure of ["timeout", "read-unavailable"] as const) {
+  it.effect(`pre-send ${failure} preserves reservations without sending the task batch`, () =>
+    Effect.gen(function* () {
+      const f = transferTreeFixture()
+      const original = assertExists(f.operations.findAll)
+      const findAll: HulyClientOperations["findAll"] = (cls, query, options) =>
+        f.state.allocated > 0
+          ? failure === "timeout"
+            ? Effect.never
+            : Effect.fail(new HulyAuthError({ message: "Untrusted failure detail must remain private" }))
+          : original(cls, query, options)
+      const fiber = yield* parseMoveIssueParams(f.input).pipe(
+        Effect.flatMap(moveIssue),
+        Effect.provide(HulyClient.testLayer({ ...f.operations, findAll })),
+        Effect.forkChild
+      )
+      yield* TestClock.adjust(TRANSFER_DISCOVERY_BUDGET)
+      const result = yield* Fiber.join(fiber)
+      expect(result).toMatchObject({ outcome: "indeterminate", execution: { phase: "allocation", commit: "not-sent" } })
+      expect(result.reason).toContain(
+        failure === "timeout" ? "Pre-send inspection exceeded its deadline" : "Pre-send inspection unavailable"
+      )
+      expect(result.reason).not.toContain("Untrusted failure detail")
+      expect(f.state.allocated).toBe(3)
+      expect(f.state.sent).toBe(0)
+    })
+  )
+}

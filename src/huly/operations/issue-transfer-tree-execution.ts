@@ -147,13 +147,7 @@ const executePlannedWrite = Effect.fn("transfer.executePlannedWrite")(function* 
     reinspect(client, prepared, destination, params).pipe(Effect.timeout(TRANSFER_DISCOVERY_BUDGET))
   )
   if (presend._tag === "Failure")
-    return yield* stoppedResult(
-      "indeterminate",
-      "Pre-send inspection unavailable; task batch was not sent. Prior allocations may leave gaps.",
-      prepared,
-      destination,
-      progress
-    )
+    return yield* stoppedResult("indeterminate", presendFailureReason(presend.failure), prepared, destination, progress)
   if (presend.success === undefined) {
     yield* observeFailure(client, prepared, destination, write, progress)
     return yield* stoppedResult(
@@ -183,6 +177,11 @@ const admittedPlan = (admission: ReadyAdmission, prepared: TransferPlan): Transf
   admission.mode === "same-project" ? admission.inspected : prepared
 
 type Admission = ReadyAdmission | { readonly status: "blocked"; readonly reason: string }
+const presendFailureReason = (failure: MovementError | Cause.TimeoutError): string =>
+  Cause.isTimeoutError(failure)
+    ? "Pre-send inspection exceeded its deadline; task batch was not sent. Prior allocations may leave gaps."
+    : "Pre-send inspection unavailable; task batch was not sent. Prior allocations may leave gaps."
+
 const admissionFailureReason = (failure: MovementError | Cause.TimeoutError): string =>
   Cause.isTimeoutError(failure)
     ? "Pre-allocation inspection exceeded its deadline; no allocation or task writes performed."
