@@ -289,7 +289,7 @@ export const inspectTransferPlan = Effect.fn("transfer.inspectPlan")(function* (
   if (conflicts.length > 0)
     return {
       conflicts,
-      discovery: combinedDiscovery(attributes.complete, records.discovery),
+      discovery: combinedDiscovery(attributes.complete, records.discovery, conflicts),
       limitation: records.limitation
     }
   return {
@@ -302,5 +302,11 @@ export const inspectTransferPlan = Effect.fn("transfer.inspectPlan")(function* (
 
 const combinedDiscovery = (
   attributesComplete: boolean,
-  records: TransferInspection["discovery"]
-): TransferInspection["discovery"] => (attributesComplete && records === "complete" ? "complete" : "incomplete")
+  records: TransferInspection["discovery"],
+  conflicts: ReadonlyArray<TransferConflict>
+): TransferInspection["discovery"] =>
+  attributesComplete &&
+  records === "complete" &&
+  conflicts.every((entry) => entry.code !== "unsupported-structure" && entry.code !== "discovery")
+    ? "complete"
+    : "incomplete"

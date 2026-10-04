@@ -76,7 +76,7 @@ it.effect("aggregates discoverable blockers before allocation; unsupported inven
     f.state.recordsBlockers = sdkFixture(["Unsupported owned comment"])
     appendTransferChild(f, movementIssue("child", { attachedTo: f.root._id }))
     const result = yield* call(f, { ...f.input, resolutions: [] })
-    expect(result).toMatchObject({ outcome: "blocked", changed: false })
+    expect(result).toMatchObject({ outcome: "blocked", changed: false, discovery: "incomplete" })
     expect(JSON.stringify(result)).toContain("not a complete inventory")
     for (const text of [
       "component",

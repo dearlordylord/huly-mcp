@@ -48,3 +48,5 @@ The first Standards review of f1c0e037 identified representation gaps. Changes a
 The first Spec review identified an obsolete-resolution retry gap when a field becomes null/unset. Those conflicts now state that clearing is unavailable and explicitly instruct omission of the obsolete resolution. `nextCall` removes stale/invalid/duplicate/out-of-tree decisions while retaining valid decisions for other fields. The direct now-absent-reference retry test consumes the returned nextCall without undocumented rewriting. The retry still rereads state and does not auto-authorize changed-value loss.
 
 Additional adapter guards require approved non-null replacement documents to remain in the destination project at conditional commit. These guards are cooperative SDK conditions, retaining the inherited scoped batch limitations.
+
+Unsupported structure and inconsistent discovery conflicts mark the blocked inventory incomplete as well as providing the explicit refusal/limitation. Fully inspected supported leaf attribute and workflow conflicts retain complete inventory reporting.
