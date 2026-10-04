@@ -12,6 +12,7 @@ const now = () => Effect.runSync(Clock.currentTimeMillis)
 const TEST_BUDGET_MS = 60_000
 const TIMEOUT_EXIT = 124
 const FAILURE_EXIT = 7
+const LAUNCH_POLL_MS = 10
 
 const fixture = async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'movement-certification-'))
@@ -101,7 +102,7 @@ test('deadline terminates real process group and permits bounded fixture cleanup
       if (state.scheduled !== 1) return realTime.schedule(callback, TEST_BUDGET_MS)
       const waitForLaunch = async () => {
         try { await readFile(path.join(f.root, 'launches')); state.clock += milliseconds; callback() }
-        catch (error) { if (error.code !== 'ENOENT') throw error; await realTime.pause(10); await waitForLaunch() }
+        catch (error) { if (error.code !== 'ENOENT') throw error; await realTime.pause(LAUNCH_POLL_MS); await waitForLaunch() }
       }
       void waitForLaunch()
       return undefined

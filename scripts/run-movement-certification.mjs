@@ -23,7 +23,7 @@ const ARGV_START = 2
 const JS_EXTENSION_LENGTH = 3
 const now = () => Effect.runSync(Clock.currentTimeMillis)
 const CLEANUP_MS = 10_000
-export const realTime = { now, schedule: (callback, milliseconds) => setTimeout(callback, milliseconds), cancel: timer => clearTimeout(timer), pause: milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)) }
+export const realTime = { now, schedule: (callback, milliseconds) => setTimeout(() => callback(), milliseconds), cancel: timer => clearTimeout(timer), pause: milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)) }
 const EnvironmentSchema = Schema.Record(Schema.String, Schema.RedactedFromValue(Schema.String))
 const parseEnvironment = () => Schema.decodeUnknownSync(EnvironmentSchema)(Object.fromEntries(Object.entries(process.env).filter(([key]) => key.startsWith('HULY_') || ['NODE_OPTIONS', 'MCP_AUTO_EXIT', 'HULY_TOOL_MODE'].includes(key))))
 const atomicState = async (file, state) => {
