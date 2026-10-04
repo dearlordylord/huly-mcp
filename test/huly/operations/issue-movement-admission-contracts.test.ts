@@ -82,7 +82,7 @@ it.effect("a selected parent's unavailable project metadata refuses without trus
   })
 )
 
-for (const change of ["missing-port", "snapshot-drift", "read-outage"]) {
+for (const change of ["missing-port", "snapshot-drift", "read-outage", "timeout"]) {
   it.effect(`an admitted execution refuses ${change} before any reservation`, () =>
     Effect.gen(function* () {
       const f = transferTreeFixture()
@@ -107,15 +107,33 @@ for (const change of ["missing-port", "snapshot-drift", "read-outage"]) {
               ...f.operations,
               findAll: (cls, query, options) =>
                 change === "read-outage"
-                  ? Effect.fail(new HulyAuthError({ message: "Admission inventory unavailable" }))
-                  : findAll(cls, query, options)
+                  ? Effect.fail(new HulyAuthError({ message: "Sensitive read detail" }))
+                  : change === "timeout"
+                    ? Effect.never
+                    : findAll(cls, query, options)
             }
       if (change === "snapshot-drift") f.root.description = sdkFixture("Concurrent edit before execution")
       const executor = yield* HulyClient.pipe(Effect.provide(HulyClient.testLayer(operations)))
-      const result = yield* executeTransferTree(executor, prepared, destination, params)
+      const fiber = yield* executeTransferTree(executor, prepared, destination, params).pipe(Effect.forkChild)
+      yield* TestClock.adjust("11 seconds")
+      const result = yield* Fiber.join(fiber)
       expect(result).toMatchObject({ outcome: "blocked", changed: false })
       expect(f.state.allocated).toBe(0)
       expect(f.state.sent).toBe(0)
+      if (change === "timeout")
+        expect(result).toHaveProperty(
+          "reason",
+          "Pre-allocation inspection exceeded its deadline; no allocation or task writes performed."
+        )
+      if (change === "read-outage") {
+        expect(result).toHaveProperty(
+          "reason",
+          "Pre-allocation inspection unavailable; no allocation or task writes performed."
+        )
+        expect(result).toHaveProperty("reason", expect.not.stringContaining("Sensitive read detail"))
+      }
+      if (change === "snapshot-drift")
+        expect(result).toHaveProperty("reason", expect.stringContaining("snapshots changed"))
       if (change === "snapshot-drift") expect(f.root.description).toBe("Concurrent edit before execution")
     })
   )

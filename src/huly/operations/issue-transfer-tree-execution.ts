@@ -3,7 +3,7 @@ import { publishVerification, interruptVerification } from "./issue-transfer-ver
 import { isDeepStrictEqual } from "node:util"
 import type { Issue, Project } from "@hcengineering/tracker"
 import { SortingOrder } from "@hcengineering/core"
-import { Effect, Schedule, Ref } from "effect"
+import { Cause, Effect, Schedule, Ref } from "effect"
 import type { MoveIssueParams } from "../../domain/schemas/issue-movement.js"
 import type { MovementProject } from "../../domain/schemas/issue-movement-state.js"
 import type { MovementUncertaintyEvidence } from "../../domain/schemas/issue-movement-uncertainty.js"
@@ -190,7 +190,14 @@ const inspectAdmission = Effect.fn("transfer.inspectAdmission")(function* (
   const admission = yield* Effect.result(
     reinspect(client, prepared, destination, params).pipe(Effect.timeout(TRANSFER_DISCOVERY_BUDGET))
   )
-  if (admission._tag === "Failure" || !admission.success)
+  if (admission._tag === "Failure")
+    return {
+      status: "blocked",
+      reason: Cause.isTimeoutError(admission.failure)
+        ? "Pre-allocation inspection exceeded its deadline; no allocation or task writes performed."
+        : "Pre-allocation inspection unavailable; no allocation or task writes performed."
+    }
+  if (!admission.success)
     return {
       status: "blocked",
       reason:
