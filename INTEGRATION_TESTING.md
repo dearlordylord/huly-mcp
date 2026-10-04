@@ -549,6 +549,28 @@ because the commit changed. Reused evidence must retain its original tested
 commit, environment, inputs and log. It is source-equivalent characterization,
 not an assertion that an earlier run executed the newer commit.
 
+For an authorized repair of a known failing feature boundary, run `pnpm build`,
+`pnpm verify-movement-fixtures`, `pnpm test:movement-process`, and the affected
+focused dependency tests before one bounded stock fixture run. This is repair
+feedback, not certification. The existing coordinator exports
+`boundedProcess(root, script, log, deadline)` for an overseer-owned private driver;
+it owns process groups and custody under the worktree lock. The CLI has
+`--plan`, `--run`, `--deadline`, `--state-dir`, `--diagnostic`, and `--prepare`;
+it has no single-suite selection flag. Do not invent one. The package
+`pnpm integration:movement` command still performs its full preparation before
+its suite inventory.
+
+The authorized no-overall-deadline continuation may run the unresolved tree
+fixture first, then the fresh ordinary `pnpm check-all` and the remaining four
+suites on the same frozen candidate. A passing early tree receipt keeps its
+original commit, log, environment, generated-bundle and input fingerprints.
+Only a successful current-candidate gate plus all five successful suite receipts
+and final fingerprint/log/artifact checks qualifies the candidate. If the gate
+changes the tested bundle or any dependency, the early receipt cannot qualify
+that changed input. Stop on failure; this ordering does not authorize automatic
+mutation retries, increase any operation or process deadline, reuse a predecessor
+candidate's gate, or certify a subset of criteria.
+
 The movement coordinator uses one absolute deadline, a worktree lock, retained
 logs and input fingerprints. The package command includes final-gate preparation
 inside the same deadline. Preparation removes inherited `HULY_*` values from

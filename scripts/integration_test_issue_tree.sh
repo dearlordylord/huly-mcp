@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Root executes this only after final combined 306–311 certification preflight.
+# Root runs this after coherent all-slice build/preflight checks for repair feedback.
+# Qualification still requires the same candidate gate, all five suites and final input audits.
 set -Eeuo pipefail
 # Report the source location, never command arguments or SDK credential payloads.
 trap 'printf "FAIL: fixture command at line %s (exit %s)\n" "$LINENO" "$?" >&2' ERR
