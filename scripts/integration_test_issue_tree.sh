@@ -77,20 +77,13 @@ assert_document_unchanged() {
 }
 cleanup() {
   local original_status=$? cleanup_status=0
-  if ! node scripts/run-bundled.mjs scripts/integration-issue-transfer-records.ts "$(jq -nc --argjson ids "$FIXTURE_RECORD_IDS" '{mode:"cleanup",recordIds:$ids}')"; then
-    echo "FAIL: explicit fixture record cleanup" >&2
-    cleanup_status=1
+  local cleanup_input
+  cleanup_input=$(jq -nc --argjson issues "$(printf '%s\n' "${ISSUES[@]}" | jq -Rsc 'split("\n")|map(select(length>0))')" --argjson projects "$(printf '%s\n' "${PROJECTS[@]}" | jq -Rsc 'split("\n")|map(select(length>0))')" --arg document "$DOCUMENT" --arg teamspace "$TEAMSPACE" --argjson records "$FIXTURE_RECORD_IDS" '{issueIds:$issues,projects:$projects,documentIds:([$document]|map(select(length>0))),teamspaceIds:([$teamspace]|map(select(length>0))),recordIds:$records}') || cleanup_status=1
+  if [[ "$cleanup_status" == 0 ]]; then
+    # One finite cleanup process. Its public receipt distinguishes acknowledgement from observed absence.
+    timeout --signal=KILL 120 node scripts/run-bundled.mjs scripts/integration-issue-tree-cleanup.ts "$cleanup_input" || cleanup_status=1
   fi
-  for ((index=${#ISSUES[@]}-1; index>=0; index--)); do
-    for project in "$SOURCE" "$TARGET"; do mcp delete_issue "$(jq -nc --arg project "$project" --arg identifier "${ISSUES[$index]}" '{project:$project,identifier:$identifier}')" >/dev/null 2>&1 || true; done
-  done
-  if [[ -n "$DOCUMENT" ]]; then mcp delete_document "$(jq -nc --arg teamspace "$TEAMSPACE" --arg document "$DOCUMENT" '{teamspace:$teamspace,document:$document}')" >/dev/null || true; fi
-  if [[ -n "$TEAMSPACE" ]]; then mcp delete_teamspace "$(jq -nc --arg teamspace "$TEAMSPACE" '{teamspace:$teamspace}')" >/dev/null || true; fi
-  for project in "${PROJECTS[@]}"; do
-    for id in $(mcp list_components "$(jq -nc --arg project "$project" '{project:$project}')" | jq -r '.[].id'); do mcp delete_component "$(jq -nc --arg project "$project" --arg component "$id" '{project:$project,component:$component}')" >/dev/null || true; done
-    for id in $(mcp list_milestones "$(jq -nc --arg project "$project" '{project:$project}')" | jq -r '.[].id'); do mcp delete_milestone "$(jq -nc --arg project "$project" --arg milestone "$id" '{project:$project,milestone:$milestone}')" >/dev/null || true; done
-    mcp delete_project "$(jq -nc --arg project "$project" '{project:$project}')" >/dev/null || true
-  done
+  if [[ "$cleanup_status" != 0 ]]; then printf 'FAIL: tree cleanup resource absence unresolved\n' >&2; fi
   trap - EXIT
   if [[ "$original_status" -ne 0 ]]; then exit "$original_status"; fi
   exit "$cleanup_status"
