@@ -1,11 +1,11 @@
-import { Option, Schema } from "effect"
+import { Result, Schema } from "effect"
 import { HulyDataInvalidError } from "./errors-base.js"
 import { MovementTransactionsSchema, type MovementTransactions } from "./issue-movement-transactions.js"
 import type { Issue } from "@hcengineering/tracker"
 import type { TxOperations } from "@hcengineering/core"
 import type { TransferTreeTaskWrite, TransferTreeWrite } from "../domain/schemas/issue-transfer-tree.js"
 import { HulyTransactionScope, type HulyConditionalWriteResult } from "../domain/schemas/shared.js"
-import { tracker } from "./huly-plugins.js"
+import { core, tracker } from "./huly-plugins.js"
 import { queueTransferRootCounts, queueTransferTask } from "./issue-transfer-adapter.js"
 import { hulyQuery } from "./operations/query-helpers.js"
 import { toRef, toClassRef } from "./operations/sdk-boundary.js"
@@ -14,10 +14,10 @@ export const commitTransferTree = async (
   client: TxOperations,
   write: TransferTreeWrite,
   publishQueuedTransactions?: (transactions: MovementTransactions) => Promise<void>
-): Promise<HulyConditionalWriteResult> => {
+): Promise<Result.Result<HulyConditionalWriteResult, HulyDataInvalidError>> => {
   const apply = client.apply(HulyTransactionScope.make(`issue-transfer:${write.rootId}`))
   const root = write.tasks.find((task) => task.issueId === write.rootId)
-  if (root === undefined) return "condition-not-met"
+  if (root === undefined) return Result.succeed("condition-not-met")
   const ids = write.tasks.map((task) => toRef<Issue>(task.issueId))
   apply.notMatch(tracker.class.Issue, hulyQuery<Issue>({ attachedTo: { $in: ids }, _id: { $nin: ids } }))
   for (const ancestor of write.ancestors)
@@ -39,8 +39,12 @@ export const commitTransferTree = async (
   }
   await queueRemovedAncestorInformation(apply, write)
   await queueTransferRootCounts(apply, root)
-  if (publishQueuedTransactions !== undefined) await publishQueuedTransactions(parseQueuedTransactions(apply))
-  return (await apply.commit()).result ? "applied" : "condition-not-met"
+  if (publishQueuedTransactions !== undefined) {
+    const parsed = parseQueuedTransactions(apply)
+    if (Result.isFailure(parsed)) return parsed
+    await publishQueuedTransactions(parsed.success)
+  }
+  return Result.succeed((await apply.commit()).result ? "applied" : "condition-not-met")
 }
 
 const queueRemovedAncestorInformation = async (
@@ -95,9 +99,11 @@ const matchProtectedTask = (apply: ReturnType<TxOperations["apply"]>, task: Tran
   )
 }
 
-const parseQueuedTransactions = (apply: ReturnType<TxOperations["apply"]>): MovementTransactions => {
+const parseQueuedTransactions = (
+  apply: ReturnType<TxOperations["apply"]>
+): Result.Result<MovementTransactions, HulyDataInvalidError> => {
   const input: unknown = apply.txes
-    .filter((tx) => String(tx._class) === "core:class:TxUpdateDoc" && String(tx.objectClass) === "tracker:class:Issue")
+    .filter((tx) => tx._class === core.class.TxUpdateDoc && tx.objectClass === tracker.class.Issue)
     .map((tx) => ({
       txId: tx._id,
       transactionClass: tx._class,
@@ -108,8 +114,7 @@ const parseQueuedTransactions = (apply: ReturnType<TxOperations["apply"]>): Move
       modifiedBy: tx.modifiedBy,
       operations: Reflect.get(tx, "operations")
     }))
-  const parsed = Schema.decodeUnknownOption(MovementTransactionsSchema)(input)
-  if (Option.isNone(parsed))
-    throw new HulyDataInvalidError({ operation: "move_issue", entity: "queued movement transactions" })
-  return parsed.value
+  return Schema.decodeUnknownResult(MovementTransactionsSchema)(input).pipe(
+    Result.mapError(() => new HulyDataInvalidError({ operation: "move_issue", entity: "queued movement transactions" }))
+  )
 }

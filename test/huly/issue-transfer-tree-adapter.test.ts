@@ -1,3 +1,8 @@
+import { TxOperations, type Client, type Tx } from "@hcengineering/core"
+import { corePersonId, sdkFixture } from "../helpers/huly-sdk.js"
+import { type MovementTransactions } from "../../src/huly/issue-movement-transactions.js"
+import { HulyDataInvalidError } from "../../src/huly/errors-base.js"
+import { MovementTransportError } from "../../src/huly/movement-transaction-transport.js"
 import { it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import { expect } from "vitest"
@@ -6,7 +11,14 @@ import {
   MovementProjectSchema,
   type MovementIssue
 } from "../../src/domain/schemas/issue-movement-state.js"
-import { DocId, IssueId, IssueIdentifier, Count, PositiveInteger } from "../../src/domain/schemas/shared.js"
+import {
+  DocId,
+  IssueId,
+  IssueIdentifier,
+  Count,
+  PositiveInteger,
+  NonEmptyString
+} from "../../src/domain/schemas/shared.js"
 import { commitTransferTree } from "../../src/huly/issue-transfer-tree-adapter.js"
 import { HulyClient } from "../../src/huly/client.js"
 import { inspectTransferPlan } from "../../src/huly/operations/issue-transfer-preflight.js"
@@ -127,7 +139,9 @@ it.effect(
         ...f.issues.map((issue) => ({ ...issue })),
         ...f.records.map((record) => ({ ...record }))
       )
-      expect(yield* Effect.promise(() => commitTransferTree(adapter.client, write))).toBe("applied")
+      expect(
+        yield* Effect.promise(() => commitTransferTree(adapter.client, write)).pipe(Effect.flatMap(Effect.fromResult))
+      ).toBe("applied")
       const updates = adapter.updates.map((args) => parseUpdate({ id: args[2], update: args[3] }))
       const previous = f.issues.map((issue) => parseIssue(issue))
       const observed = applyPersistedBatch(previous, updates, true)
@@ -146,8 +160,95 @@ it.effect(
       const changed = adapter.docs.find((doc) => doc._id === f.grandchild._id)
       expect(changed).toBeDefined()
       if (changed !== undefined) changed.modifiedOn = f.grandchild.modifiedOn + 1
-      expect(yield* Effect.promise(() => commitTransferTree(adapter.client, write))).toBe("condition-not-met")
+      expect(
+        yield* Effect.promise(() => commitTransferTree(adapter.client, write)).pipe(Effect.flatMap(Effect.fromResult))
+      ).toBe("condition-not-met")
       const countUpdates = updates.filter((entry) => entry.update.$inc !== undefined)
       expect(countUpdates.map((entry) => entry.id)).toEqual([f.old._id, f.parent._id])
     })
 )
+
+for (const lostReply of [false, true]) {
+  it.effect("publishes actual queued issue transactions before send and retains intent through a lost reply", () =>
+    Effect.gen(function* () {
+      const f = transferTreeFixture()
+      const client = yield* HulyClient.pipe(Effect.provide(f.layer))
+      const prepared = yield* inspectTransferPlan(
+        client,
+        parseIssue(f.root),
+        parseIssue(f.parent),
+        parseProject(f.source),
+        parseProject(f.destination),
+        yield* parseMoveIssueParams(f.input)
+      )
+      expect("conflicts" in prepared).toBe(false)
+      if ("conflicts" in prepared) return
+      const write = planTransferTreeWrites(
+        prepared,
+        parseProject(f.destination),
+        [4, 5, 6].map((number) => PositiveInteger.make(number)),
+        undefined
+      )
+      expect(write).toBeDefined()
+      if (write === undefined) return
+      let receipts: MovementTransactions = []
+      const sends: Tx[] = []
+      const failure = new MovementTransportError({ phase: "after-send", reason: NonEmptyString.make("Lost reply") })
+      const ordinary = new TxOperations(
+        sdkFixture<Client>({
+          tx: async (tx: Tx) => {
+            expect(receipts.length).toBeGreaterThan(write.tasks.length)
+            sends.push(tx)
+            if (lostReply) throw failure
+            return { success: true, serverTime: 1 }
+          }
+        }),
+        corePersonId("person")
+      )
+      const result = yield* Effect.tryPromise({
+        try: () =>
+          commitTransferTree(ordinary, write, async (queued) => {
+            receipts = queued
+          }),
+        catch: (error) =>
+          error instanceof MovementTransportError
+            ? error
+            : new HulyDataInvalidError({ operation: "move_issue", entity: "test queued transaction" })
+      }).pipe(Effect.flatMap(Effect.fromResult), Effect.result)
+      expect(sends).toHaveLength(1)
+      expect(receipts.map((receipt) => receipt.objectId)).toEqual(
+        expect.arrayContaining(write.tasks.map((task) => task.issueId))
+      )
+      expect(new Set(receipts.map((receipt) => receipt.txId)).size).toBe(receipts.length)
+      const beforeRejectedCallback = sends.length
+      const callbackFailure = new HulyDataInvalidError({ operation: "move_issue", entity: "receipt observer" })
+      const rejected = yield* Effect.tryPromise({
+        try: () =>
+          commitTransferTree(ordinary, write, async () => {
+            throw callbackFailure
+          }),
+        catch: (error) =>
+          error instanceof HulyDataInvalidError
+            ? error
+            : new HulyDataInvalidError({ operation: "move_issue", entity: "unexpected callback failure" })
+      }).pipe(Effect.result)
+      expect(rejected._tag).toBe("Failure")
+      if (rejected._tag === "Failure") expect(rejected.failure).toBe(callbackFailure)
+      expect(sends).toHaveLength(beforeRejectedCallback)
+      const rawBatch: unknown = sends[0]
+      const batch = Schema.decodeUnknownSync(Schema.Struct({ txes: Schema.Array(Schema.JsonObject) }))(rawBatch)
+      for (const receipt of receipts) {
+        const actual = batch.txes.find((tx) => tx._id === receipt.txId)
+        expect(actual).toBeDefined()
+        expect(actual?.objectId).toBe(receipt.objectId)
+        expect(actual?.operations).toEqual(receipt.operations)
+        expect(actual?.modifiedOn).toBe(receipt.modifiedOn)
+        expect(actual?.modifiedBy).toBe(receipt.modifiedBy)
+      }
+      if (lostReply) {
+        expect(result._tag).toBe("Failure")
+        if (result._tag === "Failure") expect(result.failure).toBe(failure)
+      } else expect(result).toEqual(expect.objectContaining({ _tag: "Success", success: "applied" }))
+    })
+  )
+}

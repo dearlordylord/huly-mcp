@@ -5,7 +5,7 @@ import { Effect, Redacted, Schema } from "effect"
 import { describe, expect } from "vitest"
 import { NonEmptyString, PositiveInteger } from "../../src/domain/schemas/shared.js"
 import { core, tracker } from "../../src/huly/huly-plugins.js"
-import { HulyConnectionError } from "../../src/huly/errors-base.js"
+import { HulyDataInvalidError, HulyConnectionError } from "../../src/huly/errors-base.js"
 import { MovementTransportError, type MovementHttpPort } from "../../src/huly/movement-transaction-transport.js"
 import { parseMovementTransportConfig, withMovementWriteClient } from "../../src/huly/movement-write-client.js"
 import { toRef } from "../../src/huly/operations/sdk-boundary.js"
@@ -190,3 +190,32 @@ describe("movement-only client boundary", () => {
     })
   )
 })
+
+it.effect("preserves a typed invalid queued receipt without invoking the movement HTTP port", () =>
+  Effect.gen(function* () {
+    const { ordinary } = clientFixture()
+    const config = yield* parseMovementTransportConfig(configuration)
+    let sends = 0
+    const http: MovementHttpPort = {
+      send: () =>
+        Effect.sync(() => {
+          sends++
+          return { status: PositiveInteger.make(200), body: "{}" }
+        })
+    }
+    const failure = new HulyDataInvalidError({ operation: "move_issue", entity: "queued movement transactions" })
+    const result = yield* withMovementWriteClient(
+      ordinary,
+      config,
+      http,
+      "conditionalUpdateDoc",
+      async (_client, signal) => {
+        expect(signal.aborted).toBe(false)
+        throw failure
+      }
+    ).pipe(Effect.result)
+    expect(result._tag).toBe("Failure")
+    if (result._tag === "Failure") expect(result.failure).toBe(failure)
+    expect(sends).toBe(0)
+  })
+)

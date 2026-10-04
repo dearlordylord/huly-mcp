@@ -452,7 +452,7 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
           commitTransferTree: (write, publishQueuedTransactions) =>
             Effect.gen(function* () {
               const context = yield* Effect.context<never>()
-              return yield* withMovementWriteClient(
+              const result = yield* withMovementWriteClient(
                 client,
                 movementTransportConfig,
                 sdk.movementHttp,
@@ -467,6 +467,7 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
                           Effect.runPromiseWith(context)(publishQueuedTransactions(transactions), { signal })
                   )
               )
+              return yield* Effect.fromResult(result)
             }),
           commitTransfer: (write) =>
             withMovementWriteClient(
