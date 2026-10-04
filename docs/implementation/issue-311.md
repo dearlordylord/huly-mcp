@@ -14,6 +14,8 @@ Run a fresh gateway for each scenario so verification-read classification cannot
 
 ## Final executable scenario matrix
 
+Routine certification runs all 14 unique concurrency cases on MCP and four representative CLI cases: `refuse-stale-attribute`, `allocated-reply-lost`, `successful-batch-reply-lost`, and `verification-outage`. These retain confirmed guarded refusal, both allocation and commit reply loss, unavailable verification, and published stable-ID recovery on the second transport. The routine profile therefore has 18 physical concurrency cases. `HULY_MOVEMENT_CONCURRENCY_PROFILE=expanded` opts into the full 28-case transport matrix as a stress profile. Both selections use the same case fixtures and assertions; no unique race or failure scenario is removed. Invalid profile names refuse before fixture creation.
+
 For each MCP and CLI case, create disposable compatible source/destination projects, a three-level tree, destination work and supported owned records. Record the exact running ordinary-server version separately. Save schema-parsed state before and after with fresh independent clients, plus schema-valid public stable-ID `get_issue` / `huly issues get` reads. Clean fixtures by stable IDs.
 
 At `allocation-before`, pause and let the independent client add a child, add a comment, add a time report, change an attribute or reparent the root. At `commit-before`, repeat each edit after sequence reservation. At `commit-after`, pause, apply a subsequent user edit, and release: never erase that edit or resume automatically. Every added object must retain its stable ID/content and its actual observed ownership.

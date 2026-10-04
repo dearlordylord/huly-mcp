@@ -1,11 +1,21 @@
 #!/usr/bin/env bash
 # Final integrated 306–311 certification only. Creates disposable ordinary Huly fixtures.
-set -euo pipefail
+set -Eeuo pipefail
+FIXTURE_PHASE=setup
+trap 'printf "FAIL: concurrency fixture phase=%s line=%s exit=%s\n" "$FIXTURE_PHASE" "$LINENO" "$?" >&2' ERR
 source "$(dirname "${BASH_SOURCE[0]}")/test-telemetry-env.sh" || exit 1
 : "${HULY_URL:?Set ordinary local Huly URL}"
 CLI=(node packages/huly-cli/dist/index.cjs)
 TSX=(node node_modules/tsx/dist/cli.mjs)
 BUNDLED=(node scripts/run-bundled.mjs)
+CONCURRENCY_PROFILE=${HULY_MOVEMENT_CONCURRENCY_PROFILE:-routine}
+case "$CONCURRENCY_PROFILE" in routine|expanded) ;; *) echo "Invalid concurrency profile: use routine or expanded" >&2; exit 1 ;; esac
+# All unique cases remain on MCP; CLI retains refusal, both lost replies and outage/recovery.
+select_concurrency_cases() {
+  jq -c --arg transport "$1" --arg profile "$CONCURRENCY_PROFILE" 'select($profile=="expanded" or $transport=="mcp" or (.name as $name | ["refuse-stale-attribute","allocated-reply-lost","successful-batch-reply-lost","verification-outage"] | index($name)!=null))'
+}
+CASE_MATRIX=$("${TSX[@]}" scripts/issue-movement-concurrency/matrix.ts) || exit 1
+jq -es 'length==14 and (map(.name)|unique|length)==14' >/dev/null <<<"$CASE_MATRIX"
 printf -v SOURCE 'C%04X' "$RANDOM"
 printf -v DESTINATION 'R%04X' "$RANDOM"
 PROJECTS=()
@@ -48,8 +58,11 @@ create() {
 create "$SOURCE" 'Alternative source ancestor'; SOURCE_PARENT="$CREATED_ID"
 create "$DESTINATION" 'Alternative destination ancestor'; DESTINATION_PARENT="$CREATED_ID"
 for transport in mcp cli; do
+  SELECTED_CASES=$(select_concurrency_cases "$transport" <<<"$CASE_MATRIX") || exit 1
   while IFS= read -r entry; do
     NAME=$(jq -r .name <<<"$entry")
+    FIXTURE_PHASE="$transport:$NAME:setup"
+    printf 'PHASE: concurrency profile=%s case=%s transport=%s\n' "$CONCURRENCY_PROFILE" "$NAME" "$transport" >&2
     KIND=$(jq -r .mutationKind <<<"$entry")
     create "$SOURCE" "Concurrency $transport $NAME"; ROOT_ID="$CREATED_ID"; ROOT_IDENTIFIER="$CREATED_IDENTIFIER"
     create "$SOURCE" "Existing child $NAME" "$ROOT_IDENTIFIER"; CHILD_ID="$CREATED_ID"; CHILD_IDENTIFIER="$CREATED_IDENTIFIER"
@@ -67,7 +80,10 @@ for transport in mcp cli; do
     SNAPSHOT_ARGS=$(jq -nc --arg root "$ROOT_ID" --arg child "$CHILD_ID" --arg grandchild "$GRANDCHILD_ID" --arg source "$SOURCE" --arg destination "$DESTINATION" '{issues:[$root,$child,$grandchild],projects:[$source,$destination]}')
     BEFORE=$("${BUNDLED[@]}" scripts/integration-issue-transfer-state.ts "$SNAPSHOT_ARGS")
     ARGS=$(jq -nc --argjson entry "$entry" --arg upstream "$HULY_URL" --arg transport "$transport" --arg root "$ROOT_ID" --arg source "$SOURCE" --arg destination "$DESTINATION" --arg sourceParent "$SOURCE_PARENT" --arg destinationParent "$DESTINATION_PARENT" --argjson mutation "$MUTATION" '$entry + {upstream:$upstream,transport:$transport,movement:{issue:$root,destination:{project:$destination}},timeoutMs:90000,mutationTarget:{project:$source,issueId:$root},mutationParents:{($source):$sourceParent,($destination):$destinationParent},mutationArgs:$mutation} | del(.name,.expectedLocation)')
+    FIXTURE_PHASE="$transport:$NAME:movement"
     RESULT=$("${BUNDLED[@]}" scripts/issue-movement-concurrency/scenario.ts "$ARGS")
+    FIXTURE_PHASE="$transport:$NAME:verification"
+    jq -c --arg transport "$transport" --arg case "$NAME" '{transport:$transport,case:$case,observation:.observation.status,outcome:.observation.result.outcome,changed:.observation.result.changed,reason:.observation.result.reason,discovery:.observation.result.discovery,verificationStatus:.observation.result.verification.status,verificationConsistency:.observation.result.verification.consistency}' <<<"$RESULT" >&2
     jq -e '.observation.status == "result" and any(.gatewayEvents[]; .event == "barrier")' >/dev/null <<<"$RESULT"
     AFTER=$("${BUNDLED[@]}" scripts/integration-issue-transfer-state.ts "$SNAPSHOT_ARGS")
     EXPECTED=$(jq -r .expectedLocation <<<"$entry")
@@ -107,5 +123,5 @@ for transport in mcp cli; do
       jq -e '.observation.result.outcome == "indeterminate" and all(.gatewayEvents[]; .event != "retry-suppressed")' >/dev/null <<<"$RESULT"
     fi
     jq -nc --arg transport "$transport" --arg name "$NAME" --argjson result "$RESULT" '{transport:$transport,case:$name,evidence:$result}'
-  done < <("${TSX[@]}" scripts/issue-movement-concurrency/matrix.ts)
+  done <<<"$SELECTED_CASES"
 done

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Execute only during final combined 306–311 certification, after build and integration preflight.
-set -euo pipefail
+set -Eeuo pipefail
+FIXTURE_PHASE=setup
+trap 'printf "FAIL: attribute fixture phase=%s line=%s exit=%s\n" "$FIXTURE_PHASE" "$LINENO" "$?" >&2' ERR
 source "$(dirname "${BASH_SOURCE[0]}")/test-telemetry-env.sh" || exit 1
 CLI=(node packages/huly-cli/dist/index.cjs)
 printf -v SOURCE 'A%04X' "$RANDOM"
@@ -52,6 +54,7 @@ milestone() {
   result=$(mcp create_milestone "$payload") || return 1
   jq -er '.id | select(type=="string" and length>0)' <<<"$result"
 }
+FIXTURE_PHASE=attribute-inventory
 SC=$(component "$SOURCE" 'Source only'); SM=$(milestone "$SOURCE" 'Source only')
 TC=$(component "$TARGET" 'Destination replacement'); TM=$(milestone "$TARGET" 'Destination replacement')
 EXSC=$(component "$SOURCE" 'Exact'); EXSM=$(milestone "$SOURCE" 'Exact')
@@ -69,7 +72,9 @@ for TRANSPORT in mcp cli; do
   }
   create "$SC" "$SM"
   BEFORE=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$STATE_ARGS")
+  FIXTURE_PHASE="$TRANSPORT:blocked"
   BLOCKED=$(move "$CALL")
+  jq -c '{phase:"blocked",outcome,changed,reason,discovery,verificationStatus:.verification.status,verificationConsistency:.verification.consistency,conflicts:[.conflicts[]?|{code,field,issueId,clearingAllowed,candidateCount:(.candidates // [] | length)}]}' <<<"$BLOCKED" >&2
   jq -e --arg root "$ROOT" '.outcome == "blocked" and .changed == false and .discovery == "complete" and ([.conflicts[]|select(.code=="attribute")]|length)==2 and all(.conflicts[]; .issueId==$root and .clearingAllowed)' >/dev/null <<<"$BLOCKED"
   [[ "$(jq -Sc . <<<"$BEFORE")" == "$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$STATE_ARGS" | jq -Sc .)" ]]
   # Construct the accepted next call using only response field names and candidate IDs.
@@ -77,19 +82,27 @@ for TRANSPORT in mcp cli; do
   # Change the current source reference after the blocked response; stale consent cannot clear it.
   mcp set_issue_component "$(jq -nc --arg project "$SOURCE" --arg identifier "$IDENTIFIER" --arg component "$EXSC" '{project:$project,identifier:$identifier,component:$component}')" >/dev/null
   STALE_BEFORE=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$STATE_ARGS")
+  FIXTURE_PHASE="$TRANSPORT:stale"
   STALE=$(move "$RETRY")
+  jq -c '{phase:"stale",outcome,changed,reason,discovery,verificationStatus:.verification.status,verificationConsistency:.verification.consistency,conflicts:[.conflicts[]?|{code,field,issueId,clearingAllowed,candidateCount:(.candidates // [] | length)}]}' <<<"$STALE" >&2
   jq -e --arg current "$EXSC" '.outcome=="blocked" and any(.conflicts[];.code=="stale-resolution" and .from==$current)' >/dev/null <<<"$STALE"
   [[ "$(jq -Sc . <<<"$STALE_BEFORE")" == "$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$STATE_ARGS" | jq -Sc .)" ]]
   mcp set_issue_component "$(jq -nc --arg project "$SOURCE" --arg identifier "$IDENTIFIER" --arg component "$SC" '{project:$project,identifier:$identifier,component:$component}')" >/dev/null
+  FIXTURE_PHASE="$TRANSPORT:completed"
   COMPLETED=$(move "$RETRY")
+  jq -c '{phase:"completed",outcome,changed,reason,discovery,verificationStatus:.verification.status,verificationConsistency:.verification.consistency,conflicts:[.conflicts[]?|{code,field,issueId,clearingAllowed,candidateCount:(.candidates // [] | length)}]}' <<<"$COMPLETED" >&2
   jq -e '.outcome=="completed" and any(.attributeChanges[];.field=="milestone" and .to==null and .reason=="explicit-clear") and any(.attributeChanges[];.field=="component" and .reason=="explicit-replacement")' >/dev/null <<<"$COMPLETED"
   AFTER=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$STATE_ARGS")
   jq -e --argjson retry "$RETRY" '.issues[0].issue.milestone==null and .issues[0].issue.component==($retry.resolutions[]|select(.field=="component")|.to)' >/dev/null <<<"$AFTER"
   create "$EXSC" "$EXSM"
+  FIXTURE_PHASE="$TRANSPORT:exact"
   EXACT=$(move "$CALL")
+  jq -c '{phase:"exact",outcome,changed,reason,discovery,verificationStatus:.verification.status,verificationConsistency:.verification.consistency,conflicts:[.conflicts[]?|{code,field,issueId,clearingAllowed,candidateCount:(.candidates // [] | length)}]}' <<<"$EXACT" >&2
   jq -e --arg component "$EXTC" --arg milestone "$EXTM" '.outcome=="completed" and (.attributeChanges|length)==2 and all(.attributeChanges[];.reason=="exact-name") and any(.attributeChanges[];.to==$component) and any(.attributeChanges[];.to==$milestone)' >/dev/null <<<"$EXACT"
   create "$ASC" "$SM"
+  FIXTURE_PHASE="$TRANSPORT:ambiguous"
   AMBIGUOUS=$(move "$CALL")
+  jq -c '{phase:"ambiguous",outcome,changed,reason,discovery,verificationStatus:.verification.status,verificationConsistency:.verification.consistency,conflicts:[.conflicts[]?|{code,field,issueId,clearingAllowed,candidateCount:(.candidates // [] | length)}]}' <<<"$AMBIGUOUS" >&2
   jq -e --arg a "$ATC1" --arg b "$ATC2" '.outcome=="blocked" and any(.conflicts[];.field=="component" and any(.candidates[];._id==$a) and any(.candidates[];._id==$b))' >/dev/null <<<"$AMBIGUOUS"
   RESOLVED=$(jq -c --arg target "$ATC2" '.nextCall + {resolutions:[.conflicts[]|select(.code=="attribute")|{issueId,field,from,to:(if .field=="component" then $target else null end)}]}' <<<"$AMBIGUOUS")
   jq -e '.outcome=="completed"' >/dev/null <<<"$(move "$RESOLVED")"
