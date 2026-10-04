@@ -145,6 +145,8 @@ const inspectSameProjectTask = Effect.fn("movement.inspectProtectedTask")(functi
   }
 })
 
+const TRANSFER_WORKFLOW_READ_CONCURRENCY = 4
+
 const inspectTransferTasks = Effect.fn("transfer.inspectTasks")(function* (
   client: HulyClient["Service"],
   tree: ReadonlyArray<MovementIssue>,
@@ -164,8 +166,16 @@ const inspectTransferTasks = Effect.fn("transfer.inspectTasks")(function* (
   )
   const tasks: Array<TransferPlan["tasks"][number]> = []
   const conflicts: Array<TransferConflict> = []
-  for (const issue of tree) {
-    const workflow = yield* Effect.result(inspectTaskWorkflow(client, issue, tree, root, parent, source, destination))
+  const workflows = yield* Effect.forEach(
+    tree,
+    (issue) =>
+      inspectTaskWorkflow(client, issue, tree, root, parent, source, destination).pipe(
+        Effect.result,
+        Effect.map((workflow) => ({ issue, workflow }))
+      ),
+    { concurrency: TRANSFER_WORKFLOW_READ_CONCURRENCY }
+  )
+  for (const { issue, workflow } of workflows) {
     const records = forest.find((entry) => entry.ownerId === issue._id)
     if (records?.status !== "observed")
       conflicts.push(transferConflict(issue, "discovery", "Owned-record observation is unavailable for this task."))
