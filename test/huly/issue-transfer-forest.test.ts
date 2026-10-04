@@ -205,7 +205,8 @@ it.effect("validates protected child edges against the whole parsed tree", () =>
     const f = forestFixture()
     const root = movementIssue("root")
     const child = movementIssue("second", { attachedTo: toRef<Issue>(IssueId.make("root")) })
-    const tree = yield* Schema.decodeUnknownEffect(Schema.Array(MovementIssueSchema))([root, child])
+    const input: unknown = [root, child]
+    const tree = yield* Schema.decodeUnknownEffect(Schema.Array(MovementIssueSchema))(input)
     f.docs.push({ ...child, title: "Changed after the tree snapshot" })
     const result = yield* inspectTransferForest(f.client, roots, tree, undefined, policy)
     expect(observed(result)[0]?.discovery).toBe("incomplete")
