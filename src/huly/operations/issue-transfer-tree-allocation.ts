@@ -1,3 +1,4 @@
+import type { MovementWriteError } from "../movement-write-client.js"
 import { Effect, Ref, Schema } from "effect"
 import type { MovementProject } from "../../domain/schemas/issue-movement-state.js"
 import type { MovementUncertaintyEvidence } from "../../domain/schemas/issue-movement-uncertainty.js"
@@ -32,23 +33,8 @@ export const allocateTransferTree = Effect.fn("transfer.allocateTree")(function*
       reservations: [...reservations, { status: "uncertain", issueId }]
     })
     const allocated = yield* Effect.result(allocate(destination._id))
-    if (allocated._tag === "Failure") {
-      const refused = allocated.failure instanceof MovementTransportError && allocated.failure.phase === "before-send"
-      if (refused)
-        yield* Ref.set<MovementUncertaintyEvidence["execution"] | undefined>(
-          execution,
-          reservations.length === 0
-            ? undefined
-            : { phase: "allocation", commit: "not-sent", reservations: [...reservations] }
-        )
-      return {
-        status: refused ? "refused" : "uncertain",
-        numbers,
-        reason: refused
-          ? "Sequence request was refused before send. Task batch was not sent; prior confirmed reservations may leave gaps."
-          : "Sequence allocation response unavailable; reservation may have occurred. Task batch was not sent; gaps may remain."
-      }
-    }
+    if (allocated._tag === "Failure")
+      return yield* failedAllocation(allocated.failure, numbers, reservations, execution)
     const parsed = parseSequence(allocated.success)
     if (parsed._tag === "None")
       return {
@@ -65,4 +51,27 @@ export const allocateTransferTree = Effect.fn("transfer.allocateTree")(function*
     })
   }
   return { status: "allocated", numbers }
+})
+
+const failedAllocation = Effect.fn("transfer.failedAllocation")(function* (
+  error: MovementWriteError,
+  numbers: ReadonlyArray<PositiveInteger>,
+  reservations: ReadonlyArray<MovementUncertaintyEvidence["execution"]["reservations"][number]>,
+  execution: MovementExecutionProgress
+): Effect.fn.Return<TransferTreeAllocation> {
+  const refused = error instanceof MovementTransportError && error.phase === "before-send"
+  if (refused)
+    yield* Ref.set<MovementUncertaintyEvidence["execution"] | undefined>(
+      execution,
+      reservations.length === 0
+        ? undefined
+        : { phase: "allocation", commit: "not-sent", reservations: [...reservations] }
+    )
+  return {
+    status: refused ? "refused" : "uncertain",
+    numbers,
+    reason: refused
+      ? "Sequence request was refused before send. Task batch was not sent; prior confirmed reservations may leave gaps."
+      : "Sequence allocation response unavailable; reservation may have occurred. Task batch was not sent; gaps may remain."
+  }
 })

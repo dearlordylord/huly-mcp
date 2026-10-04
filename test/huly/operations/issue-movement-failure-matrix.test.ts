@@ -578,6 +578,93 @@ describe("public movement uncertainty and concurrent state", () => {
     )
   }
 
+  it.effect("classifies retained known record evidence after a later partial verification returns successfully", () =>
+    Effect.gen(function* () {
+      const f = transferTreeFixture()
+      const commit = assertExists(f.operations.commitTransferTree)
+      const inspect = assertExists(f.operations.inspectTransferRecords)
+      const state = { passes: 0 }
+      const result = yield* run(f, {
+        ...f.operations,
+        commitTransferTree: (write) =>
+          commit(write).pipe(
+            Effect.tap(() =>
+              Effect.sync(() => {
+                f.records.splice(0)
+              })
+            )
+          ),
+        inspectTransferRecords: (id, tree) =>
+          inspect(id, tree).pipe(
+            Effect.map((inspection) => {
+              if (f.state.sent > 0 && String(id) === String(f.root._id)) state.passes++
+              return f.state.sent > 0 && state.passes > 1
+                ? parseInspection({ ...inspection, discovery: "incomplete", blockers: [] })
+                : inspection
+            })
+          )
+      })
+      expect(result).toMatchObject({
+        outcome: "incomplete",
+        verification: { completeness: "incomplete", consistency: "inconsistent" }
+      })
+      expect(result).toHaveProperty("verification.reason", expect.stringContaining("Earlier observed"))
+      expect(state.passes).toBe(2)
+      expect(f.state.sent).toBe(1)
+    })
+  )
+
+  it.effect(
+    "retains confirmed absence and observed records through a newer inventory contradiction followed by a hanging read",
+    () =>
+      Effect.gen(function* () {
+        const f = transferTreeFixture()
+        const findAll = assertExists(f.operations.findAll)
+        const findOne = assertExists(f.operations.findOne)
+        const state = { passes: 0 }
+        const result = yield* run(
+          f,
+          {
+            ...f.operations,
+            findAll: (cls, query, options) =>
+              findAll(cls, query, options).pipe(
+                Effect.map((rows) => {
+                  if (f.state.sent > 0 && String(query.space) === String(f.source._id)) {
+                    state.passes++
+                    if (state.passes === 2) f.old.subIssues++
+                  }
+                  return rows
+                })
+              ),
+            findOne: (cls, query, options) => {
+              if (f.state.sent > 0 && String(query._id) === String(f.root._id))
+                return state.passes === 1 ? Effect.succeed(undefined) : Effect.never
+              return findOne(cls, query, options)
+            }
+          },
+          f.input,
+          "31 seconds"
+        )
+        expect(result).toMatchObject({
+          outcome: "incomplete",
+          verification: {
+            completeness: "incomplete",
+            consistency: "inconsistent",
+            absentIssueIds: [f.root._id],
+            records: expect.arrayContaining([
+              expect.objectContaining({ recordId: assertExists(f.records[0])._id, projectId: f.destination._id })
+            ])
+          }
+        })
+        expect(result).toHaveProperty(
+          "verification.tasks",
+          expect.not.arrayContaining([expect.objectContaining({ issueId: f.root._id })])
+        )
+        expect(result).toHaveProperty("verification.reason", expect.stringContaining("Earlier observed"))
+        expect(f.state.sent).toBe(1)
+      })
+  )
+
   it.effect("a subsequent user edit survives verification failure without rollback or new reservations", () =>
     Effect.gen(function* () {
       const f = transferTreeFixture()

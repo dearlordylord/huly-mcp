@@ -1,3 +1,4 @@
+import { projectVerification, type VerificationProof } from "./issue-transfer-verification-proof.js"
 import { Effect } from "effect"
 import type { MovementProject } from "../../domain/schemas/issue-movement-state.js"
 import type { MovementUncertaintyEvidence } from "../../domain/schemas/issue-movement-uncertainty.js"
@@ -15,22 +16,12 @@ import {
 import { observeTransferRecords, type RecordObservation } from "./issue-transfer-record-observation.js"
 
 export type TransferTreeVerification = MovementUncertaintyEvidence["verification"]
-type Observation = Extract<TransferTreeVerification, { readonly status: "observed" }>
-// Internal proof separates independently established contradictions from unavailable observations.
-interface VerificationProof {
-  readonly tasks: Observation["tasks"]
-  readonly records: Observation["records"]
-  readonly absentIssueIds: ReadonlyArray<TransferTreeWrite["rootId"]>
-  readonly problems: ReadonlyArray<string>
-  readonly limitations: ReadonlyArray<string>
-}
-
 export const verifyTransferTree = Effect.fn("transfer.verifyTree")(function* (
   client: HulyClient["Service"],
   prepared: TransferPlan,
   destination: MovementProject,
   write: TransferTreeWrite,
-  publish: (observation: TransferTreeVerification) => Effect.Effect<void> = () => Effect.void
+  publish: (observation: VerificationProof) => Effect.Effect<void> = () => Effect.void
 ): Effect.fn.Return<TransferTreeVerification, MovementError> {
   const source = yield* inspectMovementProject(client, prepared.plan.root)
   const target =
@@ -51,12 +42,10 @@ export const verifyTransferTree = Effect.fn("transfer.verifyTree")(function* (
   let taskProof: TaskObservation = { observed: [], absentIssueIds: [], limitations: [] }
   let recordProof: RecordObservation = { records: [], problems: [], limitations: [] }
   const progress = () =>
-    projectVerification(
-      makeProof(hierarchyProblem, taskProof, recordProof, write, {
-        problems: [],
-        limitations: ["Further verification observations remain unavailable."]
-      })
-    )
+    makeProof(hierarchyProblem, taskProof, recordProof, write, {
+      problems: [],
+      limitations: ["Further verification observations remain unavailable."]
+    })
   yield* publish(progress())
   taskProof = yield* observeTransferTasks(client, observedIds, (observation) => {
     taskProof = observation
@@ -67,9 +56,9 @@ export const verifyTransferTree = Effect.fn("transfer.verifyTree")(function* (
     return publish(progress())
   })
   const closure = yield* observeClosure(client, hierarchy, prepared)
-  const result = projectVerification(makeProof(hierarchyProblem, taskProof, recordProof, write, closure))
-  yield* publish(result)
-  return result
+  const proof = makeProof(hierarchyProblem, taskProof, recordProof, write, closure)
+  yield* publish(proof)
+  return projectVerification(proof)
 })
 
 const makeProof = (
@@ -89,7 +78,8 @@ const makeProof = (
     ...recordProof.problems,
     ...closure.problems
   ],
-  limitations: [...taskProof.limitations, ...recordProof.limitations, ...closure.limitations]
+  limitations: [...taskProof.limitations, ...recordProof.limitations, ...closure.limitations],
+  historicalProblems: []
 })
 
 const observeClosure = Effect.fn("transfer.observeClosure")(function* (
@@ -106,29 +96,6 @@ const observeClosure = Effect.fn("transfer.observeClosure")(function* (
     ? { problems: [], limitations: [problem.message] }
     : { problems: [problem.message], limitations: [] }
 })
-const projectVerification = (proof: VerificationProof): Observation => {
-  const { tasks, records } = proof
-  const absence = proof.absentIssueIds.length === 0 ? {} : { absentIssueIds: proof.absentIssueIds }
-  const inconsistent = proof.problems.length > 0
-  const reason = [...proof.problems, ...proof.limitations].join(" ")
-  if (proof.limitations.length > 0) {
-    return inconsistent
-      ? {
-          status: "observed",
-          completeness: "incomplete",
-          consistency: "inconsistent",
-          reason,
-          tasks,
-          records,
-          ...absence
-        }
-      : { status: "observed", completeness: "incomplete", consistency: "undetermined", reason, tasks, records }
-  }
-  return inconsistent
-    ? { status: "observed", completeness: "complete", consistency: "inconsistent", reason, tasks, records, ...absence }
-    : { status: "observed", completeness: "complete", consistency: "consistent", tasks, records }
-}
-
 const hierarchyProblemAfterMove = (
   prepared: TransferPlan,
   hierarchy: ReturnType<typeof movementHierarchy>,

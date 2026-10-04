@@ -1,34 +1,55 @@
 import { Effect, Ref } from "effect"
 import type { MovementUncertaintyEvidence } from "../../domain/schemas/issue-movement-uncertainty.js"
+import { projectVerification, type VerificationProof } from "./issue-transfer-verification-proof.js"
 
 type Verification = MovementUncertaintyEvidence["verification"]
-export const verificationUnavailable = (previous: Verification, reason: string): Verification => {
-  if (previous.status !== "observed") return { status: "unavailable", reason }
-  const limitation = previous.consistency === "consistent" ? reason : `${previous.reason} ${reason}`
-  return previous.consistency === "inconsistent"
-    ? { ...previous, completeness: "incomplete", consistency: "inconsistent", reason: limitation }
-    : { ...previous, completeness: "incomplete", consistency: "undetermined", reason: limitation }
-}
-const retainVerifiedFact = (previous: Verification, next: Verification): Verification => {
-  if (previous.status !== "observed" || previous.consistency !== "inconsistent") return next
-  if (next.status === "observed" && next.consistency === "inconsistent") return next
-  if (next.status === "observed" && next.completeness === "complete") return next
-  return verificationUnavailable(
-    previous,
-    "Later verification remains unavailable; prior observed discrepancy is unresolved."
+export type VerificationFactsRef = Ref.Ref<VerificationProof | undefined>
+const mergePartialProof = (previous: VerificationProof | undefined, next: VerificationProof): VerificationProof => {
+  if (previous === undefined || next.limitations.length === 0) return next
+  const presentIds = new Set(next.tasks.map((task) => task.issueId))
+  const absentIssueIds = [...new Set([...previous.absentIssueIds, ...next.absentIssueIds])].filter(
+    (id) => !presentIds.has(id)
   )
+  const absentIds = new Set(absentIssueIds)
+  const tasks = [...new Map([...previous.tasks, ...next.tasks].map((task) => [task.issueId, task])).values()].filter(
+    (task) => !absentIds.has(task.issueId)
+  )
+  const records = [
+    ...new Map([...previous.records, ...next.records].map((record) => [record.recordId, record])).values()
+  ]
+  return {
+    tasks,
+    records,
+    absentIssueIds,
+    problems: next.problems,
+    historicalProblems: [...new Set([...previous.historicalProblems, ...previous.problems])].filter(
+      (problem) => !next.problems.includes(problem)
+    ),
+    limitations: [...new Set([...previous.limitations, ...next.limitations])]
+  }
 }
 
-// Request-owned observation sink; pending reads cannot erase an independently observed discrepancy.
+// Request-owned sink of structured facts; a partial pass cannot erase earlier completed observations.
 export const publishVerification = Effect.fn("transfer.publishVerification")(function* (
   ref: Ref.Ref<Verification>,
-  next: Verification
+  facts: VerificationFactsRef,
+  next: VerificationProof
 ): Effect.fn.Return<void> {
-  yield* Ref.update(ref, (previous) => retainVerifiedFact(previous, next))
+  const proof = mergePartialProof(yield* Ref.get(facts), next)
+  yield* Ref.set(facts, proof)
+  yield* Ref.set(ref, projectVerification(proof))
 })
 export const interruptVerification = Effect.fn("transfer.interruptVerification")(function* (
   ref: Ref.Ref<Verification>,
+  facts: VerificationFactsRef,
   reason: string
 ): Effect.fn.Return<Verification> {
-  return yield* Ref.updateAndGet(ref, (previous) => verificationUnavailable(previous, reason))
+  const previous = yield* Ref.get(facts)
+  if (previous === undefined) {
+    const unavailable: Verification = { status: "unavailable", reason }
+    yield* Ref.set(ref, unavailable)
+    return unavailable
+  }
+  yield* publishVerification(ref, facts, { ...previous, limitations: [...previous.limitations, reason] })
+  return yield* Ref.get(ref)
 })
