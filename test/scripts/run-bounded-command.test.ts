@@ -151,3 +151,33 @@ test.skipIf(process.platform === "win32")(
     }
   }
 )
+
+test.skipIf(process.platform === "win32")(
+  "relays parent termination to its detached stage and descendant",
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), "hulymcp-parent-term-"))
+    const pidFile = join(directory, "descendant.pid")
+    const leader = `
+    const { spawn } = require('node:child_process');
+    const { writeFileSync } = require('node:fs');
+    const descendant = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {stdio:'inherit'});
+    writeFileSync(${JSON.stringify(pidFile)}, String(descendant.pid));
+    process.kill(process.ppid, 'SIGTERM');
+    setInterval(() => {}, 1000);
+  `
+    const program = `
+    const {runBoundedCommand, Milliseconds} = await import('./scripts/run-bounded-command.ts');
+    try { await runBoundedCommand({executable:process.execPath,args:['-e',${JSON.stringify(leader)}],name:'parent relay',timeoutMilliseconds:Milliseconds.make(30000)}); }
+    catch (error) { console.log(error.message); }
+  `
+    try {
+      const { stdout } = await execFileAsync(process.execPath, ["--import", "tsx", "--eval", program])
+      expect(stdout).toContain("parent relay interrupted by SIGTERM")
+      expect(processExists(Number(await readFile(pidFile, "utf8")))).toBe(false)
+    } finally {
+      await terminateRecordedDescendant(pidFile)
+      await rm(directory, { recursive: true, force: true })
+    }
+  },
+  PROCESS_TEST_TIMEOUT_MS
+)

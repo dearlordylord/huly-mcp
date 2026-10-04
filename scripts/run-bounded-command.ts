@@ -17,6 +17,7 @@ const defaultTerminationGraceMilliseconds = Milliseconds.make(DEFAULT_TERMINATIO
 const LAST_BYTE_OFFSET = -1
 const LINE_FEED_BYTE = 10
 const MILLISECONDS_PER_SECOND = 1_000
+const GROUP_POLL_MILLISECONDS = 20
 
 interface LineCounter {
   endsWithLineBreak: boolean
@@ -76,6 +77,7 @@ export const runBoundedCommand = ({
     const stdoutLineCounter = { endsWithLineBreak: true, lineBreaks: OutputLineCount.make(0), wasWritten: false }
     const stderrLineCounter = { endsWithLineBreak: true, lineBreaks: OutputLineCount.make(0), wasWritten: false }
     let timedOut = false
+    let interrupted: NodeJS.Signals | undefined
     let escalationTimer: NodeJS.Timeout | undefined
 
     const observeOutput = (output: Buffer, destination: NodeJS.WriteStream, lineCounter: LineCounter): void => {
@@ -96,8 +98,7 @@ export const runBoundedCommand = ({
       observeOutput(output, process.stderr, stderrLineCounter)
     })
 
-    const timer = setTimeout(() => {
-      timedOut = true
+    const stop = (): void => {
       try {
         terminate(child, "SIGTERM")
       } catch (error) {
@@ -115,27 +116,68 @@ export const runBoundedCommand = ({
       escalationTimer = setTimeout(() => {
         try {
           terminate(child, "SIGKILL")
-          reject(new Error(`${name} exceeded ${timeoutMilliseconds / MILLISECONDS_PER_SECOND} seconds`))
         } catch (error) {
           /* v8 ignore start -- Unexpected escalation defects are forwarded unchanged. */
           reject(error)
           /* v8 ignore stop */
         }
       }, terminationGraceMilliseconds)
+    }
+    const onTerm = (): void => {
+      interrupted = "SIGTERM"
+      stop()
+    }
+    const onInt = (): void => {
+      interrupted = "SIGINT"
+      stop()
+    }
+    process.once("SIGTERM", onTerm)
+    process.once("SIGINT", onInt)
+    const removeHandlers = (): void => {
+      process.removeListener("SIGTERM", onTerm)
+      process.removeListener("SIGINT", onInt)
+    }
+    const timer = setTimeout(() => {
+      timedOut = true
+      stop()
     }, timeoutMilliseconds)
 
     child.once("error", (error) => {
       clearTimeout(timer)
+      removeHandlers()
       if (!timedOut) {
         clearTimeout(escalationTimer)
         reject(error)
       }
     })
-    child.once("close", (code, signal) => {
+    child.once("close", async (code, signal) => {
       clearTimeout(timer)
 
-      if (timedOut) return
+      if ((timedOut || interrupted !== undefined) && process.platform !== "win32" && child.pid !== undefined) {
+        const pid = child.pid
+        const groupStopped = (): boolean => {
+          try {
+            process.kill(-pid, 0)
+            return false
+          } catch (error) {
+            if (isErrnoException(error) && error.code === "ESRCH") return true
+            throw error
+          }
+        }
+        while (!groupStopped()) await new Promise<void>((done) => setTimeout(done, GROUP_POLL_MILLISECONDS))
+      }
+      removeHandlers()
       clearTimeout(escalationTimer)
+      if (timedOut || interrupted !== undefined) {
+        reject(
+          new Error(
+            interrupted === undefined
+              ? `${name} exceeded ${timeoutMilliseconds / MILLISECONDS_PER_SECOND} seconds`
+              : `${name} interrupted by ${interrupted}`
+          )
+        )
+        return
+      }
       if (code !== 0) {
         reject(new Error(`${name} failed with ${signal ?? `exit ${code}`}`))
       } else {
