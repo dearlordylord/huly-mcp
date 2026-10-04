@@ -25,8 +25,13 @@ const classes = {
   reference: activity.class.ActivityReference,
   todo: time.class.ToDo
 }
+const CaptureArguments = Schema.Struct({
+  mode: Schema.Literal("capture-project"),
+  identifier: ProjectIdentifier,
+  name: Schema.String
+})
 const Arguments = Schema.Union([
-  Schema.Struct({ mode: Schema.Literal("capture-project"), identifier: ProjectIdentifier, name: Schema.String }),
+  CaptureArguments,
   Schema.Struct({ mode: Schema.Literal("cleanup"), input: TreeCleanupInput })
 ])
 const ProjectIdentity = Schema.Struct({
@@ -35,19 +40,21 @@ const ProjectIdentity = Schema.Struct({
   identifier: ProjectIdentifier,
   name: Schema.String
 })
+const ProjectObservation = Schema.Struct({ total: Schema.Int, projects: Schema.Array(ProjectIdentity) })
 const capturedIdentityMatches = (
-  project: Schema.Schema.Type<typeof ProjectIdentity> | undefined,
-  total: number,
-  length: number,
-  identifier: string,
-  name: string
-) =>
-  project !== undefined &&
-  total === 1 &&
-  length === 1 &&
-  project.identifier === identifier &&
-  project.name === name &&
-  project._class === ObjectClassName.make(tracker.class.Project)
+  observation: Schema.Schema.Type<typeof ProjectObservation>,
+  args: Schema.Schema.Type<typeof CaptureArguments>
+) => {
+  const project = observation.projects[0]
+  return (
+    project !== undefined &&
+    observation.total === 1 &&
+    observation.projects.length === 1 &&
+    project.identifier === args.identifier &&
+    project.name === args.name &&
+    project._class === ObjectClassName.make(tracker.class.Project)
+  )
+}
 const main = async () => {
   const args = Schema.decodeUnknownSync(Schema.fromJsonString(Arguments))(process.argv[2])
   const { client } = await connectIntegrationHuly()
@@ -58,13 +65,10 @@ const main = async () => {
         hulyQuery<Project>({ identifier: args.identifier }),
         { total: true, limit: 2 }
       )
-      const raw: unknown = [...rows]
-      const projects = Schema.decodeUnknownSync(Schema.Array(ProjectIdentity))(raw)
-      const project = projects[0]
-      if (
-        !capturedIdentityMatches(project, rows.total, projects.length, args.identifier, args.name) ||
-        project === undefined
-      ) {
+      const raw: unknown = { total: rows.total, projects: [...rows] }
+      const observation = Schema.decodeUnknownSync(ProjectObservation)(raw)
+      const project = observation.projects[0]
+      if (!capturedIdentityMatches(observation, args) || project === undefined) {
         process.stderr.write("Fixture project identity unresolved\n")
         process.exitCode = 1
       } else process.stdout.write(JSON.stringify({ projectId: project._id }) + "\n")
