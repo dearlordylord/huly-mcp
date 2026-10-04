@@ -43,10 +43,12 @@ const cleanupRecords = async (client: TxOperations, recordIds: ReadonlyArray<Doc
         activity.class.ActivityReference,
         hulyQuery<ActivityReference>({ _id: toRef<ActivityReference>(id) })
       )
-      const raw = reference ?? await (async () => {
-        phase = "todo-read"
-        return client.findOne<ToDo>(time.class.ToDo, hulyQuery<ToDo>({ _id: toRef<ToDo>(id) }))
-      })()
+      const raw =
+        reference ??
+        (await (async () => {
+          phase = "todo-read"
+          return client.findOne<ToDo>(time.class.ToDo, hulyQuery<ToDo>({ _id: toRef<ToDo>(id) }))
+        })())
       if (raw === undefined) continue
       phase = "parse"
       const record = parseAttachedLocation(raw)
