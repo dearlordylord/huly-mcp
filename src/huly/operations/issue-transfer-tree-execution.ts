@@ -246,7 +246,7 @@ const commitAndVerify = Effect.fn("transfer.commitAndVerify")(function* (
     commit(write, (transactions, batch) =>
       Effect.gen(function* () {
         yield* Ref.set(progress.transactions, transactions)
-        yield* Ref.update(progress.batch, (current) =>
+        yield* Ref.update<MovementBatchCapture>(progress.batch, (current) =>
           current.status === "awaiting" ? { status: "captured", batch } : { status: "repeated" }
         )
       })
