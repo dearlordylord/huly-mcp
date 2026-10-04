@@ -28,16 +28,10 @@ const main = async () => {
     )
     if (args.mode === "unsupported") {
       // A real ordinary-model class whose task ownership is deliberately unaudited.
-      const social = parseLocation(
-        await client.findOne<SocialIdentity>(
-          contact.class.SocialIdentity,
-          hulyQuery<SocialIdentity>({ _id: toSocialIdentityRef(client.user) })
-        )
-      )
       const identity = Schema.decodeUnknownSync(Schema.Struct({ attachedTo: DocId }))(
         await client.findOne<SocialIdentity>(
           contact.class.SocialIdentity,
-          hulyQuery<SocialIdentity>({ _id: toRef<SocialIdentity>(social._id) })
+          hulyQuery<SocialIdentity>({ _id: toSocialIdentityRef(client.user) })
         )
       )
       const id = await client.createDoc(time.class.ToDo, toRef(issue.space), {

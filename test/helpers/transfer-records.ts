@@ -23,6 +23,7 @@ export const ownedRecord = (
   ...payload
 })
 const parents = new Map<string, string>([
+  ["tracker:class:CustomIssue", String(tracker.class.Issue)],
   [String(chunter.class.ThreadMessage), String(chunter.class.ChatMessage)],
   [String(chunter.class.ChatMessage), String(activity.class.ActivityMessage)],
   [String(activity.class.DocUpdateMessage), String(activity.class.ActivityMessage)],
@@ -72,7 +73,11 @@ export const recordAdapterFixture = () => {
   ]
   const state = {
     refused: false,
+    rootClass: String(tracker.class.Issue),
+    rootId: "root",
     incomplete: false,
+    unknownTotal: false,
+    invalidTotal: false,
     failRead: false,
     invalidMetadata: false,
     duplicate: false,
@@ -104,6 +109,10 @@ export const recordAdapterFixture = () => {
     })
   }
   const client = sdkFixture<TxOperations>({
+    findOne: async () => {
+      if (state.failRead) throw new Error("Unavailable root read")
+      return sdkFixture<Doc>({ _id: state.rootId, _class: state.rootClass })
+    },
     getHierarchy: () => ({
       getAllAttributes: (cls: string) => {
         if (state.invalidMetadata) return new Map([["bad", { type: { _class: core.class.Collection } }]])
@@ -128,6 +137,8 @@ export const recordAdapterFixture = () => {
         : rows
       const result = findResult(duplicated.map((doc) => sdkFixture<Doc>(doc)))
       if (state.incomplete) result.total = 10_002
+      if (state.unknownTotal) result.total = -1
+      if (state.invalidTotal) result.total = -2
       return result
     },
     apply: (scope: string | undefined) => {

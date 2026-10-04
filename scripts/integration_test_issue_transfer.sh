@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Final certification only: run after slices 306–311 are integrated, through MCP and CLI.
 set -euo pipefail
-source "$(dirname "${BASH_SOURCE[0]}")/test-telemetry-env.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/test-telemetry-env.sh" || exit 1
 CLI=(node packages/huly-cli/dist/index.cjs)
 printf -v SOURCE 'S%04X' "$RANDOM"
 printf -v DESTINATION 'D%04X' "$RANDOM"
@@ -53,6 +53,7 @@ for transport in mcp cli; do
   mcp add_issue_relation "$(jq -nc --arg project "$SOURCE" --arg issueIdentifier "$ROOT" --arg targetIssue "$COUNTERPART" '{project:$project,issueIdentifier:$issueIdentifier,targetIssue:$targetIssue,relationType:"is-blocked-by"}')" >/dev/null
   mcp add_issue_relation "$(jq -nc --arg project "$SOURCE" --arg issueIdentifier "$COUNTERPART" --arg targetIssue "$ROOT" '{project:$project,issueIdentifier:$issueIdentifier,targetIssue:$targetIssue,relationType:"is-blocked-by"}')" >/dev/null
   ARGS=$(jq -nc --arg root "$ROOT_ID" --arg old "$OLD_ID" --arg parent "$PARENT_ID" --arg existing "$EXISTING_ID" --arg counterpart "$COUNTERPART_ID" --arg source "$SOURCE" --arg target "$DESTINATION" '{issues:[$root,$old,$parent,$existing,$counterpart],projects:[$source,$target]}')
+  DESCRIPTION_BEFORE=$(mcp get_issue "$(jq -nc --arg project "$SOURCE" --arg identifier "$ROOT" '{project:$project,identifier:$identifier}')" | jq -r .description)
   # Rich leaf ownership fixture is exercised through both movement transports.
   COMMENT=$(mcp add_comment "$(jq -nc --arg project "$SOURCE" --arg issueIdentifier "$ROOT" '{project:$project,issueIdentifier:$issueIdentifier,body:"Owned comment with nested files"}')" | jq -r .commentId)
   REPLY=$(mcp add_activity_reply "$(jq -nc --arg messageId "$COMMENT" '{messageId:$messageId,body:"Nested thread preserves object refs"}')" | jq -r .replyId)
@@ -65,6 +66,15 @@ for transport in mcp cli; do
   NESTED_FILE=$(mcp add_attachment "$(jq -nc --arg objectId "$COMMENT" --arg space "$SOURCE_SPACE" '{objectId:$objectId,objectClass:"chunter:class:ChatMessage",space:$space,filename:"comment.txt",contentType:"text/plain",data:"cHJlc2VydmVkIGJsb2I="}')" | jq -r .attachmentId)
   REPLY_FILE=$(mcp add_attachment "$(jq -nc --arg objectId "$REPLY" --arg space "$SOURCE_SPACE" '{objectId:$objectId,objectClass:"chunter:class:ThreadMessage",space:$space,filename:"reply.txt",contentType:"text/plain",data:"cHJlc2VydmVkIGJsb2I="}')" | jq -r .attachmentId)
   pnpm exec tsx scripts/integration-issue-transfer-records.ts "$(jq -nc --arg issue "$ROOT_ID" --arg document "$DOCUMENT" '{issue:$issue,document:$document,mode:"references"}')" >/dev/null
+  # Exercise the normal account against private/member-only destination permissions.
+  # A restricted destination refuses before all movement effects, including allocation.
+  pnpm exec tsx scripts/integration-issue-transfer-permissions.ts "$(jq -nc --arg project "$DESTINATION" '{project:$project,restricted:true}')" >/dev/null
+  PERMISSION_BEFORE=$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$ARGS")
+  PERMISSION_DEST=$(jq -nc --arg project "$DESTINATION" --arg parent "$PARENT_ID" '{project:$project,parent:$parent}')
+  if [[ "$transport" == mcp ]]; then PERMISSION_RESULT=$(mcp move_issue "$(jq -nc --arg issue "$ROOT_ID" --argjson destination "$PERMISSION_DEST" '{issue:$issue,destination:$destination}')"); else PERMISSION_RESULT=$("${CLI[@]}" issues move "$ROOT_ID" --destination "$PERMISSION_DEST" --json); fi
+  jq -e '.outcome == "blocked" and .changed == false and (.reason | contains("Restricted project permissions"))' >/dev/null <<<"$PERMISSION_RESULT"
+  [[ "$(jq -Sc . <<<"$PERMISSION_BEFORE")" == "$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$ARGS" | jq -Sc .)" ]]
+  pnpm exec tsx scripts/integration-issue-transfer-permissions.ts "$(jq -nc --arg project "$DESTINATION" '{project:$project,restricted:false}')" >/dev/null
   BEFORE=$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$ARGS")
   jq -e --arg root "$ROOT_ID" '.issues[] | select(.issue._id == $root) | .owned.records | any(.kind == "history")' >/dev/null <<<"$BEFORE"
   DEST=$(jq -nc --arg project "$DESTINATION" --arg parent "$PARENT_ID" '{project:$project,parent:$parent}')
@@ -77,6 +87,7 @@ for transport in mcp cli; do
     ($after.issue | del(.space,.identifier,.number,.rank,.attachedTo,.parents,.modifiedOn)) == ($old.issue | del(.space,.identifier,.number,.rank,.attachedTo,.parents,.modifiedOn)) and
     $after.issue.attachedTo == $parent and
     $after.incomingReferences == $old.incomingReferences and
+    (.projects | map(del(.sequence))) == ($before.projects | map(del(.sequence))) and
     all($old.owned.records[]; . as $record | any($after.owned.records[]; ._id == $record._id and (del(.space) == ($record | del(.space))) and .space == $after.issue.space))' >/dev/null <<<"$AFTER"
   jq -e --argjson before "$BEFORE" --arg root "$ROOT_ID" --arg old "$OLD_ID" --arg parent "$PARENT_ID" --arg existing "$EXISTING_ID" --arg counterpart "$COUNTERPART_ID" '
     (.issues[] | select(.issue._id == $old) | .issue) as $sourceParent |
@@ -92,6 +103,15 @@ for transport in mcp cli; do
     (.issues[] | select(.issue._id == $root) | .issue.parents | map(.parentId)) == [$parent]' >/dev/null <<<"$AFTER"
   READ=$("${CLI[@]}" issues get "$SOURCE" "$ROOT_ID" --json)
   jq -e --arg project "$DESTINATION" --arg parent "$PARENT" '.project == $project and .parentIssue == $parent' >/dev/null <<<"$READ"
+  jq -e --arg description "$DESCRIPTION_BEFORE" '.description == $description' >/dev/null <<<"$READ"
+  MCP_DEST_READ=$(mcp get_issue "$(jq -nc --arg project "$DESTINATION" --arg identifier "$ROOT_ID" '{project:$project,identifier:$identifier}')")
+  jq -e --arg description "$DESCRIPTION_BEFORE" '.description == $description' >/dev/null <<<"$MCP_DEST_READ"
+  HISTORY_IDS=$(jq -c --arg root "$ROOT_ID" '[.issues[] | select(.issue._id == $root) | .owned.records[] | select(.kind == "history") | ._id]' <<<"$BEFORE")
+  MCP_HISTORY=$(mcp list_activity "$(jq -nc --arg project "$DESTINATION" --arg issueIdentifier "$ROOT_ID" '{project:$project,issueIdentifier:$issueIdentifier,limit:200}')")
+  CLI_HISTORY=$("${CLI[@]}" activity list --project "$DESTINATION" --issue-identifier "$ROOT_ID" --limit 200 --json)
+  for history in "$MCP_HISTORY" "$CLI_HISTORY"; do
+    jq -e --argjson ids "$HISTORY_IDS" '. as $messages | all($ids[]; . as $id | any($messages[]; .id == $id))' >/dev/null <<<"$history"
+  done
   REPEAT=$(mcp move_issue "$(jq -nc --arg issue "$ROOT_ID" --argjson destination "$DEST" '{issue:$issue,destination:$destination}')")
   jq -e '.outcome == "no-op" and .changed == false' >/dev/null <<<"$REPEAT"
   [[ "$(jq -Sc . <<<"$AFTER")" == "$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$ARGS" | jq -Sc .)" ]]

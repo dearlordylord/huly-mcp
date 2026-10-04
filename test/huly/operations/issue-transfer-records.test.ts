@@ -2,12 +2,15 @@ import { it } from "@effect/vitest"
 import { Effect, Fiber, Schema } from "effect"
 import { TestClock } from "effect/testing"
 import { expect } from "vitest"
+import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"
 import { TransferSupportedRecordSchema } from "../../../src/domain/schemas/issue-transfer.js"
 import { HulyClient } from "../../../src/huly/client.js"
 import { moveIssue } from "../../../src/huly/operations/issues.js"
 import { activity, attachment, chunter, tags, tracker } from "../../../src/huly/huly-plugins.js"
 import { transferFixture } from "../../helpers/transfer.js"
 import { ownedRecord, attachmentPayload } from "../../helpers/transfer-records.js"
+
+const move = (input: unknown) => parseMoveIssueParams(input).pipe(Effect.flatMap(moveIssue))
 
 const richFixture = () => {
   const f = transferFixture()
@@ -81,7 +84,7 @@ it.effect(
     Effect.gen(function* () {
       const fixture = richFixture()
       const before = fixture.read()
-      const result = yield* moveIssue(fixture.f.input).pipe(Effect.provide(fixture.layer))
+      const result = yield* move(fixture.f.input).pipe(Effect.provide(fixture.layer))
       expect(result).toMatchObject({ outcome: "completed", changed: true })
       expect(fixture.read()).toEqual(before.map((record) => ({ ...record, space: fixture.f.destination._id })))
       expect(fixture.read().find((record) => record._id === "outgoing")?.attachedTo).toBe("independent")
@@ -92,7 +95,7 @@ it.effect("post-write payload inconsistency reports stable records and valid pub
   Effect.gen(function* () {
     const fixture = richFixture()
     fixture.state.corrupt = true
-    const task = yield* Effect.forkChild(moveIssue(fixture.f.input).pipe(Effect.provide(fixture.layer)))
+    const task = yield* Effect.forkChild(move(fixture.f.input).pipe(Effect.provide(fixture.layer)))
     yield* TestClock.adjust("2 seconds")
     const result = yield* Fiber.join(task)
     expect(result).toMatchObject({
@@ -110,12 +113,9 @@ it.effect("post-write payload inconsistency reports stable records and valid pub
 it.effect("no-op rejects unknown semantic blockers before repeated writes", () =>
   Effect.gen(function* () {
     const f = transferFixture()
-    yield* moveIssue(f.input).pipe(Effect.provide(f.layer))
+    yield* move(f.input).pipe(Effect.provide(f.layer))
     f.state.recordsBlockers.push("Unsupported collection edge on nested owned record")
-    expect(yield* moveIssue(f.input).pipe(Effect.provide(f.layer))).toMatchObject({
-      outcome: "blocked",
-      changed: false
-    })
+    expect(yield* move(f.input).pipe(Effect.provide(f.layer))).toMatchObject({ outcome: "blocked", changed: false })
     expect(f.state.allocated).toBe(1)
     expect(f.state.sent).toBe(1)
   })
@@ -124,10 +124,10 @@ it.effect("no-op rejects unknown semantic blockers before repeated writes", () =
 it.effect("no-op refuses unavailable ownership inspection instead of claiming verified success", () =>
   Effect.gen(function* () {
     const f = transferFixture()
-    yield* moveIssue(f.input).pipe(Effect.provide(f.layer))
+    yield* move(f.input).pipe(Effect.provide(f.layer))
     const { inspectTransferRecords: _inspect, ...ports } = f.operations
     const layer = HulyClient.testLayer(ports)
-    expect(yield* moveIssue(f.input).pipe(Effect.provide(layer))).toMatchObject({
+    expect(yield* move(f.input).pipe(Effect.provide(layer))).toMatchObject({
       outcome: "blocked",
       changed: false,
       reason: expect.stringContaining("inspection unavailable")

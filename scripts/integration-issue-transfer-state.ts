@@ -40,7 +40,7 @@ const run = async () => {
         if (references.total > references.length || references.length >= 10_001)
           throw new Error("Incomplete incoming reference snapshot")
         const incomingReferences = references
-          .filter((reference) => reference.srcDocId !== id)
+          .filter((reference) => reference.srcDocId !== toRef(id))
           .map((reference) => parseSnapshot(Schema.Json, reference))
         return { issue, owned, incomingReferences }
       })

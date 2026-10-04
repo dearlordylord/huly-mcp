@@ -143,6 +143,7 @@ export const movementFixture = (issues: Array<Issue>, options: MovementFixtureOp
     Effect.succeed(
       Schema.decodeUnknownSync(TransferInspectionSchema)({
         discovery: "complete",
+        classes: [],
         records: [],
         blockers: [],
         limitation: "Fixture model has no owned records."

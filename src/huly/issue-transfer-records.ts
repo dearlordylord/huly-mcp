@@ -17,21 +17,21 @@ export const parseTransferBoundary = <A, R>(
   Schema.decodeUnknownEffect(schema)(input).pipe(Effect.mapError(recordInvalid))
 const recordInvalid = (cause: unknown) =>
   new HulyDataInvalidError({ operation: "move_issue", entity: "owned collection", cause })
+export const RecordOwnerSchema = Schema.Struct({ _id: DocId, _class: ObjectClassName })
+export type RecordOwner = Schema.Schema.Type<typeof RecordOwnerSchema>
 export const OwnershipSchema = Schema.Struct({
-  _id: DocId,
-  _class: ObjectClassName,
+  ...RecordOwnerSchema.fields,
   attachedTo: DocId,
   attachedToClass: ObjectClassName,
   collection: Schema.String
 })
-export type RecordOwner = Pick<Schema.Schema.Type<typeof OwnershipSchema>, "_id" | "_class">
 const ReferenceSchema = Schema.Struct({ srcDocId: DocId, srcDocClass: ObjectClassName, message: Schema.String })
 const AttachmentPayload = Schema.Struct({
   name: Schema.String,
   file: DocId,
   size: Schema.Number,
   type: Schema.String,
-  lastModified: Schema.Number
+  lastModified: Timestamp
 })
 const TagPayload = Schema.Struct({ tag: DocId, title: Schema.String, color: Schema.Number })
 const ReportPayload = Schema.Struct({
@@ -45,19 +45,52 @@ const { attributeUpdates: _encodedUpdates, ...historyFields } = TransferHistoryS
 const RawHistorySchema = Schema.Struct(historyFields)
 
 // Audited exact runtime classes. A new subclass does not inherit an ownership promise.
-const payloads = new Map<string, Schema.ConstraintDecoder<unknown>>([
-  [String(attachment.class.Attachment), AttachmentPayload],
-  [String(attachment.class.Embedding), AttachmentPayload],
-  [String(attachment.class.Photo), AttachmentPayload],
-  [String(tags.class.TagReference), TagPayload],
-  [String(tracker.class.TimeSpendReport), ReportPayload],
-  [String(chunter.class.ChatMessage), Schema.Struct({ message: Schema.String })],
-  [String(chunter.class.ThreadMessage), ThreadPayload],
-  [String(activity.class.Reaction), Schema.Struct({ emoji: Schema.String, createBy: Schema.String })],
-  [String(activity.class.ActivityMessage), Schema.Struct({})],
-  [String(activity.class.ActivityInfoMessage), Schema.Struct({ message: Schema.String, props: Schema.JsonObject })],
-  [String(activity.class.ActivityReference), ReferenceSchema]
+const SupportedPayloadSchema = Schema.Union([
+  Schema.Struct({
+    _class: Schema.Literal(ObjectClassName.make(String(attachment.class.Attachment))),
+    ...AttachmentPayload.fields
+  }),
+  Schema.Struct({
+    _class: Schema.Literal(ObjectClassName.make(String(attachment.class.Embedding))),
+    ...AttachmentPayload.fields
+  }),
+  Schema.Struct({
+    _class: Schema.Literal(ObjectClassName.make(String(attachment.class.Photo))),
+    ...AttachmentPayload.fields
+  }),
+  Schema.Struct({
+    _class: Schema.Literal(ObjectClassName.make(String(tags.class.TagReference))),
+    ...TagPayload.fields
+  }),
+  Schema.Struct({
+    _class: Schema.Literal(ObjectClassName.make(String(tracker.class.TimeSpendReport))),
+    ...ReportPayload.fields
+  }),
+  Schema.Struct({
+    _class: Schema.Literal(ObjectClassName.make(String(chunter.class.ChatMessage))),
+    message: Schema.String
+  }),
+  Schema.Struct({
+    _class: Schema.Literal(ObjectClassName.make(String(chunter.class.ThreadMessage))),
+    ...ThreadPayload.fields
+  }),
+  Schema.Struct({
+    _class: Schema.Literal(ObjectClassName.make(String(activity.class.Reaction))),
+    emoji: Schema.String,
+    createBy: Schema.String
+  }),
+  Schema.Struct({ _class: Schema.Literal(ObjectClassName.make(String(activity.class.ActivityMessage))) }),
+  Schema.Struct({
+    _class: Schema.Literal(ObjectClassName.make(String(activity.class.ActivityInfoMessage))),
+    message: Schema.String,
+    props: Schema.JsonObject
+  }),
+  Schema.Struct({
+    _class: Schema.Literal(ObjectClassName.make(String(activity.class.ActivityReference))),
+    ...ReferenceSchema.fields
+  })
 ])
+const supportedClasses = new Set(SupportedPayloadSchema.members.map((payload) => payload.fields._class.literal))
 const encodeSnapshot = (input: unknown) =>
   Schema.encodeUnknownEffect(Schema.fromJsonString(Schema.Json))(input).pipe(Effect.mapError(recordInvalid))
 
@@ -65,23 +98,28 @@ export const parseTransferRecord = Effect.fn("transfer.parseRecord")(function* (
   row: AttachedDoc,
   owner: RecordOwner
 ): Effect.fn.Return<TransferRecord, HulyDataInvalidError> {
-  const ownership = yield* parseTransferBoundary(OwnershipSchema, row)
-  const { space: _space, ...content } = row
-  const snapshot = yield* encodeSnapshot(content)
-  const common = { ...row, snapshot }
+  const document = yield* parseTransferBoundary(Schema.JsonObject, row)
+  const ownership = yield* parseTransferBoundary(OwnershipSchema, document)
+  const { space: _space, ...content } = document
+  const common = { ...document, ...ownership }
   if (ownership._class === AutomaticHistoryClass) {
-    const raw = yield* parseTransferBoundary(RawHistorySchema, row)
-    const updates = Reflect.get(row, "attributeUpdates")
+    const raw = yield* parseTransferBoundary(RawHistorySchema, document)
+    const updates = Reflect.get(document, "attributeUpdates")
     const attributeUpdates = updates === undefined ? undefined : yield* encodeSnapshot(updates)
     const history = { ...raw, ...(attributeUpdates === undefined ? {} : { attributeUpdates }) }
-    return yield* parseTransferBoundary(TransferRecordSchema, { ...common, kind: "history", history })
+    const snapshot = yield* encodeSnapshot({ ...content, ...raw })
+    return yield* parseTransferBoundary(TransferRecordSchema, { ...common, snapshot, kind: "history", history })
   }
-  const payload = payloads.get(ownership._class)
-  if (payload === undefined)
-    return yield* parseTransferBoundary(TransferRecordSchema, { ...common, kind: "unsupported" })
-  yield* parseTransferBoundary(payload, row)
+  if (!supportedClasses.has(ownership._class))
+    return yield* parseTransferBoundary(TransferRecordSchema, {
+      ...common,
+      snapshot: yield* encodeSnapshot(content),
+      kind: "unsupported"
+    })
+  const parsedPayload = yield* parseTransferBoundary(SupportedPayloadSchema, document)
   return yield* parseTransferBoundary(TransferRecordSchema, {
     ...common,
+    snapshot: yield* encodeSnapshot({ ...content, ...parsedPayload }),
     kind: "owned",
     ownerId: owner._id,
     ownerClass: owner._class

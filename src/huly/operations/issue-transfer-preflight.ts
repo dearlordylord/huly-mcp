@@ -31,7 +31,7 @@ export interface TransferPlan {
   readonly plan: MovementPlan
   readonly protectedIssue: TransferIssue
   readonly records: ReadonlyArray<TransferSupportedRecord>
-  readonly recordClasses?: NonNullable<TransferInspection["classes"]>
+  readonly recordClasses: TransferInspection["classes"]
 }
 export interface TransferRefusal {
   readonly conflicts: ReadonlyArray<TransferConflict>
@@ -310,7 +310,7 @@ export const inspectTransferPlan = Effect.fn("transfer.inspectPlan")(function* (
   return {
     plan: { root, parent, source, tree: [root], relevant },
     protectedIssue: workflow.protectedIssue,
-    ...(records.classes === undefined ? {} : { recordClasses: records.classes }),
+    recordClasses: records.classes,
     records: records.records.filter((record) => record.kind !== "unsupported")
   }
 })

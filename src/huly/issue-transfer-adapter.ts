@@ -55,7 +55,6 @@ export const commitTransfer = async (
 
 // Cooperative SDK conditions guard new records even when parent modifiedOn did not change.
 const guardRecordClosure = (apply: ReturnType<TxOperations["apply"]>, write: TransferWrite) => {
-  if (write.recordClasses === undefined) return
   const owners = [write.issueId, ...write.records.map((record) => record._id)].map((id) => toRef<Doc>(id))
   const known = write.records.map((record) => toRef<AttachedDoc>(record._id))
   for (const cls of write.recordClasses)

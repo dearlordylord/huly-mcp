@@ -167,3 +167,31 @@ it.effect("includes supported generic activity and informational replies without
     expect((yield* inspect(f)).blockers).toEqual([])
   })
 )
+
+it.effect("unknown totals refuse completion and invalid totals remain typed boundary failures", () =>
+  Effect.gen(function* () {
+    const f = recordAdapterFixture()
+    f.state.unknownTotal = true
+    expect((yield* inspect(f)).discovery).toBe("incomplete")
+    f.state.unknownTotal = false
+    f.state.invalidTotal = true
+    expect((yield* Effect.result(inspect(f)))._tag).toBe("Failure")
+    expect(f.updates).toEqual([])
+  })
+)
+
+it.effect("reads the root runtime model and refuses a mismatched stable root identity", () =>
+  Effect.gen(function* () {
+    const f = recordAdapterFixture()
+    f.state.rootClass = "tracker:class:CustomIssue"
+    f.docs.push(
+      ownedRecord("comment", String(chunter.class.ChatMessage), "root", "comments", {
+        message: "inherited",
+        attachedToClass: f.state.rootClass
+      })
+    )
+    expect((yield* inspect(f)).blockers).toEqual([])
+    f.state.rootId = "different-root"
+    expect((yield* Effect.result(inspect(f)))._tag).toBe("Failure")
+  })
+)

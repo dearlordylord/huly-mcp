@@ -17,7 +17,8 @@ const writeInput = {
   modifiedOn: 1,
   number: 2,
   identifier: "NEW-2",
-  rank: "0|hzzzzz:"
+  rank: "0|hzzzzz:",
+  recordClasses: []
 }
 
 it.effect(
@@ -40,10 +41,12 @@ it.effect(
         identifier: "NEW-2",
         attachedTo: "parent"
       })
-      expect(f.conditions).toMatchObject([
-        { _id: "root", space: "source", attachedTo: "old", modifiedOn: 1 },
-        { _id: "history", attachedTo: "root" }
-      ])
+      expect(f.conditions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ _id: "root", space: "source", attachedTo: "old", modifiedOn: 1 }),
+          expect.objectContaining({ _id: "history", attachedTo: "root" })
+        ])
+      )
       expect(f.updates).toHaveLength(4)
       f.state.refused = true
       expect(

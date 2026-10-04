@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from "node:util"
+import type { Issue } from "@hcengineering/tracker"
 import type { ActivityReference } from "@hcengineering/activity"
 import type { AttachedDoc, Doc, TxOperations } from "@hcengineering/core"
 import { Effect, Schema } from "effect"
@@ -9,12 +10,13 @@ import {
   type TransferRecord,
   type TransferWrite
 } from "../domain/schemas/issue-transfer.js"
-import { ObjectClassName } from "../domain/schemas/shared.js"
+import { DocId, ListTotal, ObjectClassName } from "../domain/schemas/shared.js"
 import type { HulyClientError } from "./client.js"
-import { type HulyDataInvalidError, makeOperationConnectionError } from "./errors-base.js"
+import { HulyDataInvalidError, makeOperationConnectionError } from "./errors-base.js"
 import { activity, core, tracker } from "./huly-plugins.js"
 import {
   OwnershipSchema,
+  RecordOwnerSchema,
   parseTransferBoundary,
   parseTransferRecord,
   referenceOwner,
@@ -34,13 +36,13 @@ export interface RecordDiscoveryLimits {
 }
 interface Visit {
   readonly owner: RecordOwner
-  readonly path: ReadonlyArray<string>
+  readonly path: ReadonlyArray<DocId>
 }
 interface DiscoveryState {
-  readonly records: Map<string, TransferRecord>
+  readonly records: Map<DocId, TransferRecord>
   readonly queue: Array<Visit>
   readonly blockers: Set<string>
-  readonly classes: Set<string>
+  readonly classes: Set<ObjectClassName>
   queries: number
   incomplete: boolean
 }
@@ -54,11 +56,11 @@ export const inspectTransferRecords = Effect.fn("transfer.inspectRecords")(funct
   issueId: TransferWrite["issueId"],
   limits: RecordDiscoveryLimits = DEFAULT_LIMITS
 ): Effect.fn.Return<TransferInspection, HulyClientError | HulyDataInvalidError> {
-  const root = { _id: issueId, _class: ObjectClassName.make(String(tracker.class.Issue)) }
+  const root = yield* inspectRuntimeRoot(client, issueId)
   const state: DiscoveryState = {
     records: new Map(),
     classes: new Set(),
-    queue: [{ owner: root, path: [issueId] }],
+    queue: [{ owner: root, path: [root._id] }],
     blockers: new Set(),
     queries: 0,
     incomplete: false
@@ -88,7 +90,10 @@ const inspectOwner = Effect.fn("transfer.inspectOwner")(function* (
   const collections = yield* ownerCollections(client, visit.owner)
   const classes = new Set([
     ...collections.values(),
-    ...hierarchy.getDescendants(core.class.AttachedDoc).filter((cls) => hierarchy.findDomain(cls) !== undefined)
+    ...(yield* parseTransferBoundary(
+      Schema.Array(ObjectClassName),
+      hierarchy.getDescendants(core.class.AttachedDoc).filter((cls) => hierarchy.findDomain(cls) !== undefined)
+    ))
   ])
   for (const cls of classes) {
     state.classes.add(cls)
@@ -98,11 +103,12 @@ const inspectOwner = Effect.fn("transfer.inspectOwner")(function* (
         client.findAll<AttachedDoc>(
           toClassRef<AttachedDoc>(cls),
           hulyQuery<AttachedDoc>({ attachedTo: toRef<Doc>(visit.owner._id) }),
-          { limit: limits.result }
+          { limit: limits.result, total: true }
         ),
       catch: (cause) => makeOperationConnectionError("findAll", cause)
     })
-    if (!completeResult(state, rows.length, rows.total, limits, cls)) return
+    const total = yield* parseTransferBoundary(ListTotal, rows.total)
+    if (!completeResult(state, rows.length, total, limits, cls)) return
     for (const row of rows) yield* inspectRow(client, state, visit, row, collections, limits, false)
   }
   if (!admitQuery(state, limits)) return
@@ -111,11 +117,15 @@ const inspectOwner = Effect.fn("transfer.inspectOwner")(function* (
       client.findAll<ActivityReference>(
         activity.class.ActivityReference,
         hulyQuery<ActivityReference>({ srcDocId: toRef<Doc>(visit.owner._id) }),
-        { limit: limits.result }
+        { limit: limits.result, total: true }
       ),
     catch: (cause) => makeOperationConnectionError("findAll", cause)
   })
-  if (!completeResult(state, refs.length, refs.total, limits, "source references")) return
+  const total = yield* parseTransferBoundary(ListTotal, refs.total)
+  if (
+    !completeResult(state, refs.length, total, limits, ObjectClassName.make(String(activity.class.ActivityReference)))
+  )
+    return
   for (const row of refs) yield* inspectRow(client, state, visit, row, collections, limits, true)
 })
 
@@ -130,11 +140,11 @@ const admitQuery = (state: DiscoveryState, limits: RecordDiscoveryLimits) => {
 const completeResult = (
   state: DiscoveryState,
   length: number,
-  total: number,
+  total: ListTotal,
   limits: RecordDiscoveryLimits,
-  cls: string
+  cls: ObjectClassName
 ) => {
-  if (total > length || length >= limits.result) {
+  if (total !== length || length >= limits.result) {
     refuse(state, `Incomplete collection discovery for ${cls}.`)
     return false
   }
@@ -146,7 +156,7 @@ const inspectRow = Effect.fn("transfer.inspectRecordEdge")(function* (
   state: DiscoveryState,
   visit: Visit,
   row: AttachedDoc,
-  collections: ReadonlyMap<string, string>,
+  collections: ReadonlyMap<string, ObjectClassName>,
   limits: RecordDiscoveryLimits,
   outgoing: boolean
 ): Effect.fn.Return<void, HulyDataInvalidError> {
@@ -155,7 +165,7 @@ const inspectRow = Effect.fn("transfer.inspectRecordEdge")(function* (
   const owner = reference ? yield* referenceOwner(row) : visit.owner
   if (reference && owner._id !== visit.owner._id) return // Incoming independent source owns its own routing.
   if (outgoing && !reference) {
-    state.blockers.add(`Unsupported reference subclass ${ownership._class}.`)
+    state.blockers.add(`Unsupported reference subclass ${ownership._class} (${ownership._id}).`)
     return
   }
   auditEdge(client, state, visit, ownership, owner, collections, reference)
@@ -165,7 +175,7 @@ const inspectRow = Effect.fn("transfer.inspectRecordEdge")(function* (
 
 const declaredEdge = (
   client: TxOperations,
-  collections: ReadonlyMap<string, string>,
+  collections: ReadonlyMap<string, ObjectClassName>,
   record: Schema.Schema.Type<typeof OwnershipSchema>
 ) => {
   if (record._class === AutomaticHistoryClass && record.collection === "docUpdateMessages") return true
@@ -178,10 +188,10 @@ const declaredEdge = (
 const ownerCollections = Effect.fn("transfer.modelCollections")(function* (
   client: TxOperations,
   owner: RecordOwner
-): Effect.fn.Return<ReadonlyMap<string, string>, HulyDataInvalidError> {
+): Effect.fn.Return<ReadonlyMap<string, ObjectClassName>, HulyDataInvalidError> {
   const hierarchy = client.getHierarchy()
   const attributes = hierarchy.getAllAttributes(toClassRef<Doc>(owner._class))
-  const collections = new Map<string, string>()
+  const collections = new Map<string, ObjectClassName>()
   for (const [key, attribute] of attributes) {
     if (!hierarchy.isDerived(attribute.type._class, core.class.Collection)) continue
     const collection = yield* parseTransferBoundary(CollectionTypeSchema, attribute.type)
@@ -196,18 +206,29 @@ const auditEdge = (
   visit: Visit,
   ownership: Schema.Schema.Type<typeof OwnershipSchema>,
   owner: RecordOwner,
-  collections: ReadonlyMap<string, string>,
+  collections: ReadonlyMap<string, ObjectClassName>,
   reference: boolean
 ) => {
+  if (reference) {
+    if (owner._class !== visit.owner._class)
+      state.blockers.add(`Inconsistent reference source class on ${ownership._id}.`)
+    return
+  }
+  auditAttachedEdge(client, state, visit.owner, ownership, collections)
+}
+
+const auditAttachedEdge = (
+  client: TxOperations,
+  state: DiscoveryState,
+  owner: RecordOwner,
+  ownership: Schema.Schema.Type<typeof OwnershipSchema>,
+  collections: ReadonlyMap<string, ObjectClassName>
+) => {
   const hierarchy = client.getHierarchy()
-  if (reference && owner._class !== visit.owner._class)
-    state.blockers.add(`Inconsistent reference source class on ${ownership._id}.`)
-  if (
-    !reference &&
-    !hierarchy.isDerived(toClassRef<Doc>(visit.owner._class), toClassRef<Doc>(ownership.attachedToClass))
-  )
+  if (ownership.attachedTo !== owner._id) state.blockers.add(`Conflicting ownership parent on ${ownership._id}.`)
+  if (!hierarchy.isDerived(toClassRef<Doc>(owner._class), toClassRef<Doc>(ownership.attachedToClass)))
     state.blockers.add(`Conflicting ownership class on ${ownership._id}.`)
-  if (!reference && !declaredEdge(client, collections, ownership))
+  if (!declaredEdge(client, collections, ownership))
     state.blockers.add(`Unsupported collection edge ${ownership.collection} on ${ownership._id}.`)
 }
 
@@ -233,3 +254,23 @@ const registerRecord = (state: DiscoveryState, visit: Visit, record: TransferRec
   }
   state.queue.push({ owner: { _id: record._id, _class: record._class }, path: [...visit.path, record._id] })
 }
+
+const inspectRuntimeRoot = Effect.fn("transfer.inspectRuntimeRoot")(function* (
+  client: TxOperations,
+  issueId: TransferWrite["issueId"]
+): Effect.fn.Return<RecordOwner, HulyClientError | HulyDataInvalidError> {
+  const raw = yield* Effect.tryPromise({
+    try: () => client.findOne<Issue>(tracker.class.Issue, hulyQuery<Issue>({ _id: toRef<Issue>(issueId) })),
+    catch: (cause) => makeOperationConnectionError("findOne", cause)
+  })
+  const root = yield* parseTransferBoundary(RecordOwnerSchema, raw)
+  if (root._id !== issueId)
+    return yield* Effect.fail(
+      new HulyDataInvalidError({
+        operation: "move_issue",
+        entity: "transfer root",
+        cause: "Runtime root identity changed during inspection."
+      })
+    )
+  return root
+})

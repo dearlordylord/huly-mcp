@@ -71,7 +71,7 @@ const executeTransfer = Effect.fn("transfer.execute")(function* (
   destination: MovementProject
 ): Effect.fn.Return<MoveIssueResult, MovementError> {
   const { plan } = prepared
-  const { parent, root, source } = plan
+  const { root, source } = plan
   const inspection = guidance(root, source, destination)
   const commit = client.commitTransfer
   if (commit === undefined)
@@ -209,6 +209,6 @@ const makeTransferWrite = (
     identifier: IssueIdentifier.make(`${destination.identifier}-${number}`),
     rank: NonEmptyString.make(makeRank(lastRank, undefined)),
     records: prepared.records,
-    ...(prepared.recordClasses === undefined ? {} : { recordClasses: prepared.recordClasses })
+    recordClasses: prepared.recordClasses
   }
 }

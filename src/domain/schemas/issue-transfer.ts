@@ -64,7 +64,7 @@ export const TransferRecordSchema = Schema.Union([
 export type TransferRecord = Schema.Schema.Type<typeof TransferRecordSchema>
 export const TransferInspectionSchema = Schema.Struct({
   discovery: Schema.Literals(["complete", "incomplete"]),
-  classes: Schema.optionalKey(Schema.Array(ObjectClassName)),
+  classes: Schema.Array(ObjectClassName),
   records: Schema.Array(TransferRecordSchema),
   blockers: Schema.Array(Schema.String),
   limitation: Schema.String
@@ -81,7 +81,7 @@ export const TransferWriteSchema = Schema.Struct({
   identifier: IssueIdentifier,
   rank: NonEmptyString,
   records: Schema.Array(TransferSupportedRecordSchema),
-  recordClasses: Schema.optionalKey(Schema.Array(ObjectClassName))
+  recordClasses: Schema.Array(ObjectClassName)
 })
 export type TransferWrite = Schema.Schema.Type<typeof TransferWriteSchema>
 
