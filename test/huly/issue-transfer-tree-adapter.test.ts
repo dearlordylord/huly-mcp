@@ -1,6 +1,6 @@
 import { TxOperations, type Client, type Tx, type Hierarchy } from "@hcengineering/core"
 import { corePersonId, sdkFixture } from "../helpers/huly-sdk.js"
-import { type MovementTransactions } from "../../src/huly/issue-movement-transactions.js"
+import { type MovementTransactionBatch, type MovementTransactions } from "../../src/huly/issue-movement-transactions.js"
 import { SocialIdentityId } from "../../src/domain/schemas/person-administration.js"
 import { HulyDataInvalidError } from "../../src/huly/errors-base.js"
 import { MovementTransportError } from "../../src/huly/movement-transaction-transport.js"
@@ -194,6 +194,7 @@ for (const lostReply of [false, true]) {
       expect(write).toBeDefined()
       if (write === undefined) return
       let receipts: MovementTransactions = []
+      let provenance: MovementTransactionBatch | undefined
       const sends: Tx[] = []
       const failure = new MovementTransportError({ phase: "after-send", reason: NonEmptyString.make("Lost reply") })
       const ordinary = new TxOperations(
@@ -217,8 +218,9 @@ for (const lostReply of [false, true]) {
       )
       const result = yield* Effect.tryPromise({
         try: () =>
-          commitTransferTree(ordinary, write, async (queued) => {
+          commitTransferTree(ordinary, write, async (queued, batch) => {
             receipts = queued
+            provenance = batch
           }),
         catch: (error) =>
           error instanceof MovementTransportError
@@ -226,6 +228,12 @@ for (const lostReply of [false, true]) {
             : new HulyDataInvalidError({ operation: "move_issue", entity: "test queued transaction" })
       }).pipe(Effect.flatMap(Effect.fromResult), Effect.result)
       expect(sends).toHaveLength(1)
+      expect(provenance).toEqual({
+        kind: "single-scoped-apply",
+        rootId: write.rootId,
+        scope: `issue-transfer:${write.rootId}`,
+        transactionIds: receipts.map((receipt) => receipt.txId)
+      })
       expect(receipts.map((receipt) => receipt.objectId)).toEqual(
         expect.arrayContaining(write.tasks.map((task) => task.issueId))
       )

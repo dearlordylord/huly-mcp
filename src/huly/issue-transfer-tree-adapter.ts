@@ -1,7 +1,12 @@
 import { Result, Schema } from "effect"
 import { parseMovementHistoryAttributes } from "./issue-movement-history-attributes.js"
 import { HulyDataInvalidError } from "./errors-base.js"
-import { MovementTransactionsSchema, type MovementTransactions } from "./issue-movement-transactions.js"
+import {
+  MovementTransactionsSchema,
+  MovementTransactionBatchSchema,
+  type MovementTransactionBatch,
+  type MovementTransactions
+} from "./issue-movement-transactions.js"
 import type { Issue } from "@hcengineering/tracker"
 import type { TxOperations } from "@hcengineering/core"
 import type { TransferTreeTaskWrite, TransferTreeWrite } from "../domain/schemas/issue-transfer-tree.js"
@@ -14,7 +19,7 @@ import { toRef, toClassRef } from "./operations/sdk-boundary.js"
 export const commitTransferTree = async (
   client: TxOperations,
   write: TransferTreeWrite,
-  publishQueuedTransactions?: (transactions: MovementTransactions) => Promise<void>
+  publishQueuedTransactions?: (transactions: MovementTransactions, batch?: MovementTransactionBatch) => Promise<void>
 ): Promise<Result.Result<HulyConditionalWriteResult, HulyDataInvalidError>> => {
   const apply = client.apply(HulyTransactionScope.make(`issue-transfer:${write.rootId}`))
   const root = write.tasks.find((task) => task.issueId === write.rootId)
@@ -43,7 +48,18 @@ export const commitTransferTree = async (
   if (publishQueuedTransactions !== undefined) {
     const parsed = parseQueuedTransactions(client, apply)
     if (Result.isFailure(parsed)) return Result.fail(parsed.failure)
-    await publishQueuedTransactions(parsed.success)
+    const batchInput: unknown = {
+      kind: "single-scoped-apply",
+      rootId: write.rootId,
+      scope: apply.scope,
+      transactionIds: apply.txes.map((tx) => tx._id)
+    }
+    const batch = Schema.decodeUnknownResult(MovementTransactionBatchSchema)(batchInput)
+    if (Result.isFailure(batch))
+      return Result.fail(
+        new HulyDataInvalidError({ operation: "move_issue", entity: "queued movement batch provenance" })
+      )
+    await publishQueuedTransactions(parsed.success, batch.success)
   }
   return Result.succeed((await apply.commit()).result ? "applied" : "condition-not-met")
 }

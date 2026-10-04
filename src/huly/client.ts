@@ -472,8 +472,8 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
                     write,
                     publishQueuedTransactions === undefined
                       ? undefined
-                      : (transactions) =>
-                          Effect.runPromiseWith(context)(publishQueuedTransactions(transactions), { signal })
+                      : (transactions, batch) =>
+                          Effect.runPromiseWith(context)(publishQueuedTransactions(transactions, batch), { signal })
                   )
               )
               return yield* Effect.fromResult(result)
