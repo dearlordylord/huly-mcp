@@ -19,13 +19,13 @@ for (const isError of [false, true]) {
       server,
       `
       const readline=require('node:readline'); const fs=require('node:fs');
-      if(process.env.INTEGRATION_FIXTURE_VALUE!=='typed-private-value')process.exit(1);
+      if(process.env.INTEGRATION_FIXTURE_VALUE!=='typed-private-value'||process.env.LAZY_ENVS!=='true')process.exit(1);
       let ended=false; process.stdin.on('end',()=>{ended=true});
       readline.createInterface({input:process.stdin}).on('line',line=>{
         const req=JSON.parse(line); if(req.id===undefined)return;
         if(req.method==='server/discover') process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:req.id,result:{supportedVersions:['2026-07-28'],capabilities:{tools:{}},_meta:{'io.modelcontextprotocol/serverInfo':{name:'fixture',version:'1.0.0'},'io.modelcontextprotocol/serverCapabilities':{tools:{}}}}})+'\\n');
         else if(req.method==='tools/list') process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:req.id,result:{resultType:'complete',ttlMs:0,cacheScope:'private',tools:[{name:'move_issue',inputSchema:{type:'object'}}]}})+'\\n');
-        else if(req.method==='tools/call') setImmediate(()=>{fs.writeFileSync(${JSON.stringify(marker)},String(ended));process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:req.id,result:{resultType:'complete',isError:${isError},content:[{type:'text',text:${JSON.stringify(isError ? "fixture failure" : '{"received":true}')}}]}})+'\\n')});
+        else if(req.method==='tools/call') setImmediate(()=>{fs.writeFileSync(${JSON.stringify(marker)},String(ended));process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:req.id,result:{resultType:'complete',isError:${isError},content:[{type:'text',text:${JSON.stringify(isError ? '{"code":"CONFIGURATION_ERROR","message":"Fixture client configuration unavailable"}' : '{"received":true}')}}]}})+'\\n')});
         else process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:req.id,result:{protocolVersion:'2025-11-25',serverInfo:{name:'fixture',version:'1.0.0'},capabilities:{tools:{}}}})+'\\n');
       });
     `
@@ -38,7 +38,11 @@ for (const isError of [false, true]) {
         {
           command: process.execPath,
           args: [server],
-          environment: { INTEGRATION_FIXTURE_VALUE: "typed-private-value", ABSENT_FIXTURE_VALUE: undefined }
+          environment: {
+            INTEGRATION_FIXTURE_VALUE: "typed-private-value",
+            ABSENT_FIXTURE_VALUE: undefined,
+            LAZY_ENVS: "false"
+          }
         },
         {
           now: () => {
@@ -64,7 +68,11 @@ for (const isError of [false, true]) {
       expect(JSON.stringify(events)).not.toContain("typed-private-value")
       expect(JSON.stringify(events)).not.toContain("move_issue")
       expect(reply.result.isError).toBe(isError)
-      if (isError) expect(reply.result.content[0].text).toBe("fixture failure")
+      if (isError)
+        expect(JSON.parse(reply.result.content[0].text)).toEqual({
+          code: "CONFIGURATION_ERROR",
+          message: "Fixture client configuration unavailable"
+        })
       else expect(JSON.parse(reply.result.content[0].text)).toEqual({ received: true })
       expect(await readFile(marker, "utf8")).toBe("false")
     } finally {
@@ -73,30 +81,37 @@ for (const isError of [false, true]) {
   })
 }
 
-test("actual bundled entry rejects missing arguments without launching Huly", async () => {
-  const child = spawn(process.execPath, ["scripts/run-bundled.mjs", "scripts/integration-mcp-call-main.ts"], {
-    stdio: ["ignore", "pipe", "pipe"]
-  })
-  const stdout: Array<Buffer> = []
-  const stderr: Array<Buffer> = []
-  child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk))
-  child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk))
-  const deadline = setTimeout(() => child.kill("SIGKILL"), 10000)
-  try {
-    const code = await new Promise<number | null>((done, fail) => {
-      child.once("error", fail)
-      child.once("close", done)
+const BUNDLED_ENTRY_TIMEOUT_MILLISECONDS = 10_000
+const BUNDLED_ENTRY_TEST_TIMEOUT_MILLISECONDS = 15_000
+
+test(
+  "actual bundled entry rejects missing arguments without launching Huly",
+  { timeout: BUNDLED_ENTRY_TEST_TIMEOUT_MILLISECONDS },
+  async () => {
+    const child = spawn(process.execPath, ["scripts/run-bundled.mjs", "scripts/integration-mcp-call-main.ts"], {
+      stdio: ["ignore", "pipe", "pipe"]
     })
-    expect(code).toBe(1)
-    expect(Buffer.concat(stdout).toString()).toBe("")
-    expect(Buffer.concat(stderr).toString()).toContain(
-      "Integration MCP call failed during input; no automatic mutation retry performed."
-    )
-  } finally {
-    clearTimeout(deadline)
-    if (child.exitCode === null) child.kill("SIGKILL")
+    const stdout: Array<Buffer> = []
+    const stderr: Array<Buffer> = []
+    child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk))
+    child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk))
+    const deadline = setTimeout(() => child.kill("SIGKILL"), BUNDLED_ENTRY_TIMEOUT_MILLISECONDS)
+    try {
+      const code = await new Promise<number | null>((done, fail) => {
+        child.once("error", fail)
+        child.once("close", done)
+      })
+      expect(code).toBe(1)
+      expect(Buffer.concat(stdout).toString()).toBe("")
+      expect(Buffer.concat(stderr).toString()).toContain(
+        "Integration MCP call failed during input; no automatic mutation retry performed."
+      )
+    } finally {
+      clearTimeout(deadline)
+      if (child.exitCode === null) child.kill("SIGKILL")
+    }
   }
-})
+)
 
 test("invalid tool arguments fail at the boundary before any executable starts", async () => {
   await expect(

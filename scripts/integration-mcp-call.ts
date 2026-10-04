@@ -112,7 +112,9 @@ export const integrationMcpCall = async (
   const parsed = Schema.decodeUnknownOption(InputSchema)(input)
   if (parsed._tag === "None") throw new IntegrationMcpCallError("input")
   const environment = Schema.decodeUnknownSync(EnvironmentSchema)(
-    Object.fromEntries(Object.entries(options.environment).filter((entry) => entry[1] !== undefined))
+    Object.fromEntries(
+      Object.entries({ ...options.environment, LAZY_ENVS: "true" }).filter((entry) => entry[1] !== undefined)
+    )
   )
   const transport = new StdioClientTransport({
     command: options.command,
