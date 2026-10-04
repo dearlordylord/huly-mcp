@@ -4,7 +4,7 @@ import { expect } from "vitest"
 import { inspectTransferRecords, commitTransfer } from "../../src/huly/issue-transfer-adapter.js"
 import { TransferWriteSchema } from "../../src/domain/schemas/issue-transfer.js"
 import { IssueId } from "../../src/domain/schemas/shared.js"
-import { attachment, tracker } from "../../src/huly/huly-plugins.js"
+import { activity, attachment, tracker } from "../../src/huly/huly-plugins.js"
 import { sdkFixture } from "../helpers/huly-sdk.js"
 import { recordAdapterFixture as adapterFixture, attachmentPayload, ownedRecord } from "../helpers/transfer-records.js"
 
@@ -20,6 +20,32 @@ const writeInput = {
   rank: "0|hzzzzz:",
   recordClasses: []
 }
+
+it.effect("guards outgoing reference source identity while preserving its independent target", () =>
+  Effect.gen(function* () {
+    const f = adapterFixture()
+    f.docs.push(
+      ownedRecord("outgoing", String(activity.class.ActivityReference), "independent-target", "references", {
+        attachedToClass: "document:class:Document",
+        srcDocId: "root",
+        srcDocClass: String(tracker.class.Issue),
+        message: "link"
+      })
+    )
+    const inspection = yield* inspectTransferRecords(f.client, IssueId.make("root"))
+    expect(inspection.blockers).toEqual([])
+    const input: unknown = { ...writeInput, records: inspection.records, recordClasses: inspection.classes }
+    const write = Schema.decodeUnknownSync(TransferWriteSchema)(input)
+    expect(yield* Effect.promise(() => commitTransfer(f.client, write))).toBe("applied")
+    expect(f.conditions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ _id: "outgoing", srcDocId: "root", srcDocClass: String(tracker.class.Issue) }),
+        expect.objectContaining({ _id: "outgoing", attachedTo: "independent-target" })
+      ])
+    )
+    expect(f.updates.find((update) => update[2] === "outgoing")?.[3]).toEqual({ space: "destination" })
+  })
+)
 
 it.effect(
   "discovers inherited model-owned records, migrates automatic history preserving authors/timestamps and inspects SDK commit",
