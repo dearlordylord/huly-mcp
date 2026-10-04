@@ -75,11 +75,11 @@ const richFixture = () => {
       return commit(write).pipe(
         Effect.map((result) => {
           if (result !== "applied") return result
-          extra = extra.map((record) => ({
-            ...record,
-            space: write.destinationId,
-            ...(state.corrupt ? { snapshot: "changed" } : {})
-          }))
+          extra = extra.map((record) => {
+            const owner = write.tasks.find((task) => task.records.some((owned) => owned._id === record._id))
+            if (owner === undefined) return record
+            return { ...record, space: owner.destinationId, ...(state.corrupt ? { snapshot: "changed" } : {}) }
+          })
           return result
         })
       )
