@@ -33,7 +33,7 @@ const configFor = (endpoint: string) =>
     timeoutMs: 1000
   })
 
-for (const { protocol, expected } of [
+for (const { expected, protocol } of [
   { protocol: "http:", expected: "http:" },
   { protocol: "https:", expected: "https:" },
   { protocol: "ws:", expected: "http:" },
