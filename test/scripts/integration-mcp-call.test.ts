@@ -3,7 +3,11 @@ import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { test, expect } from "vitest"
-import { integrationMcpCall, type IntegrationMcpPhase } from "../../scripts/integration-mcp-call.js"
+import {
+  integrationMcpCall,
+  IntegrationMonotonicMilliseconds,
+  type IntegrationMcpPhase
+} from "../../scripts/integration-mcp-call.js"
 
 for (const isError of [false, true]) {
   test(`keeps stdin open until the actual ${isError ? "error" : "success"} tool reply`, async () => {
@@ -36,7 +40,10 @@ for (const isError of [false, true]) {
           environment: { INTEGRATION_FIXTURE_VALUE: "typed-private-value", ABSENT_FIXTURE_VALUE: undefined }
         },
         {
-          now: () => clock.value++,
+          now: () => {
+            clock.value += 0.25
+            return IntegrationMonotonicMilliseconds.make(clock.value)
+          },
           publish: (event) => {
             events.push(event)
           }
@@ -52,7 +59,7 @@ for (const isError of [false, true]) {
         "close-start",
         "closed"
       ])
-      expect(events.map((event) => event.elapsedMilliseconds)).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
+      expect(events.map((event) => event.elapsedMilliseconds)).toEqual([0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2])
       expect(JSON.stringify(events)).not.toContain("typed-private-value")
       expect(JSON.stringify(events)).not.toContain("move_issue")
       expect(reply.result.isError).toBe(isError)

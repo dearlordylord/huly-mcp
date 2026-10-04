@@ -15,6 +15,15 @@ export class IntegrationMcpCallError extends Error {
     super(`Integration MCP call failed during ${phase}; no automatic mutation retry performed.`)
   }
 }
+const FractionalMilliseconds = Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0))
+export const IntegrationMonotonicMilliseconds = FractionalMilliseconds.pipe(
+  Schema.brand("IntegrationMonotonicMilliseconds")
+)
+export type IntegrationMonotonicMilliseconds = Schema.Schema.Type<typeof IntegrationMonotonicMilliseconds>
+export const IntegrationElapsedMilliseconds = FractionalMilliseconds.pipe(
+  Schema.brand("IntegrationElapsedMilliseconds")
+)
+export type IntegrationElapsedMilliseconds = Schema.Schema.Type<typeof IntegrationElapsedMilliseconds>
 export const IntegrationMcpPhaseSchema = Schema.Struct({
   phase: Schema.Literals([
     "bundle-ready",
@@ -27,17 +36,19 @@ export const IntegrationMcpPhaseSchema = Schema.Struct({
     "close-start",
     "closed"
   ]),
-  elapsedMilliseconds: Schema.Number
+  elapsedMilliseconds: IntegrationElapsedMilliseconds
 })
 export type IntegrationMcpPhase = Schema.Schema.Type<typeof IntegrationMcpPhaseSchema>
 // Internal clock/output ports; serialized phase events are owned by the schema above.
 export interface IntegrationMcpTelemetry {
-  readonly now: () => number
+  readonly now: () => IntegrationMonotonicMilliseconds
   readonly publish: (event: IntegrationMcpPhase) => void
 }
 const NANOSECONDS_PER_MILLISECOND = 1_000_000
-export const integrationMcpClock = (): number =>
-  Number(Effect.runSync(Clock.monotonicTimeNanos)) / NANOSECONDS_PER_MILLISECOND
+export const integrationMcpClock = (): IntegrationMonotonicMilliseconds =>
+  Schema.decodeUnknownSync(IntegrationMonotonicMilliseconds)(
+    Number(Effect.runSync(Clock.monotonicTimeNanos)) / NANOSECONDS_PER_MILLISECOND
+  )
 const quietTelemetry: IntegrationMcpTelemetry = { now: integrationMcpClock, publish: () => {} }
 // Internal process adapter seam; protocol input and output remain schema-owned.
 interface ProcessOptions {
@@ -58,7 +69,10 @@ export const integrationMcpCall = async (
   const started = telemetry.now()
   const emit = (phase: IntegrationMcpPhase["phase"]): void =>
     telemetry.publish(
-      Schema.decodeUnknownSync(IntegrationMcpPhaseSchema)({ phase, elapsedMilliseconds: telemetry.now() - started })
+      Schema.decodeUnknownSync(IntegrationMcpPhaseSchema)({
+        phase,
+        elapsedMilliseconds: IntegrationElapsedMilliseconds.make(telemetry.now() - started)
+      })
     )
   const parsed = Schema.decodeUnknownOption(InputSchema)(input)
   if (parsed._tag === "None") throw new IntegrationMcpCallError("input")
