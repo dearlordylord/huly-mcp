@@ -4,6 +4,8 @@ import { TestClock } from "effect/testing"
 import { expect } from "vitest"
 import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"
 import { MovementIssueSchema, MovementProjectSchema } from "../../../src/domain/schemas/issue-movement-state.js"
+import { MAX_SUPPORTED_ATTRIBUTE_VALUES } from "../../../src/domain/schemas/issue-transfer-attributes.js"
+import { MAX_TRANSFER_CONFLICT_ENTRIES } from "../../../src/huly/operations/issue-transfer-tree.js"
 import { MoveIssueResultSchema } from "../../../src/domain/schemas/issues-results.js"
 import { DocId, UNKNOWN_TOTAL } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
@@ -167,12 +169,17 @@ it.effect("a complete candidate inventory exceeding the response cap refuses the
       )
     }
     initializeHierarchy(f.issues)
-    for (const issue of f.issues.filter((issue) => issue.space === f.source._id && issue._id !== f.old._id)) {
+    const movingIssues = f.issues.filter((issue) => issue.space === f.source._id && issue._id !== f.old._id)
+    const fields = ["component", "milestone"]
+    const candidatesPerAttribute = MAX_SUPPORTED_ATTRIBUTE_VALUES
+    expect(candidatesPerAttribute).toBeLessThanOrEqual(MAX_SUPPORTED_ATTRIBUTE_VALUES)
+    expect(movingIssues.length * fields.length * candidatesPerAttribute).toBeGreaterThan(MAX_TRANSFER_CONFLICT_ENTRIES)
+    for (const issue of movingIssues) {
       issue.component = sdkFixture("dangling-component")
       issue.milestone = sdkFixture("dangling-milestone")
     }
-    for (const field of ["component", "milestone"]) {
-      for (let index = 0; index < 1000; index++) {
+    for (const field of fields) {
+      for (let index = 0; index < candidatesPerAttribute; index++) {
         f.attributeRows.push(
           sdkFixture({
             _id: `${field}-candidate-${index}`,
