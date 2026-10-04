@@ -8,14 +8,8 @@ CLI=(node packages/huly-cli/dist/index.cjs)
 printf -v SOURCE 'A%04X' "$RANDOM"
 printf -v TARGET 'B%04X' "$RANDOM"
 PROJECTS=(); ISSUES=()
-INIT='{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"attribute-retry-certification","version":"1.0"}},"id":1}'
-mcp() {
-  local request response
-  request=$(jq -nc --arg tool "$1" --argjson args "$2" '{jsonrpc:"2.0",method:"tools/call",params:{name:$tool,arguments:$args},id:2}')
-  response=$(printf '%s\n%s\n' "$INIT" "$request" | timeout 45 env MCP_AUTO_EXIT=true HULY_TOOL_MODE=native node dist/index.cjs 2>/dev/null | jq -c 'select(.id == 2)')
-  jq -e '.result.isError != true and .error == null' >/dev/null <<<"$response"
-  jq -r '.result.content[0].text' <<<"$response"
-}
+source "$(dirname "${BASH_SOURCE[0]}")/integration-mcp-adapter.sh" || exit 1
+mcp() { movement_mcp_call "$1" "$2"; }
 move() {
   if [[ "$TRANSPORT" == mcp ]]; then mcp move_issue "$1"; else
     local issue destination resolutions

@@ -93,32 +93,18 @@ const main = async (args: ScenarioArguments, signal: AbortSignal) => {
     ]
     if (args.movement.resolutions !== undefined)
       cliArgs.push("--resolutions", JSON.stringify(args.movement.resolutions))
-    const input =
-      [
-        {
-          jsonrpc: "2.0",
-          method: "initialize",
-          params: {
-            protocolVersion: "2024-11-05",
-            capabilities: {},
-            clientInfo: { name: "movement-concurrency-certification", version: "1.0" }
-          },
-          id: 1
-        },
-        {
-          jsonrpc: "2.0",
-          method: "tools/call",
-          params: { name: "move_issue", arguments: args.movement },
-          id: MOVEMENT_REQUEST_ID
-        }
-      ]
-        .map((request) => JSON.stringify(request))
-        .join("\n") + "\n"
     const movement = runPublic(
-      args.transport === "cli" ? cliArgs : ["dist/index.cjs"],
+      args.transport === "cli"
+        ? cliArgs
+        : [
+            "scripts/run-bundled.mjs",
+            "scripts/integration-mcp-call-main.ts",
+            "move_issue",
+            JSON.stringify(args.movement)
+          ],
       ready.url,
       lifetime.signal,
-      args.transport === "mcp" ? input : undefined
+      { freshMcpDiscovery: args.transport === "mcp" }
     ).then<ProcessObservation, ProcessObservation>(
       (stdout) => ({ status: "stdout", stdout }),
       () => ({ status: "no-result" })

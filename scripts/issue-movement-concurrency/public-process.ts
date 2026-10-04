@@ -3,10 +3,23 @@ import { Schema } from "effect"
 import type { UrlString } from "../../src/domain/schemas/shared.js"
 
 // Process environment is framework-owned and remains in this adapter; credentials are never emitted.
-export const runPublic = (argv: ReadonlyArray<string>, url: UrlString, signal: AbortSignal, input?: string) =>
+export const runPublic = (
+  argv: ReadonlyArray<string>,
+  url: UrlString,
+  signal: AbortSignal,
+  options?: { readonly freshMcpDiscovery: boolean }
+) =>
   new Promise<string>((resolve, reject) => {
     const child = spawn(process.execPath, [...argv], {
-      env: { ...process.env, HULY_URL: url, HULY_TOOL_MODE: "native", MCP_AUTO_EXIT: "true" },
+      env: {
+        ...Object.fromEntries(
+          Object.entries(process.env).filter(
+            ([key]) => !options?.freshMcpDiscovery || key !== "HULY_INTEGRATION_MCP_PRIOR"
+          )
+        ),
+        HULY_URL: url,
+        HULY_TOOL_MODE: "native"
+      },
       stdio: ["pipe", "pipe", "ignore"],
       signal
     })
@@ -25,5 +38,5 @@ export const runPublic = (argv: ReadonlyArray<string>, url: UrlString, signal: A
         ? resolve(Buffer.concat(chunks).toString("utf8"))
         : reject(new Error("Public fixture process returned no successful response"))
     )
-    child.stdin.end(input)
+    child.stdin.end()
   })

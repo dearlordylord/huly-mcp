@@ -4,14 +4,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/test-telemetry-env.sh" || exit 1
 PROJECT="${HULY_TEST_PROJECT:-HULY}"
 CLI=(node packages/huly-cli/dist/index.cjs)
 ISSUES=()
-INIT='{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"movement-integration","version":"1.0"}},"id":1}'
-mcp() {
-  local request response
-  request=$(jq -nc --arg tool "$1" --argjson args "$2" '{jsonrpc:"2.0",method:"tools/call",params:{name:$tool,arguments:$args},id:2}')
-  response=$(printf '%s\n%s\n' "$INIT" "$request" | timeout 30 env MCP_AUTO_EXIT=true HULY_TOOL_MODE=native node dist/index.cjs 2>/dev/null | jq -c 'select(.id == 2)')
-  jq -e '.result.isError != true and .error == null' >/dev/null <<<"$response"
-  jq -r '.result.content[0].text' <<<"$response"
-}
+source "$(dirname "${BASH_SOURCE[0]}")/integration-mcp-adapter.sh" || exit 1
+mcp() { movement_mcp_call "$1" "$2"; }
 cleanup() {
   for ((i=${#ISSUES[@]}-1; i>=0; i--)); do
     mcp delete_issue "$(jq -nc --arg project "$PROJECT" --arg identifier "${ISSUES[$i]}" '{project:$project,identifier:$identifier}')" >/dev/null || true
@@ -36,7 +30,7 @@ assert_result() {
   fi
 }
 # Discovery proves the published destination contract, including invalid empty shapes.
-DISCOVERY=$(printf '%s\n%s\n' "$INIT" '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":2}' | timeout 30 env MCP_AUTO_EXIT=true HULY_TOOL_MODE=native node dist/index.cjs 2>/dev/null | jq -c 'select(.id == 2)')
+DISCOVERY=$(movement_mcp_list_tools)
 jq -e '.result.tools[] | select(.name == "move_issue") | (.inputSchema | tostring | contains("destination"))' >/dev/null <<<"$DISCOVERY"
 echo "PASS: MCP discovers destination-based movement"
 create ""; OLD="$CREATED"

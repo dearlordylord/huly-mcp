@@ -79,3 +79,14 @@ for (const [name, response] of [
     assert.ok(!result.stderr.includes(secretMarker))
   })
 }
+
+for (const legacy of ['protocolVersion:"2024-11-05"', 'MCP_AUTO_EXIT=true', 'method:"initialize"']) {
+  test("rejects legacy fixture MCP transport", () => {
+    assert.equal(inspectMovementFixture(legacy, "legacy.sh").length, 1)
+  })
+}
+
+test("movement fixtures require the common call and discovery adapters", () => {
+  const failures = inspectMovementFixture("mcp() { node dist/index.cjs; }", "scripts/integration_test_issue_movement.sh")
+  assert.equal(failures.length, 2)
+})

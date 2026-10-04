@@ -22,14 +22,8 @@ printf -v SOURCE 'C%04X' "$RANDOM"
 printf -v DESTINATION 'R%04X' "$RANDOM"
 PROJECTS=()
 declare -A COMPONENTS
-INIT='{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"two-client-movement-certification","version":"1.0"}},"id":1}'
-mcp() {
-  local request response
-  request=$(jq -nc --arg tool "$1" --argjson args "$2" '{jsonrpc:"2.0",method:"tools/call",params:{name:$tool,arguments:$args},id:2}')
-  response=$(printf '%s\n%s\n' "$INIT" "$request" | timeout 45 env MCP_AUTO_EXIT=true HULY_TOOL_MODE=native node dist/index.cjs 2>/dev/null | jq -c 'select(.id == 2)')
-  jq -e '.result.isError != true and .error == null' >/dev/null <<<"$response"
-  jq -r '.result.content[0].text' <<<"$response"
-}
+source "$(dirname "${BASH_SOURCE[0]}")/integration-mcp-adapter.sh" || exit 1
+mcp() { movement_mcp_call "$1" "$2"; }
 cleanup() {
   local project ids id
   for project in "${PROJECTS[@]}"; do
