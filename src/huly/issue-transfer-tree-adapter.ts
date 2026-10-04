@@ -105,7 +105,7 @@ const parseQueuedTransactions = (
   apply: ReturnType<TxOperations["apply"]>
 ): Result.Result<MovementTransactions, HulyDataInvalidError> => {
   const input: unknown = apply.txes
-    .filter((tx) => tx._class === core.class.TxUpdateDoc && tx.objectClass === tracker.class.Issue)
+    .filter((tx) => tx._class === core.class.TxUpdateDoc)
     .map((tx) => ({
       txId: tx._id,
       transactionClass: tx._class,
@@ -134,6 +134,10 @@ const parseQueuedTransactions = (
     return Result.fail(new HulyDataInvalidError({ operation: "move_issue", entity: "queued movement transactions" }))
   const receipts = []
   for (const tx of raw.success) {
+    if (tx.objectClass !== tracker.class.Issue) {
+      receipts.push({ ...tx, target: "record" })
+      continue
+    }
     const attributes = parseMovementHistoryAttributes(client.getHierarchy(), tx.operations)
     if (Result.isFailure(attributes)) return Result.fail(attributes.failure)
     receipts.push({ ...tx, historyAttributes: attributes.success })

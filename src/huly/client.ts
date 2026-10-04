@@ -87,6 +87,7 @@ import { inspectNativePersonReferences, migrateNativePersonReferences } from "./
 
 import { inspectTransferForest } from "./issue-transfer-forest.js"
 import { commitTransfer, inspectTransferRecords } from "./issue-transfer-adapter.js"
+import { inspectMovementTransactions } from "./issue-movement-transaction-inspection.js"
 import { commitTransferTree } from "./issue-transfer-tree-adapter.js"
 import type { TransferTreeWrite } from "../domain/schemas/issue-transfer-tree.js"
 import type { MovementIssue } from "../domain/schemas/issue-movement-state.js"
@@ -454,6 +455,7 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
           Effect.tryPromise({ try: () => op(client), catch: (error) => makeOperationConnectionError(operation, error) })
 
         const operations: HulyClientOperations = {
+          inspectMovementTransactions: (queued) => inspectMovementTransactions(client, queued),
           inspectTransferRecords: (issueId, tree) => inspectTransferRecords(client, issueId, undefined, tree),
           inspectTransferForest: (roots, tree, publish) => inspectTransferForest(client, roots, tree, publish),
           commitTransferTree: (write, publishQueuedTransactions) =>

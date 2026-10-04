@@ -4,7 +4,7 @@ import type { AttachedDoc, Doc, DocumentUpdate, TxOperations } from "@hcengineer
 import type { TransferWrite, TransferSupportedRecord } from "../domain/schemas/issue-transfer.js"
 import { HulyTransactionScope, type HulyConditionalWriteResult } from "../domain/schemas/shared.js"
 import { activity, tracker } from "./huly-plugins.js"
-import { toClassRef, toCorePersonId, toRef } from "./operations/sdk-boundary.js"
+import { toClassRef, toRef } from "./operations/sdk-boundary.js"
 import { hulyQuery } from "./operations/query-helpers.js"
 import type { MovementIssue } from "../domain/schemas/issue-movement-state.js"
 export { inspectTransferRecords } from "./issue-transfer-discovery.js"
@@ -44,8 +44,7 @@ export const queueTransferTask = async (
       toRef<AttachedDoc>(record._id),
       { space: toRef(write.destinationId) },
       false,
-      record.modifiedOn,
-      toCorePersonId(record.modifiedBy)
+      record.modifiedOn
     )
   }
   await apply.updateDoc(tracker.class.Issue, toRef(write.sourceId), toRef(write.issueId), {

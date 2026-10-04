@@ -230,6 +230,11 @@ for (const lostReply of [false, true]) {
         expect.arrayContaining(write.tasks.map((task) => task.issueId))
       )
       expect(new Set(receipts.map((receipt) => receipt.txId)).size).toBe(receipts.length)
+      expect(write.tasks.flatMap((task) => task.records).every((record) => record.modifiedBy !== "person")).toBe(true)
+      const recordReceipts = receipts.filter((receipt) => "target" in receipt)
+      expect(recordReceipts.length).toBeGreaterThan(0)
+      expect(recordReceipts.every((receipt) => receipt.modifiedBy === "person")).toBe(true)
+      expect(recordReceipts.every((receipt) => receipt.operations.space === write.tasks[0]?.destinationId)).toBe(true)
       const beforeRejectedCallback = sends.length
       const callbackFailure = new HulyDataInvalidError({ operation: "move_issue", entity: "receipt observer" })
       const rejected = yield* Effect.tryPromise({
@@ -266,9 +271,10 @@ for (const lostReply of [false, true]) {
         expect(actual?.operations).toEqual(receipt.operations)
         expect(actual?.modifiedOn).toBe(receipt.modifiedOn)
         expect(actual?.modifiedBy).toBe(receipt.modifiedBy)
-        expect(receipt.historyAttributes.every((attribute) => attribute.attrClass === "core:class:TypeString")).toBe(
-          true
-        )
+        if (!("target" in receipt))
+          expect(receipt.historyAttributes.every((attribute) => attribute.attrClass === "core:class:TypeString")).toBe(
+            true
+          )
       }
       if (lostReply) {
         expect(result._tag).toBe("Failure")
