@@ -89,3 +89,14 @@ complete tree mappings, generated properties and TestClock phase bounds. Logs:
 Both independent source review axes passed that immutable candidate. These
 focused checks do not certify the complete harness, strict coverage or deployed
 Huly behavior; combined gates and the final authorized live suite remain pending.
+
+Inherited #308 recovery audit identified a genuine regression: tree failure
+projection omitted preflight supporting `recordIds` and replaced published
+supporting-record reads with task-only guidance. The successor restores known
+record IDs for both incomplete and indeterminate outcomes, deduplicated across
+all tasks, and emits schema-valid activity, attachment, comment and time-report
+reads for every task plus nested-comment attachment reads. Project-scoped reads
+include source and destination choices because known IDs are not observed
+locations. #311's current observed verification records cannot replace these
+preflight targets when verification is unavailable or not attempted. A focused
+schema round-trip/recovery-call case is authored; no new tests or jobs have run.

@@ -4,10 +4,11 @@ import type { MoveIssueResult } from "../../domain/schemas/issues-results.js"
 import { DocId, UrlString } from "../../domain/schemas/shared.js"
 import { movementNoParent } from "./issue-movement-hierarchy.js"
 import type { TransferPlan } from "./issue-transfer-preflight.js"
+import { transferTreeKnownRecordIds, transferTreeOwnedRecordGuidance } from "./issue-transfer-tree-recovery.js"
 import type { HulyClient } from "../client.js"
 
 export const transferTreeInspectionGuidance = (prepared: TransferPlan, destination: MovementProject) =>
-  `Inspect every stable ID before retry: ${prepared.plan.tree.map((issue) => `MCP get_issue ${JSON.stringify({ project: destination.identifier, identifier: issue._id })}; CLI huly issues get ${destination.identifier} ${issue._id} --json`).join("; ")}. Stable-ID lookup searches the workspace. Do not automatically repeat movement; reserved numbers may leave gaps.`
+  `Inspect every stable ID before retry: ${prepared.plan.tree.map((issue) => `MCP get_issue ${JSON.stringify({ project: destination.identifier, identifier: issue._id })}; CLI huly issues get ${destination.identifier} ${issue._id} --json`).join("; ")}. Stable-ID lookup searches the workspace. Do not automatically repeat movement; reserved numbers may leave gaps. ${transferTreeOwnedRecordGuidance(prepared, destination)}`
 
 export const transferTreeFailure = (
   outcome: "incomplete" | "indeterminate",
@@ -17,6 +18,7 @@ export const transferTreeFailure = (
 ): MoveIssueResult => ({
   outcome,
   reason,
+  recordIds: transferTreeKnownRecordIds(prepared),
   issueIds: prepared.plan.tree.map((issue) => issue._id),
   inspection: transferTreeInspectionGuidance(prepared, destination)
 })
