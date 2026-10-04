@@ -10,6 +10,7 @@ import {
 import type { Issue, Project } from "@hcengineering/tracker"
 import { Effect, Schema } from "effect"
 
+import { UNKNOWN_TOTAL } from "../../src/domain/schemas/shared.js"
 import { TransferInspectionSchema } from "../../src/domain/schemas/issue-transfer.js"
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
 import { HulyAuthError } from "../../src/huly/errors-base.js"
@@ -126,7 +127,7 @@ export const movementFixture = (issues: Array<Issue>, options: MovementFixtureOp
       result.total = options.projectSelectorTotal
     if (q.space !== undefined && options.discoveryTotal !== undefined) result.total = options.discoveryTotal
     if (q.attachedTo !== undefined)
-      result.total = findOptions?.total === true ? (options.closureTotal ?? selected.length) : -1
+      result.total = findOptions?.total === true ? (options.closureTotal ?? selected.length) : UNKNOWN_TOTAL
     if (q.space !== undefined && options.changeRootDuringRead) {
       for (const issue of result) issue.modifiedOn++
     }

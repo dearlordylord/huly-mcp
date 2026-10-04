@@ -4,6 +4,7 @@ import { TestClock } from "effect/testing"
 import { expect } from "vitest"
 
 import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"
+import { UNKNOWN_TOTAL } from "../../../src/domain/schemas/shared.js"
 import { MoveIssueResultSchema } from "../../../src/domain/schemas/issues-results.js"
 import { tracker } from "../../../src/huly/huly-plugins.js"
 import { moveIssue } from "../../../src/huly/operations/issues-move.js"
@@ -34,7 +35,7 @@ describe("destination movement", () => {
       const tree = threeLevelMovementFixture()
       const fixture = movementFixture(tree.issues)
       const unknown = yield* fixture.operations.findAll(tracker.class.Issue, { attachedTo: tree.root._id })
-      expect(unknown.total).toBe(-1)
+      expect(unknown.total).toBe(UNKNOWN_TOTAL)
       const result = yield* call(
         { issue: tree.root.identifier, destination: { parent: tree.destination.identifier } },
         fixture
