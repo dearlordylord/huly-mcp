@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Final certification only: run after slices 306–311 are integrated, through MCP and CLI.
-set -euo pipefail
+set -Eeuo pipefail
+# Report the source location, never command arguments or SDK credential payloads.
+trap 'printf "FAIL: fixture command at line %s (exit %s)\n" "$LINENO" "$?" >&2' ERR
 source "$(dirname "${BASH_SOURCE[0]}")/test-telemetry-env.sh" || exit 1
 CLI=(node packages/huly-cli/dist/index.cjs)
 printf -v SOURCE 'S%04X' "$RANDOM"
