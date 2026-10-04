@@ -40,8 +40,18 @@ for project in "$SOURCE" "$TARGET"; do
   mcp create_project "$(jq -nc --arg identifier "$project" '{identifier:$identifier,name:("Attribute retry " + $identifier)}')" >/dev/null
   PROJECTS+=("$project")
 done
-component() { mcp create_component "$(jq -nc --arg project "$1" --arg label "$2" '{project:$project,label:$label}')" | jq -r .id; }
-milestone() { mcp create_milestone "$(jq -nc --arg project "$1" --arg label "$2" '{project:$project,label:$label,targetDate:1893456000000}')" | jq -r .id; }
+component() {
+  local payload result
+  payload=$(jq -nc --arg project "$1" --arg attributeLabel "$2" '{project:$project,label:$attributeLabel}') || return 1
+  result=$(mcp create_component "$payload") || return 1
+  jq -er '.id | select(type=="string" and length>0)' <<<"$result"
+}
+milestone() {
+  local payload result
+  payload=$(jq -nc --arg project "$1" --arg attributeLabel "$2" '{project:$project,label:$attributeLabel,targetDate:1893456000000}') || return 1
+  result=$(mcp create_milestone "$payload") || return 1
+  jq -er '.id | select(type=="string" and length>0)' <<<"$result"
+}
 SC=$(component "$SOURCE" 'Source only'); SM=$(milestone "$SOURCE" 'Source only')
 TC=$(component "$TARGET" 'Destination replacement'); TM=$(milestone "$TARGET" 'Destination replacement')
 EXSC=$(component "$SOURCE" 'Exact'); EXSM=$(milestone "$SOURCE" 'Exact')
