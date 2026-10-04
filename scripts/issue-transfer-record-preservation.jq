@@ -1,4 +1,5 @@
-# No normalization without a persisted destination-only transaction matching server metadata.
+# Only last-modification metadata can normalize, with a persisted destination-only transaction.
+# Created metadata, payload and ownership remain exact even when another author last edited the record.
 def preserved_record($old; $new; $transactions):
   ($new._id == $old._id) and
   (
@@ -10,7 +11,7 @@ def preserved_record($old; $new; $transactions):
         .modifiedOn == $new.modifiedOn and .modifiedBy == $new.modifiedBy
       ) and
       ($new.snapshot | fromjson | .modifiedOn == $new.modifiedOn and .modifiedBy == $new.modifiedBy) and
-      (($new | del(.space,.modifiedOn,.snapshot)) == ($old | del(.space,.modifiedOn,.snapshot))) and
-      (($new.snapshot | fromjson | del(.modifiedOn)) == ($old.snapshot | fromjson | del(.modifiedOn)))
+      (($new | del(.space,.modifiedOn,.modifiedBy,.snapshot)) == ($old | del(.space,.modifiedOn,.modifiedBy,.snapshot))) and
+      (($new.snapshot | fromjson | del(.modifiedOn,.modifiedBy)) == ($old.snapshot | fromjson | del(.modifiedOn,.modifiedBy)))
     )
   );
