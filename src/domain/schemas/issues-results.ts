@@ -47,6 +47,7 @@ export const MoveIssueResultSchema = Schema.Union([
   }),
   Schema.Struct({
     outcome: Schema.Literals(["incomplete", "indeterminate"]),
+    recordIds: Schema.optionalKey(Schema.Array(DocId)),
     reason: Schema.String,
     issueIds: Schema.Array(IssueId),
     inspection: Schema.String

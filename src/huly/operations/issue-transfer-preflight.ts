@@ -10,7 +10,7 @@ import {
   type TransferInspection,
   type TransferConflict,
   type TransferIssue,
-  type TransferHistoryRecord
+  type TransferSupportedRecord
 } from "../../domain/schemas/issue-transfer.js"
 import type { MovementIssue, MovementProject } from "../../domain/schemas/issue-movement-state.js"
 import { HulyDataInvalidError } from "../errors-base.js"
@@ -30,7 +30,8 @@ import {
 export interface TransferPlan {
   readonly plan: MovementPlan
   readonly protectedIssue: TransferIssue
-  readonly records: ReadonlyArray<TransferHistoryRecord>
+  readonly records: ReadonlyArray<TransferSupportedRecord>
+  readonly recordClasses: TransferInspection["classes"]
 }
 export interface TransferRefusal {
   readonly conflicts: ReadonlyArray<TransferConflict>
@@ -309,6 +310,7 @@ export const inspectTransferPlan = Effect.fn("transfer.inspectPlan")(function* (
   return {
     plan: { root, parent, source, tree: [root], relevant },
     protectedIssue: workflow.protectedIssue,
-    records: records.records.filter((record) => record.kind === "history")
+    recordClasses: records.classes,
+    records: records.records.filter((record) => record.kind !== "unsupported")
   }
 })

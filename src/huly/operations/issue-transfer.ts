@@ -23,12 +23,14 @@ const failure = (
   outcome: "incomplete" | "indeterminate",
   reason: string,
   plan: MovementPlan,
-  destination: MovementProject
+  destination: MovementProject,
+  records: TransferPlan["records"]
 ): MoveIssueResult => ({
   outcome,
   reason,
   issueIds: [plan.root._id],
-  inspection: guidance(plan.root, plan.source, destination)
+  recordIds: records.map((record) => record._id),
+  inspection: `${guidance(plan.root, plan.source, destination)} Owned stable record IDs: ${records.map((record) => record._id).join(", ")}. Inspect MCP list_activity ${JSON.stringify({ objectId: plan.root._id, objectClass: String(tracker.class.Issue) })}, list_comments ${JSON.stringify({ project: destination.identifier, issueIdentifier: plan.root._id })}, list_attachments ${JSON.stringify({ objectId: plan.root._id, objectClass: String(tracker.class.Issue) })}, get_time_report ${JSON.stringify({ project: destination.identifier, identifier: plan.root._id })}.`
 })
 
 export const transferIssue = Effect.fn("transferIssue")(function* (
@@ -69,7 +71,7 @@ const executeTransfer = Effect.fn("transfer.execute")(function* (
   destination: MovementProject
 ): Effect.fn.Return<MoveIssueResult, MovementError> {
   const { plan } = prepared
-  const { parent, root, source } = plan
+  const { root, source } = plan
   const inspection = guidance(root, source, destination)
   const commit = client.commitTransfer
   if (commit === undefined)
@@ -107,7 +109,8 @@ const executeTransfer = Effect.fn("transfer.execute")(function* (
       "indeterminate",
       "Sequence allocation response unavailable; allocation may have occurred. Task move was not sent.",
       plan,
-      destination
+      destination,
+      prepared.records
     )
   const sequence = Schema.decodeUnknownOption(TransferSequenceSchema)(allocation.success)
   if (sequence._tag === "None")
@@ -115,20 +118,10 @@ const executeTransfer = Effect.fn("transfer.execute")(function* (
       "indeterminate",
       "Sequence result unavailable or invalid; allocation may have occurred. Task move was not sent.",
       plan,
-      destination
+      destination,
+      prepared.records
     )
-  const write: TransferWrite = {
-    issueId: root._id,
-    sourceId: source._id,
-    destinationId: destination._id,
-    previousParent: root.attachedTo,
-    parentId: parent?._id ?? movementNoParent,
-    modifiedOn: root.modifiedOn,
-    number: sequence.value.object.sequence,
-    identifier: IssueIdentifier.make(`${destination.identifier}-${sequence.value.object.sequence}`),
-    rank: NonEmptyString.make(makeRank(last.success?.rank, undefined)),
-    records: prepared.records
-  }
+  const write = makeTransferWrite(prepared, destination, sequence.value.object.sequence, last.success?.rank)
   return yield* commitAndVerify(client, prepared, destination, write, commit)
 })
 
@@ -147,14 +140,16 @@ const commitAndVerify = Effect.fn("transfer.commitAndVerify")(function* (
       "indeterminate",
       "Commit response unavailable; movement effects may have occurred. Number was reserved and may leave a gap.",
       plan,
-      destination
+      destination,
+      prepared.records
     )
   if (committed.success === "condition-not-met")
     return failure(
       "incomplete",
       "SDK refused commit conditions after sequence allocation. Number reservation is an effect and may leave a gap; inspect before retry.",
       plan,
-      destination
+      destination,
+      prepared.records
     )
   const verified = yield* verifyTransfer(client, prepared, destination, write).pipe(
     Effect.repeat({
@@ -165,13 +160,20 @@ const commitAndVerify = Effect.fn("transfer.commitAndVerify")(function* (
     Effect.result
   )
   if (verified._tag === "Failure" || verified.success.state === "unavailable")
-    return failure("indeterminate", "Post-send state unavailable; inspect before retry.", plan, destination)
+    return failure(
+      "indeterminate",
+      "Post-send state unavailable; inspect before retry.",
+      plan,
+      destination,
+      prepared.records
+    )
   if (verified.success.state === "inconsistent")
     return failure(
       "incomplete",
       "Observed movement state remained inconsistent after bounded verification.",
       plan,
-      destination
+      destination,
+      prepared.records
     )
   return {
     outcome: "completed",
@@ -192,3 +194,25 @@ const commitAndVerify = Effect.fn("transfer.commitAndVerify")(function* (
     ]
   }
 })
+
+const makeTransferWrite = (
+  prepared: TransferPlan,
+  destination: MovementProject,
+  number: TransferWrite["number"],
+  lastRank: string | undefined
+): TransferWrite => {
+  const { root, parent, source } = prepared.plan
+  return {
+    issueId: root._id,
+    sourceId: source._id,
+    destinationId: destination._id,
+    previousParent: root.attachedTo,
+    parentId: parent?._id ?? movementNoParent,
+    modifiedOn: root.modifiedOn,
+    number: number,
+    identifier: IssueIdentifier.make(`${destination.identifier}-${number}`),
+    rank: NonEmptyString.make(makeRank(lastRank, undefined)),
+    records: prepared.records,
+    recordClasses: prepared.recordClasses
+  }
+}

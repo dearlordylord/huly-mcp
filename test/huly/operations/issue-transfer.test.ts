@@ -181,9 +181,10 @@ for (const discovery of ["incomplete", "unsupported"] as const) {
         inspectTransferRecords: () =>
           Effect.succeed(
             discovery === "incomplete"
-              ? { discovery: "incomplete", records: [], blockers: [], limitation: "Limited discovery." }
+              ? { discovery: "incomplete", classes: [], records: [], blockers: [], limitation: "Limited discovery." }
               : {
                   discovery: "complete",
+                  classes: [],
                   records: [
                     {
                       kind: "unsupported",

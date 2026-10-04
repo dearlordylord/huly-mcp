@@ -2,15 +2,16 @@
 import {
   type Doc,
   type DocumentQuery,
-  type FindResult,
   type FindOptions,
+  type FindResult,
   type Ref,
   toFindResult
 } from "@hcengineering/core"
 import type { Issue, Project } from "@hcengineering/tracker"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 
 import { UNKNOWN_TOTAL } from "../../src/domain/schemas/shared.js"
+import { TransferInspectionSchema } from "../../src/domain/schemas/issue-transfer.js"
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
 import { HulyAuthError } from "../../src/huly/errors-base.js"
 import { tracker } from "../../src/huly/huly-plugins.js"
@@ -18,12 +19,19 @@ import { tracker } from "../../src/huly/huly-plugins.js"
 export const movementProject = (id = "project-1", identifier = "TEST"): Project =>
   ({ _id: id, identifier, _class: tracker.class.Project, name: identifier }) as unknown as Project
 
+const NUMBER_HASH_RADIX = 31
+const NUMBER_HASH_LIMIT = 1_000_000
+const fixtureNumber = (id: string) =>
+  [...id].reduce((number, char) => (number * NUMBER_HASH_RADIX + char.charCodeAt(0)) % NUMBER_HASH_LIMIT, 1) + 1
+
 export const movementIssue = (id: string, overrides: Partial<Issue> = {}): Issue =>
   ({
     _id: id,
     _class: tracker.class.Issue,
     space: "project-1",
-    identifier: `TEST-${id}`,
+    identifier: `TEST-${fixtureNumber(id)}`,
+    number: fixtureNumber(id),
+    rank: "0|hzzzzz:",
     title: `Issue ${id}`,
     attachedTo: tracker.ids.NoParent,
     attachedToClass: tracker.class.Issue,
@@ -142,7 +150,20 @@ export const movementFixture = (issues: Array<Issue>, options: MovementFixtureOp
     options.onWrite?.(issues)
     return Effect.succeed({})
   }
-  return { issues, writes, operations: { findAll, updateDoc }, layer: HulyClient.testLayer({ findAll, updateDoc }) }
+  const findOne: HulyClientOperations["findOne"] = (cls, query, findOptions) =>
+    findAll(cls, query, findOptions).pipe(Effect.map((rows) => rows[0]))
+  const inspectTransferRecords: NonNullable<HulyClientOperations["inspectTransferRecords"]> = () =>
+    Effect.succeed(
+      Schema.decodeUnknownSync(TransferInspectionSchema)({
+        discovery: "complete",
+        classes: [],
+        records: [],
+        blockers: [],
+        limitation: "Fixture model has no owned records."
+      })
+    )
+  const operations = { findAll, findOne, updateDoc, inspectTransferRecords }
+  return { issues, writes, operations, layer: HulyClient.testLayer(operations) }
 }
 
 export const threeLevelMovementFixture = () => {

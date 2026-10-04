@@ -31,7 +31,7 @@ export const MoveIssueParamsSchema = Schema.Struct({
 }).annotate({
   title: "MoveIssueParams",
   description:
-    "Move a tree within its project or a compatible leaf across projects. Cross-project moves require equal project types, supported kind/status and no component/milestone references; only automatic history records are supported. Unsupported structure is refused before allocation. Stable IDs persist; cross-project identifiers change."
+    "Move a tree within its project or a compatible leaf across projects. Cross-project moves require equal project types, supported kind/status and no component/milestone references. Comments/threads, nested attachments, labels, time reports and audited activity records follow the move; historical payloads and independent links stay intact. Unknown classes/ownership edges or discovery limits refuse before writes. Unsupported structure is refused before allocation. Stable IDs persist; cross-project identifiers change."
 })
 
 export type MoveIssueParams = Schema.Schema.Type<typeof MoveIssueParamsSchema>

@@ -114,9 +114,9 @@ export const movementNoopProblem = Effect.fn("movement.inspectNoop")(function* (
   client: HulyClient["Service"],
   plan: TransferPlan["plan"]
 ): Effect.fn.Return<string | undefined, MovementError> {
-  if (!canInspectNoop(client, plan)) return undefined
+  if (!canInspectNoop(plan)) return undefined
   const inspect = client.inspectTransferRecords
-  if (inspect === undefined) return undefined
+  if (inspect === undefined) return "No-op ownership inspection unavailable; cannot confirm a consistent destination."
   for (const issue of plan.tree) {
     const current = yield* client.findOne<Issue>(
       tracker.class.Issue,
@@ -133,11 +133,12 @@ export const movementNoopProblem = Effect.fn("movement.inspectNoop")(function* (
   return undefined
 })
 
-const canInspectNoop = (client: HulyClient["Service"], plan: TransferPlan["plan"]) =>
-  plan.root.attachedTo === (plan.parent?._id ?? movementNoParent) && client.inspectTransferRecords !== undefined
+const canInspectNoop = (plan: TransferPlan["plan"]) => plan.root.attachedTo === (plan.parent?._id ?? movementNoParent)
 
 const ownedNoopProblem = (records: TransferInspection, issue: TransferPlan["plan"]["root"]) => {
   if (records.discovery === "incomplete") return "Incomplete owned-record discovery; not a successful no-op."
+  if (records.blockers.length > 0 || records.records.some((record) => record.kind === "unsupported"))
+    return "Unsupported or inconsistent owned-record closure; not a successful no-op."
   return records.records.some((record) => record.space !== issue.space)
     ? "Owned records remain in another project; not a successful no-op."
     : undefined
