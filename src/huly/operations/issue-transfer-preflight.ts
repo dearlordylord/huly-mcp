@@ -1,3 +1,4 @@
+import { observeTransferForest } from "../issue-transfer-forest-observation.js"
 import { inspectTransferWorkflow } from "./issue-transfer-workflow.js"
 import { parseTransferSnapshot, transferConflict } from "./issue-transfer-preflight-values.js"
 import { inspectTransferAttributes } from "./issue-transfer-attribute-inspection.js"
@@ -146,7 +147,6 @@ const inspectSameProjectTask = Effect.fn("movement.inspectProtectedTask")(functi
 
 const inspectTransferTasks = Effect.fn("transfer.inspectTasks")(function* (
   client: HulyClient["Service"],
-  inspectRecords: NonNullable<HulyClient["Service"]["inspectTransferRecords"]>,
   tree: ReadonlyArray<MovementIssue>,
   root: MovementIssue,
   parent: MovementIssue | undefined,
@@ -156,14 +156,20 @@ const inspectTransferTasks = Effect.fn("transfer.inspectTasks")(function* (
   { readonly tasks: TransferPlan["tasks"]; readonly conflicts: ReadonlyArray<TransferConflict> },
   MovementError
 > {
+  const forest = yield* observeTransferForest(
+    client,
+    tree.map((issue) => issue._id),
+    tree,
+    () => Effect.void
+  )
   const tasks: Array<TransferPlan["tasks"][number]> = []
   const conflicts: Array<TransferConflict> = []
   for (const issue of tree) {
     const workflow = yield* Effect.result(inspectTaskWorkflow(client, issue, tree, root, parent, source, destination))
-    const records = yield* Effect.result(inspectRecords(issue._id, tree))
-    if (records._tag === "Failure")
+    const records = forest.find((entry) => entry.ownerId === issue._id)
+    if (records?.status !== "observed")
       conflicts.push(transferConflict(issue, "discovery", "Owned-record observation is unavailable for this task."))
-    else conflicts.push(...ownedRecordConflicts(issue, records.success))
+    else conflicts.push(...ownedRecordConflicts(issue, records.inspection))
     if (workflow._tag === "Failure") {
       conflicts.push(
         transferConflict(
@@ -178,7 +184,9 @@ const inspectTransferTasks = Effect.fn("transfer.inspectTasks")(function* (
     tasks.push({
       issue,
       protectedIssue: workflow.success.protectedIssue,
-      ...(records._tag === "Success" ? supportedRecordSnapshot(records.success) : { recordClasses: [], records: [] })
+      ...(records?.status === "observed"
+        ? supportedRecordSnapshot(records.inspection)
+        : { recordClasses: [], records: [] })
     })
   }
   return { tasks, conflicts }
@@ -215,8 +223,7 @@ export const inspectTransferPlan = Effect.fn("transfer.inspectPlan")(function* (
   destination: MovementProject,
   params: MoveIssueParams
 ): Effect.fn.Return<TransferPlan | TransferRefusal, MovementError> {
-  const inspectRecords = client.inspectTransferRecords
-  if (inspectRecords === undefined)
+  if (client.inspectTransferRecords === undefined && client.inspectTransferForest === undefined)
     return {
       conflicts: [transferConflict(root, "discovery", "Transfer adapter unavailable; no writes performed.")],
       limitation: "Inspection unavailable."
@@ -230,7 +237,7 @@ export const inspectTransferPlan = Effect.fn("transfer.inspectPlan")(function* (
   const inventories = preserveSameProjectAttributes
     ? undefined
     : yield* inspectTransferAttributes(client, source, destination)
-  const inspectedTasks = yield* inspectTransferTasks(client, inspectRecords, tree, root, parent, source, destination)
+  const inspectedTasks = yield* inspectTransferTasks(client, tree, root, parent, source, destination)
   const { tasks } = inspectedTasks
   const conflicts = [
     ...context.discoveryReasons.map((reason) => transferConflict(root, "discovery", reason)),

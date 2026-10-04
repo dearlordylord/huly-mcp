@@ -1,3 +1,5 @@
+import { observeTransferForest } from "../issue-transfer-forest-observation.js"
+import type { TransferForestEntry } from "../issue-transfer-forest-state.js"
 import { isDeepStrictEqual } from "node:util"
 import { Effect, Schema } from "effect"
 import {
@@ -38,8 +40,7 @@ export const observeTransferRecords = Effect.fn("transfer.observeRecords")(funct
   observed: ReadonlyArray<ObservedIssue>,
   publish: (observation: RecordObservation) => Effect.Effect<void>
 ): Effect.fn.Return<RecordObservation> {
-  const inspect = client.inspectTransferRecords
-  if (inspect === undefined)
+  if (client.inspectTransferRecords === undefined && client.inspectTransferForest === undefined)
     return { records: [], problems: [], limitations: ["Owned-record verifier is unavailable."] }
   const records: Array<RecordObservation["records"][number]> = []
   const problems: Array<string> = []
@@ -47,26 +48,28 @@ export const observeTransferRecords = Effect.fn("transfer.observeRecords")(funct
   const owners = [
     ...new Set([...prepared.tasks.map((task) => task.issue._id), ...observed.map((issue) => issue.hierarchy._id)])
   ]
-  for (const issueId of owners) {
-    const read = yield* Effect.result(
-      inspect(
-        issueId,
-        observed.map((issue) => issue.hierarchy)
-      )
-    )
-    if (read._tag === "Failure") {
+  const observeOwner = Effect.fn("transfer.observeOwner")(function* (
+    entry: TransferForestEntry
+  ): Effect.fn.Return<void> {
+    const issueId = entry.ownerId
+    if (entry.status === "unavailable") {
       limitations.push(`Record closure of ${issueId} could not be read.`)
-      yield* publish({ records: [...records], problems: [...problems], limitations: [...limitations] })
-      continue
+    } else {
+      const task = prepared.tasks.find((value) => value.issue._id === issueId)
+      const planned = write.tasks.find((value) => value.issueId === issueId)
+      const ownerProof = inspectOwnerRecords(entry.inspection, task?.records ?? [], planned?.destinationId)
+      records.push(...ownerProof.records)
+      problems.push(...ownerProof.problems)
+      limitations.push(...ownerProof.limitations)
     }
-    const task = prepared.tasks.find((value) => value.issue._id === issueId)
-    const planned = write.tasks.find((value) => value.issueId === issueId)
-    const ownerProof = inspectOwnerRecords(read.success, task?.records ?? [], planned?.destinationId)
-    records.push(...ownerProof.records)
-    problems.push(...ownerProof.problems)
-    limitations.push(...ownerProof.limitations)
     yield* publish({ records: [...records], problems: [...problems], limitations: [...limitations] })
-  }
+  })
+  yield* observeTransferForest(
+    client,
+    owners,
+    observed.map((issue) => issue.hierarchy),
+    observeOwner
+  )
   return { records, problems, limitations }
 })
 

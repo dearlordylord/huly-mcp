@@ -1,3 +1,4 @@
+import type { TransferForestEntry } from "../../../src/huly/issue-transfer-forest-state.js"
 import { it } from "@effect/vitest"
 import { Effect, Fiber, Schema } from "effect"
 import { TestClock } from "effect/testing"
@@ -319,3 +320,32 @@ for (const capability of ["available", "unavailable", "omitted-optional-changes"
     })
   )
 }
+
+it.effect("forest dispatch observes the complete public movement before and after commit", () =>
+  Effect.gen(function* () {
+    const f = transferTreeFixture()
+    const inspect = assertExists(f.operations.inspectTransferRecords)
+    const forestRoots: Array<ReadonlyArray<IssueId>> = []
+    const result = yield* run(f, {
+      ...f.operations,
+      inspectTransferRecords: () => Effect.fail(new HulyAuthError({ message: "Legacy port must not be used" })),
+      inspectTransferForest: (roots, tree, publish) =>
+        Effect.gen(function* () {
+          forestRoots.push([...roots])
+          const entries: Array<TransferForestEntry> = []
+          for (const ownerId of roots) {
+            const inspection = yield* inspect(ownerId, tree)
+            const entry: TransferForestEntry = { status: "observed", ownerId, inspection }
+            entries.push(entry)
+            if (publish !== undefined) yield* publish(entry)
+          }
+          return entries
+        })
+    })
+    expect(result.outcome).toBe("completed")
+    const expected = [f.root, f.child, f.grandchild].map((issue) => IssueId.make(issue._id))
+    expect(forestRoots.length).toBeGreaterThan(1)
+    for (const roots of forestRoots) expect(roots).toEqual(expected)
+    expect(f.state.sent).toBe(1)
+  })
+)
