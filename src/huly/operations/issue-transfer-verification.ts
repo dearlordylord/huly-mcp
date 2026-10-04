@@ -20,6 +20,8 @@ import type { TransferPlan } from "./issue-transfer-preflight.js"
 import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 
+const parseObservedIssue = (input: unknown) => Schema.decodeUnknownOption(TransferIssueSchema)(input)
+
 export const verifyTransfer = Effect.fn("transfer.verify")(function* (
   client: HulyClient["Service"],
   prepared: TransferPlan,
@@ -55,7 +57,7 @@ const preservedIssueMatches = Effect.fn("transfer.verifyPreservation")(function*
     tracker.class.Issue,
     hulyQuery<Issue>({ _id: toRef<Issue>(plan.root._id) })
   )
-  const parsed = Schema.decodeUnknownOption(TransferIssueSchema)(current)
+  const parsed = parseObservedIssue(current)
   if (parsed._tag === "None") return false
   const { number: _oldNumber, rank: _oldRank, ...previous } = prepared.protectedIssue
   const { number, rank, ...preserved } = parsed.value
@@ -108,7 +110,7 @@ export const movementNoopProblem = Effect.fn("movement.inspectNoop")(function* (
       tracker.class.Issue,
       hulyQuery<Issue>({ _id: toRef<Issue>(issue._id) })
     )
-    const parsed = Schema.decodeUnknownOption(TransferIssueSchema)(current)
+    const parsed = parseObservedIssue(current)
     if (parsed._tag === "None") return "No-op identity inspection failed."
     if (issue.identifier !== `${plan.source.identifier}-${parsed.value.number}`)
       return "Inconsistent issue number/identifier; not a successful no-op."
