@@ -8,7 +8,7 @@ import { movementHistoryMatches } from "./issue-movement-history.js"
 
 // Internal request-local invalidation; parsed batch payload remains schema-owned.
 export interface MovementBatchVerification {
-  readonly batch: MovementTransactionBatch | undefined
+  readonly batch: Effect.Effect<MovementTransactionBatch | undefined>
   readonly invalidate: Effect.Effect<void>
 }
 // Internal projection of authenticated parsed history from this request's one queued apply batch.

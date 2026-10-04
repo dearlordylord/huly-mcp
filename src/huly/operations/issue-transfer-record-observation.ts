@@ -212,14 +212,16 @@ const inspectTransactionEvidence = Effect.fn("transfer.inspectTransactionEvidenc
 }> {
   const recordIntents = transactions.filter((value) => "target" in value)
   const inspect = client.inspectMovementTransactions
-  if (recordIntents.length === 0 || inspect === undefined) return { persisted: undefined, batch: batchPayload(context) }
+  if (recordIntents.length === 0 || inspect === undefined)
+    return { persisted: undefined, batch: yield* batchPayload(context) }
   const result = yield* Effect.result(inspect(recordIntents))
-  if (result._tag === "Success") return { persisted: result.success, batch: batchPayload(context) }
+  if (result._tag === "Success") return { persisted: result.success, batch: yield* batchPayload(context) }
   if (result.failure instanceof HulyDataInvalidError) {
     if (context !== undefined) yield* context.invalidate
     return { persisted: undefined, batch: undefined }
   }
-  return { persisted: undefined, batch: batchPayload(context) }
+  return { persisted: undefined, batch: yield* batchPayload(context) }
 })
 
-const batchPayload = (context: MovementBatchVerification | undefined) => context?.batch
+const batchPayload = (context: MovementBatchVerification | undefined) =>
+  context === undefined ? Effect.succeed(undefined) : context.batch

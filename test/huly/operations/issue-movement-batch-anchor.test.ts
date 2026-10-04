@@ -34,7 +34,8 @@ const scenarios = [
   "conflicting-anchors",
   "direct-contradiction",
   "invalid-direct-evidence",
-  "invalid-then-empty"
+  "invalid-then-empty",
+  "invalid-repeat"
 ] as const
 for (const scenario of scenarios) {
   it.effect(`single movement batch anchor: ${scenario}`, () =>
@@ -82,11 +83,18 @@ for (const scenario of scenarios) {
       const params = yield* parseMoveIssueParams(f.input)
       f.state.failCommit = scenario === "reply-lost"
       const evidenceCalls = yield* Ref.make(0)
+      const originalTitle = f.child.title
       const operations = {
         ...f.operations,
         inspectMovementTransactions: () =>
           Effect.gen(function* () {
             const call = yield* Ref.updateAndGet(evidenceCalls, (value) => value + 1)
+            if (scenario === "invalid-repeat" && call === 1) {
+              f.child.title = originalTitle
+              return yield* Effect.fail(
+                new HulyDataInvalidError({ operation: "move_issue", entity: "persisted transactions" })
+              )
+            }
             if (scenario === "invalid-direct-evidence" || (scenario === "invalid-then-empty" && call === 1))
               return yield* Effect.fail(
                 new HulyDataInvalidError({ operation: "move_issue", entity: "persisted transactions" })
@@ -161,6 +169,7 @@ for (const scenario of scenarios) {
                   })
                 })
               )
+              if (scenario === "invalid-repeat") f.child.title = "independently changed title"
               if (scenario !== "preexisting-history") f.records.push(history)
               if (scenario === "conflicting-anchors")
                 f.records.push(
@@ -207,7 +216,10 @@ for (const scenario of scenarios) {
       yield* TestClock.adjust("2 seconds")
       const result = yield* Fiber.join(fiber)
       expect(f.state.sent).toBe(1)
-      if (scenario === "acknowledged") expect(result.outcome).toBe("completed")
+      if (scenario === "invalid-repeat") {
+        expect(["incomplete", "indeterminate"]).toContain(result.outcome)
+        expect(yield* Ref.get(evidenceCalls)).toBeGreaterThan(1)
+      } else if (scenario === "acknowledged") expect(result.outcome).toBe("completed")
       else if (scenario === "reply-lost")
         expect(result).toMatchObject({
           outcome: "indeterminate",
