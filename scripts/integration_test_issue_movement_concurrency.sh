@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Final integrated 306–311 certification only. Creates disposable ordinary Huly fixtures.
 set -euo pipefail
-source "$(dirname "${BASH_SOURCE[0]}")/test-telemetry-env.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/test-telemetry-env.sh" || exit 1
 : "${HULY_URL:?Set ordinary local Huly URL}"
 CLI=(node packages/huly-cli/dist/index.cjs)
 TSX=(node node_modules/tsx/dist/cli.mjs)
