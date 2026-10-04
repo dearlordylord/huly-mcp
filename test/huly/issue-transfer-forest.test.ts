@@ -40,15 +40,20 @@ const forestFixture = () => {
     malformed: false,
     wrongOwner: false,
     failCollection: false,
-    missing: false
+    missing: false,
+    wrongRoot: false,
+    truncateIndividual: false
   }
   const reads = new Set<Promise<unknown>>()
   const rootIds = new Set(roots)
+  const failedRoots = new Set<IssueId>()
   const hierarchy = f.client.getHierarchy()
   const client = sdkFixture<TxOperations>({
     getHierarchy: () => hierarchy,
     findOne: async (_cls: unknown, query: unknown) => {
       const id = Schema.decodeUnknownSync(RootQuerySchema)(query)._id
+      if (failedRoots.has(id)) throw new ForestFixtureFailure({ reason: "private-token" })
+      if (state.wrongRoot) return sdkFixture<Doc>({ _id: "unexpected-root", _class: tracker.class.Issue })
       return !state.missing && rootIds.has(id) ? sdkFixture<Doc>({ _id: id, _class: tracker.class.Issue }) : undefined
     },
     findAll: (cls: unknown, query: DocumentQuery<Doc>, _options?: FindOptions<Doc>) => {
@@ -78,6 +83,7 @@ const forestFixture = () => {
             )
           )
         )
+        if (owners.length === 1 && state.truncateIndividual) result.total = result.length + 1
         if (owners.length > 1 && state.truncateGrouped) result.total = result.length + 1
         if (owners.length > 1 && state.unknownGroupedTotal) result.total = UNKNOWN_TOTAL
         return result
@@ -86,7 +92,7 @@ const forestFixture = () => {
       return read
     }
   })
-  return { ...f, calls, client, rootIds, reads, state }
+  return { ...f, modelState: f.state, calls, client, failedRoots, rootIds, reads, state }
 }
 class ForestFixtureFailure extends Schema.TaggedError<ForestFixtureFailure>()("ForestFixtureFailure", {
   reason: Schema.String
@@ -369,6 +375,96 @@ it.effect("refuses contradictory ownership of one stable record across requested
         inspection.blockers.some((reason) => reason.includes("Ambiguous forest ownership"))
       )
     ).toBe(true)
+    expect(f.updates).toEqual([])
+  })
+)
+
+it.effect("refuses a root reply with a different stable identity", () =>
+  Effect.gen(function* () {
+    const f = forestFixture()
+    f.state.wrongRoot = true
+    const result = yield* inspectTransferForest(f.client, roots, [], undefined, policy)
+    expect(result).toEqual(
+      roots.map((ownerId) => ({ status: "unavailable", ownerId, reason: "inspection-unavailable" }))
+    )
+    expect(f.calls).toEqual([])
+    expect(f.updates).toEqual([])
+  })
+)
+
+it.effect("preserves an independently inspected root when another root read fails", () =>
+  Effect.gen(function* () {
+    const f = forestFixture()
+    f.failedRoots.add(IssueId.make("second"))
+    const published: Array<TransferForestEntry> = []
+    const result = yield* inspectTransferForest(
+      f.client,
+      roots,
+      [],
+      (entry) =>
+        Effect.sync(() => {
+          published.push(entry)
+        }),
+      policy
+    )
+    expect(result[0]?.status).toBe("observed")
+    expect(observed(result)[0]?.discovery).toBe("complete")
+    expect(result[1]).toEqual({
+      status: "unavailable",
+      ownerId: IssueId.make("second"),
+      reason: "inspection-unavailable"
+    })
+    expect(published).toHaveLength(roots.length)
+    expect(JSON.stringify(result)).not.toContain("private-token")
+    expect(f.updates).toEqual([])
+  })
+)
+
+it.effect("refuses unavailable model metadata without declaring complete empty ownership", () =>
+  Effect.gen(function* () {
+    const f = forestFixture()
+    f.modelState.failModel = true
+    const result = yield* inspectTransferForest(f.client, roots, [], undefined, policy)
+    expect(observed(result).every((inspection) => inspection.discovery === "incomplete")).toBe(true)
+    expect(
+      observed(result).every((inspection) =>
+        inspection.blockers.includes("Owned-record model observation is unavailable.")
+      )
+    ).toBe(true)
+    expect(f.calls).toEqual([])
+    expect(f.updates).toEqual([])
+  })
+)
+
+it.effect("refuses incomplete individual collection totals without attempting batch fallback", () =>
+  Effect.gen(function* () {
+    const f = forestFixture()
+    f.state.truncateIndividual = true
+    const result = yield* inspectTransferForest(f.client, [IssueId.make("root")], [], undefined, policy)
+    expect(observed(result)[0]?.discovery).toBe("incomplete")
+    expect(observed(result)[0]?.blockers.some((reason) => reason.includes("Incomplete collection discovery"))).toBe(
+      true
+    )
+    expect(f.calls.every((call) => call.owners.length === 1)).toBe(true)
+    expect(f.updates).toEqual([])
+  })
+)
+
+it.effect("retains parsed records and sibling observations when a later nested payload is malformed", () =>
+  Effect.gen(function* () {
+    const f = forestFixture()
+    f.docs.push(
+      ownedRecord("broken-file", String(attachment.class.Attachment), "comment-a", "attachments", {
+        ...attachmentPayload,
+        name: 1
+      })
+    )
+    const result = yield* inspectTransferForest(f.client, roots, [], undefined, policy)
+    expect(observed(result)[0]?.discovery).toBe("incomplete")
+    expect(observed(result)[0]?.records.map((row) => row._id)).toEqual(["comment-a", "history", "file-a"])
+    expect(observed(result)[0]?.blockers).toContain("Owned-record payload or ownership observation is unavailable.")
+    expect(observed(result)[1]?.discovery).toBe("complete")
+    expect(observed(result)[1]?.records.map((row) => row._id)).toEqual(["comment-b"])
     expect(f.updates).toEqual([])
   })
 )
