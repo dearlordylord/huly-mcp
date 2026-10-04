@@ -73,11 +73,20 @@ const inspectIssuePreservation = Effect.fn("transfer.verifyPreservation")(functi
   const { number, rank, ...preserved } = parsed.value
   return number === write.number &&
     rank === write.rank &&
-    isDeepStrictEqual(previous, preserved) &&
+    isDeepStrictEqual(plannedAttributes(previous, prepared), preserved) &&
     current.title === plan.root.title
     ? "consistent"
     : "inconsistent"
 })
+
+const plannedAttributes = (
+  previous: Omit<TransferPlan["protectedIssue"], "number" | "rank">,
+  prepared: TransferPlan
+) => {
+  const planned = { ...previous }
+  for (const change of prepared.attributeChanges) planned[change.field] = change.to
+  return planned
+}
 
 const recordsMatch = (previous: TransferPlan["records"], current: TransferInspection, destination: MovementProject) =>
   current.discovery === "complete" &&

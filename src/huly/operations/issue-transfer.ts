@@ -1,3 +1,4 @@
+import { transferRetryCall } from "./issue-transfer-retry.js"
 import type { Issue, Project } from "@hcengineering/tracker"
 import { SortingOrder } from "@hcengineering/core"
 import { makeRank } from "@hcengineering/rank"
@@ -47,6 +48,8 @@ export const transferIssue = Effect.fn("transferIssue")(function* (
     return {
       outcome: "blocked",
       changed: false,
+      discovery: "incomplete",
+      destinationId: destination._id,
       reason: `Pre-write inspection failed: ${preparedResult.failure.message}`,
       issueIds: [root._id],
       inspection
@@ -57,6 +60,8 @@ export const transferIssue = Effect.fn("transferIssue")(function* (
       outcome: "blocked",
       changed: false,
       reason: `${prepared.conflicts.map((entry) => entry.reason).join(" ")} ${prepared.limitation}`,
+      discovery: prepared.discovery ?? "incomplete",
+      nextCall: transferRetryCall(params, root._id, prepared.conflicts),
       conflicts: prepared.conflicts,
       destinationId: destination._id,
       issueIds: [root._id],
@@ -78,6 +83,8 @@ const executeTransfer = Effect.fn("transfer.execute")(function* (
     return {
       outcome: "blocked",
       changed: false,
+      discovery: "incomplete",
+      destinationId: destination._id,
       reason: "Transfer commit adapter unavailable.",
       issueIds: [root._id],
       inspection
@@ -91,6 +98,8 @@ const executeTransfer = Effect.fn("transfer.execute")(function* (
     return {
       outcome: "blocked",
       changed: false,
+      discovery: "incomplete",
+      destinationId: destination._id,
       reason: "Destination ordering inspection failed before writes.",
       issueIds: [root._id],
       inspection
@@ -178,6 +187,7 @@ const commitAndVerify = Effect.fn("transfer.commitAndVerify")(function* (
   return {
     outcome: "completed",
     changed: true,
+    attributeChanges: prepared.attributeChanges,
     issueId: root._id,
     projectId: DocId.make(destination._id),
     parentId: parent?._id ?? null,
@@ -213,6 +223,7 @@ const makeTransferWrite = (
     identifier: IssueIdentifier.make(`${destination.identifier}-${number}`),
     rank: NonEmptyString.make(makeRank(lastRank, undefined)),
     records: prepared.records,
-    recordClasses: prepared.recordClasses
+    recordClasses: prepared.recordClasses,
+    attributeChanges: prepared.attributeChanges
   }
 }

@@ -1,6 +1,6 @@
 import type { ActivityReference } from "@hcengineering/activity"
-import type { Issue } from "@hcengineering/tracker"
-import type { AttachedDoc, Doc, TxOperations } from "@hcengineering/core"
+import type { Component, Issue, Milestone, Project } from "@hcengineering/tracker"
+import type { AttachedDoc, Doc, DocumentUpdate, TxOperations } from "@hcengineering/core"
 import type { TransferWrite, TransferSupportedRecord } from "../domain/schemas/issue-transfer.js"
 import { HulyTransactionScope, type HulyConditionalWriteResult } from "../domain/schemas/shared.js"
 import { activity, tracker } from "./huly-plugins.js"
@@ -23,6 +23,7 @@ export const commitTransfer = async (
     })
   )
   guardRecordClosure(apply, write)
+  matchTransferAttributes(apply, write)
   for (const record of write.records) {
     matchRecord(apply, record)
     await apply.updateDoc(
@@ -40,7 +41,8 @@ export const commitTransfer = async (
     attachedTo: toRef(write.parentId),
     number: write.number,
     identifier: write.identifier,
-    rank: write.rank
+    rank: write.rank,
+    ...attributeUpdates(write)
   })
   if (String(write.previousParent) !== String(tracker.ids.NoParent))
     await apply.updateDoc(tracker.class.Issue, toRef(write.sourceId), toRef(write.previousParent), {
@@ -96,4 +98,33 @@ const matchRecord = (apply: ReturnType<TxOperations["apply"]>, record: TransferS
       collection: record.collection
     })
   )
+}
+
+const attributeUpdates = (write: TransferWrite) => {
+  const updates: DocumentUpdate<Issue> = {}
+  for (const change of write.attributeChanges ?? []) {
+    if (change.field === "component") updates.component = change.to === null ? null : toRef(change.to)
+    else updates.milestone = change.to === null ? null : toRef(change.to)
+  }
+  return updates
+}
+
+const matchTransferAttributes = (apply: ReturnType<TxOperations["apply"]>, write: TransferWrite) => {
+  for (const change of write.attributeChanges ?? []) {
+    apply.match(
+      tracker.class.Issue,
+      hulyQuery<Issue>({ _id: toRef(write.issueId), [change.field]: toRef(change.from) })
+    )
+    if (change.to === null) continue
+    if (change.field === "component")
+      apply.match(
+        tracker.class.Component,
+        hulyQuery<Component>({ _id: toRef<Component>(change.to), space: toRef<Project>(write.destinationId) })
+      )
+    else
+      apply.match(
+        tracker.class.Milestone,
+        hulyQuery<Milestone>({ _id: toRef<Milestone>(change.to), space: toRef<Project>(write.destinationId) })
+      )
+  }
 }

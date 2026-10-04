@@ -1,3 +1,8 @@
+import {
+  TransferAttributeChangeSchema,
+  TransferComponentConflictFields,
+  TransferMilestoneConflictFields
+} from "./issue-transfer-attributes.js"
 import { SocialIdentityId } from "./person-administration.js"
 import { Schema } from "effect"
 import {
@@ -98,7 +103,8 @@ export const TransferWriteSchema = Schema.Struct({
   identifier: IssueIdentifier,
   rank: NonEmptyString,
   records: Schema.Array(TransferSupportedRecordSchema),
-  recordClasses: Schema.Array(ObjectClassName)
+  recordClasses: Schema.Array(ObjectClassName),
+  attributeChanges: Schema.optionalKey(Schema.Array(TransferAttributeChangeSchema))
 })
 export type TransferWrite = Schema.Schema.Type<typeof TransferWriteSchema>
 
@@ -136,17 +142,35 @@ export const TransferKindSchema = Schema.Struct({
 })
 export const TransferSequenceSchema = Schema.Struct({ object: Schema.Struct({ sequence: PositiveInteger }) })
 
-export const TransferConflictSchema = Schema.Struct({
-  code: Schema.Literals([
-    "unsupported-structure",
-    "unsupported-attribute",
-    "workflow",
-    "authorization",
-    "discovery",
-    "invalid-resolution"
-  ]),
-  issueId: IssueId,
-  identifier: IssueIdentifier,
-  reason: Schema.String
-})
+const ConflictFields = { issueId: IssueId, identifier: IssueIdentifier, reason: Schema.String }
+const CurrentAttributeConflictFields = {
+  ...ConflictFields,
+  from: DocId,
+  sourceName: Schema.optionalKey(Schema.String),
+  clearingAllowed: Schema.Literal(true),
+  code: Schema.Literals(["attribute", "stale-resolution", "invalid-resolution", "discovery"])
+}
+const AbsentAttributeConflictFields = {
+  ...ConflictFields,
+  from: Schema.Null,
+  clearingAllowed: Schema.Literal(false),
+  code: Schema.Literal("stale-resolution")
+}
+export const TransferConflictSchema = Schema.Union([
+  Schema.Struct({ ...CurrentAttributeConflictFields, ...TransferComponentConflictFields }),
+  Schema.Struct({ ...CurrentAttributeConflictFields, ...TransferMilestoneConflictFields }),
+  Schema.Struct({ ...AbsentAttributeConflictFields, ...TransferComponentConflictFields }),
+  Schema.Struct({ ...AbsentAttributeConflictFields, ...TransferMilestoneConflictFields }),
+  Schema.Struct({
+    ...ConflictFields,
+    code: Schema.Literals([
+      "unsupported-structure",
+      "unsupported-attribute",
+      "workflow",
+      "authorization",
+      "discovery",
+      "invalid-resolution"
+    ])
+  })
+])
 export type TransferConflict = Schema.Schema.Type<typeof TransferConflictSchema>

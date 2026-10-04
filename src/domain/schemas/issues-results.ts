@@ -1,3 +1,5 @@
+import { MoveIssueParamsSchema } from "./issue-movement.js"
+import { TransferAttributeChangeSchema } from "./issue-transfer-attributes.js"
 import { Schema } from "effect"
 
 import { TransferConflictSchema } from "./issue-transfer.js"
@@ -20,6 +22,7 @@ export const DeleteIssueResultSchema = Schema.Struct({ identifier: IssueIdentifi
 export type DeleteIssueResult = Schema.Schema.Type<typeof DeleteIssueResultSchema>
 
 const MovementCompletedFields = {
+  attributeChanges: Schema.optionalKey(Schema.Array(TransferAttributeChangeSchema)),
   issueId: IssueId,
   projectId: DocId,
   parentId: Schema.NullOr(IssueId),
@@ -37,6 +40,8 @@ export const MoveIssueResultSchema = Schema.Union([
   Schema.Struct({ ...MovementCompletedFields, outcome: Schema.Literal("completed"), changed: Schema.Literal(true) }),
   Schema.Struct({ ...MovementCompletedFields, outcome: Schema.Literal("no-op"), changed: Schema.Literal(false) }),
   Schema.Struct({
+    discovery: Schema.optionalKey(Schema.Literals(["complete", "incomplete"])),
+    nextCall: Schema.optionalKey(MoveIssueParamsSchema),
     conflicts: Schema.optionalKey(Schema.Array(TransferConflictSchema)),
     destinationId: Schema.optionalKey(DocId),
     outcome: Schema.Literal("blocked"),

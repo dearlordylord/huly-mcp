@@ -195,3 +195,14 @@ it.effect("reads the root runtime model and refuses a mismatched stable root ide
     expect((yield* Effect.result(inspect(f)))._tag).toBe("Failure")
   })
 )
+
+it.effect("unknown nested counts refuse completion even when root records are visible", () =>
+  Effect.gen(function* () {
+    const f = recordAdapterFixture()
+    f.state.unknownNestedTotal = true
+    const result = yield* inspect(f)
+    expect(result.discovery).toBe("incomplete")
+    expect(result.blockers.join(" ")).toContain("Incomplete")
+    expect(f.updates).toEqual([])
+  })
+)

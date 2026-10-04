@@ -77,6 +77,7 @@ export const recordAdapterFixture = () => {
     rootId: "root",
     incomplete: false,
     unknownTotal: false,
+    unknownNestedTotal: false,
     invalidTotal: false,
     failRead: false,
     invalidMetadata: false,
@@ -139,7 +140,7 @@ export const recordAdapterFixture = () => {
         : rows
       const result = findResult(duplicated.map((doc) => sdkFixture<Doc>(doc)))
       if (state.incomplete) result.total = 10_002
-      if (state.unknownTotal) result.total = -1
+      if (state.unknownTotal || (state.unknownNestedTotal && query.attachedTo === history._id)) result.total = -1
       if (state.invalidTotal) result.total = -2
       return result
     },
