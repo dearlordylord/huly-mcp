@@ -46,7 +46,7 @@ export const transferTreeFixture = () => {
       if (f.state.refuseCommit) return Effect.succeed("condition-not-met")
       if (!f.state.ignoreCommit) {
         for (const task of write.tasks) {
-          const issue = f.issues.find((candidate) => candidate._id === task.issueId)
+          const issue = f.issues.find((candidate) => String(candidate._id) === task.issueId)
           if (issue === undefined) return Effect.succeed("condition-not-met")
           Object.assign(issue, {
             space: task.destinationId,

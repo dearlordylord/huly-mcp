@@ -50,9 +50,11 @@ const queueRemovedAncestorInformation = async (
           !task.finalParents.some((parent) => parent.parentId === ancestor._id)
       )
       .map((task) => toRef<Issue>(task.issueId))
-    if (removed.length > 0)
+    // SDK DocumentUpdate supports an exact childInfo element predicate. Queue
+    // every removed ID in the same atomic apply; no broad replacement of childInfo.
+    for (const childId of removed)
       await apply.updateDoc(tracker.class.Issue, toRef(ancestor.space), toRef<Issue>(ancestor._id), {
-        $pull: { childInfo: { childId: { $in: removed } } }
+        $pull: { childInfo: { childId } }
       })
   }
 }

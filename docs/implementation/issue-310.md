@@ -55,3 +55,13 @@ Verification distinguishes unavailable closure/payload parsing from confirmed ab
 or inconsistent state using the typed closure inspector. Public regression cases and
 the pinned batch ancestry simulation are authored; verification remains unrun pending
 the root's scheduled slot. No live Huly writes were made.
+
+First scheduled typecheck at 067786ea terminated in TypeScript with six errors;
+Effect diagnostics and focused tests did not run. The source successor uses one
+SDK-supported `$pull: { childInfo: { childId } }` per removed task, all queued in
+the same scoped apply. This matches the pinned tracker trigger at index.ts:482
+and the core operator's exact object-field predicate at operator.ts:58; every
+old-only external ancestor entry is removed without replacing unrelated entries.
+The adapter batch simulation now parses and applies that actual scalar predicate.
+The remaining errors were fixture readonly construction, brand comparisons and
+the shared UNKNOWN_TOTAL import. No gate or live success is claimed.

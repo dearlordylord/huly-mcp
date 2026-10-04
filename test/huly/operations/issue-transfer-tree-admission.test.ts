@@ -1,9 +1,9 @@
-import { UNKNOWN_TOTAL, type Doc, type DocumentQuery, type FindOptions } from "@hcengineering/core"
+import { type Doc, type DocumentQuery, type FindOptions } from "@hcengineering/core"
 import { it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import { expect } from "vitest"
 import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"
-import { IssueId } from "../../../src/domain/schemas/shared.js"
+import { UNKNOWN_TOTAL, IssueId } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { moveIssue } from "../../../src/huly/operations/issue-movement.js"
 import { sdkFixture, findResultForTestClass } from "../../helpers/huly-sdk.js"
@@ -137,7 +137,7 @@ it.effect("one malformed protected sibling retains other workflow, attribute and
       original<T>(sdkFixture(cls), query, options).pipe(
         Effect.map((row) => {
           const parsed = parseIdQuery(query)
-          return parsed._tag === "Some" && parsed.value._id === f.child._id && row !== undefined
+          return parsed._tag === "Some" && parsed.value._id === String(f.child._id) && row !== undefined
             ? sdkFixture<T>({ ...row, description: 123 })
             : row
         })

@@ -24,9 +24,7 @@ const TaskUpdateSchema = Schema.Struct({
     identifier: Schema.optionalKey(IssueIdentifier),
     parents: Schema.optionalKey(MovementIssueSchema.fields.parents),
     $inc: Schema.optionalKey(Schema.Struct({ subIssues: Schema.Number })),
-    $pull: Schema.optionalKey(
-      Schema.Struct({ childInfo: Schema.Struct({ childId: Schema.Struct({ $in: Schema.Array(IssueId) }) }) })
-    )
+    $pull: Schema.optionalKey(Schema.Struct({ childInfo: Schema.Struct({ childId: IssueId }) }))
   })
 })
 type TaskUpdate = Schema.Schema.Type<typeof TaskUpdateSchema>
@@ -45,7 +43,7 @@ const applyPersistedBatch = (
   for (const { id, update } of updates) {
     const current = stored.get(id)
     if (current === undefined) continue
-    const removed = update.$pull?.childInfo.childId.$in ?? []
+    const removed = update.$pull?.childInfo.childId
     stored.set(id, {
       ...current,
       space: update.space ?? current.space,
@@ -53,7 +51,7 @@ const applyPersistedBatch = (
       identifier: update.identifier ?? current.identifier,
       parents: includeParents ? (update.parents ?? current.parents) : current.parents,
       subIssues: Count.make(current.subIssues + (update.$inc?.subIssues ?? 0)),
-      childInfo: current.childInfo.filter((child) => !removed.includes(child.childId))
+      childInfo: current.childInfo.filter((child) => removed !== child.childId)
     })
   }
   const derived: Array<{ issue: MovementIssue; parents: MovementIssue["parents"] }> = []

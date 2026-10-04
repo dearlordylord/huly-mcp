@@ -115,6 +115,31 @@ export const transferFixture = () => {
     return Effect.succeed(documentForTestClass<T>(found))
   }
   const attributeRows: Array<Doc> = []
+  const commitTransfer: NonNullable<HulyClientOperations["commitTransfer"]> = (write: TransferWrite) => {
+    state.sent++
+    if (state.refuseCommit) return Effect.succeed("condition-not-met")
+    if (!state.ignoreCommit) {
+      Object.assign(root, {
+        space: write.destinationId,
+        attachedTo: write.parentId,
+        identifier: write.identifier,
+        rank: write.rank,
+        number: write.number
+      })
+      for (const change of write.attributeChanges ?? []) Reflect.set(root, change.field, change.to)
+      if (state.corruptNumber) root.number++
+      if (state.corruptContent) root.description = sdkFixture("Changed content")
+      if (!state.corruptHistory) for (const record of records) record.space = write.destinationId
+      if (state.corruptHistoryPayload) for (const record of records) record.history.action = "remove"
+      if (state.corruptHistoryAuthor)
+        for (const record of records) record.modifiedBy = NonEmptyString.make("changed author")
+      if (state.corruptHistoryTime)
+        for (const record of records) record.modifiedOn = Timestamp.make(CORRUPTED_HISTORY_TIMESTAMP)
+      initializeHierarchy(issues)
+    }
+    if (state.failCommit) return unavailable()
+    return Effect.succeed("applied")
+  }
   const operations: Partial<HulyClientOperations> = {
     ...fixture.operations,
     findOne,
@@ -148,40 +173,12 @@ export const transferFixture = () => {
       if (state.failAllocation) return unavailable()
       return Effect.succeed(state.invalidAllocation ? {} : { object: { sequence: state.sequence } })
     },
-    commitTransfer: (write: TransferWrite) => {
-      state.sent++
-      if (state.refuseCommit) return Effect.succeed("condition-not-met")
-      if (!state.ignoreCommit) {
-        Object.assign(root, {
-          space: write.destinationId,
-          attachedTo: write.parentId,
-          identifier: write.identifier,
-          rank: write.rank,
-          number: write.number
-        })
-        for (const change of write.attributeChanges ?? []) Reflect.set(root, change.field, change.to)
-        if (state.corruptNumber) root.number++
-        if (state.corruptContent) root.description = sdkFixture("Changed content")
-        if (!state.corruptHistory) for (const record of records) record.space = write.destinationId
-        if (state.corruptHistoryPayload) for (const record of records) record.history.action = "remove"
-        if (state.corruptHistoryAuthor)
-          for (const record of records) record.modifiedBy = NonEmptyString.make("changed author")
-        if (state.corruptHistoryTime)
-          for (const record of records) record.modifiedOn = Timestamp.make(CORRUPTED_HISTORY_TIMESTAMP)
-        initializeHierarchy(issues)
-      }
-      if (state.failCommit) return unavailable()
-      return Effect.succeed("applied")
+    commitTransfer,
+    // Model the guarded leaf tree port explicitly, including derived ancestor cleanup.
+    commitTransferTree: (write) => {
+      const task = write.tasks[0]
+      return task === undefined || write.tasks.length !== 1 ? Effect.succeed("condition-not-met") : commitTransfer(task)
     }
-  }
-  // The leaf fixture supplies the same complete-tree port; its derived-state
-  // initializer models final ancestry and old-ancestor cleanup, never production fallback.
-  operations.commitTransferTree = (write) => {
-    const task = write.tasks[0]
-    const commit = operations.commitTransfer
-    return task === undefined || write.tasks.length !== 1 || commit === undefined
-      ? Effect.succeed("condition-not-met")
-      : commit(task)
   }
   return {
     ...fixture,
