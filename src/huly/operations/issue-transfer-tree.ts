@@ -14,7 +14,7 @@ export type TransferTree =
   | { readonly complete: true; readonly issues: ReadonlyArray<MovementIssue> }
   | { readonly complete: false; readonly issues: ReadonlyArray<MovementIssue>; readonly reasons: ReadonlyArray<string> }
 
-export const discoverTransferTree = (root: MovementIssue, inventory: ReadonlyArray<MovementIssue>): TransferTree => {
+const indexTransferAttachments = (inventory: ReadonlyArray<MovementIssue>) => {
   const reasons: Array<string> = []
   const children = new Map<IssueId, Array<MovementIssue>>()
   const ids = new Set<IssueId>()
@@ -25,30 +25,43 @@ export const discoverTransferTree = (root: MovementIssue, inventory: ReadonlyArr
     siblings.push(issue)
     children.set(issue.attachedTo, siblings)
   }
-  const issues = [root]
-  const visited = new Set([root._id])
-  for (const parent of issues) {
+  return { children, reasons }
+}
+
+// Internal traversal accumulator: mutation is local to the deterministic walk.
+interface TransferTraversal {
+  readonly issues: Array<MovementIssue>
+  readonly visited: Set<IssueId>
+  readonly reasons: Array<string>
+}
+
+const appendTransferChild = (root: MovementIssue, child: MovementIssue, traversal: TransferTraversal): boolean => {
+  if (traversal.visited.has(child._id)) {
+    traversal.reasons.push(`Cycle or duplicate traversal at ${child._id}; inspect attachments before retry.`)
+    return false
+  }
+  traversal.visited.add(child._id)
+  if (child.space !== root.space)
+    traversal.reasons.push(`Descendant ${child._id} is in another project; inspect partially moved tree before retry.`)
+  if (traversal.issues.length >= MAX_TRANSFER_TASKS) {
+    traversal.reasons.push(`Tree exceeds the supported ${MAX_TRANSFER_TASKS}-task response limit; no prefix can move.`)
+    return true
+  }
+  traversal.issues.push(child)
+  return false
+}
+
+export const discoverTransferTree = (root: MovementIssue, inventory: ReadonlyArray<MovementIssue>): TransferTree => {
+  const { children, reasons } = indexTransferAttachments(inventory)
+  const traversal: TransferTraversal = { issues: [root], visited: new Set([root._id]), reasons }
+  for (const parent of traversal.issues) {
     for (const child of children.get(parent._id) ?? []) {
-      if (visited.has(child._id)) {
-        reasons.push(`Cycle or duplicate traversal at ${child._id}; inspect attachments before retry.`)
-        continue
-      }
-      visited.add(child._id)
-      if (child.space !== root.space)
-        reasons.push(`Descendant ${child._id} is in another project; inspect partially moved tree before retry.`)
-      if (issues.length >= MAX_TRANSFER_TASKS)
-        return {
-          complete: false,
-          issues,
-          reasons: [
-            ...reasons,
-            `Tree exceeds the supported ${MAX_TRANSFER_TASKS}-task response limit; no prefix can move.`
-          ]
-        }
-      issues.push(child)
+      if (appendTransferChild(root, child, traversal)) return { complete: false, issues: traversal.issues, reasons }
     }
   }
-  return reasons.length === 0 ? { complete: true, issues } : { complete: false, issues, reasons }
+  return reasons.length === 0
+    ? { complete: true, issues: traversal.issues }
+    : { complete: false, issues: traversal.issues, reasons }
 }
 
 export const transferTreeParent = (
