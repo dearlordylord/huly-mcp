@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { test } from "node:test"
@@ -24,15 +24,14 @@ for (const [name, response, mode, expected, exit, processExit = 0] of [
   test(`native Bash adapter ${name}`, (t) => {
     const directory = mkdtempSync(join(tmpdir(), "native-mcp-adapter-"))
     t.after(() => rmSync(directory, { recursive: true }))
-    mkdirSync(join(directory, "scripts"))
     writeFileSync(join(directory, "response"), response)
-    writeFileSync(join(directory, "scripts/run-bundled.mjs"), `import fs from 'node:fs'; fs.appendFileSync('calls', JSON.stringify(process.argv.slice(2))+'\\n'); process.stdout.write(fs.readFileSync('response')); process.exitCode=${processExit};`)
-    const result = spawnSync("bash", ["-c", 'source "$1"; if [[ "$2" == list ]]; then movement_mcp_list_tools; else movement_mcp_call move_issue "{}"; fi', "adapter-test", adapter, mode], { cwd: directory, encoding: "utf8", timeout: processTimeoutMilliseconds })
+    writeFileSync(join(directory, "fixture.mjs"), `import fs from 'node:fs'; fs.appendFileSync('calls', JSON.stringify(process.argv.slice(2))+'\\n'); process.stdout.write(fs.readFileSync('response')); process.exitCode=${processExit};`)
+    const result = spawnSync("bash", ["-c", 'source "$1"; fixture_command=(node "$3"); if [[ "$2" == list ]]; then movement_mcp_list_tools fixture_command; else movement_mcp_call move_issue "{}" fixture_command; fi', "adapter-test", adapter, mode, join(directory, "fixture.mjs")], { cwd: directory, encoding: "utf8", timeout: processTimeoutMilliseconds, killSignal: "SIGKILL" })
     assert.equal(result.status, exit)
     if (expected !== undefined) assert.equal(result.stdout.trim(), expected)
     assert.ok(!result.stderr.includes(privateMarker))
     const calls = readFileSync(join(directory, "calls"), "utf8").trim().split("\n").map(JSON.parse)
     assert.equal(calls.length, 1)
-    assert.deepEqual(calls[0], ["scripts/integration-mcp-call-main.ts", ...(mode === "list" ? ["--list-tools"] : ["move_issue", "{}"])])
+    assert.deepEqual(calls[0], mode === "list" ? ["--list-tools"] : ["move_issue", "{}"])
   })
 }
