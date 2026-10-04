@@ -198,43 +198,12 @@ Versioning uses [Changesets](https://github.com/changesets/changesets):
 
 Package: `@firfi/huly-mcp` on npm.
 
-## Dalph delivery for issues 306–311
+## Current delivery ownership and validation cadence
 
-Dalph owns task and integration worktrees and the issue dependency frontier. Implement only the task specified by the title and body in your supplied task specification. The immutable RunTarget URL points to overall closure root311, not necessarily your assigned task. Never infer your task identity from that URL. Do not create competing orchestration or manually close issues. You are not alone in this codebase; accommodate others' changes and do not revert them.
+The user disabled Dalph and transferred306–311 delivery to the overseer and its implementer/reviewer agents. Do not invoke Dalph or follow its obsolete orchestration instructions. You are not alone in this codebase; do not revert other agents' work. Each implementer owns its assigned worktree. All six issues and all71 criteria remain required.
 
-Task identity and prerequisite mapping:
+306 is accepted at200075a4e86c21791130d57277bb252203b403a6.307 is unfinished; retained candidateac782a0c and corrections are in this worktree. Authoritative cached specifications are /tmp/hulymcp-dalph-306-311/issues/305.json through311.json.307 depends on306;308 and309 depend on307 and can run in parallel;310 depends on308/309;311 depends on310. Implement the complete assigned issue, persist through tests and review fixes, and do not return investigation-only work.
 
-| Issue | Supplied task title | Immediate prerequisites |
-| --- | --- | --- |
-|306|Unify destination-based movement within a project|none|
-|307|Move a compatible leaf issue across projects with verifiable outcomes|306|
-|308|Preserve task-owned records during project movement|307|
-|309|Resolve project attribute conflicts through an actionable retry|307|
-|310|Move complete issue trees with all descendant data and conflicts|308 and309|
-|311|Detect concurrent movement changes and expose verified outcomes|310|
+Live Huly integration runs ONLY after all six slices are implemented and integrated, per explicit user instruction overriding earlier per-feature scheduling. Author executable MCP/CLI fixtures now, keep every behavioral criterion, and record live evidence as pending final certification. Each intermediate slice must pass pnpm check-all and fresh Standards/Spec reviews through $code-review. Never weaken coverage thresholds, timeouts, inventory or diagnostics. GOMAXPROCS=2 is a current compiler concurrency experiment; compare actual results and retain all diagnostic checks.
 
-306 is already accepted and promoted at200075a4e86c21791130d57277bb252203b403a6. Do not recover or reimplement306. Task307 needs306 only; issues308–311 are future work, not307 prerequisites. Read your supplied task specification fully, consult parent305, and preserve every acceptance criterion. Cached original issue bodies are available in /tmp/hulymcp-dalph-306-311/issues/305.json through311.json. Prefer gh api repos/dearlordylord/huly-mcp/issues/NNN for fresh REST reads when gh issue view's GraphQL quota is restricted. A failed auxiliary fetch does not change your assigned task.
-
-Before acceptance, invoke $code-review against the immutable base_sha from the Dalph task prompt. Use separate parallel Standards and Spec reviewer sub-agents. Consult .claude/review-rules.md and parent GitHub issue305 in addition to your task issue. Record both review reports and validation evidence in docs/implementation/issue-NNN.md. Resolve blocking findings before returning an accepted commit.
-
-## Implementation responsibility and retained307 investigation
-
-The task body is an instruction to implement the complete assigned feature, not a request for investigation or a plan. Persist through implementation, executable fixtures, unit/property tests, check-all and fresh reviews. Complexity, missing existing APIs that this task must add, or the fact that the feature is currently unimplemented are not external blockers. Do not end the attempt with an investigation-only report or merely run the unchanged baseline gate. Return a failure only when a concrete external dependency prevents further authorized work; record that dependency and attempted recovery accurately.
-
-For307, read /tmp/hulymcp-dalph-306-311/issue-307-retained-investigation.md before repeating research. The previous attempt found the reference collection walker and sequence/batch APIs and identified stable-ID public recovery as part of this task, but wrote no feature code. Its baseline gate failed on three CLI harness timeout observations; all eight focused tests subsequently passed. Do not count that focused pass as a full gate pass. Implement307, then run the full gate on your actual candidate and fix any reproducible failure through the existing seams without weakening thresholds or timeouts. Live integration remains deferred as described below.
-
-## User-directed validation cadence: live integration only at the end
-
-The user explicitly changed the integration cadence: run live Huly integration only after all six306–311 slices are implemented and integrated. This overrides earlier per-feature and per-slice integration scheduling instructions in this checkout and linked issues. Keep every behavioral acceptance criterion; defer its real-server execution evidence to final certification, rather than discarding the requirement. Do not launch any new live Huly suite, including focused movement suites, during intermediate slices.
-
-Each intermediate slice must pass pnpm check-all and fresh parallel Standards/Spec plus Dalph reviews. Implement complete unit/property coverage with existing injection seams, and author or extend executable real-Huly fixture cases covering every issue criterion for the final run. Record the final integration obligations and accurate evidence status in docs/implementation/issue-NNN.md. Intermediate code acceptance permits progression and integration; it does not certify final live behavior. Do not reject an otherwise passing intermediate implementation merely because its live evidence is scheduled at the end by the user.
-
-After all six slices are integrated, the overall delivery must pass final check-all, all authored movement/transfer fixture suites through MCP and CLI, and clean whole-server MCP/full CLI regression suites on that final production candidate. The overseer owns long live suites because Dalph's opaque functions.exec command sessions have a600000ms lifetime limit. Dalph still owns implementation, reviews, worktrees and code integration. Any real-server defect found at final certification must be fixed and the relevant required checks rerun before overall completion.
-
-306 passed fresh check-all:342 files,4810 tests, all coverage metrics99% or higher. Its report is docs/implementation/issue-306.md. Historical scoped real-Huly movement verification passed. Historical broad MCP had1441 passes and one document-edit missing-response failure; a focused diagnostic passed27 cases. Historical full CLI was intentionally interrupted. All historical live processes are stopped. These results are not final combined-candidate certification; the broad MCP failure remains a final regression obligation.
-
-Bootstrap every generated worktree using bash scripts/bootstrap-worktree.sh /tmp/hulymcp-dalph-306-311/retry-repository. That repository has Linux-local dependencies. Never reinstall dependencies in the canonical shared checkout.
-
-## Preserve accepted prerequisites in dependent worktrees
-
-The production planner starts ordinary attempts at one configured base, even after prerequisite code is accepted and promoted. At the beginning of each dependent slice (307after306;308/309after307;310after308/309;311after310), inspect refs/heads/master in the shared repository and merge that accepted integration head into your own Dalph-owned worktree before implementation. Preserve the immutable planned base in your evidence. Do not import an unaccepted candidate or discard another worker's changes. If master lacks the accepted prerequisite, report the missing authority rather than rebuilding its API. Review both the complete planned-base diff and your delta from the observed prerequisite head. Dalph's integrator owns final integration and conflicts.
+Use Linux-local dependencies. Bootstrap with bash scripts/bootstrap-worktree.sh /tmp/hulymcp-dalph-306-311/retry-repository. Never reinstall dependencies in the canonical Darwin checkout. Consult pinned Effect references. Record candidate changes, full gate and reviews in docs/implementation/issue-NNN.md. The final combined candidate must pass check-all, authored movement/transfer MCP+CLI fixtures and full MCP/full CLI regressions. The overseer owns live suite execution.
