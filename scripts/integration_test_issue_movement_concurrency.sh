@@ -14,8 +14,10 @@ case "$CONCURRENCY_PROFILE" in routine|expanded) ;; *) echo "Invalid concurrency
 select_concurrency_cases() {
   jq -c --arg transport "$1" --arg profile "$CONCURRENCY_PROFILE" 'select($profile=="expanded" or $transport=="mcp" or (.name as $name | ["refuse-stale-attribute","allocated-reply-lost","successful-batch-reply-lost","verification-outage"] | index($name)!=null))'
 }
+ALL_CASE_NAMES='["refuse-stale-child","preserve-later-child","refuse-stale-comment","preserve-later-comment","refuse-stale-time","preserve-later-time","refuse-stale-attribute","preserve-later-attribute","refuse-stale-ancestry","preserve-later-ancestry","before-allocation-send","allocated-reply-lost","successful-batch-reply-lost","verification-outage"]'
+ROUTINE_CLI_NAMES='["refuse-stale-attribute","allocated-reply-lost","successful-batch-reply-lost","verification-outage"]'
 CASE_MATRIX=$("${TSX[@]}" scripts/issue-movement-concurrency/matrix.ts) || exit 1
-jq -es 'length==14 and (map(.name)|unique|length)==14' >/dev/null <<<"$CASE_MATRIX"
+jq -es --argjson expected "$ALL_CASE_NAMES" 'length==14 and (map(.name)|sort)==($expected|sort)' >/dev/null <<<"$CASE_MATRIX"
 printf -v SOURCE 'C%04X' "$RANDOM"
 printf -v DESTINATION 'R%04X' "$RANDOM"
 PROJECTS=()
@@ -59,6 +61,9 @@ create "$SOURCE" 'Alternative source ancestor'; SOURCE_PARENT="$CREATED_ID"
 create "$DESTINATION" 'Alternative destination ancestor'; DESTINATION_PARENT="$CREATED_ID"
 for transport in mcp cli; do
   SELECTED_CASES=$(select_concurrency_cases "$transport" <<<"$CASE_MATRIX") || exit 1
+  EXPECTED_CASE_NAMES="$ALL_CASE_NAMES"
+  if [[ "$CONCURRENCY_PROFILE" == routine && "$transport" == cli ]]; then EXPECTED_CASE_NAMES="$ROUTINE_CLI_NAMES"; fi
+  jq -es --argjson expected "$EXPECTED_CASE_NAMES" 'length==($expected|length) and (map(.name)|sort)==($expected|sort)' >/dev/null <<<"$SELECTED_CASES"
   while IFS= read -r entry; do
     NAME=$(jq -r .name <<<"$entry")
     FIXTURE_PHASE="$transport:$NAME:setup"
@@ -85,7 +90,8 @@ for transport in mcp cli; do
     FIXTURE_PHASE="$transport:$NAME:verification"
     jq -c --arg transport "$transport" --arg case "$NAME" '{transport:$transport,case:$case,observation:.observation.status,outcome:.observation.result.outcome,changed:.observation.result.changed,reason:.observation.result.reason,discovery:.observation.result.discovery,verificationStatus:.observation.result.verification.status,verificationConsistency:.observation.result.verification.consistency}' <<<"$RESULT" >&2
     jq -e '.observation.status == "result" and any(.gatewayEvents[]; .event == "barrier")' >/dev/null <<<"$RESULT"
-    AFTER=$("${BUNDLED[@]}" scripts/integration-issue-transfer-state.ts "$SNAPSHOT_ARGS")
+    AFTER_ARGS=$(jq -nc --argjson args "$SNAPSHOT_ARGS" --argjson before "$BEFORE" --arg destination "$DESTINATION" '$args + {migrationEvidence:{destinationSpace:($before.projects[]|select(.identifier==$destination)|._id),beforeRecordIds:[$before.issues[].owned.records[]._id]}}')
+    AFTER=$("${BUNDLED[@]}" scripts/integration-issue-transfer-state.ts "$AFTER_ARGS")
     EXPECTED=$(jq -r .expectedLocation <<<"$entry")
     PROJECT="$SOURCE"; [[ "$EXPECTED" == destination ]] && PROJECT="$DESTINATION"
     jq -e --arg id "$ROOT_ID" --arg project "$PROJECT" '.mutation.after.issueId == $id and .mutation.after.project == $project' >/dev/null <<<"$RESULT"
@@ -107,7 +113,13 @@ for transport in mcp cli; do
       jq -e --arg root "$ROOT_ID" --arg component "${COMPONENTS[$PROJECT]}" '.issues[] | select(.issue._id == $root) | .issue.component == $component' >/dev/null <<<"$AFTER"
     fi
     # Baseline descendant-owned IDs must survive every race and interruption.
-    jq -e --argjson before "$BEFORE" '. as $after | all($before.issues[]; . as $old | any($after.issues[]; . as $current | .issue._id == $old.issue._id and all($old.owned.records[]; . as $record | any($current.owned.records[]; ._id == $record._id and .snapshot == $record.snapshot))))' >/dev/null <<<"$AFTER"
+    RECORD_EVIDENCE=$(jq -L scripts -c --argjson before "$BEFORE" --arg root "$ROOT_ID" -f scripts/issue-movement-concurrency/assert-record-preservation.jq <<<"$AFTER")
+    jq -c '{phase:"owned-record-preservation",valid,lastModificationEvidence,recordCount:(.records|length)}' <<<"$RECORD_EVIDENCE" >&2
+    jq -e '.valid' >/dev/null <<<"$RECORD_EVIDENCE"
+    # Unavailable metadata never authenticates completed movement; uncertainty remains explicit.
+    if jq -e '.lastModificationEvidence=="unavailable"' >/dev/null <<<"$RECORD_EVIDENCE"; then
+      jq -e '.observation.result.outcome=="incomplete" or .observation.result.outcome=="indeterminate"' >/dev/null <<<"$RESULT"
+    fi
     # Single-send sequence evidence is measured independently, not inferred from a gateway response.
     EXPECTED_INCREMENT=3
     # A later independently created destination child reserves its own fourth number.
