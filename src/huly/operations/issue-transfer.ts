@@ -142,7 +142,6 @@ const commitAndVerify = Effect.fn("transfer.commitAndVerify")(function* (
   commit: NonNullable<HulyClient["Service"]["commitTransfer"]>
 ): Effect.fn.Return<MoveIssueResult, MovementError> {
   const { plan } = prepared
-  const { parent, root } = plan
   const committed = yield* Effect.result(commit(write))
   if (committed._tag === "Failure")
     return failure(
@@ -184,6 +183,16 @@ const commitAndVerify = Effect.fn("transfer.commitAndVerify")(function* (
       destination,
       prepared.records
     )
+  return completedTransferResult(client.workbenchUrlConfig, prepared, destination, verified.success.issue)
+})
+
+const completedTransferResult = (
+  urls: HulyClient["Service"]["workbenchUrlConfig"],
+  prepared: TransferPlan,
+  destination: MovementProject,
+  observed: MovementIssue
+): MoveIssueResult => {
+  const { root, parent } = prepared.plan
   return {
     outcome: "completed",
     changed: true,
@@ -195,15 +204,15 @@ const commitAndVerify = Effect.fn("transfer.commitAndVerify")(function* (
       {
         issueId: IssueId.make(root._id),
         previousIdentifier: root.identifier,
-        identifier: IssueIdentifier.make(verified.success.issue.identifier),
-        parentId: verified.success.issue.attachedTo === movementNoParent ? null : verified.success.issue.attachedTo,
+        identifier: IssueIdentifier.make(observed.identifier),
+        parentId: observed.attachedTo === movementNoParent ? null : observed.attachedTo,
         url: UrlString.make(
-          `${client.workbenchUrlConfig.baseUrl.replace(/\/+$/, "")}/workbench/${client.workbenchUrlConfig.workspaceUrlSlug}/tracker/${encodeURIComponent(verified.success.issue.identifier)}`
+          `${urls.baseUrl.replace(/\/+$/, "")}/workbench/${urls.workspaceUrlSlug}/tracker/${encodeURIComponent(observed.identifier)}`
         )
       }
     ]
   }
-})
+}
 
 const makeTransferWrite = (
   prepared: TransferPlan,
