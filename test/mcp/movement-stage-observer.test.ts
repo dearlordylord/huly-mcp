@@ -147,3 +147,38 @@ it.effect("a synchronous reporting constructor defect preserves success, typed f
     expect(statuses).toEqual(Array.from({ length: 3 }, () => ({ observerStatus: "unavailable" })))
   })
 )
+
+// Internal read ports exercise actual Effect span completion and interruption without SDK I/O.
+it.effect("distinguishes completed frontier reads from the one interrupted read", () =>
+  Effect.gen(function* () {
+    const readCount = 8
+    const reports: Array<MovementStageReport> = []
+    const pendingStarted = yield* Deferred.make<void>()
+    const observe = makeMovementStageObserver({
+      write: (report) =>
+        Effect.sync(() => {
+          reports.push(report)
+        }),
+      publishStatus: () => Effect.void
+    })
+    const read = (ordinal: number) =>
+      ordinal === readCount - 1
+        ? Deferred.succeed(pendingStarted, undefined).pipe(Effect.andThen(Effect.never))
+        : Effect.void
+    const operation = Effect.forEach(
+      Array.from({ length: readCount }, (_, ordinal) => ordinal),
+      (ordinal) => read(ordinal).pipe(Effect.withSpan("transfer.readForestOwners")),
+      { concurrency: readCount }
+    ).pipe(Effect.withSpan("transfer.inspectForestFrontier"))
+    const fiber = yield* observe(operation).pipe(Effect.forkChild)
+    yield* Deferred.await(pendingStarted)
+    yield* TestClock.adjust("1 second")
+    yield* Fiber.interrupt(fiber)
+    const report = yield* Schema.decodeUnknownEffect(MovementStageReportSchema)(reports[0])
+    const reads = report.stages.filter((stage) => stage.stage === "transfer.readForestOwners")
+    expect(reads).toHaveLength(readCount)
+    expect(reads.filter((stage) => stage.outcome === "success")).toHaveLength(readCount - 1)
+    expect(reads.filter((stage) => stage.outcome === "interrupted")).toHaveLength(1)
+    expect(report.stages.find((stage) => stage.stage === "transfer.inspectForestFrontier")?.outcome).toBe("interrupted")
+  })
+)
