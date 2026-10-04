@@ -130,3 +130,15 @@ test('changed suite inputs during child execution never create reusable pass evi
     assert.equal(receipt.inputsStable, false)
   } finally { await rm(f.root, { recursive: true }) }
 })
+
+test('preparation cannot qualify source changed during its execution', async () => {
+  const f = await fixture()
+  try {
+    await mkdir(path.join(f.root, 'src'))
+    await writeFile(path.join(f.root, 'scripts/prepare.sh'), '#!/bin/bash\necho changed >> src/main.ts\n')
+    const result = await runCertification({ ...f, prepare: 'scripts/prepare.sh' })
+    assert.equal(result.exit, 1)
+    assert.equal(result.drift, true)
+    await assert.rejects(readFile(path.join(f.root, 'launches')), { code: 'ENOENT' })
+  } finally { await rm(f.root, { recursive: true }) }
+})

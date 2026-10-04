@@ -60,11 +60,11 @@ const dependencies = async (root, initial) => {
   return [...files].sort((a, b) => a.localeCompare(b))
 }
 const byteFingerprint = async (root, files) => hash(JSON.stringify(await Promise.all(files.map(async file => [file, hash(await readFile(path.join(root, file)))]))))
-export const fingerprintSuite = async (root, suite, prepare) => {
+export const fingerprintSuite = async (root, suite, prepare, includeGenerated = true) => {
   const commonFiles = ['pnpm-lock.yaml', 'tsconfig.json', ...(await walk(path.join(root, 'src'))).map(file => path.relative(root, file)),
     ...(await walk(path.join(root, 'packages/huly-cli/src'))).map(file => path.relative(root, file)),
-    ...(await walk(path.join(root, 'dist'))).map(file => path.relative(root, file)),
-    ...(await walk(path.join(root, 'packages/huly-cli/dist'))).map(file => path.relative(root, file))]
+    ...(includeGenerated ? await walk(path.join(root, 'dist')) : []).map(file => path.relative(root, file)),
+    ...(includeGenerated ? await walk(path.join(root, 'packages/huly-cli/dist')) : []).map(file => path.relative(root, file))]
   if (prepare !== undefined) commonFiles.push(...await dependencies(root, prepare))
   const environment = parseEnvironment()
   const packageData = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.JsonObject))(await readFile(path.join(root, 'package.json'), 'utf8'))
@@ -145,12 +145,16 @@ const ownedCertification = async ({ deadline, diagnostic, mode, prepare, root, s
   let clean = true
   try {
     await writeFile(path.join(root, '.movement-certification.lock/owner.json'), JSON.stringify({ pid: process.pid, deadline: effectiveDeadline, stateDir }))
+    const sourceBaseline = await fingerprintSuite(root, suites[0], prepare, false)
     if (prepare !== undefined) {
       await dependencies(root, prepare)
+      ownership.clean = false
       const result = await boundedProcess(root, prepare, path.join(stateDir, 'prepare.log'), effectiveDeadline, time)
       clean = result.clean
+      ownership.clean = clean
       if (result.exit !== 0 || !result.clean) return { exit: result.exit || 1, expired: result.exit === TIMEOUT_EXIT, plan: [] }
     }
+    if ((await fingerprintSuite(root, suites[0], prepare, false)).fingerprint !== sourceBaseline.fingerprint) return { exit: 1, expired: false, plan: [], drift: true }
     const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
     const plan = []
     const accepted = new Map()
@@ -162,10 +166,13 @@ const ownedCertification = async ({ deadline, diagnostic, mode, prepare, root, s
       if (receipt?.exit === 0 && receipt.clean && receipt.inputsStable && await reusableLog(receipt, time)) { accepted.set(suite, fingerprint); plan.push({ suite, status: 'reuse', log: receipt.log, sourceCommit: receipt.sourceCommit }); continue }
       const admission = diagnostic?.startsWith(`${suite}:`) === true ? diagnostic.slice(suite.length + 1).trim() : undefined
       if (receipt !== undefined && !admission) return { exit: 1, expired: false, plan: [...plan, { suite, status: 'blocked', log: receipt.log }] }
+      ownership.clean = false
       const started = time.now(), log = path.join(stateDir, `${suite}-${started}.log`)
       const result = await boundedProcess(root, `scripts/integration_test_${suite}.sh`, log, effectiveDeadline, time)
       clean = result.clean
-      const inputsStable = (await fingerprintSuite(root, suite, prepare)).fingerprint === fingerprint
+      ownership.clean = clean
+      const sourceStable = (await fingerprintSuite(root, suites[0], prepare, false)).fingerprint === sourceBaseline.fingerprint
+      const inputsStable = sourceStable && (await fingerprintSuite(root, suite, prepare)).fingerprint === fingerprint
       const evidence = parseReceipt(JSON.stringify({ suite, ...fingerprints, sourceCommit, log, logHash: hash(await readFile(log)), started, ended: time.now(), exit: result.exit, clean, inputsStable,
         ...(admission ? { diagnostic: admission } : {}) }))
       await appendFile(receiptFile, JSON.stringify(evidence) + '\n'); receipts.push(evidence)
@@ -173,14 +180,15 @@ const ownedCertification = async ({ deadline, diagnostic, mode, prepare, root, s
       if (result.exit !== 0 || !clean || !inputsStable) { state.expired ||= result.exit === TIMEOUT_EXIT; return { exit: result.exit || 1, expired: state.expired, plan } }
       accepted.set(suite, fingerprint)
     }
+    if ((await fingerprintSuite(root, suites[0], prepare, false)).fingerprint !== sourceBaseline.fingerprint) return { exit: 1, expired: false, plan, drift: true }
     for (const [suite, fingerprint] of accepted) {
       if ((await fingerprintSuite(root, suite, prepare)).fingerprint !== fingerprint) return { exit: 1, expired: false, plan, drift: true }
     }
     return { exit: time.now() >= effectiveDeadline ? TIMEOUT_EXIT : 0, expired: time.now() >= effectiveDeadline, plan }
   } finally {
+    ownership.clean = ownership.clean && clean
     state.expired ||= time.now() >= effectiveDeadline
     await atomicState(stateFile, state)
-    ownership.clean = clean
   }
 }
 if (process.argv[1] !== undefined && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
