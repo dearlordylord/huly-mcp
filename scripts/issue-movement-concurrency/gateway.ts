@@ -4,6 +4,7 @@ import { Schema } from "effect"
 import { PositiveInteger, UrlString } from "../../src/domain/schemas/shared.js"
 import { makeGatewayBarrier } from "./barrier.js"
 import { GatewayArguments, GatewayControl, GatewayEvent, parseWritePoint, type GatewayPoint } from "./protocol.js"
+const HTTP_SERVICE_UNAVAILABLE = 503
 
 const emit = (event: Schema.Schema.Type<typeof GatewayEvent>) =>
   process.stdout.write(`${JSON.stringify(Schema.decodeUnknownSync(GatewayEvent)(event))}\n`)
@@ -13,7 +14,7 @@ const readBody = async (request: IncomingMessage) => {
   return Buffer.concat(chunks)
 }
 const fail = (response: ServerResponse) => {
-  response.writeHead(503, { "content-type": "application/json" })
+  response.writeHead(HTTP_SERVICE_UNAVAILABLE, { "content-type": "application/json" })
   response.end('{"error":"Disposable movement fixture transport refusal"}')
 }
 
