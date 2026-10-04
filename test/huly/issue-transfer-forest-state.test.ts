@@ -139,3 +139,73 @@ it.effect("an observed owner is published before a later forest read exceeds its
     expect(published).toEqual([root])
   })
 )
+
+it.effect("a partial callback followed by a refined terminal observation refuses that owner", () =>
+  Effect.gen(function* () {
+    const f = transferTreeFixture()
+    const inspection = yield* assertExists(f.operations.inspectTransferRecords)(IssueId.make(f.root._id), [])
+    const prefix: TransferForestEntry = {
+      status: "observed",
+      ownerId: IssueId.make(f.root._id),
+      inspection: { ...inspection, discovery: "incomplete", records: [], blockers: ["Partial prefix"] }
+    }
+    const client = yield* HulyClient.pipe(
+      Effect.provide(
+        HulyClient.testLayer({
+          ...f.operations,
+          inspectTransferForest: (_roots, _tree, publish) =>
+            Effect.gen(function* () {
+              yield* assertExists(publish)(prefix)
+              return [{ status: "observed", ownerId: prefix.ownerId, inspection }]
+            })
+        })
+      )
+    )
+    const published: Array<TransferForestEntry> = []
+    const result = yield* observeTransferForest(client, [prefix.ownerId], [], (entry) =>
+      Effect.sync(() => {
+        published.push(entry)
+      })
+    )
+    const refusal: TransferForestEntry = {
+      status: "unavailable",
+      ownerId: prefix.ownerId,
+      reason: "conflicting-owner-observation"
+    }
+    expect(result).toEqual([refusal])
+    expect(published).toEqual([prefix, refusal])
+  })
+)
+
+it.effect("a contradictory terminal observation preserves the earlier publication and refuses refinement", () =>
+  Effect.gen(function* () {
+    const f = transferTreeFixture()
+    const inspection = yield* assertExists(f.operations.inspectTransferRecords)(IssueId.make(f.root._id), [])
+    const first: TransferForestEntry = { status: "observed", ownerId: IssueId.make(f.root._id), inspection }
+    const client = yield* HulyClient.pipe(
+      Effect.provide(
+        HulyClient.testLayer({
+          ...f.operations,
+          inspectTransferForest: (_roots, _tree, publish) =>
+            Effect.gen(function* () {
+              yield* assertExists(publish)(first)
+              return [{ status: "unavailable", ownerId: first.ownerId, reason: "owner-unavailable" }]
+            })
+        })
+      )
+    )
+    const published: Array<TransferForestEntry> = []
+    const result = yield* observeTransferForest(client, [first.ownerId], [], (entry) =>
+      Effect.sync(() => {
+        published.push(entry)
+      })
+    )
+    const refusal: TransferForestEntry = {
+      status: "unavailable",
+      ownerId: first.ownerId,
+      reason: "conflicting-owner-observation"
+    }
+    expect(result).toEqual([refusal])
+    expect(published).toEqual([first, refusal])
+  })
+)

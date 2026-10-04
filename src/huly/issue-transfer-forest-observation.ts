@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from "node:util"
 import { Effect } from "effect"
 import type { IssueId } from "../domain/schemas/shared.js"
 import type { MovementIssue } from "../domain/schemas/issue-movement-state.js"
@@ -51,9 +52,12 @@ export const observeTransferForest = Effect.fn("transfer.observeForest")(functio
   const entries = new Map<IssueId, TransferForestEntry>()
   const record: TransferForestProgress = (entry) =>
     Effect.gen(function* () {
-      if (!roots.includes(entry.ownerId) || entries.has(entry.ownerId)) return
-      entries.set(entry.ownerId, entry)
-      yield* publish(entry)
+      if (!roots.includes(entry.ownerId)) return
+      const previous = entries.get(entry.ownerId)
+      const next = reconcileOwnerObservation(previous, entry)
+      if (next === undefined) return
+      entries.set(entry.ownerId, next)
+      yield* publish(next)
     })
   yield* inspectForestRoots(client, roots, tree, record)
   const ordered: Array<TransferForestEntry> = []
@@ -68,3 +72,13 @@ export const observeTransferForest = Effect.fn("transfer.observeForest")(functio
   }
   return ordered
 })
+
+const reconcileOwnerObservation = (
+  previous: TransferForestEntry | undefined,
+  current: TransferForestEntry
+): TransferForestEntry | undefined => {
+  if (previous === undefined) return current
+  if (isDeepStrictEqual(previous, current)) return undefined
+  if (previous.status === "unavailable" && previous.reason === "conflicting-owner-observation") return undefined
+  return { status: "unavailable", ownerId: current.ownerId, reason: "conflicting-owner-observation" }
+}
