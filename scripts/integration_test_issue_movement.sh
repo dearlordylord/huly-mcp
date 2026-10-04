@@ -70,10 +70,14 @@ assert_result "$RESULT" blocked
 jq -e '.changed == false and (.reason | contains("Omit resolutions"))' >/dev/null <<<"$RESULT"
 [[ "$(jq -Sc . <<<"$(snapshot)")" == "$(jq -Sc . <<<"$AFTER")" ]]
 echo "PASS: agreeing project/parent stable IDs no-op; same-project resolutions refused without writes"
+echo "INFO: waiting 30 seconds for the shared Huly RPC quota window before the independent CLI movement/no-op pair"
+sleep 30
 RESULT=$("${CLI[@]}" issues move "$ROOT_ID" --destination '{"parent":null}' --json)
 assert_result "$RESULT" completed
 RESULT=$("${CLI[@]}" issues move "$ROOT_ID" --destination "$(jq -nc --arg project "$PROJECT" '{project:$project}')" --json)
 assert_result "$RESULT" no-op
+echo "INFO: waiting 30 seconds for the shared Huly RPC quota window before the independent identifier movement/cycle group"
+sleep 30
 RESULT=$("${CLI[@]}" issues move "$ROOT" --destination "$(jq -nc --arg project "$PROJECT_ID" --arg parent "$DEST_ID" '{project:$project,parent:$parent}')" --json)
 assert_result "$RESULT" completed
 RESULT=$("${CLI[@]}" issues move "$ROOT" --destination "$(jq -nc --arg parent "$LEAF" '{parent:$parent}')" --json)

@@ -505,3 +505,11 @@ preserved fields and relations, and checks actual `parents`, `subIssues` and
 `childInfo` data. See `docs/implementation/issue-306.md` for ordinary Huly 0.7.409
 trigger ownership and parent-array ordering. Movement refuses inconsistent trees;
 it does not repair or resume a partially moved tree automatically.
+
+The fixture waits 30 seconds between independent MCP and CLI scenario groups
+to respect the ordinary server's shared account RPC quota window. Each movement
+and its immediate no-op remain together; concurrent actors run without an
+intervening cooldown. These fixture waits do not change operation deadlines,
+fresh inspection guards, or assertions, and failed movements are not retried.
+They isolate independent certification cases from cumulative quota pressure;
+they are not evidence of improved product latency.
