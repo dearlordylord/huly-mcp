@@ -25,7 +25,6 @@ export const movementRecordProof = (
   const after = parseSnapshot(current.snapshot)
   if (Option.isNone(before) || Option.isNone(after)) return "unavailable"
   if (!protectedRecordMatches(current, expected, destinationId, before.value, after.value)) return "changed"
-  if (current.modifiedOn === expected.modifiedOn && isDeepStrictEqual(before.value, after.value)) return "preserved"
   if (!snapshotMetadataMatches(after.value, current)) return "changed"
   return committedRecordTime(current, expected, destinationId, queued, persisted)
 }
