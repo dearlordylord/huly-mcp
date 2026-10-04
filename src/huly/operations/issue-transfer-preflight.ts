@@ -283,14 +283,28 @@ const inspectTransferTasks = Effect.fn("transfer.inspectTasks")(function* (
   const conflicts: Array<TransferConflict> = []
   for (const issue of tree) {
     const taskParent = issue._id === root._id ? parent : tree.find((candidate) => candidate._id === issue.attachedTo)
-    const workflow = yield* inspectWorkflow(client, issue, taskParent, source, destination)
-    const records = yield* inspectRecords(issue._id, tree)
-    conflicts.push(...workflow.conflicts, ...ownedRecordConflicts(issue, records))
+    const workflow = yield* Effect.result(inspectWorkflow(client, issue, taskParent, source, destination))
+    const records = yield* Effect.result(inspectRecords(issue._id, tree))
+    if (records._tag === "Failure")
+      conflicts.push(conflict(issue, "discovery", "Owned-record observation is unavailable for this task."))
+    else conflicts.push(...ownedRecordConflicts(issue, records.success))
+    if (workflow._tag === "Failure") {
+      conflicts.push(
+        conflict(
+          issue,
+          "discovery",
+          "Protected payload/workflow observation is unavailable for this task; independently inspectable siblings remain included."
+        )
+      )
+      continue
+    }
+    conflicts.push(...workflow.success.conflicts)
     tasks.push({
       issue,
-      protectedIssue: workflow.protectedIssue,
-      recordClasses: records.classes,
-      records: records.records.filter((record) => record.kind !== "unsupported")
+      protectedIssue: workflow.success.protectedIssue,
+      recordClasses: records._tag === "Success" ? records.success.classes : [],
+      records:
+        records._tag === "Success" ? records.success.records.filter((record) => record.kind !== "unsupported") : []
     })
   }
   return { tasks, conflicts }
@@ -323,7 +337,7 @@ export const inspectTransferPlan = Effect.fn("transfer.inspectPlan")(function* (
     ...hierarchyConflicts(root, hierarchy, relevant),
     ...inspectedTasks.conflicts
   ]
-  const attributes = resolveTransferTreeAttributes(root, tasks, inventories, params.resolutions)
+  const attributes = resolveTransferTreeAttributes(root, tasks, inventories, params.resolutions, tree)
   conflicts.push(...attributes.conflicts)
   if (closureProblem !== undefined) conflicts.push(conflict(root, "discovery", closureProblem))
   const capacityProblem = transferCapacityProblem(tasks, conflicts)

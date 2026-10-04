@@ -120,3 +120,47 @@ it.effect("unknown descendant totals preserve independently discovered attribute
     expect(f.state.sent).toBe(0)
   })
 )
+
+it.effect("one malformed protected sibling retains other workflow, attribute and every supplied consent check", () =>
+  Effect.gen(function* () {
+    const f = transferTreeFixture()
+    f.grandchild.status = sdkFixture("unsupported-status")
+    f.grandchild.component = sdkFixture("missing-component")
+    const original = assertExists(f.operations.findOne)
+    const IdQuery = Schema.Struct({ _id: IssueId })
+    const parseIdQuery = (input: unknown) => Schema.decodeUnknownOption(IdQuery)(input)
+    const findOne: HulyClientOperations["findOne"] = <T extends Doc>(
+      cls: unknown,
+      query: DocumentQuery<T>,
+      options?: FindOptions<T>
+    ) =>
+      original<T>(sdkFixture(cls), query, options).pipe(
+        Effect.map((row) => {
+          const parsed = parseIdQuery(query)
+          return parsed._tag === "Some" && parsed.value._id === f.child._id && row !== undefined
+            ? sdkFixture<T>({ ...row, description: 123 })
+            : row
+        })
+      )
+    const result = yield* parseMoveIssueParams({
+      ...f.input,
+      resolutions: [
+        { issueId: f.child._id, field: "component", from: "unknown-component", to: null },
+        { issueId: "out-of-tree", field: "component", from: "unknown-component", to: null }
+      ]
+    }).pipe(Effect.flatMap(moveIssue), Effect.provide(HulyClient.testLayer({ ...f.operations, findOne })))
+    expect(result).toMatchObject({ outcome: "blocked", changed: false, discovery: "incomplete" })
+    if (result.outcome !== "blocked") return
+    expect(result.conflicts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "workflow", issueId: f.grandchild._id }),
+        expect.objectContaining({ code: "attribute", issueId: f.grandchild._id }),
+        expect.objectContaining({ code: "discovery", issueId: f.child._id }),
+        expect.objectContaining({ code: "invalid-resolution", issueId: f.child._id }),
+        expect.objectContaining({ code: "invalid-resolution", issueId: f.root._id })
+      ])
+    )
+    expect(f.state.allocated).toBe(0)
+    expect(f.state.sent).toBe(0)
+  })
+)
