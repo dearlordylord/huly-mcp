@@ -576,6 +576,19 @@ environment identity. An invalid or stale prior fails before invocation; it does
 not authorize replaying a mutation. Keep the prior private and include its hash
 in the coordinator's input audit.
 
+All five movement fixtures use the official SDK helper with the published
+`2026-07-28` protocol. The four fixtures other than tree use the shared Bash
+adapter `scripts/integration-mcp-adapter.sh`; tree retains its own strict reply
+and ownership-ledger wrapper. Tool calls retain
+stdin until their matching reply, supply the discovered tool definition, and do
+not resend mutations. Read-only inventory uses the helper's `--list-tools`
+mode. Telemetry opt-outs are normalized before prior identity construction.
+The concurrency gateway changes the endpoint, so its MCP movement child omits
+the upstream discovery prior and performs fresh discovery for that endpoint;
+upstream CLI reads and the independent writer retain their ordinary routes.
+Transport source, prior/helper modules and their regression fixtures are included
+in every stock suite fingerprint, not merely the private continuation audit.
+
 When the authorized coordinator provides `MOVEMENT_PRIVATE_EVIDENCE_DIR` (an
 owned, normalized 0700 directory), the tree fixture atomically retains a 0600
 `tree-ledger.json`. It records known project, issue, component, milestone,

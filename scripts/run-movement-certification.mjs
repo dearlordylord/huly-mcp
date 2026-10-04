@@ -69,8 +69,9 @@ const preparationFingerprint = async root => {
     if (await optionalFile(path.join(root, configuration)) !== undefined) files.push(configuration)
   return byteFingerprint(root, files.sort((a, b) => a.localeCompare(b)))
 }
+export const movementTransportInputs = ['scripts/integration-mcp-adapter.sh', 'scripts/integration-mcp-adapter.test.mjs', 'scripts/integration-mcp-call.ts', 'scripts/integration-mcp-call-main.ts', 'scripts/integration-mcp-prior.ts', 'scripts/integration-mcp-prior-prepare.ts', 'test/scripts/integration-mcp-call.test.ts', 'test/scripts/integration-mcp-prior.test.ts', 'test/integration-fixtures/movement-public-process.test.ts', 'test/integration-fixtures/movement-public-process-fixture.ts']
 export const fingerprintSuite = async (root, suite, prepare, includeGenerated = true) => {
-  const commonFiles = ['pnpm-lock.yaml', 'tsconfig.json', ...(await walk(path.join(root, 'src'))).map(file => path.relative(root, file)),
+  const commonFiles = [...movementTransportInputs, 'pnpm-lock.yaml', 'tsconfig.json', ...(await walk(path.join(root, 'src'))).map(file => path.relative(root, file)),
     ...(await walk(path.join(root, 'packages/huly-cli/src'))).map(file => path.relative(root, file)),
     ...(includeGenerated ? await walk(path.join(root, 'dist')) : []).map(file => path.relative(root, file)),
     ...(includeGenerated ? await walk(path.join(root, 'packages/huly-cli/dist')) : []).map(file => path.relative(root, file))]

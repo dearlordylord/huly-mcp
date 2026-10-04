@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import os from 'node:os'
 import { createRequire } from 'node:module'
-import { realTime, runCertification, suites } from '../../scripts/run-movement-certification.mjs'
+import { realTime, runCertification, suites, movementTransportInputs, fingerprintSuite } from '../../scripts/run-movement-certification.mjs'
 
 const now = () => Effect.runSync(Clock.currentTimeMillis)
 const TEST_BUDGET_MS = 60_000
@@ -21,6 +21,10 @@ const fixture = async () => {
   await writeFile(path.join(root, 'packages/huly-cli/package.json'), '{}')
   for (const file of ['package.json', 'pnpm-lock.yaml', 'tsconfig.json']) await writeFile(path.join(root, file), '{}')
   for (const suite of suites) await writeFile(path.join(root, `scripts/integration_test_${suite}.sh`), '#!/bin/bash\necho ran >> launches\n')
+  for (const file of movementTransportInputs) {
+    await mkdir(path.dirname(path.join(root, file)), { recursive: true })
+    await writeFile(path.join(root, file), 'transport dependency')
+  }
   execFileSync('git', ['init', '-q', root])
   execFileSync('git', ['-C', root, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '--allow-empty', '-qm', 'Fixture'])
   return { root, stateDir: path.join(root, 'evidence'), mode: 'run', deadline: now() + TEST_BUDGET_MS }
@@ -196,5 +200,18 @@ test('real detached quality-stage custody survives a successful preparation lead
     assert.equal(entries.length, 1)
     assert.equal(JSON.parse(await readFile(path.join(custody, entries[0]), 'utf8')).state, 'unconfirmed')
     assert.equal((await runCertification({ ...f, mode: 'plan' })).locked, true)
+  } finally { await rm(f.root, { recursive: true }) }
+})
+
+test('shared transport source and fixture dependency changes invalidate every suite', async () => {
+  const f = await fixture()
+  try {
+    let before = await Promise.all(suites.map(suite => fingerprintSuite(f.root, suite)))
+    for (const dependency of ['scripts/integration-mcp-adapter.sh', 'test/integration-fixtures/movement-public-process-fixture.ts']) {
+      await writeFile(path.join(f.root, dependency), `changed ${dependency}`)
+      const after = await Promise.all(suites.map(suite => fingerprintSuite(f.root, suite)))
+      assert.ok(after.every((entry, index) => entry.fingerprint !== before[index].fingerprint))
+      before = after
+    }
   } finally { await rm(f.root, { recursive: true }) }
 })
