@@ -280,7 +280,8 @@ describe("HulyClient Service", () => {
         number: 2,
         identifier: "NEW-2",
         rank: "0|hzzzzz:",
-        records: []
+        records: [],
+        recordClasses: []
       })
       expect(yield* commitTransfer(write)).toBe("applied")
       expect(mockApply.mock.calls[0]?.[0]).toBe("issue-transfer:root")

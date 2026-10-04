@@ -69,7 +69,9 @@ for (const mutation of mutations) {
         number: f.root.number,
         identifier: f.root.identifier,
         rank: f.root.rank,
-        records: prepared.records
+        records: prepared.records,
+        recordClasses: prepared.recordClasses,
+        attributeChanges: prepared.attributeChanges
       })
       if (mutation === "missingRoot") f.issues.splice(f.issues.indexOf(f.root), 1)
       if (mutation === "wrongProject") f.root.space = sdkFixture("third-project")
@@ -102,6 +104,7 @@ for (const mutation of mutations) {
       const inspection = Schema.decodeUnknownSync(TransferInspectionSchema)({
         discovery: mutation === "incompleteRecords" ? "incomplete" : "complete",
         records: currentRecords,
+        classes: prepared.recordClasses,
         blockers: mutation === "recordBlockers" ? ["New unsupported record"] : [],
         limitation: "Test inventory"
       })

@@ -36,6 +36,7 @@ for (const mode of ["unavailableInspection", "invalidIdentity", "incompleteInven
                   Schema.decodeUnknownSync(TransferInspectionSchema)({
                     discovery: "incomplete",
                     records: [],
+                    classes: [...new Set(f.records.map((record) => record._class))],
                     blockers: [],
                     limitation: "Missing closure inventory"
                   })
@@ -50,7 +51,7 @@ for (const mode of ["unavailableInspection", "invalidIdentity", "incompleteInven
         tree: [root],
         relevant: [root, parent]
       })
-      if (mode === "unavailableInspection") expect(problem).toBeUndefined()
+      if (mode === "unavailableInspection") expect(problem).toContain("No-op ownership inspection unavailable")
       if (mode === "invalidIdentity") expect(problem).toBe("No-op identity inspection failed.")
       if (mode === "incompleteInventory") expect(problem).toContain("Incomplete owned-record discovery")
       expect(f.state.allocated).toBe(1)

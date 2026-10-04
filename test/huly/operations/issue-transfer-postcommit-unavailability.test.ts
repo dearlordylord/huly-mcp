@@ -48,6 +48,7 @@ for (const mode of [
                 Schema.decodeUnknownSync(TransferInspectionSchema)({
                   discovery: "incomplete",
                   records: [],
+                  classes: [...new Set(f.records.map((record) => record._class))],
                   blockers: [],
                   limitation: "Post-commit inventory unavailable"
                 })
