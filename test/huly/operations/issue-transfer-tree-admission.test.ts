@@ -192,6 +192,7 @@ for (const failure of ["timeout", "read-unavailable"] as const) {
       yield* TestClock.adjust(TRANSFER_DISCOVERY_BUDGET)
       const result = yield* Fiber.join(fiber)
       expect(result).toMatchObject({ outcome: "indeterminate", execution: { phase: "allocation", commit: "not-sent" } })
+      if (result.outcome !== "indeterminate") throw new Error("Expected an indeterminate pre-send result")
       expect(result.reason).toContain(
         failure === "timeout" ? "Pre-send inspection exceeded its deadline" : "Pre-send inspection unavailable"
       )
