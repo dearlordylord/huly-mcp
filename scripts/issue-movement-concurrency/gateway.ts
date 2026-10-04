@@ -89,12 +89,18 @@ const main = async () => {
       if (writePoint !== undefined && response.destroyed) suppressedWrites.add(writePoint)
       return
     }
-    const rewritten = !url.pathname.includes("/api/v1/") && upstream.headers.get("content-type")?.includes("json")
+    if (!url.pathname.includes("/api/v1/") && upstream.headers.get("content-encoding") === "snappy") {
+      emit({ event: "failure", reason: "Compressed bootstrap cannot be endpoint-routed; certification must not bypass the gateway" })
+      fail(response)
+      return
+    }
+    const rewritten = upstream.headers.get("content-encoding") !== "snappy" && !url.pathname.includes("/api/v1/") && upstream.headers.get("content-type")?.includes("json")
       ? Buffer.from(JSON.stringify(rewriteDiscovery(Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Json))(content.toString("utf8")))))
       : content
     response.statusCode = upstream.status
     for (const [key, value] of upstream.headers)
-      if (!["content-length", "content-encoding", "transfer-encoding", "connection"].includes(key)) response.setHeader(key, value)
+      if (key === "content-encoding" && value === "snappy") response.setHeader(key, value)
+      else if (!["content-length", "content-encoding", "transfer-encoding", "connection"].includes(key)) response.setHeader(key, value)
     response.end(rewritten)
   }
   const server = createServer((request, response) => {

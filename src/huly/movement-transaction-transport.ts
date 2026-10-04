@@ -2,7 +2,6 @@ import { TxOperations, type Client, type Tx } from "@hcengineering/core"
 import { Effect, Redacted, Schema } from "effect"
 import { DocId, NonEmptyString, ObjectClassName, PositiveInteger, Timestamp, UrlString } from "../domain/schemas/shared.js"
 import { TransferSequenceSchema } from "../domain/schemas/issue-transfer.js"
-import { core, tracker } from "./huly-plugins.js"
 
 export const MovementTransportMilliseconds = PositiveInteger.pipe(Schema.brand("MovementTransportMilliseconds"))
 export const MovementTransportConfigSchema = Schema.Struct({
@@ -17,21 +16,28 @@ export class MovementTransportError extends Schema.TaggedError<MovementTransport
   reason: NonEmptyString
 }) {}
 
+// Installed core 0.7.26 class names; plain boundary literals avoid SDK Ref type graphs in codecs.
+const MovementTransactionClasses = {
+  update: Schema.Literal("core:class:TxUpdateDoc"),
+  project: Schema.Literal("tracker:class:Project"),
+  conditional: Schema.Literal("core:class:TxApplyIf"),
+  issue: Schema.Literal("tracker:class:Issue")
+}
 const TransactionFields = {
   _id: DocId, _class: ObjectClassName, space: DocId, objectSpace: DocId,
   modifiedOn: Timestamp, modifiedBy: NonEmptyString
 }
 const SequenceTransactionSchema = Schema.Struct({
   ...TransactionFields,
-  _class: Schema.Literal(core.class.TxUpdateDoc),
-  objectClass: Schema.Literal(tracker.class.Project),
+  _class: MovementTransactionClasses.update,
+  objectClass: MovementTransactionClasses.project,
   objectId: DocId,
   operations: Schema.Struct({ $inc: Schema.Struct({ sequence: PositiveInteger }) }),
   retrieve: Schema.Literal(true)
 })
 const ConditionalMovementSchema = Schema.Struct({
   ...TransactionFields,
-  _class: Schema.Literal(core.class.TxApplyIf),
+  _class: MovementTransactionClasses.conditional,
   scope: NonEmptyString,
   match: Schema.Array(Schema.Struct({ _class: ObjectClassName, query: Schema.JsonObject })),
   notMatch: Schema.Array(Schema.Struct({ _class: ObjectClassName, query: Schema.JsonObject })),
@@ -41,8 +47,8 @@ const ConditionalMovementSchema = Schema.Struct({
 })
 const SameProjectUpdateSchema = Schema.Struct({
   ...TransactionFields,
-  _class: Schema.Literal(core.class.TxUpdateDoc),
-  objectClass: Schema.Literal(tracker.class.Issue),
+  _class: MovementTransactionClasses.update,
+  objectClass: MovementTransactionClasses.issue,
   objectId: DocId,
   operations: Schema.JsonObject
 })
@@ -52,7 +58,10 @@ const supportsConditional = Schema.decodeUnknownOption(ConditionalMovementSchema
 const MovementTransactionSchema = Schema.JsonObject.check(Schema.makeFilter((value) =>
   supportsSequence(value)._tag === "Some" || supportsConditional(value)._tag === "Some" || supportsSameProjectUpdate(value)._tag === "Some"
 ))
-const ConditionalReplySchema = Schema.Struct({ success: Schema.Boolean, serverTime: Schema.Number })
+const ConditionalReplySchema = Schema.Union([
+  Schema.Struct({ success: Schema.Literal(false) }),
+  Schema.Struct({ success: Schema.Literal(true), serverTime: Schema.Number })
+])
 const TransportReplySchema = Schema.Struct({ status: PositiveInteger, body: Schema.String })
 const TransportRequestSchema = Schema.Struct({
   ...MovementTransportConfigSchema.fields,
@@ -68,13 +77,13 @@ export interface MovementHttpPort {
 export const movementHttpPort: MovementHttpPort = {
   send: Effect.fn("movement.singleSendHttp")(function* (request) {
     return yield* Effect.tryPromise({
-      try: async () => {
+      try: async (signal) => {
         const endpoint = request.endpoint.replace(/^ws:/, "http:").replace(/^wss:/, "https:").replace(/\/+$/, "")
         const response = await fetch(`${endpoint}/api/v1/tx/${encodeURIComponent(request.workspace)}`, {
           method: "POST",
           headers: { "content-type": "application/json", authorization: `Bearer ${Redacted.value(request.token)}` },
           body: request.body,
-          signal: AbortSignal.timeout(request.timeoutMs),
+          signal,
           redirect: "error"
         })
         return Schema.decodeUnknownSync(TransportReplySchema)({ status: response.status, body: await response.text() })
@@ -97,7 +106,10 @@ export const sendMovementTransaction = Effect.fn("movement.sendTransaction")(fun
   const parsed = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(MovementTransactionSchema))(json).pipe(
     Effect.mapError(() => new MovementTransportError({ phase: "before-send", reason: NonEmptyString.make("Unsupported or malformed movement transaction; no request sent.") }))
   )
-  const reply = yield* http.send({ ...config, body: JSON.stringify(parsed) })
+  const reply = yield* http.send({ ...config, body: JSON.stringify(parsed) }).pipe(
+    Effect.timeout(config.timeoutMs),
+    Effect.mapError((cause) => cause instanceof MovementTransportError ? cause : new MovementTransportError({ phase: "after-send", reason: NonEmptyString.make("Movement write response timed out; effects require inspection. No retry attempted.") }))
+  )
   if (reply.status < 200 || reply.status >= 300)
     return yield* new MovementTransportError({ phase: "after-send", reason: NonEmptyString.make("Movement write returned a non-success HTTP response; effects require inspection. No retry attempted.") })
   const response = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.JsonObject))(reply.body).pipe(

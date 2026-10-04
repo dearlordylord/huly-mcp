@@ -1,6 +1,6 @@
 import type { Tx } from "@hcengineering/core"
 import { it } from "@effect/vitest"
-import { Effect, Redacted } from "effect"
+import { Effect, Fiber, Redacted } from "effect"
 import { describe, expect } from "vitest"
 import {
   MovementTransportConfigSchema,
@@ -10,6 +10,7 @@ import {
 } from "../../src/huly/movement-transaction-transport.js"
 import { NonEmptyString, PositiveInteger, UrlString } from "../../src/domain/schemas/shared.js"
 import { Schema } from "effect"
+import { TestClock } from "effect/testing"
 import { sdkFixture } from "../helpers/huly-sdk.js"
 
 const config = Schema.decodeUnknownSync(MovementTransportConfigSchema)({
@@ -82,3 +83,32 @@ describe("single-send movement transaction boundary", () => {
     expect(sent).toEqual([])
   }))
 })
+
+it.effect("returns confirmed scoped refusal from the ordinary false-only response without resend", () => Effect.gen(function* () {
+  const sent: Array<string> = []
+  const http: MovementHttpPort = {
+    send: (request) => Effect.sync(() => {
+      sent.push(request.body)
+      return { status: PositiveInteger.make(200), body: '{"success":false}' }
+    })
+  }
+  const conditional = sdkFixture<Tx>({
+    _id: "batch-1", _class: "core:class:TxApplyIf", space: "core:space:Tx", objectSpace: "core:space:Tx",
+    modifiedOn: 0, modifiedBy: "person", scope: "issue-transfer:root", match: [], notMatch: [], txes: []
+  })
+  expect(yield* sendMovementTransaction(conditional, config, http)).toEqual({ success: false })
+  expect(sent).toHaveLength(1)
+}))
+
+it.effect("bounds a single write response with Effect Clock and reports after-send uncertainty", () => Effect.gen(function* () {
+  const sent: Array<string> = []
+  const http: MovementHttpPort = {
+    send: (request) => Effect.sync(() => { sent.push(request.body) }).pipe(Effect.andThen(Effect.never))
+  }
+  const fiber = yield* sendMovementTransaction(sequence, config, http).pipe(Effect.result, Effect.forkChild)
+  yield* TestClock.adjust("2 seconds")
+  const result = yield* Fiber.join(fiber)
+  expect(result._tag).toBe("Failure")
+  if (result._tag === "Failure") expect(result.failure.phase).toBe("after-send")
+  expect(sent).toHaveLength(1)
+}))
