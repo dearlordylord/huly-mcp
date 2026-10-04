@@ -1,9 +1,10 @@
 # Controller has already decoded the published result with MoveIssueResultSchema.
 def uncertainty:
+  . as $current |
   (has("changed") | not) and
   .destination.projectId == $destinationId and .destination.parentId == null and
   .discovery.status == "complete" and
-  all($ids[]; . as $id | any($result.issueIds[]; . == $id));
+  all($ids[]; . as $id | any($current.issueIds[]; . == $id));
 def confirmed_reservations:
   (.execution.reservations | length) == ($ids | length) and
   all(.execution.reservations[]; .status == "confirmed") and
@@ -11,11 +12,12 @@ def confirmed_reservations:
   (.execution.reservations | map(.number) | sort) ==
     [range($previousSequence + 1; $previousSequence + 1 + ($ids | length))];
 def observed_inconsistent:
+  . as $current |
   .verification.status == "observed" and
   .verification.completeness == "complete" and
   .verification.consistency == "inconsistent" and
   (.verification.reason | length) > 0 and
-  all($ids[]; . as $id | any($result.verification.tasks[]; .issueId == $id));
+  all($ids[]; . as $id | any($current.verification.tasks[]; .issueId == $id));
 .observation.result as $result |
 $result |
 if ($name | startswith("refuse-stale-")) then
