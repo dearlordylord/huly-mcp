@@ -28,6 +28,7 @@ import {
 import { hulyQuery } from "./operations/query-helpers.js"
 import { toRef } from "./operations/sdk-boundary.js"
 
+export const FOREST_CLASS_READ_CONCURRENCY = 8
 export const FOREST_ROOT_BATCH_SIZE = 4
 export const FOREST_OWNER_BATCH_SIZE = 16
 
@@ -125,7 +126,7 @@ const inspectFrontier = Effect.fn("transfer.inspectForestFrontier")(function* (
   limits: RecordDiscoveryLimits
 ) {
   const classes = [...new Set(frontier.flatMap(({ representatives }) => representatives))]
-  for (const window of EffectArray.chunksOf(classes, OWNER_CLASS_READ_CONCURRENCY)) {
+  for (const window of EffectArray.chunksOf(classes, FOREST_CLASS_READ_CONCURRENCY)) {
     // SDK reads overlap, but row auditing retains original representative order.
     const replies = yield* Effect.forEach(
       window,
@@ -134,7 +135,7 @@ const inspectFrontier = Effect.fn("transfer.inspectForestFrontier")(function* (
           const visits = frontier.filter((target) => !target.state.incomplete && target.representatives.includes(cls))
           return { cls, visits, result: yield* Effect.result(readForestClass(client, cls, visits, limits)) }
         }),
-      { concurrency: OWNER_CLASS_READ_CONCURRENCY }
+      { concurrency: FOREST_CLASS_READ_CONCURRENCY }
     )
     for (const { cls, result, visits } of replies) yield* auditClassResult(client, cls, visits, result, limits, false)
   }

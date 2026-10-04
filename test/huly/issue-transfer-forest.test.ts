@@ -6,8 +6,8 @@ import { MovementIssueSchema } from "../../src/domain/schemas/issue-movement-sta
 import { movementIssue } from "../helpers/movement.js"
 import type { Issue } from "@hcengineering/tracker"
 import { DocId, IssueId, ObjectClassName, UNKNOWN_TOTAL } from "../../src/domain/schemas/shared.js"
-import { OWNER_CLASS_READ_CONCURRENCY } from "../../src/huly/issue-transfer-class-reads.js"
 import {
+  FOREST_CLASS_READ_CONCURRENCY,
   FOREST_OWNER_BATCH_SIZE,
   FOREST_ROOT_BATCH_SIZE,
   inspectTransferForest
@@ -27,7 +27,7 @@ const QuerySchema = Schema.Struct({
 const RootQuerySchema = Schema.Struct({ _id: IssueId })
 const policy = { records: 100, queries: 1000, depth: 32, result: 101 }
 const roots = [IssueId.make("root"), IssueId.make("second")]
-const forestFixture = () => {
+const forestFixture = (extraClasses: ReadonlyArray<ObjectClassName> = []) => {
   const f = recordAdapterFixture()
   f.docs.push(
     ownedRecord("comment-a", String(chunter.class.ChatMessage), "root", "comments", { message: "A" }),
@@ -52,7 +52,14 @@ const forestFixture = () => {
   const rootIds = new Set(roots)
   const failedRoots = new Set<IssueId>()
   const rootReads: Array<IssueId> = []
-  const hierarchy = f.client.getHierarchy()
+  const originalHierarchy = f.client.getHierarchy()
+  const hierarchy = sdkFixture<ReturnType<TxOperations["getHierarchy"]>>({
+    ...originalHierarchy,
+    getDescendants: (cls: Parameters<ReturnType<TxOperations["getHierarchy"]>["getDescendants"]>[0]) => [
+      ...originalHierarchy.getDescendants(cls),
+      ...extraClasses.map(toClassRef<Doc>)
+    ]
+  })
   const client = sdkFixture<TxOperations>({
     getHierarchy: () => hierarchy,
     findOne: async (_cls: unknown, query: unknown) => {
@@ -252,9 +259,12 @@ it.effect("retains outgoing source-owned references and unsupported nested recor
   })
 )
 
-it.effect("keeps at most four SDK collection requests active for a multi-owner frontier", () =>
+it.effect("keeps at most eight SDK collection requests active for a multi-owner frontier", () =>
   Effect.gen(function* () {
-    const f = forestFixture()
+    const extraClasses = Array.from({ length: FOREST_CLASS_READ_CONCURRENCY }, (_, index) =>
+      ObjectClassName.make(`test:class:Independent${index}`)
+    )
+    const f = forestFixture(extraClasses)
     const started = yield* Deferred.make<void>()
     const release = yield* Deferred.make<void>()
     const state = { active: 0, maximum: 0 }
@@ -266,7 +276,7 @@ it.effect("keeps at most four SDK collection requests active for a multi-owner f
         const read = f.client.findAll(...args).then(async (rows) => {
           state.active++
           state.maximum = Math.max(state.maximum, state.active)
-          if (state.active === OWNER_CLASS_READ_CONCURRENCY)
+          if (state.active === FOREST_CLASS_READ_CONCURRENCY)
             await Effect.runPromise(Deferred.succeed(started, undefined))
           try {
             await Effect.runPromise(Deferred.await(release))
@@ -288,12 +298,16 @@ it.effect("keeps at most four SDK collection requests active for a multi-owner f
       )
     )
     yield* Deferred.await(started)
-    expect(state.active).toBe(OWNER_CLASS_READ_CONCURRENCY)
-    expect(f.calls).toHaveLength(OWNER_CLASS_READ_CONCURRENCY)
+    expect(state.active).toBe(FOREST_CLASS_READ_CONCURRENCY)
+    expect(f.calls).toHaveLength(FOREST_CLASS_READ_CONCURRENCY)
     expect(f.calls.every((call) => call.owners.length === roots.length)).toBe(true)
     yield* Deferred.succeed(release, undefined)
-    yield* Fiber.join(fiber)
-    expect(state.maximum).toBe(4)
+    const result = yield* Fiber.join(fiber)
+    const baseline = forestFixture(extraClasses)
+    const original = yield* Effect.forEach(roots, (root) => inspectTransferRecords(baseline.client, root, policy))
+    expect(observed(result)).toEqual(original)
+    expect(new Set(f.calls.map((call) => call.cls))).toEqual(new Set(baseline.calls.map((call) => call.cls)))
+    expect(state.maximum).toBe(FOREST_CLASS_READ_CONCURRENCY)
     expect(state.active).toBe(0)
   })
 )
