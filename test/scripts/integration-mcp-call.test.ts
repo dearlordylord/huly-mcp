@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process"
 import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -38,3 +39,28 @@ for (const isError of [false, true]) {
     }
   })
 }
+
+test("actual bundled entry rejects missing arguments without launching Huly", async () => {
+  const child = spawn(process.execPath, ["scripts/run-bundled.mjs", "scripts/integration-mcp-call-main.ts"], {
+    stdio: ["ignore", "pipe", "pipe"]
+  })
+  const stdout: Array<Buffer> = []
+  const stderr: Array<Buffer> = []
+  child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk))
+  child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk))
+  const deadline = setTimeout(() => child.kill("SIGKILL"), 10000)
+  try {
+    const code = await new Promise<number | null>((done, fail) => {
+      child.once("error", fail)
+      child.once("close", done)
+    })
+    expect(code).toBe(1)
+    expect(Buffer.concat(stdout).toString()).toBe("")
+    expect(Buffer.concat(stderr).toString()).toContain(
+      "Integration MCP call failed during input; no automatic mutation retry performed."
+    )
+  } finally {
+    clearTimeout(deadline)
+    if (child.exitCode === null) child.kill("SIGKILL")
+  }
+})

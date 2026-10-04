@@ -1,11 +1,8 @@
 import { Client } from "@modelcontextprotocol/client"
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"
 import { Redacted, Schema } from "effect"
-import { resolve } from "node:path"
-import { pathToFileURL } from "node:url"
 
 const CALL_TIMEOUT_MILLISECONDS = 45_000
-const ARGUMENT_OFFSET = 2
 const InputSchema = Schema.Tuple([Schema.NonEmptyString, Schema.fromJsonString(Schema.JsonObject)])
 const RESPONSE_ID = 2
 const EnvironmentSchema = Schema.Record(Schema.String, Schema.RedactedFromValue(Schema.String))
@@ -13,7 +10,7 @@ const ReplySchema = Schema.Struct({
   isError: Schema.optionalKey(Schema.Boolean),
   content: Schema.Tuple([Schema.Struct({ type: Schema.Literal("text"), text: Schema.NonEmptyString })])
 })
-class IntegrationMcpCallError extends Error {
+export class IntegrationMcpCallError extends Error {
   constructor(phase: "input" | "connect" | "call" | "reply" | "close") {
     super(`Integration MCP call failed during ${phase}; no automatic mutation retry performed.`)
   }
@@ -82,19 +79,4 @@ export const integrationMcpCall = async (
       throw new IntegrationMcpCallError(phase)
     }
   )
-}
-if (process.argv[1] !== undefined && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
-  try {
-    const result = await integrationMcpCall(process.argv.slice(ARGUMENT_OFFSET), {
-      command: process.execPath,
-      args: [resolve("dist/index.cjs")],
-      environment: { ...process.env, HULY_TOOL_MODE: "native" }
-    })
-    process.stdout.write(`${JSON.stringify(result)}\n`)
-  } catch (error) {
-    process.stderr.write(
-      `${error instanceof IntegrationMcpCallError ? error.message : "Integration MCP call failed during input; no automatic mutation retry performed."}\n`
-    )
-    process.exitCode = 1
-  }
 }
