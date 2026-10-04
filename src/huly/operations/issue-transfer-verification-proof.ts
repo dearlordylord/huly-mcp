@@ -13,7 +13,7 @@ export interface VerificationProof {
 }
 
 export const projectVerification = (proof: VerificationProof): Observation => {
-  const { tasks, records } = proof
+  const { records, tasks } = proof
   const absence = proof.absentIssueIds.length === 0 ? {} : { absentIssueIds: proof.absentIssueIds }
   const inconsistent = proof.problems.length > 0 || proof.historicalProblems.length > 0
   const historical =

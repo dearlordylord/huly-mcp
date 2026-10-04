@@ -29,7 +29,7 @@ const reinspect = Effect.fn("transfer.reinspectTree")(function* (
   destination: MovementProject,
   params: MoveIssueParams
 ): Effect.fn.Return<boolean, MovementError> {
-  const { root, parent, source } = prepared.plan
+  const { parent, root, source } = prepared.plan
   const current = yield* inspectTransferPlan(client, root, parent, source, destination, params)
   return !("conflicts" in current) && isDeepStrictEqual(current, prepared)
 })
