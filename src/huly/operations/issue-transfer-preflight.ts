@@ -178,12 +178,15 @@ const inspectTransferTasks = Effect.fn("transfer.inspectTasks")(function* (
     tasks.push({
       issue,
       protectedIssue: workflow.success.protectedIssue,
-      recordClasses: records._tag === "Success" ? records.success.classes : [],
-      records:
-        records._tag === "Success" ? records.success.records.filter((record) => record.kind !== "unsupported") : []
+      ...(records._tag === "Success" ? supportedRecordSnapshot(records.success) : { recordClasses: [], records: [] })
     })
   }
   return { tasks, conflicts }
+})
+
+const supportedRecordSnapshot = (inspection: TransferInspection) => ({
+  recordClasses: inspection.classes,
+  records: inspection.records.filter((record) => record.kind !== "unsupported")
 })
 
 export const inspectTransferPlan = Effect.fn("transfer.inspectPlan")(function* (

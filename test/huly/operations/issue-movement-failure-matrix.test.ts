@@ -6,7 +6,7 @@ import { describe, expect } from "vitest"
 import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"
 import { MoveIssueResultSchema } from "../../../src/domain/schemas/issues-results.js"
 import { TransferInspectionSchema } from "../../../src/domain/schemas/issue-transfer.js"
-import { DocId, NonEmptyString } from "../../../src/domain/schemas/shared.js"
+import { DocId, NonEmptyString, UNKNOWN_TOTAL } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { MovementTransportError } from "../../../src/huly/movement-transaction-transport.js"
 import { core, tracker } from "../../../src/huly/huly-plugins.js"
@@ -384,6 +384,148 @@ describe("public movement uncertainty and concurrent state", () => {
       })
     )
   }
+
+  for (const later of ["read-outage", "malformed"]) {
+    it.effect(`confirmed absence survives a later ${later} without fabricating either task`, () =>
+      Effect.gen(function* () {
+        const f = transferTreeFixture()
+        const findOne = assertExists(f.operations.findOne)
+        const result = yield* run(f, {
+          ...f.operations,
+          findOne: (cls, query, options) =>
+            findOne(cls, query, options).pipe(
+              Effect.flatMap((row) => {
+                if (f.state.sent === 0) return Effect.succeed(row)
+                if (String(query._id) === String(f.root._id)) return Effect.succeed(undefined)
+                if (String(query._id) === String(f.child._id)) {
+                  if (later === "read-outage")
+                    return Effect.fail(new HulyAuthError({ message: "Child read unavailable" }))
+                  if (row !== undefined) Reflect.set(row, "description", 123)
+                }
+                return Effect.succeed(row)
+              })
+            )
+        })
+        expect(result).toMatchObject({
+          outcome: "incomplete",
+          verification: { completeness: "incomplete", consistency: "inconsistent", absentIssueIds: [f.root._id] }
+        })
+        expect(result).toHaveProperty(
+          "verification.tasks",
+          expect.not.arrayContaining([
+            expect.objectContaining({ issueId: f.root._id }),
+            expect.objectContaining({ issueId: f.child._id })
+          ])
+        )
+        expect(result).toHaveProperty("verification.reason", expect.stringContaining("could not"))
+        expect(f.state.sent).toBe(1)
+      })
+    )
+  }
+
+  it.effect("a complete hierarchy contradiction survives subsequent task read unavailability", () =>
+    Effect.gen(function* () {
+      const f = transferTreeFixture()
+      const commit = assertExists(f.operations.commitTransferTree)
+      const findOne = assertExists(f.operations.findOne)
+      const result = yield* run(f, {
+        ...f.operations,
+        commitTransferTree: (write) =>
+          commit(write).pipe(
+            Effect.tap(() =>
+              Effect.sync(() => {
+                f.old.subIssues++
+              })
+            )
+          ),
+        findOne: (cls, query, options) =>
+          f.state.sent > 0 && String(query._id) === String(f.root._id)
+            ? Effect.fail(new HulyAuthError({ message: "Root read unavailable" }))
+            : findOne(cls, query, options)
+      })
+      expect(result).toMatchObject({
+        outcome: "incomplete",
+        verification: { completeness: "incomplete", consistency: "inconsistent" }
+      })
+      expect(result).toHaveProperty("verification.reason", expect.stringContaining("could not"))
+      expect(result).toHaveProperty("verification.reason", expect.stringContaining("child count"))
+      expect(f.state.sent).toBe(1)
+    })
+  )
+
+  for (const change of ["missing", "payload", "partial-project"]) {
+    it.effect(`known ${change} record contradiction survives a later owner's outage`, () =>
+      Effect.gen(function* () {
+        const f = transferTreeFixture()
+        const commit = assertExists(f.operations.commitTransferTree)
+        const inspect = assertExists(f.operations.inspectTransferRecords)
+        const result = yield* run(f, {
+          ...f.operations,
+          commitTransferTree: (write) =>
+            commit(write).pipe(
+              Effect.tap(() =>
+                Effect.sync(() => {
+                  if (change === "missing") f.records.splice(0)
+                  else if (change === "payload") assertExists(f.records[0]).history.action = "remove"
+                  else assertExists(f.records[0]).space = DocId.make(f.source._id)
+                })
+              )
+            ),
+          inspectTransferRecords: (id, tree) => {
+            if (f.state.sent > 0 && String(id) === String(f.child._id))
+              return Effect.fail(new HulyAuthError({ message: "Later owner read unavailable" }))
+            return inspect(id, tree).pipe(
+              Effect.map((inspection) =>
+                change === "partial-project" && f.state.sent > 0
+                  ? parseInspection({ ...inspection, discovery: "incomplete", blockers: [] })
+                  : inspection
+              )
+            )
+          }
+        })
+        expect(result).toMatchObject({
+          outcome: "incomplete",
+          verification: { completeness: "incomplete", consistency: "inconsistent" }
+        })
+        expect(result).toHaveProperty("verification.reason", expect.stringContaining("could not be read"))
+        expect(f.state.sent).toBe(1)
+        expect(f.state.allocated).toBe(3)
+      })
+    )
+  }
+
+  it.effect("known changed record payload survives unavailable descendant closure", () =>
+    Effect.gen(function* () {
+      const f = transferTreeFixture()
+      const commit = assertExists(f.operations.commitTransferTree)
+      const findAll = assertExists(f.operations.findAll)
+      const result = yield* run(f, {
+        ...f.operations,
+        commitTransferTree: (write) =>
+          commit(write).pipe(
+            Effect.tap(() =>
+              Effect.sync(() => {
+                assertExists(f.records[0]).history.action = "remove"
+              })
+            )
+          ),
+        findAll: (cls, query, options) =>
+          findAll(cls, query, options).pipe(
+            Effect.map((rows) => {
+              if (f.state.sent > 0 && query.attachedTo !== undefined) rows.total = UNKNOWN_TOTAL
+              return rows
+            })
+          )
+      })
+      expect(result).toMatchObject({
+        outcome: "incomplete",
+        verification: { completeness: "incomplete", consistency: "inconsistent" }
+      })
+      expect(result).toHaveProperty("verification.reason", expect.stringContaining("incomplete"))
+      expect(result).toHaveProperty("verification.reason", expect.stringContaining("record"))
+      expect(f.state.sent).toBe(1)
+    })
+  )
 
   it.effect("a subsequent user edit survives verification failure without rollback or new reservations", () =>
     Effect.gen(function* () {
