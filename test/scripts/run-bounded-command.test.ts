@@ -233,15 +233,15 @@ test.skipIf(process.platform === "win32")(
     writeFileSync(${JSON.stringify(pidFile)},String(child.pid));child.unref();
   `
     try {
-      await expect(
-        runBoundedCommand({
-          executable: process.execPath,
-          args: ["-e", leader],
-          name: "escaped stdio",
-          timeoutMilliseconds: COMMAND_TIMEOUT,
-          terminationGraceMilliseconds: Milliseconds.make(100)
-        })
-      ).rejects.toThrow("process-group cleanup is unconfirmed")
+      const program = `
+      const {runBoundedCommand,Milliseconds}=await import('./scripts/run-bounded-command.ts');
+      try { await runBoundedCommand({executable:process.execPath,args:['-e',${JSON.stringify(leader)}],name:'escaped stdio',timeoutMilliseconds:Milliseconds.make(${COMMAND_TIMEOUT}),terminationGraceMilliseconds:Milliseconds.make(100)}); }
+      catch(error) { console.log(error.message); }
+    `
+      const { stdout } = await execFileAsync(process.execPath, ["--import", "tsx", "--eval", program], {
+        env: { ...process.env, MOVEMENT_CUSTODY_DIR: join(directory, "custody") }
+      })
+      expect(stdout).toContain("process-group cleanup is unconfirmed")
     } finally {
       await terminateRecordedDescendant(pidFile)
       await rm(directory, { recursive: true, force: true })
