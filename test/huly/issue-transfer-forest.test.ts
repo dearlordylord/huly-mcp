@@ -7,7 +7,11 @@ import { movementIssue } from "../helpers/movement.js"
 import type { Issue } from "@hcengineering/tracker"
 import { DocId, IssueId, ObjectClassName, UNKNOWN_TOTAL } from "../../src/domain/schemas/shared.js"
 import { OWNER_CLASS_READ_CONCURRENCY } from "../../src/huly/issue-transfer-class-reads.js"
-import { FOREST_OWNER_BATCH_SIZE, inspectTransferForest } from "../../src/huly/issue-transfer-forest.js"
+import {
+  FOREST_OWNER_BATCH_SIZE,
+  FOREST_ROOT_BATCH_SIZE,
+  inspectTransferForest
+} from "../../src/huly/issue-transfer-forest.js"
 import { inspectTransferRecords } from "../../src/huly/issue-transfer-discovery.js"
 import type { TransferForestEntry } from "../../src/huly/issue-transfer-forest-state.js"
 import { activity, attachment, chunter, tracker } from "../../src/huly/huly-plugins.js"
@@ -338,7 +342,7 @@ it.effect("awaits terminal owner publication before a later root batch can hang"
     )
     yield* Deferred.await(started)
     expect(new Set(published.map((entry) => entry.ownerId))).toEqual(
-      new Set(requested.slice(0, FOREST_OWNER_BATCH_SIZE))
+      new Set(requested.slice(0, FOREST_ROOT_BATCH_SIZE))
     )
     yield* Deferred.succeed(release, undefined)
     const result = yield* Fiber.join(fiber)
@@ -470,3 +474,54 @@ it.effect("retains parsed records and sibling observations when a later nested p
     expect(f.updates).toEqual([])
   })
 )
+
+for (const truncated of [false, true]) {
+  it.effect("partitions a wider owned-record frontier and preserves exact records through per-owner fallback", () =>
+    Effect.gen(function* () {
+      const f = forestFixture()
+      const extra = Array.from(
+        { length: FOREST_OWNER_BATCH_SIZE - FOREST_ROOT_BATCH_SIZE },
+        (_, index) => `wide-comment-${index}`
+      )
+      for (const id of extra)
+        f.docs.push(
+          ownedRecord(id, String(chunter.class.ChatMessage), "root", "comments", { message: id }),
+          ownedRecord(`file-${id}`, String(attachment.class.Attachment), id, "attachments", attachmentPayload)
+        )
+      const baseline = yield* inspectTransferRecords(f.client, roots[0] ?? IssueId.make("root"), policy)
+      f.calls.splice(0)
+      f.rootReads.splice(0)
+      f.state.truncateGrouped = truncated
+      const published: TransferForestEntry[] = []
+      const result = yield* inspectTransferForest(
+        f.client,
+        roots,
+        [],
+        (entry) =>
+          Effect.sync(() => {
+            published.push(entry)
+          }),
+        policy
+      )
+      expect(result.map((entry) => entry.ownerId)).toEqual(roots)
+      expect(observed(result)[0]).toEqual(baseline)
+      expect(observed(result).every((inspection) => inspection.discovery === "complete")).toBe(true)
+      const wide = f.calls.filter((call) => call.owners.length > FOREST_ROOT_BATCH_SIZE)
+      expect(wide.length).toBeGreaterThan(0)
+      expect(wide.some((call) => call.owners.length > FOREST_OWNER_BATCH_SIZE / 2)).toBe(true)
+      expect(f.calls.every((call) => call.owners.length <= FOREST_OWNER_BATCH_SIZE)).toBe(true)
+      expect(wide.some((call) => call.outgoing)).toBe(true)
+      for (const id of extra) {
+        expect(
+          observed(result)[0]?.records.some((record) => record._id === `file-${id}` && record.attachedTo === id)
+        ).toBe(true)
+        if (truncated) expect(f.calls.some((call) => call.owners.length === 1 && call.owners[0] === id)).toBe(true)
+      }
+      expect(published).toHaveLength(roots.length)
+      expect(new Set(published.map((entry) => entry.ownerId))).toEqual(new Set(roots))
+      expect(f.rootReads).toEqual(roots)
+      expect(f.updates).toEqual([])
+      expect(f.scopes).toEqual([])
+    })
+  )
+}

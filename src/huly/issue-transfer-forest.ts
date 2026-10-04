@@ -28,7 +28,8 @@ import {
 import { hulyQuery } from "./operations/query-helpers.js"
 import { toRef } from "./operations/sdk-boundary.js"
 
-export const FOREST_OWNER_BATCH_SIZE = 4
+export const FOREST_ROOT_BATCH_SIZE = 4
+export const FOREST_OWNER_BATCH_SIZE = 16
 
 const seedRoot = Effect.fn("transfer.seedForestRoot")(function* (
   client: TxOperations,
@@ -152,7 +153,7 @@ const seedStates = Effect.fn("transfer.seedForestStates")(function* (
   states: Map<IssueId, DiscoveryState>,
   emit: ForestEntryEmitter
 ) {
-  for (const ids of EffectArray.chunksOf([...new Set(roots)], FOREST_OWNER_BATCH_SIZE)) {
+  for (const ids of EffectArray.chunksOf([...new Set(roots)], FOREST_ROOT_BATCH_SIZE)) {
     const seeded = yield* Effect.forEach(
       ids,
       (id) =>
@@ -212,7 +213,7 @@ export const inspectTransferForest = Effect.fn("transfer.inspectForest")(functio
     entries.set(entry.ownerId, entry)
     if (publish !== undefined) yield* publish(entry)
   })
-  for (const batch of EffectArray.chunksOf([...new Set(roots)], FOREST_OWNER_BATCH_SIZE)) {
+  for (const batch of EffectArray.chunksOf([...new Set(roots)], FOREST_ROOT_BATCH_SIZE)) {
     yield* seedStates(client, batch, tree, states, emit)
     while (states.size > 0) {
       const frontier = yield* prepareFrontier(client, states)
