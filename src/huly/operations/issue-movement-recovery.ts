@@ -24,7 +24,7 @@ export const movementFailureResult = (
   plan: MovementPlan,
   destination: MovementProject,
   evidence: Pick<MovementUncertaintyEvidence, "execution" | "verification">
-): MoveIssueResult => {
+): Extract<MoveIssueResult, { readonly outcome: "incomplete" | "indeterminate" }> => {
   const issueIds = [
     ...new Set([
       ...plan.tree.map((issue) => issue._id),

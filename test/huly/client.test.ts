@@ -38,7 +38,8 @@ import {
   IssueId,
   HulyTransactionScope,
   PersonId as DomainPersonId,
-  PersonName
+  PersonName,
+  PositiveInteger
 } from "../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../../src/huly/client.js"
 import type { EmployeePreparationPlan } from "../../src/huly/employee-preparation.js"
@@ -56,6 +57,7 @@ import { toClassRef, toRef } from "../../src/huly/operations/sdk-boundary.js"
 import { HulySdk, type HulySdkDependencies } from "../../src/huly/sdk-deps.js"
 import { normalizeHulyOrigin } from "../../src/huly/unavailable-diagnostics.js"
 import { assertAt, assertExists } from "../../src/utils/assertions.js"
+import { corePersonId } from "../helpers/huly-sdk.js"
 import { mockFn } from "../helpers/mock-fn.js"
 
 // --- Mock setup ---
@@ -103,6 +105,8 @@ const mockHierarchy = {
 }
 
 const mockTxOperations = {
+  user: corePersonId("movement-user"),
+  isDerived: false,
   findAll: mockFindAll,
   findOne: mockFindOne,
   getModel: () => ({ findAllSync: mockFindAllInModel }),
@@ -266,8 +270,26 @@ interface TestDoc extends Doc {
 }
 
 describe("HulyClient Service", () => {
-  it.effect("wires scoped transfer commit through the live client dependency seam", () =>
-    Effect.gen(function* () {
+  it.effect("wires scoped transfer commit through the single-send client dependency seam", () => {
+    const requests: Array<Schema.JsonObject> = []
+    const state = { success: true }
+    const sdk: HulySdkDependencies = {
+      ...testSdk,
+      movementHttp: {
+        send: (request) =>
+          Effect.sync(() => {
+            requests.push(Schema.decodeUnknownSync(Schema.fromJsonString(Schema.JsonObject))(request.body))
+            return {
+              status: PositiveInteger.make(200),
+              body: JSON.stringify({ success: state.success, serverTime: 0 })
+            }
+          })
+      }
+    }
+    const layer = HulyClient.layerWithDependencies.pipe(
+      Layer.provide(Layer.merge(testConfigLayer, Layer.succeed(HulySdk, sdk)))
+    )
+    return Effect.gen(function* () {
       const client = yield* HulyClient
       const commitTransfer = assertExists(client.commitTransfer)
       const write = Schema.decodeUnknownSync(TransferWriteSchema)({
@@ -284,12 +306,14 @@ describe("HulyClient Service", () => {
         recordClasses: []
       })
       expect(yield* commitTransfer(write)).toBe("applied")
-      expect(mockApply.mock.calls[0]?.[0]).toBe("issue-transfer:root")
-      expect(mockApplyMatch.mock.calls.length).toBeGreaterThan(0)
-      mockApplyCommit.mockResolvedValue({ result: false })
+      expect(requests).toHaveLength(1)
+      expect(requests[0]).toMatchObject({ scope: "issue-transfer:root", _class: "core:class:TxApplyIf" })
+      expect(mockApply.mock.calls).toHaveLength(0)
+      state.success = false
       expect(yield* commitTransfer(write)).toBe("condition-not-met")
-    }).pipe(Effect.provide(liveClientLayer), Effect.scoped)
-  )
+      expect(requests).toHaveLength(2)
+    }).pipe(Effect.provide(layer), Effect.scoped)
+  })
 
   it.effect("wires model-owned transfer discovery through the live client dependency seam", () =>
     Effect.gen(function* () {
