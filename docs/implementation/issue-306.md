@@ -81,12 +81,15 @@ branches 99.00%, functions 99.01%, lines 99.56% in
 `/tmp/issue-306-final-check-all.log`. These are historical results, not this
 attempt's fresh gate result.
 
-Final certification obligations remain: final integrated check-all, all authored
-movement/transfer fixtures through MCP and CLI, whole-server MCP and full CLI
-regression suites. The historical broad MCP run passed 1441 cases but had one
-document-edit missing response; focused diagnostic passed 27 cases. This remains
-an open final regression obligation. Historical broad CLI runs cannot certify
-the final integrated candidate. The overseer owns long live suites.
+The user revised qualification scope after the 2026-10-04 retrospective. Final
+certification requires integrated check-all and the five relevant movement,
+transfer, attribute, tree and concurrency fixtures. Each unique concurrency
+scenario remains; representative CLI cases establish the second transport.
+The whole-server MCP suite and its full CLI mirror were additional orchestrator
+obligations, not named requirements in #305–311, and are excluded from this
+feature completion. The historical broad MCP document-edit missing response
+remains unresolved global regression evidence; no clean broad-suite result is
+claimed. Use the bounded workflow in INTEGRATION_TESTING.md.
 
 ## Fresh current attempt evidence
 

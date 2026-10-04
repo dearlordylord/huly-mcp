@@ -69,7 +69,10 @@
     "prepack": "pnpm build:mcp && pnpm verify-version",
     "prepublishOnly": "pnpm check-all && pnpm verify-version && pnpm --filter @firfi/huly-cli verify-version && pnpm verify-cli-integration-coverage && pnpm verify-cli-package-closure && pnpm verify-cli-skill && pnpm verify-cli-skill-package && pnpm report-cli-artifact-size",
     "update-readme": "tsx scripts/update-readme-tools.mjs",
-    "verify-readme": "tsx scripts/update-readme-tools.mjs --check"
+    "verify-readme": "tsx scripts/update-readme-tools.mjs --check",
+    "verify-movement-fixtures": "node scripts/verify-movement-fixtures.mjs",
+    "test:movement-process": "node --test scripts/verify-movement-fixtures.test.mjs test/scripts/run-movement-certification.node.test.mjs",
+    "integration:movement": "node scripts/run-movement-certification.mjs"
   },
   "bin": {
     "huly-mcp": "./dist/index.cjs"

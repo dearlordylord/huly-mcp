@@ -27,6 +27,8 @@ interface QualityGate {
 }
 
 const gates: ReadonlyArray<QualityGate> = [
+  { args: ["verify-movement-fixtures"], name: "movement fixture preflight", timeout: MINUTE },
+  { args: ["test:movement-process"], name: "movement process checks", timeout: MINUTE },
   { args: ["verify:effect-cohort"], name: "Effect dependency cohort", timeout: MINUTE },
   { args: ["build"], name: "build", timeout: TWO_MINUTES },
   { args: ["typecheck"], name: "TypeScript and Effect diagnostics", timeout: TWO_MINUTES },

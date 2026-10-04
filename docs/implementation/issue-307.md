@@ -32,7 +32,7 @@ Serial built-CLI malformed-input measurements used an exact archive of accepted 
 
 No live Huly suite has been launched and no fixture writes were performed, per the user's final-only cadence. `scripts/integration_test_issue_transfer.sh` and `scripts/integration-issue-transfer-state.ts` author final MCP/CLI execution cases with disposable source/destination projects, a destination parent containing existing work, relation counterparts, an independent document reference and automatically created history. The fixture checks preserved payload/history, stable recovery, changed identifiers, no-op sequence stability and pre-write owned-record refusal. Injected ports cover workflow and authorization refusal, conditional commit refusal and post-send uncertainty.
 
-Final certification must run this fixture, #306 movement fixtures and all subsequent slice fixtures on the combined production candidate, followed by final check-all and clean whole-server MCP/full CLI regressions. Record the server version and verify trigger responsibility and project-type restrictions empirically. Historical broad MCP document-edit missing-response behavior remains a regression obligation.
+Under the user’s 2026-10-04 process correction, final certification runs the five relevant movement fixtures and final check-all. Retain all unique concurrency scenarios plus representative CLI physical checks. Whole-server MCP/full CLI suites are outside this feature completion; their historical document-edit missing response remains unresolved and is not claimed fixed. Record the server version and verify trigger responsibility and project-type restrictions empirically. See INTEGRATION_TESTING.md for the bounded qualification workflow.
 
 ## Reviews
 

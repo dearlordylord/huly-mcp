@@ -513,3 +513,39 @@ intervening cooldown. These fixture waits do not change operation deadlines,
 fresh inspection guards, or assertions, and failed movements are not retried.
 They isolate independent certification cases from cumulative quota pressure;
 they are not evidence of improved product latency.
+
+
+## Bounded movement qualification
+
+For #305–311, use the five movement fixtures: movement, transfer, attributes,
+tree and concurrency. They own feature integration through MCP and CLI. The
+routine concurrency profile retains all fourteen unique cases through MCP and
+four representative CLI cases; `HULY_MOVEMENT_CONCURRENCY_PROFILE=expanded`
+selects the historical 28-case transport matrix. Whole-server unrelated-tool
+regressions remain separate checks, not a substitute for these feature cases.
+
+Run focused failure checks during repair. Run `pnpm check-all` once on a coherent,
+reviewed production candidate. A fixture-only correction uses shell/preflight
+and affected fixture checks; do not restart passed, unchanged feature cases just
+because the commit changed. Reused evidence must retain its original tested
+commit, environment, inputs and log. It is source-equivalent characterization,
+not an assertion that an earlier run executed the newer commit.
+
+The movement coordinator uses one absolute deadline, a worktree lock, retained
+logs and input fingerprints. Inspect `pnpm integration:movement -- --plan`
+before running. After process preparation, the user’s delivery budget is twenty
+minutes including the final gate, queueing, diagnosis and live work. Never reset
+that budget for a new commit or subtask. Expiry is an incomplete outcome, never
+qualification. Do not relaunch an unchanged failed case without a named,
+distinguishing diagnostic; after two non-advancing attempts, change the method.
+
+Before each expensive run, record expected duration, UTC stop time, failed
+boundary and unexecuted suffix in the existing handoff. Preserve safe phase and
+line diagnostics before assertions, with private result/log files where needed.
+A lost response permits bounded read-only reconciliation, never another write.
+Use retained evidence to separate fixture, startup, transport and product faults.
+
+This workflow adopts the finite-work controls in sibling Dalph’s
+`docs/development/workflow.md` and Hapsland’s `docs/testing-matrix.md`. It changes
+qualification selection, not the movement API, coverage thresholds, permissions,
+or truthfulness requirements.
