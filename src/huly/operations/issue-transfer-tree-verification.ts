@@ -108,7 +108,7 @@ export const verifyTransferTree = Effect.fn("transfer.verifyTree")(function* (
       status: "observed",
       completeness: "incomplete",
       consistency: knownTaskProblem === undefined ? "undetermined" : "inconsistent",
-      reason: knownTaskProblem ?? records.reason,
+      reason: knownTaskProblem === undefined ? records.reason : `${knownTaskProblem} ${records.reason}`,
       tasks,
       records: records.observed
     }
@@ -118,7 +118,7 @@ export const verifyTransferTree = Effect.fn("transfer.verifyTree")(function* (
       status: "observed",
       completeness: "incomplete",
       consistency: knownTaskProblem === undefined ? "undetermined" : "inconsistent",
-      reason: knownTaskProblem ?? closure.message,
+      reason: knownTaskProblem === undefined ? closure.message : `${knownTaskProblem} ${closure.message}`,
       tasks,
       records: records.observed
     }
