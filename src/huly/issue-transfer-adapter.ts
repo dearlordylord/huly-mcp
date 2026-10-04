@@ -1,5 +1,5 @@
 import type { Issue } from "@hcengineering/tracker"
-import type { AttachedDoc, Doc, TxOperations } from "@hcengineering/core"
+import type { AttachedDoc, Doc, DocumentUpdate, TxOperations } from "@hcengineering/core"
 import { Effect, Schema } from "effect"
 import {
   AutomaticHistoryClass,
@@ -130,6 +130,11 @@ export const commitTransfer = async (
       modifiedOn: write.modifiedOn
     })
   )
+  for (const change of write.attributeChanges ?? [])
+    apply.match(
+      tracker.class.Issue,
+      hulyQuery<Issue>({ _id: toRef(write.issueId), [change.field]: toRef(change.from) })
+    )
   for (const record of write.records) {
     apply.match(
       toClassRef<AttachedDoc>(record._class),
@@ -155,7 +160,8 @@ export const commitTransfer = async (
     attachedTo: toRef(write.parentId),
     number: write.number,
     identifier: write.identifier,
-    rank: write.rank
+    rank: write.rank,
+    ...attributeUpdates(write)
   })
   if (String(write.previousParent) !== String(tracker.ids.NoParent))
     await apply.updateDoc(tracker.class.Issue, toRef(write.sourceId), toRef(write.previousParent), {
@@ -166,4 +172,13 @@ export const commitTransfer = async (
       $inc: { subIssues: 1 }
     })
   return (await apply.commit()).result ? "applied" : "condition-not-met"
+}
+
+const attributeUpdates = (write: TransferWrite) => {
+  const updates: DocumentUpdate<Issue> = {}
+  for (const change of write.attributeChanges ?? []) {
+    if (change.field === "component") updates.component = change.to === null ? null : toRef(change.to)
+    else updates.milestone = change.to === null ? null : toRef(change.to)
+  }
+  return updates
 }

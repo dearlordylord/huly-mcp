@@ -166,3 +166,31 @@ it.effect("parses historical update payloads into immutable encoded snapshots an
     expect(f.updates).toEqual([])
   })
 )
+
+it.effect("writes only planned attributes and conditions each replacement or clear on its expected reference", () =>
+  Effect.gen(function* () {
+    for (const field of ["component", "milestone"]) {
+      for (const to of ["replacement", null]) {
+        const f = adapterFixture()
+        const write = Schema.decodeUnknownSync(TransferWriteSchema)({
+          ...writeInput,
+          records: [],
+          attributeChanges: [
+            {
+              issueId: "root",
+              field,
+              from: "expected",
+              to,
+              reason: to === null ? "explicit-clear" : "explicit-replacement"
+            }
+          ]
+        })
+        expect(yield* Effect.promise(() => commitTransfer(f.client, write))).toBe("applied")
+        expect(f.conditions).toContainEqual({ _id: "root", [field]: "expected" })
+        expect(f.updates[0]?.[3]).toMatchObject({ [field]: to })
+        const other = field === "component" ? "milestone" : "component"
+        expect(f.updates[0]?.[3]).not.toHaveProperty(other)
+      }
+    }
+  })
+)

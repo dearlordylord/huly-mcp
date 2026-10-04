@@ -1,3 +1,4 @@
+import { TransferAttributeChangeSchema, TransferAttributeConflictFields } from "./issue-transfer-attributes.js"
 import { SocialIdentityId } from "./person-administration.js"
 import { Schema } from "effect"
 import {
@@ -63,7 +64,8 @@ export const TransferWriteSchema = Schema.Struct({
   number: PositiveInteger,
   identifier: IssueIdentifier,
   rank: NonEmptyString,
-  records: Schema.Array(TransferHistoryRecordSchema)
+  records: Schema.Array(TransferHistoryRecordSchema),
+  attributeChanges: Schema.optionalKey(Schema.Array(TransferAttributeChangeSchema))
 })
 export type TransferWrite = Schema.Schema.Type<typeof TransferWriteSchema>
 
@@ -101,17 +103,23 @@ export const TransferKindSchema = Schema.Struct({
 })
 export const TransferSequenceSchema = Schema.Struct({ object: Schema.Struct({ sequence: PositiveInteger }) })
 
-export const TransferConflictSchema = Schema.Struct({
-  code: Schema.Literals([
-    "unsupported-structure",
-    "unsupported-attribute",
-    "workflow",
-    "authorization",
-    "discovery",
-    "invalid-resolution"
-  ]),
-  issueId: IssueId,
-  identifier: IssueIdentifier,
-  reason: Schema.String
-})
+const ConflictFields = { issueId: IssueId, identifier: IssueIdentifier, reason: Schema.String }
+export const TransferConflictSchema = Schema.Union([
+  Schema.Struct({
+    ...ConflictFields,
+    ...TransferAttributeConflictFields,
+    code: Schema.Literals(["attribute", "stale-resolution", "invalid-resolution", "discovery"])
+  }),
+  Schema.Struct({
+    ...ConflictFields,
+    code: Schema.Literals([
+      "unsupported-structure",
+      "unsupported-attribute",
+      "workflow",
+      "authorization",
+      "discovery",
+      "invalid-resolution"
+    ])
+  })
+])
 export type TransferConflict = Schema.Schema.Type<typeof TransferConflictSchema>

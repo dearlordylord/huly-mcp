@@ -1,6 +1,7 @@
+import { TransferAttributeFieldSchema } from "./issue-transfer-attributes.js"
 import { Schema } from "effect"
 import { toDraft07JsonSchema } from "./json-schema.js"
-import { IssueId, IssueIdentifier, NonEmptyString, ProjectIdentifier } from "./shared.js"
+import { DocId, IssueId, IssueIdentifier, ProjectIdentifier } from "./shared.js"
 
 const MovementDestinationSchema = Schema.Union([
   Schema.Struct({ project: ProjectIdentifier, parent: Schema.optionalKey(Schema.NullOr(IssueIdentifier)) }),
@@ -17,21 +18,16 @@ export const MoveIssueParamsSchema = Schema.Struct({
   destination: MovementDestinationSchema,
   resolutions: Schema.optionalKey(
     Schema.Array(
-      Schema.Struct({
-        issueId: IssueId,
-        field: Schema.Literals(["component", "milestone"]),
-        from: NonEmptyString,
-        to: Schema.NullOr(NonEmptyString)
-      })
+      Schema.Struct({ issueId: IssueId, field: TransferAttributeFieldSchema, from: DocId, to: Schema.NullOr(DocId) })
     ).annotate({
       description:
-        "Cross-project-only decisions. Omit for same-project movement, including no-ops. This slice refuses component/milestone resolutions; choose a compatible leaf without those references."
+        "Cross-project-only decisions. Omit for same-project movement, including no-ops. Each decision is {issueId,field: component|milestone,from: expected current stable value ID,to: destination stable value ID or null to clear}. Consent covers only that exact task and value. Blocked results include candidates and all discovered conflicts; retry the original destination with decisions."
     })
   )
 }).annotate({
   title: "MoveIssueParams",
   description:
-    "Move a tree within its project or a compatible leaf across projects. Cross-project moves require equal project types, supported kind/status and no component/milestone references; only automatic history records are supported. Unsupported structure is refused before allocation. Stable IDs persist; cross-project identifiers change."
+    "Move a tree within its project or a compatible leaf across projects. Cross-project moves require equal project types, supported kind/status with component/milestone references resolved by valid destination IDs or literal unique names; only automatic history records are supported. Unsupported structure is refused before allocation. Stable IDs persist; cross-project identifiers change."
 })
 
 export type MoveIssueParams = Schema.Schema.Type<typeof MoveIssueParamsSchema>

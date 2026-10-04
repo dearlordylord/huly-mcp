@@ -86,7 +86,6 @@ it.effect("aggregates discoverable blockers before allocation; unsupported inven
       "Status",
       "leaf",
       "comment",
-      "Resolutions",
       "equal project types"
     ])
       expect(JSON.stringify(result)).toContain(text)

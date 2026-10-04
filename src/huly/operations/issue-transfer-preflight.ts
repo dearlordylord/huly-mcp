@@ -1,3 +1,6 @@
+import { inspectTransferAttributes } from "./issue-transfer-attribute-inspection.js"
+import { resolveTransferAttributes } from "./issue-transfer-attribute-resolution.js"
+import type { TransferAttributeChange } from "../../domain/schemas/issue-transfer-attributes.js"
 import type { Issue, Project } from "@hcengineering/tracker"
 import type { ProjectType, TaskType } from "@hcengineering/task"
 import { Effect, Schema } from "effect"
@@ -29,11 +32,13 @@ import {
 // Internal proof carrying parsed snapshots; it is not an I/O payload.
 export interface TransferPlan {
   readonly plan: MovementPlan
+  readonly attributeChanges: ReadonlyArray<TransferAttributeChange>
   readonly protectedIssue: TransferIssue
   readonly records: ReadonlyArray<TransferHistoryRecord>
 }
 export interface TransferRefusal {
   readonly conflicts: ReadonlyArray<TransferConflict>
+  readonly discovery?: TransferInspection["discovery"]
   readonly limitation: TransferInspection["limitation"]
 }
 const parse = <A, R>(
@@ -47,7 +52,7 @@ const parse = <A, R>(
   )
 const conflict = (
   root: MovementIssue,
-  code: TransferConflict["code"],
+  code: Exclude<TransferConflict["code"], "attribute" | "stale-resolution">,
   reason: TransferConflict["reason"]
 ): TransferConflict => ({ code, issueId: root._id, identifier: root.identifier, reason })
 const related = (hierarchy: MovementHierarchy, root: MovementIssue, parent: MovementIssue | undefined) => [
@@ -157,35 +162,6 @@ const parentKindConflicts = (
   return conflicts
 }
 
-const attributeConflicts = (root: MovementIssue, issue: TransferIssue, params: MoveIssueParams) => {
-  const conflicts: Array<TransferConflict> = []
-  if (issue.component != null)
-    conflicts.push(
-      conflict(
-        root,
-        "unsupported-attribute",
-        `Unsupported component reference ${issue.component}; component resolution is deferred.`
-      )
-    )
-  if (issue.milestone != null)
-    conflicts.push(
-      conflict(
-        root,
-        "unsupported-attribute",
-        `Unsupported milestone reference ${issue.milestone}; milestone resolution is deferred.`
-      )
-    )
-  if (params.resolutions !== undefined)
-    conflicts.push(
-      conflict(
-        root,
-        "invalid-resolution",
-        "Resolutions are unsupported for this compatible-leaf slice; omit resolutions."
-      )
-    )
-  return conflicts
-}
-
 const availableWorkflowConflicts = (
   root: MovementIssue,
   parent: TransferIssue | undefined,
@@ -209,8 +185,7 @@ const inspectWorkflow = Effect.fn("transfer.inspectWorkflow")(function* (
   root: MovementIssue,
   parent: MovementIssue | undefined,
   source: MovementProject,
-  destination: MovementProject,
-  params: MoveIssueParams
+  destination: MovementProject
 ): Effect.fn.Return<
   { readonly protectedIssue: TransferIssue; readonly conflicts: ReadonlyArray<TransferConflict> },
   MovementError
@@ -248,8 +223,7 @@ const inspectWorkflow = Effect.fn("transfer.inspectWorkflow")(function* (
         )
   const conflicts = [
     ...projectConflicts(client, root, sourceData, destinationData),
-    ...availableWorkflowConflicts(root, parentIssue, protectedIssue, destinationData.type, workflow, kind),
-    ...attributeConflicts(root, protectedIssue, params)
+    ...availableWorkflowConflicts(root, parentIssue, protectedIssue, destinationData.type, workflow, kind)
   ]
   if (raw?.modifiedOn !== root.modifiedOn)
     conflicts.push(conflict(root, "discovery", "Root changed during inspection."))
@@ -280,11 +254,18 @@ export const inspectTransferPlan = Effect.fn("transfer.inspectPlan")(function* (
   const hierarchy = movementHierarchy([...sourceHierarchy.issues, ...destinationHierarchy.issues])
   const relevant = related(hierarchy, root, parent)
   const closureProblem = yield* inspectMovementClosure(client, hierarchy, relevant)
-  const workflow = yield* inspectWorkflow(client, root, parent, source, destination, params)
+  const workflow = yield* inspectWorkflow(client, root, parent, source, destination)
+  const attributes = resolveTransferAttributes(
+    root,
+    workflow.protectedIssue,
+    yield* inspectTransferAttributes(client, source, destination),
+    params.resolutions
+  )
   const records = yield* inspectRecords(root._id)
   const conflicts = [
     ...hierarchyConflicts(root, hierarchy, relevant),
     ...workflow.conflicts,
+    ...attributes.conflicts,
     ...(records.discovery === "incomplete"
       ? [conflict(root, "discovery", "Incomplete owned-record discovery; no complete conflict inventory.")]
       : []),
@@ -305,10 +286,21 @@ export const inspectTransferPlan = Effect.fn("transfer.inspectPlan")(function* (
       )
   ]
   if (closureProblem !== undefined) conflicts.push(conflict(root, "discovery", closureProblem))
-  if (conflicts.length > 0) return { conflicts, limitation: records.limitation }
+  if (conflicts.length > 0)
+    return {
+      conflicts,
+      discovery: combinedDiscovery(attributes.complete, records.discovery),
+      limitation: records.limitation
+    }
   return {
     plan: { root, parent, source, tree: [root], relevant },
+    attributeChanges: attributes.changes,
     protectedIssue: workflow.protectedIssue,
     records: records.records.filter((record) => record.kind === "history")
   }
 })
+
+const combinedDiscovery = (
+  attributesComplete: boolean,
+  records: TransferInspection["discovery"]
+): TransferInspection["discovery"] => (attributesComplete && records === "complete" ? "complete" : "incomplete")

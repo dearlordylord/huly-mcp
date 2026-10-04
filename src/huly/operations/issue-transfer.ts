@@ -55,6 +55,8 @@ export const transferIssue = Effect.fn("transferIssue")(function* (
       outcome: "blocked",
       changed: false,
       reason: `${prepared.conflicts.map((entry) => entry.reason).join(" ")} ${prepared.limitation}`,
+      discovery: prepared.discovery ?? "incomplete",
+      nextCall: { ...params, issue: IssueIdentifier.make(root._id) },
       conflicts: prepared.conflicts,
       destinationId: destination._id,
       issueIds: [root._id],
@@ -127,6 +129,7 @@ const executeTransfer = Effect.fn("transfer.execute")(function* (
     number: sequence.value.object.sequence,
     identifier: IssueIdentifier.make(`${destination.identifier}-${sequence.value.object.sequence}`),
     rank: NonEmptyString.make(makeRank(last.success?.rank, undefined)),
+    attributeChanges: prepared.attributeChanges,
     records: prepared.records
   }
   return yield* commitAndVerify(client, prepared, destination, write, commit)
@@ -172,6 +175,7 @@ const commitAndVerify = Effect.fn("transfer.commitAndVerify")(function* (
   return {
     outcome: "completed",
     changed: true,
+    attributeChanges: prepared.attributeChanges,
     issueId: root._id,
     projectId: DocId.make(destination._id),
     parentId: parent?._id ?? null,

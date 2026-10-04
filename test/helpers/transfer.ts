@@ -1,4 +1,4 @@
-import type { Doc, DocumentQuery } from "@hcengineering/core"
+import type { Doc, DocumentQuery, FindOptions } from "@hcengineering/core"
 import { IssuePriority, type Issue } from "@hcengineering/tracker"
 import { Effect, Schema } from "effect"
 import { TransferInspectionSchema, type TransferWrite } from "../../src/domain/schemas/issue-transfer.js"
@@ -6,7 +6,7 @@ import { DocId, IssueId, ObjectClassName, Timestamp, NonEmptyString } from "../.
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
 import { HulyAuthError } from "../../src/huly/errors-base.js"
 import { activity, task, tracker } from "../../src/huly/huly-plugins.js"
-import { sdkFixture, documentForTestClass } from "./huly-sdk.js"
+import { sdkFixture, documentForTestClass, findResultForTestClass } from "./huly-sdk.js"
 import { initializeHierarchy, movementFixture, movementIssue, movementProject } from "./movement.js"
 
 const CORRUPTED_HISTORY_TIMESTAMP = 2
@@ -89,6 +89,8 @@ export const transferFixture = () => {
     corruptContent: false,
     failOrdering: false,
     recordsBlockers: Array<string>(),
+    unfilteredAttributeRows: false,
+    attributeTotal: Number.NaN,
     inspected: 0
   }
   const unavailable = () => Effect.fail(new HulyAuthError({ message: "Injected authorization refusal" }))
@@ -109,9 +111,21 @@ export const transferFixture = () => {
     )
     return Effect.succeed(documentForTestClass<T>(found))
   }
+  const attributeRows: Array<Doc> = []
   const operations: Partial<HulyClientOperations> = {
     ...fixture.operations,
     findOne,
+    findAll: <T extends Doc>(cls: unknown, query: DocumentQuery<T>, options?: FindOptions<T>) => {
+      if (cls !== tracker.class.Component && cls !== tracker.class.Milestone)
+        return fixture.operations.findAll<T>(sdkFixture(cls), query, options)
+      const result = findResultForTestClass<T>(
+        state.unfilteredAttributeRows
+          ? attributeRows
+          : attributeRows.filter((row) => row._class === cls && row.space === query.space)
+      )
+      if (Number.isFinite(state.attributeTotal)) result.total = state.attributeTotal
+      return Effect.succeed(result)
+    },
     inspectTransferRecords: () => {
       state.inspected++
       if (state.failPostRead && state.sent > 0) return unavailable()
@@ -141,6 +155,7 @@ export const transferFixture = () => {
           rank: write.rank,
           number: write.number
         })
+        for (const change of write.attributeChanges ?? []) Reflect.set(root, change.field, change.to)
         if (state.corruptNumber) root.number++
         if (state.corruptContent) root.description = sdkFixture("Changed content")
         if (!state.corruptHistory) for (const record of records) record.space = write.destinationId
@@ -157,6 +172,7 @@ export const transferFixture = () => {
   }
   return {
     ...fixture,
+    attributeRows,
     root,
     old,
     parent,
