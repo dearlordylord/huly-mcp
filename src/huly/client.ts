@@ -85,6 +85,8 @@ import { testWorkbenchUrlConfig, type WorkbenchUrlConfig } from "./url-builders.
 import { inspectNativePersonReferences, migrateNativePersonReferences } from "./person-reference-migration.js"
 
 import { commitTransfer, inspectTransferRecords } from "./issue-transfer-adapter.js"
+import { commitTransferTree } from "./issue-transfer-tree-adapter.js"
+import type { TransferTreeWrite } from "../domain/schemas/issue-transfer-tree.js"
 import type { TransferInspection, TransferWrite } from "../domain/schemas/issue-transfer.js"
 
 // --- Connection helpers ---
@@ -219,6 +221,7 @@ export interface HulyClientOperations extends HulyClientContext {
     issueId: IssueId
   ) => Effect.Effect<TransferInspection, HulyClientError | HulyDataInvalidError>
   readonly commitTransfer?: (write: TransferWrite) => Effect.Effect<HulyConditionalWriteResult, HulyClientError>
+  readonly commitTransferTree?: (write: TransferTreeWrite) => Effect.Effect<HulyConditionalWriteResult, HulyClientError>
   readonly getAccountUuid: () => AccountUuid
   readonly getPrimarySocialId: () => PersonId
   readonly getSocialIds?: () => ReadonlyArray<PersonId>
@@ -411,6 +414,8 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
         const operations: HulyClientOperations = {
           inspectTransferRecords: (issueId) => inspectTransferRecords(client, issueId),
           commitTransfer: (write) => withClient((client) => commitTransfer(client, write), "conditionalUpdateDoc"),
+          commitTransferTree: (write) =>
+            withClient((client) => commitTransferTree(client, write), "conditionalUpdateDoc"),
           getAccountUuid: () => accountUuid,
           getPrimarySocialId: () => primarySocialId,
           getSocialIds: () => socialIds,

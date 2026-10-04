@@ -121,6 +121,15 @@ export const commitTransfer = async (
   write: TransferWrite
 ): Promise<HulyConditionalWriteResult> => {
   const apply = client.apply(HulyTransactionScope.make(`issue-transfer:${write.issueId}`))
+  await queueTransferTask(apply, write)
+  await queueTransferRootCounts(apply, write)
+  return (await apply.commit()).result ? "applied" : "condition-not-met"
+}
+
+export const queueTransferTask = async (
+  apply: ReturnType<TxOperations["apply"]>,
+  write: TransferWrite
+): Promise<void> => {
   apply.match(
     tracker.class.Issue,
     hulyQuery<Issue>({
@@ -159,6 +168,12 @@ export const commitTransfer = async (
     rank: write.rank,
     ...attributeUpdates(write)
   })
+}
+
+export const queueTransferRootCounts = async (
+  apply: ReturnType<TxOperations["apply"]>,
+  write: TransferWrite
+): Promise<void> => {
   if (String(write.previousParent) !== String(tracker.ids.NoParent))
     await apply.updateDoc(tracker.class.Issue, toRef(write.sourceId), toRef(write.previousParent), {
       $inc: { subIssues: -1 }
@@ -167,7 +182,6 @@ export const commitTransfer = async (
     await apply.updateDoc(tracker.class.Issue, toRef(write.destinationId), toRef(write.parentId), {
       $inc: { subIssues: 1 }
     })
-  return (await apply.commit()).result ? "applied" : "condition-not-met"
 }
 
 const attributeUpdates = (write: TransferWrite) => {
