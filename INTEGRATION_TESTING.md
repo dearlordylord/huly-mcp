@@ -517,8 +517,9 @@ they are not evidence of improved product latency.
 
 ## Bounded movement qualification
 
-For #305–311, use the five movement fixtures: movement, transfer, attributes,
-tree and concurrency. They own feature integration through MCP and CLI. The
+For #305–311, use all five movement fixtures. The coordinator runs attributes,
+tree and concurrency before movement and rich transfer, putting unresolved
+feature boundaries ahead of previously passing checks. They own feature integration through MCP and CLI. The
 routine concurrency profile retains all fourteen unique cases through MCP and
 four representative CLI cases; `HULY_MOVEMENT_CONCURRENCY_PROFILE=expanded`
 selects the historical 28-case transport matrix. Whole-server unrelated-tool

@@ -55,14 +55,14 @@ test('passes reuse unchanged inputs; only changed suite invalidates', async () =
 test('failed unchanged suite blocks without explicit named diagnostic', async () => {
   const f = await fixture()
   try {
-    await writeFile(path.join(f.root, 'scripts/integration_test_issue_movement.sh'), '#!/bin/bash\necho failed >> launches\nexit 7\n')
+    await writeFile(path.join(f.root, `scripts/integration_test_${suites[0]}.sh`), '#!/bin/bash\necho failed >> launches\nexit 7\n')
     assert.equal((await runCertification(f)).exit, FAILURE_EXIT)
     const launches = await readFile(path.join(f.root, 'launches'), 'utf8')
     const blocked = await runCertification(f)
     assert.equal(blocked.exit, 1)
     assert.equal(blocked.plan[0].status, 'blocked')
     assert.equal(await readFile(path.join(f.root, 'launches'), 'utf8'), launches)
-    assert.equal((await runCertification({ ...f, diagnostic: 'issue_movement:explicit failure inspection' })).exit, FAILURE_EXIT)
+    assert.equal((await runCertification({ ...f, diagnostic: `${suites[0]}:explicit failure inspection` })).exit, FAILURE_EXIT)
   } finally { await rm(f.root, { recursive: true }) }
 })
 
@@ -91,7 +91,7 @@ test('exclusive lock fails fast without reading state or removing another owner 
 test('deadline terminates real process group and permits bounded fixture cleanup', async () => {
   const f = await fixture()
   try {
-    await writeFile(path.join(f.root, 'scripts/integration_test_issue_movement.sh'), '#!/bin/bash\ntrap \'echo cleaned >> cleanup; exit 0\' TERM\necho running >> launches\nsleep 30\n')
+    await writeFile(path.join(f.root, `scripts/integration_test_${suites[0]}.sh`), '#!/bin/bash\ntrap \'echo cleaned >> cleanup; exit 0\' TERM\necho running >> launches\nsleep 30\n')
     const state = { clock: now(), scheduled: 0 }
     const time = { ...realTime, now: () => state.clock, schedule: (callback, milliseconds) => {
       state.scheduled++
@@ -122,7 +122,7 @@ test('modified historical log refuses reuse rather than inventing passed evidenc
 test('changed suite inputs during child execution never create reusable pass evidence', async () => {
   const f = await fixture()
   try {
-    await writeFile(path.join(f.root, 'scripts/integration_test_issue_movement.sh'), '#!/bin/bash\necho changed >> scripts/integration_test_issue_movement.sh\nexit 0\n')
+    await writeFile(path.join(f.root, `scripts/integration_test_${suites[0]}.sh`), '#!/bin/bash\necho changed >> scripts/integration_test_issue_movement.sh\nexit 0\n')
     const result = await runCertification(f)
     assert.equal(result.exit, 1)
     const receipt = JSON.parse((await readFile(path.join(f.stateDir, 'receipts.jsonl'), 'utf8')).trim())
