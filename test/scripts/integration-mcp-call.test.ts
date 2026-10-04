@@ -1,8 +1,9 @@
-import { spawn } from "node:child_process"
 import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { test, expect } from "vitest"
+import { Schema } from "effect"
+import { Milliseconds, runBoundedCommand } from "../../scripts/run-bounded-command.js"
 import {
   integrationMcpCall,
   IntegrationMonotonicMilliseconds,
@@ -81,34 +82,49 @@ for (const isError of [false, true]) {
   })
 }
 
-const BUNDLED_ENTRY_TIMEOUT_MILLISECONDS = 10_000
+const BUNDLED_ENTRY_TIMEOUT_MILLISECONDS = Milliseconds.make(10_000)
+const BUNDLED_ENTRY_CLEANUP_MILLISECONDS = Milliseconds.make(1_000)
 const BUNDLED_ENTRY_TEST_TIMEOUT_MILLISECONDS = 15_000
 
 test(
   "actual bundled entry rejects missing arguments without launching Huly",
   { timeout: BUNDLED_ENTRY_TEST_TIMEOUT_MILLISECONDS },
   async () => {
-    const child = spawn(process.execPath, ["scripts/run-bundled.mjs", "scripts/integration-mcp-call-main.ts"], {
-      stdio: ["ignore", "pipe", "pipe"]
-    })
-    const stdout: Array<Buffer> = []
-    const stderr: Array<Buffer> = []
-    child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk))
-    child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk))
-    const deadline = setTimeout(() => child.kill("SIGKILL"), BUNDLED_ENTRY_TIMEOUT_MILLISECONDS)
+    const directory = await mkdtemp(join(tmpdir(), "hulymcp-bundled-entry-"))
+    const stdout = join(directory, "stdout")
+    const stderr = join(directory, "stderr")
+    const status = join(directory, "status")
+    // Regular files avoid inherited pipe holders; the shared runner owns the whole detached group.
+    const program = `
+    const fs=require('node:fs');const {spawn}=require('node:child_process');
+    const child=spawn(process.execPath,['scripts/run-bundled.mjs','scripts/integration-mcp-call-main.ts'],{
+      stdio:['ignore',fs.openSync(${JSON.stringify(stdout)},'w'),fs.openSync(${JSON.stringify(stderr)},'w')]
+    });
+    child.once('error',()=>process.exit(1));
+    child.once('close',(code,signal)=>{fs.writeFileSync(${JSON.stringify(status)},JSON.stringify({code,signal}));process.exitCode=code??1;});
+  `
     try {
-      const code = await new Promise<number | null>((done, fail) => {
-        child.once("error", fail)
-        child.once("close", done)
-      })
-      expect(code).toBe(1)
-      expect(Buffer.concat(stdout).toString()).toBe("")
-      expect(Buffer.concat(stderr).toString()).toContain(
+      await expect(
+        runBoundedCommand({
+          executable: process.execPath,
+          args: ["-e", program],
+          name: "bundled missing-input fixture",
+          timeoutMilliseconds: BUNDLED_ENTRY_TIMEOUT_MILLISECONDS,
+          terminationGraceMilliseconds: BUNDLED_ENTRY_CLEANUP_MILLISECONDS,
+          forwardOutput: false
+        })
+      ).rejects.toThrow("bundled missing-input fixture failed with exit 1")
+      expect(
+        Schema.decodeUnknownSync(
+          Schema.fromJsonString(Schema.Struct({ code: Schema.Literal(1), signal: Schema.Null }))
+        )(await readFile(status, "utf8"))
+      ).toEqual({ code: 1, signal: null })
+      expect(await readFile(stdout, "utf8")).toBe("")
+      expect(await readFile(stderr, "utf8")).toContain(
         "Integration MCP call failed during input; no automatic mutation retry performed."
       )
     } finally {
-      clearTimeout(deadline)
-      if (child.exitCode === null) child.kill("SIGKILL")
+      await rm(directory, { recursive: true, force: true })
     }
   }
 )
