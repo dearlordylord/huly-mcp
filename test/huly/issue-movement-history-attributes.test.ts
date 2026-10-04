@@ -15,7 +15,7 @@ const hierarchy = (attributes: ReadonlyMap<string, unknown>, unavailable = false
 
 it("captures model-declared reference, array and scalar types while excluding hidden and missing fields", () => {
   const model = hierarchy(
-    new Map([
+    new Map<string, unknown>([
       ["attachedTo", { type: { _class: "core:class:RefTo", to: "tracker:class:Issue" } }],
       ["parents", { type: { _class: "core:class:ArrOf", of: { _class: "core:class:TypeString" } } }],
       ["nested", { type: { _class: "core:class:Other", of: { to: "tracker:class:Project" } } }],
@@ -43,7 +43,7 @@ it("captures model-declared reference, array and scalar types while excluding hi
 })
 
 it("matches activity operator key discovery and deduplicates repeated changed fields", () => {
-  const model = hierarchy(new Map([["children", { type: { _class: "core:class:TypeString" } }]]))
+  const model = hierarchy(new Map<string, unknown>([["children", { type: { _class: "core:class:TypeString" } }]]))
   const result = parseMovementHistoryAttributes(model, {
     $push: { children: "a" },
     $pull: { children: "b" },
@@ -57,13 +57,15 @@ it("matches activity operator key discovery and deduplicates repeated changed fi
 
 for (const type of [{ _class: "core:class:ArrOf" }, { _class: 42 }]) {
   it("refuses malformed declared metadata rather than authenticating with a guessed class", () => {
-    const result = parseMovementHistoryAttributes(hierarchy(new Map([["parents", { type }]])), { parents: [] })
+    const result = parseMovementHistoryAttributes(hierarchy(new Map<string, unknown>([["parents", { type }]])), {
+      parents: []
+    })
     expect(Result.isFailure(result)).toBe(true)
   })
 }
 
 it("returns a typed model failure when hierarchy lookup fails", () => {
-  const result = parseMovementHistoryAttributes(hierarchy(new Map(), true), { attachedTo: "parent" })
+  const result = parseMovementHistoryAttributes(hierarchy(new Map<string, unknown>(), true), { attachedTo: "parent" })
   expect(Result.isFailure(result)).toBe(true)
   if (Result.isFailure(result)) expect(result.failure._tag).toBe("HulyDataInvalidError")
 })
