@@ -12,16 +12,9 @@ import type { MoveIssueParams } from "../../domain/schemas/issue-movement.js"
 import { type IssueIdentifier, type ProjectIdentifier } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import { tracker } from "../huly-plugins.js"
-import {
-  ancestorsOf,
-  descendantsOf,
-  hierarchyProblem,
-  type MovementHierarchy,
-  movementHierarchy
-} from "./issue-movement-hierarchy.js"
+import { type MovementHierarchy, movementHierarchy } from "./issue-movement-hierarchy.js"
 import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
-import { inspectTransferTree } from "./issue-transfer-tree-inspection.js"
 
 const DISCOVERY_LIMIT = 10_001
 export type MovementError = HulyClientError | HulyDataInvalidError
@@ -34,15 +27,6 @@ export interface MovementPlan {
   readonly tree: ReadonlyArray<Issue>
   readonly relevant: ReadonlyArray<Issue>
 }
-export interface MovementPlanRefusal {
-  readonly reason: string
-  readonly issueIds: ReadonlyArray<Issue["_id"]>
-}
-const planRefusal = (root: Issue, reason: string, issues: ReadonlyArray<Issue> = [root]): MovementPlanRefusal => ({
-  reason,
-  issueIds: issues.map((issue) => issue._id)
-})
-
 // Internal SDK result metadata check; record payloads are parsed separately below.
 const completeDiscovery = (result: { readonly total: number; readonly length: number }) =>
   result.total === result.length && result.length < DISCOVERY_LIMIT
@@ -135,36 +119,6 @@ export const movementDestinationProblem = (
     : undefined
 }
 
-export const inspectMovementPlan = Effect.fn("movement.inspectPlan")(function* (
-  client: HulyClient["Service"],
-  root: Issue,
-  parent: Issue | undefined,
-  source: Project
-): Effect.fn.Return<MovementPlan | MovementPlanRefusal, MovementError> {
-  const hierarchy = yield* inspectMovementProject(client, root)
-  if (hierarchy === undefined)
-    return planRefusal(root, "Incomplete or duplicate project discovery; safety limit may have been exceeded.")
-  const observedRoot = hierarchy.byId.get(root._id)
-  if (observedRoot === undefined) return planRefusal(root, "Root changed during inspection.")
-  const discovered = yield* inspectTransferTree(client, observedRoot)
-  if (!discovered.complete) return planRefusal(root, discovered.reasons.join(" "), discovered.issues)
-  const tree = discovered.issues
-  const snapshotProblem = inspectedSnapshotProblem(root, observedRoot, parent, hierarchy)
-  if (snapshotProblem !== undefined) return planRefusal(root, snapshotProblem, tree)
-  const relevant = [...tree, ...(ancestorsOf(hierarchy, observedRoot) ?? []), ...parentHierarchy(hierarchy, parent)]
-  const inconsistent = relevant
-    .map((issue) => hierarchyProblem(hierarchy, issue))
-    .find((reason) => reason !== undefined)
-  if (inconsistent !== undefined) return planRefusal(root, inconsistent, tree)
-  const closureProblem = yield* inspectMovementClosure(client, hierarchy, relevant)
-  return closureProblem === undefined
-    ? { root: observedRoot, parent, source, tree, relevant }
-    : planRefusal(root, closureProblem, tree)
-})
-
-const parentHierarchy = (hierarchy: ReturnType<typeof movementHierarchy>, parent: Issue | undefined) =>
-  parent === undefined ? [] : [parent, ...(ancestorsOf(hierarchy, parent) ?? [])]
-
 const movementSpace = (root: Issue, parent: Issue | undefined, project: Project | undefined) =>
   parent?.space ?? project?._id ?? root.space
 
@@ -208,22 +162,6 @@ const closureIssueMatches = (hierarchy: ReturnType<typeof movementHierarchy>, ob
     previous.space === observed.space &&
     previous.modifiedOn === observed.modifiedOn
   )
-}
-
-const inspectedSnapshotProblem = (
-  root: Issue,
-  observedRoot: Issue,
-  parent: Issue | undefined,
-  hierarchy: ReturnType<typeof movementHierarchy>
-) => {
-  if (observedRoot.modifiedOn !== root.modifiedOn) return "Root changed during inspection."
-  if (parent === undefined) return undefined
-  const observedParent = hierarchy.byId.get(parent._id)
-  if (observedParent === undefined || observedParent.modifiedOn !== parent.modifiedOn)
-    return "Destination parent changed during inspection."
-  return descendantsOf(hierarchy, observedRoot).some((issue) => issue._id === parent._id)
-    ? "Destination cannot be the root or a descendant."
-    : undefined
 }
 
 const parseIssueState = (input: SdkIssue | undefined) =>
