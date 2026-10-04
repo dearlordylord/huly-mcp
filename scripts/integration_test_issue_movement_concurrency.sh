@@ -94,6 +94,8 @@ for transport in mcp cli; do
     jq -e --argjson before "$BEFORE" '. as $after | all($before.issues[]; . as $old | any($after.issues[]; . as $current | .issue._id == $old.issue._id and all($old.owned.records[]; . as $record | any($current.owned.records[]; ._id == $record._id and .snapshot == $record.snapshot))))' >/dev/null <<<"$AFTER"
     # Single-send sequence evidence is measured independently, not inferred from a gateway response.
     EXPECTED_INCREMENT=3
+    # A later independently created destination child reserves its own fourth number.
+    [[ "$NAME" == preserve-later-child ]] && EXPECTED_INCREMENT=4
     [[ "$NAME" == before-allocation-send ]] && EXPECTED_INCREMENT=0
     [[ "$NAME" == allocated-reply-lost ]] && EXPECTED_INCREMENT=1
     jq -e --argjson before "$BEFORE" --arg destination "$DESTINATION" --argjson increment "$EXPECTED_INCREMENT" '(.projects[] | select(.identifier == $destination) | .sequence) == (($before.projects[] | select(.identifier == $destination) | .sequence) + $increment)' >/dev/null <<<"$AFTER"
