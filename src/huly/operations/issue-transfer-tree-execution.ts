@@ -29,10 +29,10 @@ const reinspect = Effect.fn("transfer.reinspectTree")(function* (
   prepared: TransferPlan,
   destination: MovementProject,
   params: MoveIssueParams
-): Effect.fn.Return<boolean, MovementError> {
+): Effect.fn.Return<TransferPlan | undefined, MovementError> {
   const { parent, root, source } = prepared.plan
   const current = yield* inspectTransferPlan(client, root, parent, source, destination, params)
-  return !("conflicts" in current) && isDeepStrictEqual(current, prepared)
+  return "conflicts" in current || !isDeepStrictEqual(current, prepared) ? undefined : current
 })
 
 export const executeTransferTree = Effect.fn("transfer.executeTree")(function* (
@@ -90,10 +90,10 @@ const executeWithinBudget = Effect.fn("transfer.executeWithinBudget")(function* 
 ): Effect.fn.Return<MoveIssueResult, MovementError> {
   const admission = yield* inspectAdmission(client, prepared, destination, params)
   if (admission.status === "blocked") return transferTreeRefusal(admission.reason, prepared, destination)
-  const sameProject = admission.mode === "same-project"
+  const planned = admittedPlan(admission, prepared)
   const allocation =
     admission.mode === "same-project"
-      ? { status: "allocated" as const, numbers: prepared.tasks.map((task) => task.protectedIssue.number) }
+      ? { status: "allocated" as const, numbers: planned.tasks.map((task) => task.protectedIssue.number) }
       : yield* allocateTransferTree(
           admission.allocate,
           destination,
@@ -108,7 +108,7 @@ const executeWithinBudget = Effect.fn("transfer.executeWithinBudget")(function* 
       destination,
       progress
     )
-  const write = planTransferTreeWrites(prepared, destination, allocation.numbers, admission.lastRank)
+  const write = planTransferTreeWrites(planned, destination, allocation.numbers, admission.lastRank)
   if (write === undefined)
     return yield* stoppedResult(
       "incomplete",
@@ -117,16 +117,7 @@ const executeWithinBudget = Effect.fn("transfer.executeWithinBudget")(function* 
       destination,
       progress
     )
-  return yield* executePlannedWrite(
-    client,
-    prepared,
-    destination,
-    params,
-    progress,
-    write,
-    sameProject,
-    admission.commit
-  )
+  return yield* executePlannedWrite(client, prepared, destination, params, progress, write, admission)
 })
 
 const executePlannedWrite = Effect.fn("transfer.executePlannedWrite")(function* (
@@ -136,11 +127,14 @@ const executePlannedWrite = Effect.fn("transfer.executePlannedWrite")(function* 
   params: MoveIssueParams,
   progress: ExecutionProgress,
   write: TransferTreeWrite,
-  sameProject: boolean,
-  commit: NonNullable<HulyClient["Service"]["commitTransferTree"]>
+  admission: ReadyAdmission
 ): Effect.fn.Return<MoveIssueResult, MovementError> {
-  const noOp = sameProject && prepared.plan.root.attachedTo === (prepared.plan.parent?._id ?? movementNoParent)
-  if (noOp) return yield* finishVerification(client, prepared, destination, write, progress)
+  if (admission.mode === "same-project") {
+    const { plan } = admission.inspected
+    if (plan.root.attachedTo === (plan.parent?._id ?? movementNoParent))
+      return yield* finishVerification(client, prepared, destination, write, progress)
+    return yield* commitAndVerify(client, prepared, destination, write, progress, admission.commit)
+  }
   const presend = yield* Effect.result(
     reinspect(client, prepared, destination, params).pipe(Effect.timeout(TRANSFER_DISCOVERY_BUDGET))
   )
@@ -152,7 +146,7 @@ const executePlannedWrite = Effect.fn("transfer.executePlannedWrite")(function* 
       destination,
       progress
     )
-  if (!presend.success) {
+  if (presend.success === undefined) {
     yield* observeFailure(client, prepared, destination, write, progress)
     return yield* stoppedResult(
       "incomplete",
@@ -162,20 +156,24 @@ const executePlannedWrite = Effect.fn("transfer.executePlannedWrite")(function* 
       progress
     )
   }
-  return yield* commitAndVerify(client, prepared, destination, write, progress, commit)
+  return yield* commitAndVerify(client, prepared, destination, write, progress, admission.commit)
 })
 
 type ReadyAdmission = {
   readonly status: "ready"
   readonly commit: NonNullable<HulyClient["Service"]["commitTransferTree"]>
 } & (
-  | { readonly mode: "same-project"; readonly lastRank: undefined }
+  | { readonly mode: "same-project"; readonly lastRank: undefined; readonly inspected: TransferPlan }
   | {
       readonly mode: "cross-project"
       readonly lastRank: string | undefined
       readonly allocate: NonNullable<HulyClient["Service"]["allocateMovementNumber"]>
     }
 )
+// The same-project proof remains current through pure planning; allocation expires the cross-project proof.
+const admittedPlan = (admission: ReadyAdmission, prepared: TransferPlan): TransferPlan =>
+  admission.mode === "same-project" ? admission.inspected : prepared
+
 type Admission = ReadyAdmission | { readonly status: "blocked"; readonly reason: string }
 const admissionFailureReason = (failure: MovementError | Cause.TimeoutError): string =>
   Cause.isTimeoutError(failure)
@@ -198,14 +196,14 @@ const inspectAdmission = Effect.fn("transfer.inspectAdmission")(function* (
     reinspect(client, prepared, destination, params).pipe(Effect.timeout(TRANSFER_DISCOVERY_BUDGET))
   )
   if (admission._tag === "Failure") return { status: "blocked", reason: admissionFailureReason(admission.failure) }
-  if (!admission.success)
+  if (admission.success === undefined)
     return {
       status: "blocked",
       reason:
         "Task, ownership or hierarchy snapshots changed before allocation; inspect stable IDs and rebuild the call."
     }
   if (destination._id === prepared.plan.source._id)
-    return { status: "ready", mode: "same-project", lastRank: undefined, commit }
+    return { status: "ready", mode: "same-project", lastRank: undefined, inspected: admission.success, commit }
   const allocate = client.allocateMovementNumber
   if (allocate === undefined)
     return {
