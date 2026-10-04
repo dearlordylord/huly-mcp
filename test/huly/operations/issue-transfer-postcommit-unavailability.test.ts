@@ -24,10 +24,8 @@ for (const mode of [
   it.effect(`post-commit ${mode} is indeterminate and never retries writes`, () =>
     Effect.gen(function* () {
       const f = transferFixture()
-      const originalFindAll = f.operations.findAll
-      const originalInspect = f.operations.inspectTransferRecords
-      assertExists(originalFindAll)
-      assertExists(originalInspect)
+      const originalFindAll = assertExists(f.operations.findAll)
+      const originalInspect = assertExists(f.operations.inspectTransferRecords)
       const layer = HulyClient.testLayer({
         ...f.operations,
         findAll: (cls, query, options) =>

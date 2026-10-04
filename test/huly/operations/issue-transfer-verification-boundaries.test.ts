@@ -97,8 +97,7 @@ for (const mutation of mutations) {
             _id: DocId.make("unsupported-new-record")
           })
       }
-      const originalFindOne = f.operations.findOne
-      assertExists(originalFindOne)
+      const originalFindOne = assertExists(f.operations.findOne)
       const inspection = Schema.decodeUnknownSync(TransferInspectionSchema)({
         discovery: mutation === "incompleteRecords" ? "incomplete" : "complete",
         records: currentRecords,
@@ -106,8 +105,7 @@ for (const mutation of mutations) {
         limitation: "Test inventory"
       })
       const { inspectTransferRecords: _inspector, ...withoutInspector } = f.operations
-      const originalFindAll = f.operations.findAll
-      assertExists(originalFindAll)
+      const originalFindAll = assertExists(f.operations.findAll)
       const observed = HulyClient.testLayer({
         ...withoutInspector,
         findOne: (cls, query, options) =>

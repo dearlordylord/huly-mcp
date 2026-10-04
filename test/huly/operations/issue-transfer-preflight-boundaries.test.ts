@@ -60,10 +60,8 @@ for (const mode of modes) {
       if (mode === "changedRoot") f.root.modifiedOn++
       if (mode === "brokenSourceAncestry") f.root.attachedTo = sdkFixture("missing-source-parent")
       if (mode === "brokenParentAncestry") f.parent.attachedTo = sdkFixture("missing-destination-parent")
-      const originalFindOne = f.operations.findOne
-      assertExists(originalFindOne)
-      const originalFindAll = f.operations.findAll
-      assertExists(originalFindAll)
+      const originalFindOne = assertExists(f.operations.findOne)
+      const originalFindAll = assertExists(f.operations.findAll)
       const { inspectTransferRecords: _inspect, ...withoutInspector } = f.operations
       const layer = HulyClient.testLayer({
         ...(mode === "missingAdapter" ? withoutInspector : f.operations),

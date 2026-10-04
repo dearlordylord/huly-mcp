@@ -269,7 +269,7 @@ describe("HulyClient Service", () => {
   it.effect("wires scoped transfer commit through the live client dependency seam", () =>
     Effect.gen(function* () {
       const client = yield* HulyClient
-      assertExists(client.commitTransfer)
+      const commitTransfer = assertExists(client.commitTransfer)
       const write = Schema.decodeUnknownSync(TransferWriteSchema)({
         issueId: "root",
         sourceId: "source",
@@ -282,11 +282,11 @@ describe("HulyClient Service", () => {
         rank: "0|hzzzzz:",
         records: []
       })
-      expect(yield* client.commitTransfer(write)).toBe("applied")
+      expect(yield* commitTransfer(write)).toBe("applied")
       expect(mockApply.mock.calls[0]?.[0]).toBe("issue-transfer:root")
       expect(mockApplyMatch.mock.calls.length).toBeGreaterThan(0)
       mockApplyCommit.mockResolvedValue({ result: false })
-      expect(yield* client.commitTransfer(write)).toBe("condition-not-met")
+      expect(yield* commitTransfer(write)).toBe("condition-not-met")
     }).pipe(Effect.provide(liveClientLayer), Effect.scoped)
   )
 
@@ -294,8 +294,8 @@ describe("HulyClient Service", () => {
     Effect.gen(function* () {
       mockGetDescendants.mockReturnValue([])
       const client = yield* HulyClient
-      assertExists(client.inspectTransferRecords)
-      expect(yield* client.inspectTransferRecords(IssueId.make("root"))).toMatchObject({
+      const inspectTransferRecords = assertExists(client.inspectTransferRecords)
+      expect(yield* inspectTransferRecords(IssueId.make("root"))).toMatchObject({
         discovery: "complete",
         records: [],
         blockers: []
