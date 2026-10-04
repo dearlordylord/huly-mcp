@@ -10,7 +10,7 @@ import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 import { discoverTransferTree, MAX_TRANSFER_TASKS, type TransferTree } from "./issue-transfer-tree.js"
 
-const TreeRowsSchema = Schema.Struct({ rows: Schema.Array(Schema.Unknown), total: Count })
+const TreeRowsSchema = Schema.Struct({ rows: Schema.Array(Schema.Unknown), total: Schema.Unknown })
 const parseRows = (input: unknown) =>
   Schema.decodeUnknownEffect(TreeRowsSchema)(input).pipe(
     Effect.mapError((cause) => new HulyDataInvalidError({ operation: "move_issue", entity: "tree attachments", cause }))
@@ -39,8 +39,9 @@ export const inspectTransferTree = Effect.fn("transfer.inspectTree")(function* (
         reasons.push("An attached task payload is invalid; usable siblings are inspected independently.")
       else rows.push(issue.value)
     }
+    const total = Schema.decodeUnknownOption(Count)(parsed.total)
     const capacity = inventory.length + rows.length > MAX_TRANSFER_TASKS
-    if (parsed.total !== parsed.rows.length || capacity)
+    if (total._tag === "None" || total.value !== parsed.rows.length || capacity)
       reasons.push(
         `Attachment discovery is incomplete or exceeds the ${MAX_TRANSFER_TASKS}-task safety limit; no prefix can move.`
       )
