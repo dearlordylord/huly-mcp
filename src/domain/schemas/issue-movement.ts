@@ -27,7 +27,7 @@ export const MoveIssueParamsSchema = Schema.Struct({
 }).annotate({
   title: "MoveIssueParams",
   description:
-    "Move a tree within its project or a compatible leaf across projects. Cross-project moves require equal project types, supported kind/status with component/milestone references resolved by valid destination IDs or literal unique names; only automatic history records are supported. Unsupported structure is refused before allocation. Stable IDs persist; cross-project identifiers change."
+    "Move a tree within its project or a complete compatible descendant tree across projects. Cross-project moves require equal project types, supported kind/status with component/milestone references resolved by valid destination IDs or literal unique names. Comments/threads, nested attachments, labels, time reports and audited activity records follow the move; historical payloads and independent links stay intact. Unknown classes/ownership edges or discovery limits refuse before writes. Tree discovery follows attachments, and all task conflicts and resolutions are checked before allocation. Consent never extends to siblings or newly discovered children. Safety limits refuse a complete move before writes; successful mappings include every task. Stable IDs persist; cross-project identifiers change."
 })
 
 export type MoveIssueParams = Schema.Schema.Type<typeof MoveIssueParamsSchema>

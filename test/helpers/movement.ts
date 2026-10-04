@@ -1,8 +1,18 @@
+import { sdkFixture } from "./huly-sdk.js"
 /* eslint-disable no-restricted-syntax -- Huly SDK fixture refs and generic injected ports are nominal; fixture casts bridge SDK types with no runtime constructors. */
-import { type Doc, type DocumentQuery, type FindResult, type Ref, toFindResult } from "@hcengineering/core"
+import {
+  type Doc,
+  type DocumentQuery,
+  type FindOptions,
+  type FindResult,
+  type Ref,
+  toFindResult
+} from "@hcengineering/core"
 import type { Issue, Project } from "@hcengineering/tracker"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 
+import { UNKNOWN_TOTAL } from "../../src/domain/schemas/shared.js"
+import { TransferInspectionSchema } from "../../src/domain/schemas/issue-transfer.js"
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
 import { HulyAuthError } from "../../src/huly/errors-base.js"
 import { tracker } from "../../src/huly/huly-plugins.js"
@@ -10,12 +20,19 @@ import { tracker } from "../../src/huly/huly-plugins.js"
 export const movementProject = (id = "project-1", identifier = "TEST"): Project =>
   ({ _id: id, identifier, _class: tracker.class.Project, name: identifier }) as unknown as Project
 
+const NUMBER_HASH_RADIX = 31
+const NUMBER_HASH_LIMIT = 1_000_000
+const fixtureNumber = (id: string) =>
+  [...id].reduce((number, char) => (number * NUMBER_HASH_RADIX + char.charCodeAt(0)) % NUMBER_HASH_LIMIT, 1) + 1
+
 export const movementIssue = (id: string, overrides: Partial<Issue> = {}): Issue =>
   ({
     _id: id,
     _class: tracker.class.Issue,
     space: "project-1",
-    identifier: `TEST-${id}`,
+    identifier: `TEST-${fixtureNumber(id)}`,
+    number: fixtureNumber(id),
+    rank: "0|hzzzzz:",
     title: `Issue ${id}`,
     attachedTo: tracker.ids.NoParent,
     attachedToClass: tracker.class.Issue,
@@ -85,7 +102,11 @@ export interface MovementFixtureOptions {
 export const movementFixture = (issues: Array<Issue>, options: MovementFixtureOptions = {}) => {
   const projects = options.projects ?? [movementProject()]
   const writes: Array<{ id: Ref<Doc>; operations: unknown }> = []
-  const findAll: HulyClientOperations["findAll"] = <T extends Doc>(cls: unknown, query: DocumentQuery<T>) => {
+  const findAll: HulyClientOperations["findAll"] = <T extends Doc>(
+    cls: unknown,
+    query: DocumentQuery<T>,
+    findOptions?: FindOptions<T>
+  ) => {
     if (options.failVerification && writes.length > 0)
       return Effect.fail(new HulyAuthError({ message: "Read unavailable" }))
     const q = query as Record<string, unknown>
@@ -107,6 +128,7 @@ export const movementFixture = (issues: Array<Issue>, options: MovementFixtureOp
       result.total = options.projectSelectorTotal
     if (q.space !== undefined && options.discoveryTotal !== undefined) result.total = options.discoveryTotal
     if (q.attachedTo !== undefined && options.closureTotal !== undefined) result.total = options.closureTotal
+    if (findOptions?.total !== true) result.total = UNKNOWN_TOTAL
     if (q.space !== undefined && options.changeRootDuringRead) {
       for (const issue of result) issue.modifiedOn++
     }
@@ -129,7 +151,38 @@ export const movementFixture = (issues: Array<Issue>, options: MovementFixtureOp
     options.onWrite?.(issues)
     return Effect.succeed({})
   }
-  return { issues, writes, operations: { findAll, updateDoc }, layer: HulyClient.testLayer({ findAll, updateDoc }) }
+  const findOne: HulyClientOperations["findOne"] = (cls, query, findOptions) =>
+    findAll(cls, query, findOptions).pipe(Effect.map((rows) => rows[0]))
+  const inspectTransferRecords: NonNullable<HulyClientOperations["inspectTransferRecords"]> = () =>
+    Effect.succeed(
+      Schema.decodeUnknownSync(TransferInspectionSchema)({
+        discovery: "complete",
+        classes: [],
+        records: [],
+        blockers: [],
+        limitation: "Fixture model has no owned records."
+      })
+    )
+  const commitTransferTree: NonNullable<HulyClientOperations["commitTransferTree"]> = (write) =>
+    Effect.gen(function* () {
+      for (const task of write.tasks)
+        yield* updateDoc(tracker.class.Issue, sdkFixture(task.sourceId), sdkFixture(task.issueId), {
+          attachedTo: sdkFixture(task.parentId)
+        })
+      const root = write.tasks.find((task) => task.issueId === write.rootId)
+      if (root === undefined) return "condition-not-met"
+      if (root.previousParent !== tracker.ids.NoParent)
+        yield* updateDoc(tracker.class.Issue, sdkFixture(root.sourceId), sdkFixture(root.previousParent), {
+          $inc: { subIssues: -1 }
+        })
+      if (root.parentId !== tracker.ids.NoParent)
+        yield* updateDoc(tracker.class.Issue, sdkFixture(root.destinationId), sdkFixture(root.parentId), {
+          $inc: { subIssues: 1 }
+        })
+      return "applied"
+    })
+  const operations = { findAll, findOne, updateDoc, inspectTransferRecords, commitTransferTree }
+  return { issues, writes, operations, layer: HulyClient.testLayer(operations) }
 }
 
 export const threeLevelMovementFixture = () => {

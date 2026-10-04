@@ -4,6 +4,7 @@ import { TestClock } from "effect/testing"
 import { expect } from "vitest"
 
 import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"
+import { UNKNOWN_TOTAL } from "../../../src/domain/schemas/shared.js"
 import { MoveIssueResultSchema } from "../../../src/domain/schemas/issues-results.js"
 import { tracker } from "../../../src/huly/huly-plugins.js"
 import { moveIssue } from "../../../src/huly/operations/issues-move.js"
@@ -29,6 +30,20 @@ const expectBlocked = (
 }
 
 describe("destination movement", () => {
+  it.effect("public movement requests totals that the SDK otherwise leaves unknown", () =>
+    Effect.gen(function* () {
+      const tree = threeLevelMovementFixture()
+      const fixture = movementFixture(tree.issues)
+      const unknown = yield* fixture.operations.findAll(tracker.class.Issue, { attachedTo: tree.root._id })
+      expect(unknown.total).toBe(UNKNOWN_TOTAL)
+      const result = yield* call(
+        { issue: tree.root.identifier, destination: { parent: tree.destination.identifier } },
+        fixture
+      )
+      expect(result).toMatchObject({ outcome: "completed", changed: true })
+    })
+  )
+
   it.effect("moves a three-level tree, preserves data and lets triggers maintain ancestry and aggregates", () =>
     Effect.gen(function* () {
       const tree = threeLevelMovementFixture()
@@ -154,8 +169,14 @@ describe("destination movement", () => {
 
   it.effect("refuses ambiguous issue and project identifiers", () =>
     Effect.gen(function* () {
-      const fixture = movementFixture([movementIssue("root"), movementIssue("other", { identifier: "TEST-root" })])
-      expectBlocked(yield* call({ issue: "TEST-root", destination: { parent: null } }, fixture), fixture)
+      const fixture = movementFixture([
+        movementIssue("root"),
+        movementIssue("other", { identifier: movementIssue("root").identifier })
+      ])
+      expectBlocked(
+        yield* call({ issue: movementIssue("root").identifier, destination: { parent: null } }, fixture),
+        fixture
+      )
       const ambiguous = movementFixture([movementIssue("root")], {
         projects: [movementProject(), movementProject("other")]
       })

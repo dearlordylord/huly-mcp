@@ -1,3 +1,4 @@
+import { MovementUncertaintyFields } from "./issue-movement-uncertainty.js"
 import { MoveIssueParamsSchema } from "./issue-movement.js"
 import { TransferAttributeChangeSchema } from "./issue-transfer-attributes.js"
 import { Schema } from "effect"
@@ -51,7 +52,9 @@ export const MoveIssueResultSchema = Schema.Union([
     inspection: Schema.String
   }),
   Schema.Struct({
+    ...MovementUncertaintyFields,
     outcome: Schema.Literals(["incomplete", "indeterminate"]),
+    recordIds: Schema.optionalKey(Schema.Array(DocId)),
     reason: Schema.String,
     issueIds: Schema.Array(IssueId),
     inspection: Schema.String

@@ -31,8 +31,15 @@ import { TestClock } from "effect/testing"
 import { beforeEach, expect } from "vitest"
 import { HulyConfigService } from "../../src/config/config.js"
 import { SocialIdentityId } from "../../src/domain/schemas/person-administration.js"
+import { TransferWriteSchema } from "../../src/domain/schemas/issue-transfer.js"
 import { PersonMergeReferenceImpactSchema } from "../../src/domain/schemas/person-merge.js"
-import { Email, HulyTransactionScope, PersonId as DomainPersonId, PersonName } from "../../src/domain/schemas/shared.js"
+import {
+  Email,
+  IssueId,
+  HulyTransactionScope,
+  PersonId as DomainPersonId,
+  PersonName
+} from "../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../../src/huly/client.js"
 import type { EmployeePreparationPlan } from "../../src/huly/employee-preparation.js"
 import {
@@ -44,11 +51,11 @@ import {
 } from "../../src/huly/errors.js"
 import { INLINE_COMMENT_MARK_TYPE } from "../../src/huly/operations/inline-comment-mark.js"
 import { MARKDOWN_INPUT_REF_URL } from "../../src/huly/operations/markup.js"
-import { attachment, chunter, contact, core } from "../../src/huly/huly-plugins.js"
+import { attachment, chunter, contact, core, tracker } from "../../src/huly/huly-plugins.js"
 import { toClassRef, toRef } from "../../src/huly/operations/sdk-boundary.js"
 import { HulySdk, type HulySdkDependencies } from "../../src/huly/sdk-deps.js"
 import { normalizeHulyOrigin } from "../../src/huly/unavailable-diagnostics.js"
-import { assertAt } from "../../src/utils/assertions.js"
+import { assertAt, assertExists } from "../../src/utils/assertions.js"
 import { mockFn } from "../helpers/mock-fn.js"
 
 // --- Mock setup ---
@@ -86,6 +93,7 @@ const mockFindDomain = mockFn()
 const mockHierarchyIsMixin = mockFn()
 
 const mockHierarchy = {
+  getAllAttributes: () => new Map(),
   getBaseClass: mockGetBaseClass,
   getAncestors: mockGetAncestors,
   getDescendants: mockGetDescendants,
@@ -258,6 +266,45 @@ interface TestDoc extends Doc {
 }
 
 describe("HulyClient Service", () => {
+  it.effect("wires scoped transfer commit through the live client dependency seam", () =>
+    Effect.gen(function* () {
+      const client = yield* HulyClient
+      const commitTransfer = assertExists(client.commitTransfer)
+      const write = Schema.decodeUnknownSync(TransferWriteSchema)({
+        issueId: "root",
+        sourceId: "source",
+        destinationId: "destination",
+        previousParent: "old",
+        parentId: "parent",
+        modifiedOn: 1,
+        number: 2,
+        identifier: "NEW-2",
+        rank: "0|hzzzzz:",
+        records: [],
+        recordClasses: []
+      })
+      expect(yield* commitTransfer(write)).toBe("applied")
+      expect(mockApply.mock.calls[0]?.[0]).toBe("issue-transfer:root")
+      expect(mockApplyMatch.mock.calls.length).toBeGreaterThan(0)
+      mockApplyCommit.mockResolvedValue({ result: false })
+      expect(yield* commitTransfer(write)).toBe("condition-not-met")
+    }).pipe(Effect.provide(liveClientLayer), Effect.scoped)
+  )
+
+  it.effect("wires model-owned transfer discovery through the live client dependency seam", () =>
+    Effect.gen(function* () {
+      mockGetDescendants.mockReturnValue([])
+      mockFindOne.mockResolvedValue({ _id: "root", _class: String(tracker.class.Issue) })
+      const client = yield* HulyClient
+      const inspectTransferRecords = assertExists(client.inspectTransferRecords)
+      expect(yield* inspectTransferRecords(IssueId.make("root"))).toMatchObject({
+        discovery: "complete",
+        records: [],
+        blockers: []
+      })
+    }).pipe(Effect.provide(liveClientLayer), Effect.scoped)
+  )
+
   beforeEach(() => {
     clearAllMockFns()
     mockFindAll.mockResolvedValue(toFindResult([]))
