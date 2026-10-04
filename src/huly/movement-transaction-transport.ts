@@ -1,18 +1,23 @@
 import { TxOperations, type Client, type Tx } from "@hcengineering/core"
 import { Cause, Effect, Redacted, Schema } from "effect"
-import {
-  DocId,
-  NonEmptyString,
-  ObjectClassName,
-  PositiveInteger,
-  Timestamp,
-  UrlString
-} from "../domain/schemas/shared.js"
+import { DocId, NonEmptyString, ObjectClassName, PositiveInteger, Timestamp } from "../domain/schemas/shared.js"
 import { TransferSequenceSchema } from "../domain/schemas/issue-transfer.js"
 
 export const MovementTransportMilliseconds = PositiveInteger.pipe(Schema.brand("MovementTransportMilliseconds"))
+const endpointProtocols = new Set(["http:", "https:", "ws:", "wss:"])
+export const MovementEndpointSchema = Schema.URLFromString.check(
+  Schema.makeFilter(
+    (url) =>
+      endpointProtocols.has(url.protocol) &&
+      url.username === "" &&
+      url.password === "" &&
+      url.search === "" &&
+      url.hash === "",
+    { message: "Expected an absolute http, https, ws or wss endpoint without credentials, query or fragment" }
+  )
+)
 export const MovementTransportConfigSchema = Schema.Struct({
-  endpoint: UrlString,
+  endpoint: MovementEndpointSchema,
   workspace: NonEmptyString,
   token: Schema.Redacted(NonEmptyString),
   timeoutMs: MovementTransportMilliseconds
@@ -87,10 +92,23 @@ export interface MovementHttpPort {
 }
 export const movementHttpPort: MovementHttpPort = {
   send: Effect.fn("movement.singleSendHttp")(function* (request) {
+    const url = yield* Effect.try({
+      try: () => {
+        const endpoint = Schema.decodeUnknownSync(MovementEndpointSchema)(request.endpoint.href)
+        endpoint.protocol =
+          endpoint.protocol === "ws:" ? "http:" : endpoint.protocol === "wss:" ? "https:" : endpoint.protocol
+        endpoint.pathname = `${endpoint.pathname.replace(/\/+$/, "")}/api/v1/tx/${encodeURIComponent(request.workspace)}`
+        return endpoint
+      },
+      catch: () =>
+        new MovementTransportError({
+          phase: "before-send",
+          reason: NonEmptyString.make("Movement HTTP endpoint is invalid; no request sent.")
+        })
+    })
     return yield* Effect.tryPromise({
       try: async (signal) => {
-        const endpoint = request.endpoint.replace(/^ws:/, "http:").replace(/^wss:/, "https:").replace(/\/+$/, "")
-        const response = await fetch(`${endpoint}/api/v1/tx/${encodeURIComponent(request.workspace)}`, {
+        const response = await fetch(url, {
           method: "POST",
           headers: { "content-type": "application/json", authorization: `Bearer ${Redacted.value(request.token)}` },
           body: request.body,

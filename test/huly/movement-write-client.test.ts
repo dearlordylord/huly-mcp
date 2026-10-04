@@ -17,6 +17,43 @@ const configuration = {
   token: Redacted.make(NonEmptyString.make("private-token")),
   timeoutMs: 1000
 }
+
+for (const endpoint of [
+  "http://ordinary-huly.invalid",
+  "https://ordinary-huly.invalid/rest/",
+  "ws://ordinary-huly.invalid:3333",
+  "wss://ordinary-huly.invalid/rest"
+]) {
+  it.effect(`parses the absolute movement endpoint ${endpoint}`, () =>
+    Effect.gen(function* () {
+      const parsed = yield* parseMovementTransportConfig({ ...configuration, endpoint })
+      expect(parsed.endpoint).toBeInstanceOf(URL)
+      expect(parsed.endpoint.href).toBe(new URL(endpoint).href)
+    })
+  )
+}
+for (const endpoint of [
+  "invalid",
+  "/relative",
+  "http://",
+  "ftp://ordinary-huly.invalid",
+  "file:///tmp/huly",
+  "https://private-token@ordinary-huly.invalid",
+  "https://:private-token@ordinary-huly.invalid",
+  "https://ordinary-huly.invalid?token=private-token",
+  "https://ordinary-huly.invalid/#private-token"
+]) {
+  it.effect("rejects invalid or unsupported movement endpoint before startup writes", () =>
+    Effect.gen(function* () {
+      const result = yield* Effect.result(parseMovementTransportConfig({ ...configuration, endpoint }))
+      expect(result._tag).toBe("Failure")
+      if (result._tag === "Failure") {
+        expect(result.failure).toBeInstanceOf(HulyConnectionError)
+        expect(JSON.stringify(result.failure)).not.toContain("private-token")
+      }
+    })
+  )
+}
 const clientFixture = () => {
   const state = { closed: 0, ordinaryWrites: 0 }
   const ordinary = new TxOperations(

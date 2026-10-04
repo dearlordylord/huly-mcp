@@ -7,6 +7,7 @@ import {
   MovementTransportError,
   makeMovementTxOperations,
   MovementTransportMilliseconds,
+  movementHttpPort,
   sendMovementTransaction,
   type MovementHttpPort
 } from "../../src/huly/movement-transaction-transport.js"
@@ -26,6 +27,18 @@ const config = Schema.decodeUnknownSync(MovementTransportConfigSchema)({
   token: Redacted.make(NonEmptyString.make("fixture-secret")),
   timeoutMs: MovementTransportMilliseconds.make(1000)
 })
+
+it.effect("rejects a malformed HTTP endpoint before fetch with sanitized pre-send failure", () =>
+  Effect.gen(function* () {
+    const endpoint = new URL("file:///invalid/private-token")
+    const result = yield* Effect.result(movementHttpPort.send({ ...config, endpoint, body: JSON.stringify(sequence) }))
+    expect(result._tag).toBe("Failure")
+    if (result._tag === "Failure") {
+      expect(result.failure.phase).toBe("before-send")
+      expect(JSON.stringify(result.failure)).not.toContain("private-token")
+    }
+  })
+)
 const sequence = sdkFixture<Tx>({
   _id: "tx-1",
   _class: "core:class:TxUpdateDoc",
