@@ -11,7 +11,7 @@ import { MoveIssueResultSchema } from "../../../src/domain/schemas/issues-result
 import { TransferInspectionSchema } from "../../../src/domain/schemas/issue-transfer.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
 import { MovementTransportError } from "../../../src/huly/movement-transaction-transport.js"
-import { NonEmptyString } from "../../../src/domain/schemas/shared.js"
+import { IssueId, NonEmptyString } from "../../../src/domain/schemas/shared.js"
 import { HulyAuthError } from "../../../src/huly/errors-base.js"
 import { moveIssue } from "../../../src/huly/operations/issue-movement.js"
 import { assertExists } from "../../../src/utils/assertions.js"
@@ -160,7 +160,7 @@ it.effect("duplicate record ownership across task closures refuses before alloca
       inspectTransferRecords: (id, tree) =>
         inspect(id, tree).pipe(
           Effect.map((inspection) =>
-            id === f.child._id
+            id === IssueId.make(f.child._id)
               ? parseInspection({ ...inspection, records: [{ ...record, attachedTo: f.child._id }] })
               : inspection
           )
@@ -180,7 +180,7 @@ it.effect("record discovery outage during initial preflight cannot admit a parti
     const result = yield* run(f, {
       ...f.operations,
       inspectTransferRecords: (id, tree) =>
-        id === f.child._id
+        id === IssueId.make(f.child._id)
           ? Effect.fail(new HulyAuthError({ message: "Child ownership inventory unavailable" }))
           : inspect(id, tree)
     })
@@ -241,7 +241,7 @@ for (const change of ["payload-unavailable", "wrong-project", "wrong-owner"]) {
         inspectTransferRecords: (id, tree) =>
           inspect(id, tree).pipe(
             Effect.map((inspection) => {
-              if (id !== f.root._id) return inspection
+              if (id !== IssueId.make(f.root._id)) return inspection
               const current =
                 f.state.sent === 0
                   ? comment

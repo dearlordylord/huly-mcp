@@ -414,7 +414,7 @@ describe("HulyClient Service", () => {
       mockUpdateCollection.mockResolvedValue({ id: "record-update" })
       const program = Effect.gen(function* () {
         const client = yield* HulyClient
-        return yield* client.updateCollection(
+        return yield* assertExists(client.updateCollection)(
           chunter.class.ChatMessage,
           toRef(DocId.make("project")),
           toRef(DocId.make("comment")),
