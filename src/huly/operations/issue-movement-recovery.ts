@@ -4,11 +4,7 @@ import type { MoveIssueResult } from "../../domain/schemas/issues-results.js"
 import type { IssueId } from "../../domain/schemas/shared.js"
 import type { MovementPlan } from "./issue-movement-preflight.js"
 
-export const movementRecoveryInstructions = (
-  plan: MovementPlan,
-  destination: MovementProject,
-  issueIds: ReadonlyArray<IssueId> = plan.tree.map((issue) => issue._id)
-) =>
+export const movementStableIdReadInstructions = (destination: MovementProject, issueIds: ReadonlyArray<IssueId>) =>
   `Inspect every stable ID before retry: ${issueIds
     .map(
       (issueId) =>
@@ -18,17 +14,26 @@ export const movementRecoveryInstructions = (
       "; "
     )}. Stable-ID lookup searches the workspace and returns each task's current project. Historical identifier mappings are not reconstructed from uncertain replies. Do not automatically repeat movement or roll back subsequent edits; reserved numbers may leave gaps.`
 
+export const movementRecoveryInstructions = (
+  plan: MovementPlan,
+  destination: MovementProject,
+  issueIds: ReadonlyArray<IssueId> = plan.tree.map((issue) => issue._id)
+) => movementStableIdReadInstructions(destination, issueIds)
+
 export const movementFailureResult = (
   outcome: "incomplete" | "indeterminate",
   reason: Extract<MoveIssueResult, { readonly outcome: "incomplete" | "indeterminate" }>["reason"],
   plan: MovementPlan,
   destination: MovementProject,
   evidence: Pick<MovementUncertaintyEvidence, "execution" | "verification">
-): MoveIssueResult => {
+): Extract<MoveIssueResult, { readonly outcome: "incomplete" | "indeterminate" }> => {
   const issueIds = [
     ...new Set([
       ...plan.tree.map((issue) => issue._id),
-      ...(evidence.verification.status === "observed" ? evidence.verification.tasks.map((task) => task.issueId) : [])
+      ...(evidence.verification.status === "observed" ? evidence.verification.tasks.map((task) => task.issueId) : []),
+      ...(evidence.verification.status === "observed" && evidence.verification.consistency === "inconsistent"
+        ? (evidence.verification.absentIssueIds ?? [])
+        : [])
     ])
   ]
   return {

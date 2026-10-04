@@ -1,3 +1,4 @@
+import { transferTreeKnownRecordIds, transferTreeOwnedRecordGuidance } from "./issue-transfer-owned-recovery.js"
 import type { MovementUncertaintyEvidence } from "../../domain/schemas/issue-movement-uncertainty.js"
 import { movementRecoveryInstructions, movementFailureResult } from "./issue-movement-recovery.js"
 import type { MovementProject } from "../../domain/schemas/issue-movement-state.js"
@@ -17,7 +18,14 @@ export const transferTreeFailure = (
   prepared: TransferPlan,
   destination: MovementProject,
   evidence: Pick<MovementUncertaintyEvidence, "execution" | "verification">
-): MoveIssueResult => movementFailureResult(outcome, reason, prepared.plan, destination, evidence)
+): MoveIssueResult => {
+  const failure = movementFailureResult(outcome, reason, prepared.plan, destination, evidence)
+  return {
+    ...failure,
+    recordIds: transferTreeKnownRecordIds(prepared),
+    inspection: `${failure.inspection} ${transferTreeOwnedRecordGuidance(prepared, destination)}`
+  }
+}
 
 export const transferTreeRefusal = (
   reason: string,

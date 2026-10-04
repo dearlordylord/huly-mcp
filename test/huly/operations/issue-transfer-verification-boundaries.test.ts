@@ -3,19 +3,19 @@ import { Effect, Schema } from "effect"
 import { expect } from "vitest"
 import { MovementIssueSchema, MovementProjectSchema } from "../../../src/domain/schemas/issue-movement-state.js"
 import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"
-import { TransferInspectionSchema, TransferWriteSchema } from "../../../src/domain/schemas/issue-transfer.js"
+import { TransferInspectionSchema } from "../../../src/domain/schemas/issue-transfer.js"
 import { DocId, ObjectClassName } from "../../../src/domain/schemas/shared.js"
 import { HulyClient } from "../../../src/huly/client.js"
 import { moveIssue } from "../../../src/huly/operations/issue-movement.js"
 import { inspectTransferPlan } from "../../../src/huly/operations/issue-transfer-preflight.js"
-import { verifyTransfer } from "../../../src/huly/operations/issue-transfer-verification.js"
+import { verifyTransferTree } from "../../../src/huly/operations/issue-transfer-tree-verification.js"
+import type { TransferTreeWrite } from "../../../src/domain/schemas/issue-transfer-tree.js"
 import { assertExists } from "../../../src/utils/assertions.js"
 import { sdkFixture } from "../../helpers/huly-sdk.js"
 import { transferFixture } from "../../helpers/transfer.js"
 
 const issueSnapshot = (input: unknown) => Schema.decodeUnknownSync(MovementIssueSchema)(input)
 const projectSnapshot = (input: unknown) => Schema.decodeUnknownSync(MovementProjectSchema)(input)
-const writeSnapshot = (input: unknown) => Schema.decodeUnknownSync(TransferWriteSchema)(input)
 
 const mutations = [
   "missingRoot",
@@ -57,22 +57,19 @@ for (const mutation of mutations) {
       )
       expect("conflicts" in prepared).toBe(false)
       if ("conflicts" in prepared) return
-      const moved = yield* moveIssue(params).pipe(Effect.provide(f.layer))
-      expect(moved.outcome).toBe("completed")
-      const write = writeSnapshot({
-        issueId: f.root._id,
-        sourceId: f.source._id,
-        destinationId: f.destination._id,
-        previousParent: f.old._id,
-        parentId: f.parent._id,
-        modifiedOn: prepared.plan.root.modifiedOn,
-        number: f.root.number,
-        identifier: f.root.identifier,
-        rank: f.root.rank,
-        records: prepared.records,
-        recordClasses: prepared.recordClasses,
-        attributeChanges: prepared.attributeChanges
+      const committed: Array<TransferTreeWrite> = []
+      const commit = assertExists(f.operations.commitTransferTree)
+      const committing = HulyClient.testLayer({
+        ...f.operations,
+        commitTransferTree: (write) => {
+          committed.push(write)
+          return commit(write)
+        }
       })
+      const moved = yield* moveIssue(params).pipe(Effect.provide(committing))
+      expect(moved.outcome).toBe("completed")
+      expect(committed).toHaveLength(1)
+      const write = assertExists(committed[0])
       if (mutation === "missingRoot") f.issues.splice(f.issues.indexOf(f.root), 1)
       if (mutation === "wrongProject") f.root.space = sdkFixture("third-project")
       if (mutation === "wrongIdentifier") f.root.identifier = "OTHER-wrong"
@@ -131,18 +128,20 @@ for (const mutation of mutations) {
         ...(mutation === "missingInspector" ? {} : { inspectTransferRecords: () => Effect.succeed(inspection) })
       })
       const observedClient = yield* HulyClient.pipe(Effect.provide(observed))
-      expect(yield* verifyTransfer(observedClient, prepared, destination, write)).toMatchObject({
-        state: [
-          "invalidIdentity",
-          "missingInspector",
-          "incompleteRecords",
-          "incompleteSource",
-          "incompleteTarget",
-          "closureChange"
-        ].includes(mutation)
-          ? "unavailable"
-          : "inconsistent"
-      })
+      const verified = yield* Effect.result(verifyTransferTree(observedClient, prepared, destination, write))
+      expect(verified._tag).toBe("Success")
+      if (verified._tag === "Success") {
+        if (["incompleteSource", "incompleteTarget"].includes(mutation))
+          expect(verified.success).toMatchObject({ status: "unavailable" })
+        else if (["invalidIdentity", "missingInspector", "incompleteRecords", "closureChange"].includes(mutation))
+          expect(verified.success).toMatchObject({
+            status: "observed",
+            completeness: "incomplete",
+            consistency: "undetermined"
+          })
+        else expect(verified.success).toMatchObject({ status: "observed", consistency: "inconsistent" })
+      }
+
       expect(f.state.sent).toBe(1)
     })
   )

@@ -1,3 +1,8 @@
+import {
+  publishVerification,
+  interruptVerification,
+  type VerificationFactsRef
+} from "./issue-transfer-verification-progress.js"
 import { Effect, Ref } from "effect"
 import type { HulyClient } from "../client.js"
 import type { MovementWriteError } from "../movement-write-client.js"
@@ -16,6 +21,7 @@ import { TRANSFER_DISCOVERY_BUDGET } from "./issue-transfer-tree.js"
 export interface ExecutionProgress {
   readonly execution: MovementExecutionProgress
   readonly verification: Ref.Ref<TransferTreeVerification>
+  readonly verificationFacts: VerificationFactsRef
 }
 
 export const stoppedResult = Effect.fn("transfer.stoppedResult")(function* (
@@ -42,14 +48,18 @@ export const observeFailure = Effect.fn("transfer.observeFailure")(function* (
   progress: ExecutionProgress
 ): Effect.fn.Return<void> {
   const observed = yield* Effect.result(
-    verifyTransferTree(client, prepared, destination, write).pipe(Effect.timeout(TRANSFER_DISCOVERY_BUDGET))
+    verifyTransferTree(client, prepared, destination, write, (observed) =>
+      publishVerification(progress.verification, progress.verificationFacts, observed)
+    ).pipe(Effect.timeout(TRANSFER_DISCOVERY_BUDGET))
   )
-  yield* Ref.set<TransferTreeVerification>(
-    progress.verification,
-    observed._tag === "Failure"
-      ? { status: "unavailable", reason: "Current task/ownership/hierarchy state could not be read completely." }
-      : observed.success
-  )
+  if (observed._tag === "Failure")
+    yield* interruptVerification(
+      progress.verification,
+      progress.verificationFacts,
+      "Current task/ownership/hierarchy state could not be read completely."
+    )
+  else if (observed.success.status === "unavailable")
+    yield* interruptVerification(progress.verification, progress.verificationFacts, observed.success.reason)
 })
 
 export const failedCommit = Effect.fn("transfer.failedCommit")(function* (

@@ -147,4 +147,26 @@ describe("movement uncertainty evidence contract", () => {
     if (result._tag === "Some" && result.value.verification.status === "observed")
       expect(result.value.verification.tasks[0]).toMatchObject({ issueId: "child", identifier: "SOURCE-3" })
   })
+  it("retains a concrete observed contradiction when additional discovery is incomplete", () => {
+    const result = decode({
+      destination,
+      discovery: { status: "complete" },
+      execution: { phase: "verification", commit: "acknowledged", reservations: [] },
+      verification: {
+        status: "observed",
+        completeness: "incomplete",
+        consistency: "inconsistent",
+        reason: "Parsed child moved to a foreign project; remaining closure is unavailable.",
+        tasks: [{ issueId: "child", projectId: "foreign", parentId: "root", identifier: "FOREIGN-3", number: 3 }],
+        records: []
+      }
+    })
+    expect(result._tag).toBe("Some")
+    if (result._tag === "Some")
+      expect(result.value.verification).toMatchObject({
+        completeness: "incomplete",
+        consistency: "inconsistent",
+        tasks: [{ issueId: "child", projectId: "foreign" }]
+      })
+  })
 })

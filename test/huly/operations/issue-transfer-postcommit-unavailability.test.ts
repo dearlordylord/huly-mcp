@@ -61,7 +61,10 @@ for (const mode of [
       const result = yield* Fiber.join(fiber)
       expect(result).toMatchObject({ outcome: "indeterminate" })
       expect(result).not.toHaveProperty("changed")
-      expect(JSON.stringify(result)).toContain("Post-send state unavailable")
+      if (result.outcome === "indeterminate") {
+        expect(result.inspection).toContain(f.root._id)
+        expect(result.issueIds).toContain(f.input.issue)
+      }
       expect(f.state.allocated).toBe(1)
       expect(f.state.sent).toBe(1)
       expect(f.root.space).toBe(f.destination._id)

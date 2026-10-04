@@ -1,3 +1,6 @@
+import { parseGetIssueParams } from "../../../src/domain/schemas/issues.js"
+import { getIssue } from "../../../src/huly/operations/issues-read.js"
+import { withDiagnostics } from "../../helpers/diagnostics.js"
 import { it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import { expect } from "vitest"
@@ -234,8 +237,20 @@ it.effect("a partially moved no-op tree refuses with stable-ID inspection guidan
     })
     if (refused.outcome === "blocked") {
       expect(refused.conflicts?.[0]?.code).toBe("discovery")
-      expect(refused.inspection).toContain(f.grandchild._id)
-      expect(refused.inspection).toContain("huly issues get")
+      for (const issue of [f.root, f.child, f.grandchild]) {
+        const request = { project: f.destination.identifier, identifier: issue._id }
+        expect(refused.inspection).toContain(`MCP get_issue ${JSON.stringify(request)}`)
+        expect(refused.inspection).toContain(`CLI huly issues get ${f.destination.identifier} ${issue._id} --json`)
+        const current = yield* parseGetIssueParams(request).pipe(
+          Effect.flatMap(getIssue),
+          Effect.provide(f.layer),
+          withDiagnostics
+        )
+        expect(current).toMatchObject({
+          issueId: issue._id,
+          project: issue === f.grandchild ? f.source.identifier : f.destination.identifier
+        })
+      }
     }
     expect(f.state.allocated).toBe(3)
     expect(f.state.sent).toBe(1)

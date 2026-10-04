@@ -46,13 +46,21 @@ export const planTransferTreeWrites = (
       prepared.plan.relevant.filter((issue) => !movedIds.has(issue._id)).map((issue) => [issue._id, issue])
     ).values()
   ]
+  return finalizeAncestry(prepared.plan.root._id, tasks, ancestors)
+}
+
+const finalizeAncestry = (
+  rootId: TransferTreeWrite["rootId"],
+  tasks: TransferTreeWrite["tasks"],
+  ancestors: TransferTreeWrite["ancestors"]
+): TransferTreeWrite | undefined => {
   const finalTasks: Array<TransferTreeWrite["tasks"][number]> = []
   for (const task of tasks) {
     const parents = plannedAncestry(task, tasks, ancestors)
     if (parents === undefined) return undefined
     finalTasks.push({ ...task, finalParents: parents })
   }
-  return { rootId: prepared.plan.root._id, tasks: finalTasks, ancestors }
+  return { rootId, tasks: finalTasks, ancestors }
 }
 
 const plannedAncestry = (
@@ -68,7 +76,6 @@ const plannedAncestry = (
     visited.add(parentId)
     const moved = tasks.find((candidate) => candidate.issueId === parentId)
     const existing = ancestors.find((candidate) => candidate._id === parentId)
-    if (moved === undefined && existing === undefined) return undefined
     if (moved !== undefined) {
       parents.push({
         parentId,
@@ -77,7 +84,8 @@ const plannedAncestry = (
         space: moved.destinationId
       })
       parentId = moved.parentId
-    } else if (existing !== undefined) {
+    } else {
+      if (existing === undefined) return undefined
       parents.push({ parentId, identifier: existing.identifier, parentTitle: existing.title, space: existing.space })
       parentId = existing.attachedTo
     }

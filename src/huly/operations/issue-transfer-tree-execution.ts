@@ -1,3 +1,5 @@
+import type { VerificationProof } from "./issue-transfer-verification-proof.js"
+import { publishVerification, interruptVerification } from "./issue-transfer-verification-progress.js"
 import { isDeepStrictEqual } from "node:util"
 import type { Issue, Project } from "@hcengineering/tracker"
 import { SortingOrder } from "@hcengineering/core"
@@ -27,7 +29,7 @@ const reinspect = Effect.fn("transfer.reinspectTree")(function* (
   destination: MovementProject,
   params: MoveIssueParams
 ): Effect.fn.Return<boolean, MovementError> {
-  const { root, parent, source } = prepared.plan
+  const { parent, root, source } = prepared.plan
   const current = yield* inspectTransferPlan(client, root, parent, source, destination, params)
   return !("conflicts" in current) && isDeepStrictEqual(current, prepared)
 })
@@ -40,14 +42,36 @@ export const executeTransferTree = Effect.fn("transfer.executeTree")(function* (
 ): Effect.fn.Return<MoveIssueResult, MovementError> {
   const progress: ExecutionProgress = {
     execution: yield* Ref.make<MovementUncertaintyEvidence["execution"] | undefined>(undefined),
-    verification: yield* Ref.make<TransferTreeVerification>({ status: "not-attempted" })
+    verification: yield* Ref.make<TransferTreeVerification>({ status: "not-attempted" }),
+    verificationFacts: yield* Ref.make<VerificationProof | undefined>(undefined)
   }
   const result = yield* Effect.result(
     executeWithinBudget(client, prepared, destination, params, progress).pipe(Effect.timeout(TRANSFER_EXECUTION_BUDGET))
   )
   if (result._tag === "Success") return result.success
+  return yield* interruptedExecution(prepared, destination, progress)
+})
+
+const interruptedExecution = Effect.fn("transfer.interruptedExecution")(function* (
+  prepared: TransferPlan,
+  destination: MovementProject,
+  progress: ExecutionProgress
+): Effect.fn.Return<MoveIssueResult> {
+  const execution = yield* Ref.get(progress.execution)
+  const verification =
+    execution?.phase === "verification"
+      ? yield* interruptVerification(
+          progress.verification,
+          progress.verificationFacts,
+          "Movement deadline interrupted remaining verification reads."
+        )
+      : yield* Ref.get(progress.verification)
   return yield* stoppedResult(
-    "indeterminate",
+    execution?.phase === "verification" &&
+      verification.status === "observed" &&
+      verification.consistency === "inconsistent"
+      ? "incomplete"
+      : "indeterminate",
     "Movement deadline or response unavailable; inspect every stable ID before retry.",
     prepared,
     destination,
@@ -91,6 +115,28 @@ const executeWithinBudget = Effect.fn("transfer.executeWithinBudget")(function* 
       destination,
       progress
     )
+  return yield* executePlannedWrite(
+    client,
+    prepared,
+    destination,
+    params,
+    progress,
+    write,
+    sameProject,
+    admission.commit
+  )
+})
+
+const executePlannedWrite = Effect.fn("transfer.executePlannedWrite")(function* (
+  client: HulyClient["Service"],
+  prepared: TransferPlan,
+  destination: MovementProject,
+  params: MoveIssueParams,
+  progress: ExecutionProgress,
+  write: TransferTreeWrite,
+  sameProject: boolean,
+  commit: NonNullable<HulyClient["Service"]["commitTransferTree"]>
+): Effect.fn.Return<MoveIssueResult, MovementError> {
   const noOp = sameProject && prepared.plan.root.attachedTo === (prepared.plan.parent?._id ?? movementNoParent)
   if (noOp) return yield* finishVerification(client, prepared, destination, write, progress)
   const presend = yield* Effect.result(
@@ -114,7 +160,7 @@ const executeWithinBudget = Effect.fn("transfer.executeWithinBudget")(function* 
       progress
     )
   }
-  return yield* commitAndVerify(client, prepared, destination, write, progress, admission.commit)
+  return yield* commitAndVerify(client, prepared, destination, write, progress, commit)
 })
 
 type ReadyAdmission = {
@@ -216,8 +262,14 @@ const finishVerification = Effect.fn("transfer.finishVerification")(function* (
   progress: ExecutionProgress
 ): Effect.fn.Return<MoveIssueResult> {
   const result = yield* Effect.result(
-    verifyTransferTree(client, prepared, destination, write).pipe(
-      Effect.tap((value) => Ref.set(progress.verification, value)),
+    verifyTransferTree(client, prepared, destination, write, (observed) =>
+      publishVerification(progress.verification, progress.verificationFacts, observed)
+    ).pipe(
+      Effect.tap((value) =>
+        value.status === "unavailable"
+          ? interruptVerification(progress.verification, progress.verificationFacts, value.reason).pipe(Effect.asVoid)
+          : Effect.void
+      ),
       Effect.repeat({
         schedule: Schedule.spaced("200 millis"),
         times: 4,
@@ -226,16 +278,24 @@ const finishVerification = Effect.fn("transfer.finishVerification")(function* (
     )
   )
   if (result._tag === "Failure") {
-    yield* Ref.set(progress.verification, { status: "unavailable", reason: "Post-send verification read failed." })
+    const verification = yield* interruptVerification(
+      progress.verification,
+      progress.verificationFacts,
+      "Post-send verification read failed or exceeded the deadline."
+    )
     return yield* stoppedResult(
-      "indeterminate",
+      verification.status === "observed" && verification.consistency === "inconsistent"
+        ? "incomplete"
+        : "indeterminate",
       "Verification reads unavailable; no automatic retry or rollback attempted.",
       prepared,
       destination,
       progress
     )
   }
-  const observed = result.success
+  const observed = yield* Ref.get(progress.verification)
+  if (observed.status === "observed" && observed.consistency === "inconsistent")
+    return yield* stoppedResult("incomplete", observed.reason, prepared, destination, progress)
   if (observed.status !== "observed" || observed.completeness !== "complete")
     return yield* stoppedResult(
       "indeterminate",
@@ -244,7 +304,5 @@ const finishVerification = Effect.fn("transfer.finishVerification")(function* (
       destination,
       progress
     )
-  if (observed.consistency === "inconsistent")
-    return yield* stoppedResult("incomplete", observed.reason, prepared, destination, progress)
   return completedTransferTreeResult(client, prepared, destination, write)
 })

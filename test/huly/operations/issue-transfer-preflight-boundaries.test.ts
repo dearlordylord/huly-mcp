@@ -109,13 +109,10 @@ for (const mode of modes) {
           yield* parseMoveIssueParams(f.input)
         )
       )
-      if (mode === "malformedIdentity") expect(inspected._tag).toBe("Failure")
-      else {
-        expect(inspected._tag).toBe("Success")
-        if (inspected._tag === "Success") {
-          expect("conflicts" in inspected.success).toBe(true)
-          if ("conflicts" in inspected.success) expect(inspected.success.conflicts.length).toBeGreaterThan(0)
-        }
+      expect(inspected._tag).toBe("Success")
+      if (inspected._tag === "Success") {
+        expect("conflicts" in inspected.success).toBe(true)
+        if ("conflicts" in inspected.success) expect(inspected.success.conflicts.length).toBeGreaterThan(0)
       }
       expect(f.state.allocated).toBe(0)
       expect(f.state.sent).toBe(0)

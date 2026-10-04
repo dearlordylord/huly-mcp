@@ -302,10 +302,10 @@ it.effect("verification cannot report completed when observed attributes differ 
     f.root.component = sdkFixture("source")
     value(f, "source", "component", "API", false)
     value(f, "approved", "component", "API")
-    const commit = assertExists(f.operations.commitTransfer)
+    const commit = assertExists(f.operations.commitTransferTree)
     const layer = HulyClient.testLayer({
       ...f.operations,
-      commitTransfer: (write) =>
+      commitTransferTree: (write) =>
         commit(write).pipe(
           Effect.tap(() =>
             Effect.sync(() => {
@@ -320,11 +320,12 @@ it.effect("verification cannot report completed when observed attributes differ 
       Effect.forkChild
     )
     yield* TestClock.adjust("2 seconds")
-    expect(yield* Fiber.join(fiber)).toMatchObject({
-      outcome: "incomplete",
-      reason: expect.stringContaining("inconsistent")
-    })
+    const result = yield* Fiber.join(fiber)
+    expect(result).toMatchObject({ outcome: "incomplete" })
+    expect(result).not.toHaveProperty("changed", false)
+    expect(f.state.allocated).toBe(1)
     expect(f.state.sent).toBe(1)
+    expect(f.root.space).toBe(f.destination._id)
     expect(f.root.component).toBe("unexpected")
   })
 )

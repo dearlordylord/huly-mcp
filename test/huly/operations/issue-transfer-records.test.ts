@@ -2,7 +2,7 @@ import { it } from "@effect/vitest"
 import { Effect, Fiber, Schema } from "effect"
 import { TestClock } from "effect/testing"
 import { expect } from "vitest"
-import { DocId } from "../../../src/domain/schemas/shared-refs.js"
+import { DocId, ObjectClassName } from "../../../src/domain/schemas/shared.js"
 import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"
 import { TransferSupportedRecordSchema } from "../../../src/domain/schemas/issue-transfer.js"
 import { HulyClient } from "../../../src/huly/client.js"
@@ -57,27 +57,29 @@ const richFixture = () => {
   const state = { corrupt: false, unavailableAfterWrite: false }
   const layer = HulyClient.testLayer({
     ...f.operations,
-    inspectTransferRecords: () => {
+    inspectTransferRecords: (issueId) => {
       const inspect = f.operations.inspectTransferRecords
       if (inspect === undefined) return Effect.die("Fixture inspection is required")
-      return inspect(f.input.issue).pipe(
+      return inspect(issueId).pipe(
         Effect.map((inspection) => ({
           ...inspection,
           discovery: state.unavailableAfterWrite && f.state.sent > 0 ? "incomplete" : inspection.discovery,
-          records: [...inspection.records, ...extra]
+          classes: [...new Set([...inspection.classes, ...extra.map((record) => ObjectClassName.make(record._class))])],
+          records: [...inspection.records, ...(issueId === f.input.issue ? extra : [])]
         }))
       )
     },
-    commitTransfer: (write) => {
-      const commit = f.operations.commitTransfer
+    commitTransferTree: (write) => {
+      const commit = f.operations.commitTransferTree
       if (commit === undefined) return Effect.die("Fixture commit is required")
       return commit(write).pipe(
         Effect.map((result) => {
-          extra = extra.map((record) => ({
-            ...record,
-            space: write.destinationId,
-            ...(state.corrupt ? { snapshot: "changed" } : {})
-          }))
+          if (result !== "applied") return result
+          extra = extra.map((record) => {
+            const owner = write.tasks.find((task) => task.records.some((owned) => owned._id === record._id))
+            if (owner === undefined) return record
+            return { ...record, space: owner.destinationId, ...(state.corrupt ? { snapshot: "changed" } : {}) }
+          })
           return result
         })
       )
@@ -134,12 +136,16 @@ it.effect("no-op refuses unavailable ownership inspection instead of claiming ve
     const f = transferFixture()
     yield* move(f.input).pipe(Effect.provide(f.layer))
     const { inspectTransferRecords: _inspect, ...ports } = f.operations
+    expect(_inspect).toBeDefined()
+    expect(ports).not.toHaveProperty("inspectTransferRecords")
     const layer = HulyClient.testLayer(ports)
-    expect(yield* move(f.input).pipe(Effect.provide(layer))).toMatchObject({
-      outcome: "blocked",
-      changed: false,
-      reason: expect.stringContaining("inspection unavailable")
-    })
+    const result = yield* move(f.input).pipe(Effect.provide(layer))
+    expect(result).toMatchObject({ outcome: "blocked", changed: false, discovery: "incomplete" })
+    if (result.outcome === "blocked") {
+      expect(result.inspection).toContain("MCP get_issue")
+      expect(result.inspection).toContain(f.root._id)
+      expect(result.issueIds).toContain(f.input.issue)
+    }
     expect(f.state.allocated).toBe(1)
     expect(f.state.sent).toBe(1)
   })

@@ -1,20 +1,16 @@
 import { it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import { expect } from "vitest"
-import { MovementIssueSchema, MovementProjectSchema } from "../../../src/domain/schemas/issue-movement-state.js"
 import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"
 import { parseGetIssueParams } from "../../../src/domain/schemas/issues.js"
 import { TransferInspectionSchema } from "../../../src/domain/schemas/issue-transfer.js"
 import { HulyClient } from "../../../src/huly/client.js"
 import { moveIssue } from "../../../src/huly/operations/issue-movement.js"
 import { getIssue } from "../../../src/huly/operations/issues-read.js"
-import { movementNoopProblem } from "../../../src/huly/operations/issue-transfer-verification.js"
 import { withDiagnostics } from "../../helpers/diagnostics.js"
 import { transferFixture } from "../../helpers/transfer.js"
+import { assertExists } from "../../../src/utils/assertions.js"
 import { sdkFixture } from "../../helpers/huly-sdk.js"
-
-const issueSnapshot = (input: unknown) => Schema.decodeUnknownSync(MovementIssueSchema)(input)
-const projectSnapshot = (input: unknown) => Schema.decodeUnknownSync(MovementProjectSchema)(input)
 
 for (const mode of ["unavailableInspection", "invalidIdentity", "incompleteInventory"]) {
   it.effect(`no-op inspection handles ${mode} without a second write`, () =>
@@ -22,38 +18,36 @@ for (const mode of ["unavailableInspection", "invalidIdentity", "incompleteInven
       const f = transferFixture()
       const params = yield* parseMoveIssueParams(f.input)
       expect((yield* moveIssue(params).pipe(Effect.provide(f.layer))).outcome).toBe("completed")
-      const root = issueSnapshot(f.root)
-      const parent = issueSnapshot(f.parent)
       if (mode === "invalidIdentity") f.root.number = Number.NaN
       const { inspectTransferRecords: _inspect, ...withoutInspector } = f.operations
+      const inspect = assertExists(_inspect)
       const layer = HulyClient.testLayer({
         ...withoutInspector,
         ...(mode === "unavailableInspection"
           ? {}
-          : {
-              inspectTransferRecords: () =>
-                Effect.succeed(
-                  Schema.decodeUnknownSync(TransferInspectionSchema)({
-                    discovery: "incomplete",
-                    records: [],
-                    classes: [...new Set(f.records.map((record) => record._class))],
-                    blockers: [],
-                    limitation: "Missing closure inventory"
-                  })
-                )
-            })
+          : mode === "invalidIdentity"
+            ? { inspectTransferRecords: inspect }
+            : {
+                inspectTransferRecords: () =>
+                  Effect.succeed(
+                    Schema.decodeUnknownSync(TransferInspectionSchema)({
+                      discovery: "incomplete",
+                      records: [],
+                      classes: [...new Set(f.records.map((record) => record._class))],
+                      blockers: [],
+                      limitation: "Missing closure inventory"
+                    })
+                  )
+              })
       })
-      const client = yield* HulyClient.pipe(Effect.provide(layer))
-      const problem = yield* movementNoopProblem(client, {
-        root,
-        parent,
-        source: projectSnapshot(f.destination),
-        tree: [root],
-        relevant: [root, parent]
-      })
-      if (mode === "unavailableInspection") expect(problem).toContain("No-op ownership inspection unavailable")
-      if (mode === "invalidIdentity") expect(problem).toBe("No-op identity inspection failed.")
-      if (mode === "incompleteInventory") expect(problem).toContain("Incomplete owned-record discovery")
+      const observed = yield* Effect.result(moveIssue(params).pipe(Effect.provide(layer)))
+      expect(observed).toMatchObject({ _tag: "Success", success: { outcome: "blocked", changed: false } })
+      if (observed._tag === "Success" && observed.success.outcome === "blocked") {
+        expect(observed.success.discovery).toBe("incomplete")
+        expect(observed.success.issueIds).toContain(f.input.issue)
+        expect(observed.success.inspection).toContain(f.root._id)
+      }
+
       expect(f.state.allocated).toBe(1)
       expect(f.state.sent).toBe(1)
     })
@@ -66,7 +60,10 @@ it.effect("malformed transfer identity is a pre-write refusal with no sequence g
     f.root.rank = sdkFixture(null)
     const result = yield* parseMoveIssueParams(f.input).pipe(Effect.flatMap(moveIssue), Effect.provide(f.layer))
     expect(result).toMatchObject({ outcome: "blocked", changed: false })
-    expect(JSON.stringify(result)).toContain("Pre-write inspection failed")
+    if (result.outcome === "blocked") {
+      expect(result.discovery).toBe("incomplete")
+      expect(result.conflicts).toEqual(expect.arrayContaining([expect.objectContaining({ code: "discovery" })]))
+    }
     expect(f.state.allocated).toBe(0)
     expect(f.state.sent).toBe(0)
   })
