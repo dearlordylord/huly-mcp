@@ -3,7 +3,6 @@ import { movementHistoryMatches } from "./issue-movement-history.js"
 import type { MovementTransactionInspection, MovementTransactions } from "../issue-movement-transactions.js"
 import { observeTransferForest } from "../issue-transfer-forest-observation.js"
 import type { TransferForestEntry } from "../issue-transfer-forest-state.js"
-import { isDeepStrictEqual } from "node:util"
 import { Effect, Schema } from "effect"
 import {
   MovementObservedRecordSchema,
@@ -131,24 +130,6 @@ const inspectRecordCompleteness = (
     limitations: []
   }
 }
-const presentRecordProblem = (
-  current: TransferRecord,
-  expected: TransferSupportedRecord | undefined,
-  destinationId: TransferTreeWrite["tasks"][number]["destinationId"] | undefined
-): string | undefined => {
-  if (expected === undefined) return `Unexpected owned record ${current._id} was observed after preflight.`
-  if (destinationId === undefined) return `Record ${current._id} belongs to an unplanned task.`
-  if (current.kind === "unsupported")
-    return current.space !== destinationId ||
-      current.attachedTo !== expected.attachedTo ||
-      current._class !== expected._class
-      ? `Observed ownership or project of record ${current._id} differs from approved state.`
-      : undefined
-  return isDeepStrictEqual(current, { ...expected, space: destinationId })
-    ? undefined
-    : `Observed protected payload or ownership of record ${current._id} differs from approved state.`
-}
-
 // Internal mutually exclusive decision from parsed observation and transaction evidence.
 type RecordPreservationDecision =
   | { readonly status: "preserved" }
@@ -165,10 +146,9 @@ const recordPreservationDecision = (
     if (movementHistoryMatches(record, transactions, destinationId)) return { status: "preserved" }
     return { status: "changed", problem: `Unexpected owned record ${record._id} was observed after preflight.` }
   }
-  if (destinationId === undefined || record.kind === "unsupported") {
-    const problem = presentRecordProblem(record, expected, destinationId)
-    return problem === undefined ? { status: "preserved" } : { status: "changed", problem }
-  }
+  if (destinationId === undefined)
+    return { status: "changed", problem: `Record ${record._id} belongs to an unplanned task.` }
+  if (record.kind === "unsupported") return unsupportedRecordDecision(record, expected, destinationId)
   const proof = movementRecordProof(record, expected, destinationId, transactions, persisted)
   if (proof === "preserved") return { status: "preserved" }
   if (proof === "unavailable")
@@ -181,3 +161,15 @@ const recordPreservationDecision = (
     problem: `Observed protected payload or ownership of record ${record._id} differs from approved state.`
   }
 }
+
+const unsupportedRecordDecision = (
+  current: Extract<TransferRecord, { readonly kind: "unsupported" }>,
+  expected: TransferSupportedRecord,
+  destinationId: TransferTreeWrite["tasks"][number]["destinationId"]
+): RecordPreservationDecision =>
+  current.space !== destinationId || current.attachedTo !== expected.attachedTo || current._class !== expected._class
+    ? {
+        status: "changed",
+        problem: `Observed ownership or project of record ${current._id} differs from approved state.`
+      }
+    : { status: "preserved" }

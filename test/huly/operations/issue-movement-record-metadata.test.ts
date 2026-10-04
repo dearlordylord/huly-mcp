@@ -33,7 +33,13 @@ const scenarios = [
   "later-edit",
   "changed-created",
   "changed-content",
-  "opaque-wrong-route"
+  "opaque-wrong-route",
+  "opaque-same",
+  "opaque-changed",
+  "snapshot-author-mismatch",
+  "queued-class",
+  "queued-source",
+  "queued-operations"
 ] as const
 for (const scenario of scenarios) {
   it.effect(`owned-record migration metadata: ${scenario}`, () =>
@@ -51,7 +57,7 @@ for (const scenario of scenarios) {
         record,
         parseRecord({
           ...record,
-          snapshot: scenario === "opaque-wrong-route" ? "opaque protected history" : JSON.stringify(snapshot)
+          snapshot: scenario.startsWith("opaque-") ? "opaque protected history" : JSON.stringify(snapshot)
         })
       )
       const commit = assertExists(f.operations.commitTransferTree)
@@ -62,11 +68,11 @@ for (const scenario of scenarios) {
           txId: "record-migration-tx",
           transactionClass: "core:class:TxUpdateDoc",
           objectId: record._id,
-          objectClass: record._class,
-          objectSpace: record.space,
+          objectClass: scenario === "queued-class" ? "chunter:class:ChatMessage" : record._class,
+          objectSpace: scenario === "queued-source" ? f.destination._id : record.space,
           modifiedOn: 10,
           modifiedBy: scenario === "other-author" ? "current-caller" : record.modifiedBy,
-          operations: { space: f.destination._id }
+          operations: { space: scenario === "queued-operations" ? f.source._id : f.destination._id }
         }
       ])
       const intent = assertExists(transactions[0])
@@ -113,16 +119,18 @@ for (const scenario of scenarios) {
                   modifiedOn: scenario === "later-edit" ? 21 : 20,
                   modifiedBy: intent.modifiedBy,
                   collection: scenario === "opaque-wrong-route" ? "different-collection" : record.collection,
-                  snapshot:
-                    scenario === "opaque-wrong-route"
-                      ? "opaque protected history"
-                      : JSON.stringify({
-                          ...snapshot,
-                          modifiedOn: scenario === "later-edit" ? 21 : 20,
-                          modifiedBy: intent.modifiedBy,
-                          createdBy: scenario === "changed-created" ? "changed-creator" : snapshot.createdBy,
-                          content: scenario === "changed-content" ? "changed" : snapshot.content
-                        })
+                  snapshot: scenario.startsWith("opaque-")
+                    ? scenario === "opaque-changed"
+                      ? "different opaque history"
+                      : "opaque protected history"
+                    : JSON.stringify({
+                        ...snapshot,
+                        modifiedOn: scenario === "later-edit" ? 21 : 20,
+                        modifiedBy:
+                          scenario === "snapshot-author-mismatch" ? "snapshot-other-author" : intent.modifiedBy,
+                        createdBy: scenario === "changed-created" ? "changed-creator" : snapshot.createdBy,
+                        content: scenario === "changed-content" ? "changed" : snapshot.content
+                      })
                 })
               )
             )
@@ -148,7 +156,11 @@ for (const scenario of scenarios) {
         scenario === "wrong-tx" ||
         scenario === "duplicate-evidence" ||
         scenario === "wrong-class" ||
-        scenario === "wrong-source"
+        scenario === "wrong-source" ||
+        scenario === "opaque-same" ||
+        scenario === "queued-class" ||
+        scenario === "queued-source" ||
+        scenario === "queued-operations"
       ) {
         expect(result.outcome).toBe("indeterminate")
         expect(result).toMatchObject({ verification: { consistency: "undetermined" } })
