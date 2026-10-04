@@ -7,6 +7,8 @@ import { GatewayEvent, type GatewayEvent as Event } from "./protocol.js"
 import { ScenarioArguments, ScenarioEvidence } from "./scenario-contract.js"
 import { runPublic } from "./public-process.js"
 import { readStableIssue, runMutation } from "./mutation.js"
+import { FixtureBoundaryError } from "./fixture-errors.js"
+import { NonEmptyString } from "../../src/domain/schemas/shared.js"
 
 const McpResponse = Schema.Struct({
   id: Schema.Literal(2),
@@ -160,7 +162,11 @@ const args = Schema.decodeUnknownSync(Schema.fromJsonString(ScenarioArguments))(
 void Effect.runPromise(
   Effect.tryPromise({
     try: (signal) => main(args, signal),
-    catch: () => new Error("Movement concurrency fixture failed; no workspace-state claim made.")
+    catch: () =>
+      new FixtureBoundaryError({
+        stage: "scenario",
+        reason: NonEmptyString.make("Movement concurrency fixture failed; no workspace-state claim made.")
+      })
   }).pipe(Effect.timeout(args.timeoutMs))
 ).catch(() => {
   process.stderr.write("Movement concurrency fixture failed or exceeded its deadline; no workspace-state claim made.\n")
