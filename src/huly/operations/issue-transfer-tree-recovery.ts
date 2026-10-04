@@ -1,3 +1,4 @@
+import type { MovementTransactions } from "../issue-movement-transactions.js"
 import {
   publishVerification,
   interruptVerification,
@@ -19,6 +20,7 @@ import { TRANSFER_DISCOVERY_BUDGET } from "./issue-transfer-tree.js"
 
 // Request-local progress proof; no durable state or replay protocol is introduced.
 export interface ExecutionProgress {
+  readonly transactions: Ref.Ref<MovementTransactions>
   readonly execution: MovementExecutionProgress
   readonly verification: Ref.Ref<TransferTreeVerification>
   readonly verificationFacts: VerificationFactsRef
@@ -48,8 +50,13 @@ export const observeFailure = Effect.fn("transfer.observeFailure")(function* (
   progress: ExecutionProgress
 ): Effect.fn.Return<void> {
   const observed = yield* Effect.result(
-    verifyTransferTree(client, prepared, destination, write, (observed) =>
-      publishVerification(progress.verification, progress.verificationFacts, observed)
+    verifyTransferTree(
+      client,
+      prepared,
+      destination,
+      write,
+      (observed) => publishVerification(progress.verification, progress.verificationFacts, observed),
+      yield* Ref.get(progress.transactions)
     ).pipe(Effect.timeout(TRANSFER_DISCOVERY_BUDGET))
   )
   if (observed._tag === "Failure")

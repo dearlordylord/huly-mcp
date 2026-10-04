@@ -1,3 +1,4 @@
+import type { MovementTransactions } from "../issue-movement-transactions.js"
 import type { VerificationProof } from "./issue-transfer-verification-proof.js"
 import { publishVerification, interruptVerification } from "./issue-transfer-verification-progress.js"
 import { isDeepStrictEqual } from "node:util"
@@ -41,6 +42,7 @@ export const executeTransferTree = Effect.fn("transfer.executeTree")(function* (
   params: MoveIssueParams
 ): Effect.fn.Return<MoveIssueResult, MovementError> {
   const progress: ExecutionProgress = {
+    transactions: yield* Ref.make<MovementTransactions>([]),
     execution: yield* Ref.make<MovementUncertaintyEvidence["execution"] | undefined>(undefined),
     verification: yield* Ref.make<TransferTreeVerification>({ status: "not-attempted" }),
     verificationFacts: yield* Ref.make<VerificationProof | undefined>(undefined)
@@ -234,7 +236,7 @@ const commitAndVerify = Effect.fn("transfer.commitAndVerify")(function* (
     commit: "sent",
     reservations
   })
-  const committed = yield* Effect.result(commit(write))
+  const committed = yield* Effect.result(commit(write, (transactions) => Ref.set(progress.transactions, transactions)))
   if (committed._tag === "Failure")
     return yield* failedCommit(client, prepared, destination, write, progress, committed.failure, reservations)
   if (committed.success === "condition-not-met") {
@@ -268,8 +270,13 @@ const finishVerification = Effect.fn("transfer.finishVerification")(function* (
   progress: ExecutionProgress
 ): Effect.fn.Return<MoveIssueResult> {
   const result = yield* Effect.result(
-    verifyTransferTree(client, prepared, destination, write, (observed) =>
-      publishVerification(progress.verification, progress.verificationFacts, observed)
+    verifyTransferTree(
+      client,
+      prepared,
+      destination,
+      write,
+      (observed) => publishVerification(progress.verification, progress.verificationFacts, observed),
+      yield* Ref.get(progress.transactions)
     ).pipe(
       Effect.tap((value) =>
         value.status === "unavailable"

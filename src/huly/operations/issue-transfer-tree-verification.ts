@@ -1,3 +1,4 @@
+import type { MovementTransactions } from "../issue-movement-transactions.js"
 import { projectVerification, type VerificationProof } from "./issue-transfer-verification-proof.js"
 import { Effect } from "effect"
 import type { MovementProject } from "../../domain/schemas/issue-movement-state.js"
@@ -21,7 +22,8 @@ export const verifyTransferTree = Effect.fn("transfer.verifyTree")(function* (
   prepared: TransferPlan,
   destination: MovementProject,
   write: TransferTreeWrite,
-  publish: (observation: VerificationProof) => Effect.Effect<void> = () => Effect.void
+  publish: (observation: VerificationProof) => Effect.Effect<void> = () => Effect.void,
+  transactions: MovementTransactions = []
 ): Effect.fn.Return<TransferTreeVerification, MovementError> {
   const source = yield* inspectMovementProject(client, prepared.plan.root)
   const target =
@@ -51,10 +53,17 @@ export const verifyTransferTree = Effect.fn("transfer.verifyTree")(function* (
     taskProof = observation
     return publish(progress())
   })
-  recordProof = yield* observeTransferRecords(client, prepared, write, taskProof.observed, (observation) => {
-    recordProof = observation
-    return publish(progress())
-  })
+  recordProof = yield* observeTransferRecords(
+    client,
+    prepared,
+    write,
+    taskProof.observed,
+    (observation) => {
+      recordProof = observation
+      return publish(progress())
+    },
+    transactions
+  )
   const closure = yield* observeClosure(client, hierarchy, prepared)
   const proof = makeProof(hierarchyProblem, taskProof, recordProof, write, closure)
   yield* publish(proof)

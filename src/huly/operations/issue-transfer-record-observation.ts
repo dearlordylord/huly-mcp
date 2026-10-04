@@ -1,3 +1,5 @@
+import { movementHistoryMatches } from "./issue-movement-history.js"
+import type { MovementTransactions } from "../issue-movement-transactions.js"
 import { observeTransferForest } from "../issue-transfer-forest-observation.js"
 import type { TransferForestEntry } from "../issue-transfer-forest-state.js"
 import { isDeepStrictEqual } from "node:util"
@@ -38,7 +40,8 @@ export const observeTransferRecords = Effect.fn("transfer.observeRecords")(funct
   prepared: TransferPlan,
   write: TransferTreeWrite,
   observed: ReadonlyArray<ObservedIssue>,
-  publish: (observation: RecordObservation) => Effect.Effect<void>
+  publish: (observation: RecordObservation) => Effect.Effect<void>,
+  transactions: MovementTransactions = []
 ): Effect.fn.Return<RecordObservation> {
   if (client.inspectTransferRecords === undefined && client.inspectTransferForest === undefined)
     return { records: [], problems: [], limitations: ["Owned-record verifier is unavailable."] }
@@ -57,7 +60,12 @@ export const observeTransferRecords = Effect.fn("transfer.observeRecords")(funct
     } else {
       const task = prepared.tasks.find((value) => value.issue._id === issueId)
       const planned = write.tasks.find((value) => value.issueId === issueId)
-      const ownerProof = inspectOwnerRecords(entry.inspection, task?.records ?? [], planned?.destinationId)
+      const ownerProof = inspectOwnerRecords(
+        entry.inspection,
+        task?.records ?? [],
+        planned?.destinationId,
+        transactions
+      )
       records.push(...ownerProof.records)
       problems.push(...ownerProof.problems)
       limitations.push(...ownerProof.limitations)
@@ -76,7 +84,8 @@ export const observeTransferRecords = Effect.fn("transfer.observeRecords")(funct
 const inspectOwnerRecords = (
   inspection: TransferInspection,
   previous: ReadonlyArray<TransferSupportedRecord>,
-  destinationId: TransferTreeWrite["tasks"][number]["destinationId"] | undefined
+  destinationId: TransferTreeWrite["tasks"][number]["destinationId"] | undefined,
+  transactions: MovementTransactions
 ): RecordObservation => {
   const records: Array<RecordObservation["records"][number]> = []
   const problems: Array<string> = []
@@ -86,7 +95,10 @@ const inspectOwnerRecords = (
     if (route._tag === "Some") records.push(route.value)
     else limitations.push(`Record route of ${record._id} is unavailable.`)
     const expected = previous.find((value) => value._id === record._id)
-    const problem = presentRecordProblem(record, expected, destinationId)
+    const problem =
+      expected === undefined && movementHistoryMatches(record, transactions, destinationId)
+        ? undefined
+        : presentRecordProblem(record, expected, destinationId)
     if (problem !== undefined) problems.push(problem)
     if (record.kind === "unsupported") limitations.push(`Protected payload of record ${record._id} is unavailable.`)
   }
