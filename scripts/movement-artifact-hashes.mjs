@@ -11,7 +11,7 @@ export const MovementArtifactSnapshotSchema=Schema.Struct({
 export const snapshotEvidenceArtifacts=async directory=>{
  const root=await lstat(directory)
  if(!root.isDirectory()||root.isSymbolicLink()||root.uid!==process.getuid?.()||(root.mode&PERMISSION_BITS)!==PRIVATE_DIRECTORY_MODE||await realpath(directory)!==directory)throw new Error('Evidence directory unavailable')
- const files={},directories=[]
+ const files=new Map(),directories=[]
  const visit=async(current,prefix)=>{
   for(const name of (await readdir(current)).sort()){
    const file=`${current}/${name}`,relative=prefix+name,stat=await lstat(file)
@@ -21,12 +21,12 @@ export const snapshotEvidenceArtifacts=async directory=>{
     directories.push({path:relative,mode:PRIVATE_DIRECTORY_MODE})
     await visit(file,relative+'/')
    }else if(stat.isFile()&&(stat.mode&PERMISSION_BITS)===PRIVATE_FILE_MODE){
-    files[relative]=createHash('sha256').update(await readFile(file)).digest('hex')
+    files.set(relative,createHash('sha256').update(await readFile(file)).digest('hex'))
    }else throw new Error('Evidence file unavailable')
   }
  }
  await visit(directory,'')
- return Schema.decodeUnknownSync(MovementArtifactSnapshotSchema)({files,directories})
+ return Schema.decodeUnknownSync(MovementArtifactSnapshotSchema)({files:Object.fromEntries(files),directories})
 }
 export const auditEvidenceArtifacts=async(directory,input)=>{
  const expected=Schema.decodeUnknownSync(MovementArtifactSnapshotSchema)(input)

@@ -30,3 +30,14 @@ test('symlinks and public files cannot enter an owned private snapshot',()=>fixt
  await chmod(directory+'/report',0o644)
  await assert.rejects(snapshotEvidenceArtifacts(directory),/file unavailable/)
 }))
+
+test('prototype-shaped filename remains an own hashed artifact and tampering fails',()=>fixture(async directory=>{
+ await writeFile(directory+'/__proto__','original',{mode:0o600})
+ const snapshot=await snapshotEvidenceArtifacts(directory)
+ assert.equal(Object.hasOwn(snapshot.files,'__proto__'),true)
+ assert.equal(Object.keys(snapshot.files).length,1)
+ assert.match(snapshot.files.__proto__,/^[a-f0-9]{64}$/)
+ assert.deepEqual(await auditEvidenceArtifacts(directory,snapshot),{filesStable:true,directoriesStable:true})
+ await writeFile(directory+'/__proto__','changed')
+ assert.deepEqual(await auditEvidenceArtifacts(directory,snapshot),{filesStable:false,directoriesStable:true})
+}))
