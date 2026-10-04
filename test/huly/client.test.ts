@@ -1,3 +1,4 @@
+import type { TransferForestEntry } from "../../src/huly/issue-transfer-forest-state.js"
 import { describe, it } from "@effect/vitest"
 import type { MarkupRef } from "@hcengineering/api-client"
 import {
@@ -451,6 +452,27 @@ describe("HulyClient Service", () => {
         records: [],
         blockers: []
       })
+    }).pipe(Effect.provide(liveClientLayer), Effect.scoped)
+  )
+
+  it.effect("wires completed-owner forest progress through the ordinary SDK connection", () =>
+    Effect.gen(function* () {
+      mockGetDescendants.mockReturnValue([])
+      const ownerId = IssueId.make("forest-root")
+      mockFindOne.mockResolvedValue({ _id: ownerId, _class: tracker.class.Issue })
+      const client = yield* HulyClient
+      const published: Array<TransferForestEntry> = []
+      const result = yield* assertExists(client.inspectTransferForest)([ownerId], [], (entry) =>
+        Effect.sync(() => {
+          published.push(entry)
+        })
+      )
+      expect(result).toEqual(published)
+      expect(result).toMatchObject([
+        { status: "observed", ownerId, inspection: { discovery: "complete", records: [], blockers: [] } }
+      ])
+      expect(mockFindOne.mock.calls).toHaveLength(1)
+      expect(mockUpdateDoc.mock.calls).toHaveLength(0)
     }).pipe(Effect.provide(liveClientLayer), Effect.scoped)
   )
 

@@ -85,6 +85,7 @@ import { classifyHulyUnavailableFailure, normalizeHulyOrigin } from "./unavailab
 import { testWorkbenchUrlConfig, type WorkbenchUrlConfig } from "./url-builders.js"
 import { inspectNativePersonReferences, migrateNativePersonReferences } from "./person-reference-migration.js"
 
+import { inspectTransferForest } from "./issue-transfer-forest.js"
 import { commitTransfer, inspectTransferRecords } from "./issue-transfer-adapter.js"
 import { commitTransferTree } from "./issue-transfer-tree-adapter.js"
 import type { TransferTreeWrite } from "../domain/schemas/issue-transfer-tree.js"
@@ -445,6 +446,7 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
 
         const operations: HulyClientOperations = {
           inspectTransferRecords: (issueId, tree) => inspectTransferRecords(client, issueId, undefined, tree),
+          inspectTransferForest: (roots, tree, publish) => inspectTransferForest(client, roots, tree, publish),
           commitTransferTree: (write) =>
             withMovementWriteClient(
               client,
