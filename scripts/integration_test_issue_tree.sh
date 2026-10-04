@@ -63,7 +63,7 @@ assert_tree_completion() {
   local result="$1"
   shift
   if ! jq -e "$@" >/dev/null 2>/dev/null <<<"$result"; then
-    jq -nc --argjson result "$result" '{expected:"complete-tree-mapping",outcome:(if (["completed","blocked","no-op","incomplete","indeterminate"]|index($result.outcome))!=null then $result.outcome else "invalid" end),changed:(if ($result.changed|type)=="boolean" then $result.changed else null end),taskCount:(if ($result.tasks|type)=="array" then ($result.tasks|length) else null end),executionPhase:(if (["allocation","commit","verification"]|index($result.execution.phase))!=null then $result.execution.phase else null end),reservationCount:(if ($result.execution.reservations|type)=="array" then ($result.execution.reservations|length) else null end)}' 2>/dev/null >&2 || printf 'FAIL: tree completion result is not JSON\n' >&2
+    jq -nc --argjson result "$result" '{expected:"complete-tree-mapping",outcome:(if (["completed","blocked","no-op","incomplete","indeterminate"]|index($result.outcome))!=null then $result.outcome else "invalid" end),changed:(if ($result.changed|type)=="boolean" then $result.changed else null end),taskCount:(if ($result.tasks|type)=="array" then ($result.tasks|length) else null end),executionPhase:(if (["allocation","commit","verification"]|index($result.execution.phase))!=null then $result.execution.phase else null end),reservationCount:(if ($result.execution.reservations|type)=="array" then ($result.execution.reservations|length) else null end)}' >&2 2>/dev/null || printf 'FAIL: tree completion result is not JSON\n' >&2
     return 1
   fi
 }
