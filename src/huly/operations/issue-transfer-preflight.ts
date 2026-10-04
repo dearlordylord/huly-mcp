@@ -123,14 +123,37 @@ const projectConflicts = (
   return conflicts
 }
 
+// Internal observation proof: absence is distinct from a failed concrete-parent read.
+type TransferParentObservation =
+  | { readonly status: "absent" }
+  | { readonly status: "available"; readonly issue: TransferIssue }
+  | { readonly status: "unavailable" }
+
+const inspectTransferParent = Effect.fn("transfer.inspectParent")(function* (
+  client: HulyClient["Service"],
+  parent: MovementIssue | undefined
+): Effect.fn.Return<TransferParentObservation> {
+  if (parent === undefined) return { status: "absent" }
+  const observation = yield* Effect.result(
+    Effect.gen(function* () {
+      return yield* parse(
+        TransferIssueSchema,
+        yield* client.findOne<Issue>(tracker.class.Issue, hulyQuery<Issue>({ _id: toRef<Issue>(parent._id) }))
+      )
+    })
+  )
+  return observation._tag === "Success"
+    ? { status: "available", issue: observation.success }
+    : { status: "unavailable" }
+})
+
 const workflowConflicts = (
   root: MovementIssue,
-  parent: TransferIssue | undefined,
+  parent: TransferParentObservation,
   issue: TransferIssue,
   projectType: Schema.Schema.Type<typeof TransferProjectSchema>["type"],
   workflow: Schema.Schema.Type<typeof TransferWorkflowSchema>,
-  kind: Schema.Schema.Type<typeof TransferKindSchema>,
-  parentInspected: boolean
+  kind: Schema.Schema.Type<typeof TransferKindSchema>
 ) => {
   const conflicts: Array<TransferConflict> = []
   if (!workflow.tasks.includes(issue.kind) || kind.parent !== projectType)
@@ -148,7 +171,9 @@ const workflowConflicts = (
         `Status ${issue.status} is unsupported for kind ${issue.kind}. Select a compatible destination; status cannot be cleared or converted.`
       )
     )
-  return parentInspected ? [...conflicts, ...parentKindConflicts(root, parent, kind)] : conflicts
+  return parent.status === "unavailable"
+    ? conflicts
+    : [...conflicts, ...parentKindConflicts(root, parent.status === "available" ? parent.issue : undefined, kind)]
 }
 
 const parentKindConflicts = (
@@ -168,12 +193,11 @@ const parentKindConflicts = (
 
 const availableWorkflowConflicts = (
   root: MovementIssue,
-  parent: TransferIssue | undefined,
+  parent: TransferParentObservation,
   issue: TransferIssue,
   projectType: Schema.Schema.Type<typeof TransferProjectSchema>["type"],
   workflow: Schema.Schema.Type<typeof TransferWorkflowSchema> | undefined,
-  kind: Schema.Schema.Type<typeof TransferKindSchema> | undefined,
-  parentInspected: boolean
+  kind: Schema.Schema.Type<typeof TransferKindSchema> | undefined
 ) =>
   workflow === undefined || kind === undefined
     ? [
@@ -183,7 +207,7 @@ const availableWorkflowConflicts = (
           "Destination workflow metadata unavailable; select a project supporting the current kind and status."
         )
       ]
-    : workflowConflicts(root, parent, issue, projectType, workflow, kind, parentInspected)
+    : workflowConflicts(root, parent, issue, projectType, workflow, kind)
 
 const inspectWorkflow = Effect.fn("transfer.inspectWorkflow")(function* (
   client: HulyClient["Service"],
@@ -219,31 +243,12 @@ const inspectWorkflow = Effect.fn("transfer.inspectWorkflow")(function* (
       hulyQuery<TaskType>({ _id: toRef<TaskType>(protectedIssue.kind) })
     )
   )
-  const parentObservation =
-    parent === undefined
-      ? undefined
-      : yield* Effect.result(
-          Effect.gen(function* () {
-            return yield* parse(
-              TransferIssueSchema,
-              yield* client.findOne<Issue>(tracker.class.Issue, hulyQuery<Issue>({ _id: toRef<Issue>(parent._id) }))
-            )
-          })
-        )
-  const parentIssue = parentObservation?._tag === "Success" ? parentObservation.success : undefined
+  const parentObservation = yield* inspectTransferParent(client, parent)
   const conflicts = [
     ...projectConflicts(client, root, sourceData, destinationData),
-    ...availableWorkflowConflicts(
-      root,
-      parentIssue,
-      protectedIssue,
-      destinationData.type,
-      workflow,
-      kind,
-      parentObservation?._tag !== "Failure"
-    )
+    ...availableWorkflowConflicts(root, parentObservation, protectedIssue, destinationData.type, workflow, kind)
   ]
-  if (parentObservation?._tag === "Failure")
+  if (parentObservation.status === "unavailable")
     conflicts.push(
       conflict(
         root,
