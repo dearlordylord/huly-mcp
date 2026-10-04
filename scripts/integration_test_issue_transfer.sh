@@ -33,8 +33,9 @@ cleanup() {
   if [[ -n "$DOCUMENT" ]]; then mcp delete_document "$(jq -nc --arg teamspace "$TEAMSPACE" --arg document "$DOCUMENT" '{teamspace:$teamspace,document:$document}')" >/dev/null || true; fi
   if [[ -n "$TEAMSPACE" ]]; then mcp delete_teamspace "$(jq -nc --arg teamspace "$TEAMSPACE" '{teamspace:$teamspace}')" >/dev/null || true; fi
   for project in "${PROJECTS[@]}"; do mcp delete_project "$(jq -nc --arg project "$project" '{project:$project}')" >/dev/null || true; done
-  if [[ "$original_status" -ne 0 ]]; then return "$original_status"; fi
-  return "$cleanup_status"
+  trap - EXIT
+  if [[ "$original_status" -ne 0 ]]; then exit "$original_status"; fi
+  exit "$cleanup_status"
 }
 FIXTURE_RECORD_IDS='[]'
 trap cleanup EXIT

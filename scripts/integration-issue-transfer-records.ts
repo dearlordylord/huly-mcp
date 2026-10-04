@@ -52,7 +52,7 @@ const cleanupRecords = async (client: TxOperations, recordIds: ReadonlyArray<Doc
       )
     } catch (cause) {
       failures.push(cause)
-      process.stderr.write(`Fixture record cleanup failed for ${id}: ${String(cause)}\n`)
+      process.stderr.write(`Fixture record cleanup failed for record ${id}\n`)
     }
   }
   if (failures.length > 0) throw new Error(`Fixture record cleanup failed for ${failures.length} records`)
@@ -152,7 +152,7 @@ const main = async () => {
     await client.close()
   }
 }
-void main().catch((cause: unknown) => {
-  process.stderr.write(`${String(cause)}\n`)
+void main().catch(() => {
+  process.stderr.write("Integration fixture record operation failed\n")
   process.exitCode = 1
 })

@@ -40,8 +40,9 @@ cleanup() {
     for id in $(mcp list_milestones "$(jq -nc --arg project "$project" '{project:$project}')" | jq -r '.[].id'); do mcp delete_milestone "$(jq -nc --arg project "$project" --arg milestone "$id" '{project:$project,milestone:$milestone}')" >/dev/null || true; done
     mcp delete_project "$(jq -nc --arg project "$project" '{project:$project}')" >/dev/null || true
   done
-  if [[ "$original_status" -ne 0 ]]; then return "$original_status"; fi
-  return "$cleanup_status"
+  trap - EXIT
+  if [[ "$original_status" -ne 0 ]]; then exit "$original_status"; fi
+  exit "$cleanup_status"
 }
 FIXTURE_RECORD_IDS='[]'
 trap cleanup EXIT
