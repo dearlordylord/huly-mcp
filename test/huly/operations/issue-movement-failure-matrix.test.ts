@@ -91,6 +91,18 @@ describe("public movement uncertainty and concurrent state", () => {
         verification: { status: "not-attempted" }
       })
       assertRecovery(result, [f.root._id, f.child._id, f.grandchild._id])
+      expect(result).toMatchObject({ recordIds: f.records.map((record) => record._id) })
+      if (result.outcome === "indeterminate") {
+        for (const issue of [f.root, f.child, f.grandchild]) {
+          expect(result.inspection).toContain(
+            `MCP list_activity ${JSON.stringify({ objectId: issue._id, objectClass: String(tracker.class.Issue) })}`
+          )
+          for (const project of [f.source.identifier, f.destination.identifier])
+            expect(result.inspection).toContain(
+              `MCP list_comments ${JSON.stringify({ project, issueIdentifier: issue._id })}`
+            )
+        }
+      }
       expect(f.state.allocated).toBe(2)
       expect(f.state.sent).toBe(0)
     })
