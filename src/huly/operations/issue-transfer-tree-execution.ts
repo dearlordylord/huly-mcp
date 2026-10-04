@@ -175,6 +175,11 @@ type ReadyAdmission = {
     }
 )
 type Admission = ReadyAdmission | { readonly status: "blocked"; readonly reason: string }
+const admissionFailureReason = (failure: MovementError | Cause.TimeoutError): string =>
+  Cause.isTimeoutError(failure)
+    ? "Pre-allocation inspection exceeded its deadline; no allocation or task writes performed."
+    : "Pre-allocation inspection unavailable; no allocation or task writes performed."
+
 const inspectAdmission = Effect.fn("transfer.inspectAdmission")(function* (
   client: HulyClient["Service"],
   prepared: TransferPlan,
@@ -190,13 +195,7 @@ const inspectAdmission = Effect.fn("transfer.inspectAdmission")(function* (
   const admission = yield* Effect.result(
     reinspect(client, prepared, destination, params).pipe(Effect.timeout(TRANSFER_DISCOVERY_BUDGET))
   )
-  if (admission._tag === "Failure")
-    return {
-      status: "blocked",
-      reason: Cause.isTimeoutError(admission.failure)
-        ? "Pre-allocation inspection exceeded its deadline; no allocation or task writes performed."
-        : "Pre-allocation inspection unavailable; no allocation or task writes performed."
-    }
+  if (admission._tag === "Failure") return { status: "blocked", reason: admissionFailureReason(admission.failure) }
   if (!admission.success)
     return {
       status: "blocked",
