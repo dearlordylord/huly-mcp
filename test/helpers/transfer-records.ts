@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 import type { Doc, TxOperations } from "@hcengineering/core"
 import { activity, attachment, chunter, core, tags, tracker } from "../../src/huly/huly-plugins.js"
+import { ObjectClassName } from "../../src/domain/schemas/shared.js"
 import { sdkFixture, findResult } from "./huly-sdk.js"
 
 const LAST_SCOPE = -1
@@ -22,18 +23,27 @@ export const ownedRecord = (
   modifiedBy: "author",
   ...payload
 })
-const parents = new Map<string, string>([
-  ["tracker:class:CustomIssue", String(tracker.class.Issue)],
-  [String(chunter.class.ThreadMessage), String(chunter.class.ChatMessage)],
-  [String(chunter.class.ChatMessage), String(activity.class.ActivityMessage)],
-  [String(activity.class.DocUpdateMessage), String(activity.class.ActivityMessage)],
-  [String(activity.class.ActivityInfoMessage), String(activity.class.ActivityMessage)],
-  [String(activity.class.ActivityReference), String(activity.class.ActivityMessage)],
-  [String(attachment.class.Photo), String(attachment.class.Attachment)],
-  [String(attachment.class.Embedding), String(attachment.class.Attachment)]
-])
-const derived = (cls: string, parent: string, modelParents: ReadonlyMap<string, string>): boolean =>
-  cls === parent || (modelParents.has(cls) && derived(modelParents.get(cls) ?? "", parent, modelParents))
+const parseClassName = Schema.decodeUnknownSync(ObjectClassName)
+const parents = new Map(
+  Schema.decodeUnknownSync(Schema.Array(Schema.Tuple([ObjectClassName, ObjectClassName])))([
+    ["tracker:class:CustomIssue", String(tracker.class.Issue)],
+    [String(chunter.class.ThreadMessage), String(chunter.class.ChatMessage)],
+    [String(chunter.class.ChatMessage), String(activity.class.ActivityMessage)],
+    [String(activity.class.DocUpdateMessage), String(activity.class.ActivityMessage)],
+    [String(activity.class.ActivityInfoMessage), String(activity.class.ActivityMessage)],
+    [String(activity.class.ActivityReference), String(activity.class.ActivityMessage)],
+    [String(attachment.class.Photo), String(attachment.class.Attachment)],
+    [String(attachment.class.Embedding), String(attachment.class.Attachment)]
+  ])
+)
+const derived = (
+  cls: ObjectClassName,
+  parent: ObjectClassName,
+  modelParents: ReadonlyMap<ObjectClassName, ObjectClassName>
+): boolean => {
+  const ancestor = modelParents.get(cls)
+  return cls === parent || (ancestor !== undefined && derived(ancestor, parent, modelParents))
+}
 const definitions = new Map<string, Map<string, string>>([
   [
     String(tracker.class.Issue),
@@ -56,10 +66,11 @@ const definitions = new Map<string, Map<string, string>>([
 ])
 export const recordAdapterFixture = (
   requireMatches = false,
-  additionalParents: ReadonlyMap<string, string> = new Map()
+  additionalParents: ReadonlyMap<ObjectClassName, ObjectClassName> = new Map()
 ) => {
   const modelParents = new Map([...parents, ...additionalParents])
-  const isDerived = (cls: string, parent: string) => derived(cls, parent, modelParents)
+  const isDerived = (cls: unknown, parent: unknown) =>
+    derived(parseClassName(cls), parseClassName(parent), modelParents)
   const history = ownedRecord("history", String(activity.class.DocUpdateMessage), "root", "docUpdateMessages", {
     objectId: "root",
     objectClass: tracker.class.Issue,
