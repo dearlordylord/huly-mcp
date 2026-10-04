@@ -2,7 +2,7 @@ import { it } from "@effect/vitest"
 import { Effect, Fiber, Ref, Schema } from "effect"
 import { TestClock } from "effect/testing"
 import { expect } from "vitest"
-import { HulyDataInvalidError } from "../../../src/huly/errors-base.js"
+import { HulyConnectionError, HulyDataInvalidError } from "../../../src/huly/errors-base.js"
 import { HulyClient } from "../../../src/huly/client.js"
 import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"
 import { TransferHistoryRecordSchema } from "../../../src/domain/schemas/issue-transfer.js"
@@ -35,7 +35,9 @@ const scenarios = [
   "direct-contradiction",
   "invalid-direct-evidence",
   "invalid-then-empty",
-  "invalid-repeat"
+  "invalid-repeat",
+  "wrong-scope",
+  "transaction-connection-outage"
 ] as const
 for (const scenario of scenarios) {
   it.effect(`single movement batch anchor: ${scenario}`, () =>
@@ -89,6 +91,8 @@ for (const scenario of scenarios) {
         inspectMovementTransactions: () =>
           Effect.gen(function* () {
             const call = yield* Ref.updateAndGet(evidenceCalls, (value) => value + 1)
+            if (scenario === "transaction-connection-outage")
+              return yield* Effect.fail(new HulyConnectionError({ message: "Persisted transaction read unavailable" }))
             if (scenario === "invalid-repeat" && call === 1) {
               f.child.title = originalTitle
               return yield* Effect.fail(
@@ -151,7 +155,7 @@ for (const scenario of scenarios) {
             const batch = batchFrom({
               kind: "single-scoped-apply",
               rootId: write.rootId,
-              scope: `issue-transfer:${write.rootId}`,
+              scope: scenario === "wrong-scope" ? "unrelated-movement-scope" : `issue-transfer:${write.rootId}`,
               transactionIds: transactions.map((value) => value.txId)
             })
             yield* assertExists(publish)(transactions, scenario === "no-provenance" ? undefined : batch)
@@ -219,7 +223,8 @@ for (const scenario of scenarios) {
       if (scenario === "invalid-repeat") {
         expect(["incomplete", "indeterminate"]).toContain(result.outcome)
         expect(yield* Ref.get(evidenceCalls)).toBeGreaterThan(1)
-      } else if (scenario === "acknowledged") expect(result.outcome).toBe("completed")
+      } else if (scenario === "acknowledged" || scenario === "transaction-connection-outage")
+        expect(result.outcome).toBe("completed")
       else if (scenario === "reply-lost")
         expect(result).toMatchObject({
           outcome: "indeterminate",
