@@ -17,6 +17,9 @@ const Arguments = Schema.fromJsonString(
 )
 const Location = Schema.Struct({ _id: DocId, _class: ObjectClassName, space: DocId })
 const Result = Schema.Struct({ recordIds: Schema.Array(DocId) })
+const Identity = Schema.Struct({ attachedTo: DocId })
+const parseIdentity = (input: unknown) => Schema.decodeUnknownSync(Identity)(input)
+const parseResult = (input: unknown) => Schema.decodeUnknownSync(Result)(input)
 const parseLocation = (input: unknown) => Schema.decodeUnknownSync(Location)(input)
 
 const main = async () => {
@@ -28,7 +31,7 @@ const main = async () => {
     )
     if (args.mode === "unsupported") {
       // A real ordinary-model class whose task ownership is deliberately unaudited.
-      const identity = Schema.decodeUnknownSync(Schema.Struct({ attachedTo: DocId }))(
+      const identity = parseIdentity(
         await client.findOne<SocialIdentity>(
           contact.class.SocialIdentity,
           hulyQuery<SocialIdentity>({ _id: toSocialIdentityRef(client.user) })
@@ -47,7 +50,7 @@ const main = async () => {
         priority: ToDoPriority.NoPriority,
         rank: "0|hzzzzz:"
       })
-      process.stdout.write(`${JSON.stringify(Schema.decodeUnknownSync(Result)({ recordIds: [id] }))}\n`)
+      process.stdout.write(`${JSON.stringify(parseResult({ recordIds: [id] }))}\n`)
       return
     }
     const independent = parseLocation(
@@ -80,7 +83,7 @@ const main = async () => {
         message: "Incoming independent reference stays in its original space"
       })
     )
-    process.stdout.write(`${JSON.stringify(Schema.decodeUnknownSync(Result)({ recordIds }))}\n`)
+    process.stdout.write(`${JSON.stringify(parseResult({ recordIds }))}\n`)
   } finally {
     await client.close()
   }

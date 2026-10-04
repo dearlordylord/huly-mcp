@@ -35,9 +35,9 @@ const run = async () => {
         const references = await client.findAll<ActivityReference>(
           activity.class.ActivityReference,
           hulyQuery<ActivityReference>({ attachedTo: toRef(id) }),
-          { limit: 10_001 }
+          { limit: 10_001, total: true }
         )
-        if (references.total > references.length || references.length >= 10_001)
+        if (references.total !== references.length || references.length >= 10_001)
           throw new Error("Incomplete incoming reference snapshot")
         const incomingReferences = references
           .filter((reference) => reference.srcDocId !== toRef(id))

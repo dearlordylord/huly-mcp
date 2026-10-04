@@ -11,6 +11,7 @@ import { connectIntegrationHuly } from "./integration-huly-client.js"
 const Arguments = Schema.fromJsonString(Schema.Struct({ project: ProjectIdentifier, restricted: Schema.Boolean }))
 const Result = Schema.Struct({ projectId: DocId })
 const ProjectState = Schema.Struct({ ...TransferProjectSchema.fields, _id: DocId })
+const parseResult = (input: unknown) => Schema.decodeUnknownSync(Result)(input)
 const parseProject = (input: unknown) => Schema.decodeUnknownSync(ProjectState)(input)
 const main = async () => {
   const args = Schema.decodeUnknownSync(Arguments)(process.argv[2])
@@ -26,7 +27,7 @@ const main = async () => {
       restricted: args.restricted,
       members
     })
-    process.stdout.write(`${JSON.stringify(Schema.decodeUnknownSync(Result)({ projectId: project._id }))}\n`)
+    process.stdout.write(`${JSON.stringify(parseResult({ projectId: project._id }))}\n`)
   } finally {
     await client.close()
   }
