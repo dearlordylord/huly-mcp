@@ -36,8 +36,8 @@ export const publishVerification = Effect.fn("transfer.publishVerification")(fun
   next: VerificationProof
 ): Effect.fn.Return<void> {
   const proof = mergePartialProof(yield* Ref.get(facts), next)
-  yield* Ref.set(facts, proof)
-  yield* Ref.set(ref, projectVerification(proof))
+  yield* Ref.set<VerificationProof | undefined>(facts, proof)
+  yield* Ref.set<Verification>(ref, projectVerification(proof))
 })
 export const interruptVerification = Effect.fn("transfer.interruptVerification")(function* (
   ref: Ref.Ref<Verification>,
@@ -47,7 +47,7 @@ export const interruptVerification = Effect.fn("transfer.interruptVerification")
   const previous = yield* Ref.get(facts)
   if (previous === undefined) {
     const unavailable: Verification = { status: "unavailable", reason }
-    yield* Ref.set(ref, unavailable)
+    yield* Ref.set<Verification>(ref, unavailable)
     return unavailable
   }
   yield* publishVerification(ref, facts, { ...previous, limitations: [...previous.limitations, reason] })
