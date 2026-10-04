@@ -30,7 +30,9 @@ import { toRef } from "./operations/sdk-boundary.js"
 
 export const FOREST_CLASS_READ_CONCURRENCY = 8
 export const FOREST_ROOT_BATCH_SIZE = 4
-export const FOREST_OWNER_BATCH_SIZE = 16
+export const FOREST_OWNER_BATCH_SIZE = 64
+const LEGACY_FOREST_OWNER_BATCH_SIZE = 16
+type ForestOwnerBatchSize = typeof LEGACY_FOREST_OWNER_BATCH_SIZE | typeof FOREST_OWNER_BATCH_SIZE
 
 const seedRoot = Effect.fn("transfer.seedForestRoot")(function* (
   client: TxOperations,
@@ -56,12 +58,13 @@ const seedRoot = Effect.fn("transfer.seedForestRoot")(function* (
 
 const prepareFrontier = Effect.fn("transfer.prepareForestFrontier")(function* (
   client: TxOperations,
-  states: ReadonlyMap<IssueId, DiscoveryState>
+  states: ReadonlyMap<IssueId, DiscoveryState>,
+  ownerBatchSize: ForestOwnerBatchSize
 ) {
   const frontier: Array<ForestVisit> = []
   for (const state of states.values()) {
     if (state.incomplete) continue
-    while (state.queue.length > 0 && frontier.length < FOREST_OWNER_BATCH_SIZE) {
+    while (state.queue.length > 0 && frontier.length < ownerBatchSize) {
       const visit = state.queue.shift()
       if (visit === undefined) break
       const prepared = yield* Effect.result(prepareOwnerClasses(client, state, visit))
@@ -71,7 +74,7 @@ const prepareFrontier = Effect.fn("transfer.prepareForestFrontier")(function* (
       }
       frontier.push({ state, visit, ...prepared.success })
     }
-    if (frontier.length === FOREST_OWNER_BATCH_SIZE) break
+    if (frontier.length === ownerBatchSize) break
   }
   return frontier
 })
@@ -204,7 +207,9 @@ export const inspectTransferForest = Effect.fn("transfer.inspectForest")(functio
   roots: ReadonlyArray<IssueId>,
   tree: ReadonlyArray<MovementIssue> = [],
   publish?: TransferForestProgress,
-  limits: RecordDiscoveryLimits = DEFAULT_RECORD_DISCOVERY_LIMITS
+  limits: RecordDiscoveryLimits = DEFAULT_RECORD_DISCOVERY_LIMITS,
+  // Internal scheduling DI seam; no serialized caller input or discovery policy changes.
+  ownerBatchSize: ForestOwnerBatchSize = FOREST_OWNER_BATCH_SIZE
 ) {
   const states = new Map<IssueId, DiscoveryState>()
   const entries = new Map<IssueId, TransferForestEntry>()
@@ -217,7 +222,7 @@ export const inspectTransferForest = Effect.fn("transfer.inspectForest")(functio
   for (const batch of EffectArray.chunksOf([...new Set(roots)], FOREST_ROOT_BATCH_SIZE)) {
     yield* seedStates(client, batch, tree, states, emit)
     while (states.size > 0) {
-      const frontier = yield* prepareFrontier(client, states)
+      const frontier = yield* prepareFrontier(client, states, ownerBatchSize)
       yield* inspectFrontier(client, frontier, limits)
       auditForestOwnership(states, recordRoots)
       yield* settleStates(states, emit)

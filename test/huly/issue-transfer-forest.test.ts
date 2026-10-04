@@ -12,7 +12,7 @@ import {
   FOREST_ROOT_BATCH_SIZE,
   inspectTransferForest
 } from "../../src/huly/issue-transfer-forest.js"
-import { inspectTransferRecords } from "../../src/huly/issue-transfer-discovery.js"
+import { DEFAULT_RECORD_DISCOVERY_LIMITS, inspectTransferRecords } from "../../src/huly/issue-transfer-discovery.js"
 import type { TransferForestEntry } from "../../src/huly/issue-transfer-forest-state.js"
 import { activity, attachment, chunter, tracker } from "../../src/huly/huly-plugins.js"
 import { toClassRef, toRef } from "../../src/huly/operations/sdk-boundary.js"
@@ -48,6 +48,7 @@ const forestFixture = (extraClasses: ReadonlyArray<ObjectClassName> = []) => {
     wrongRoot: false,
     truncateIndividual: false
   }
+  const malformedOwners = new Set<DocId>()
   const reads = new Set<Promise<unknown>>()
   const rootIds = new Set(roots)
   const failedRoots = new Set<IssueId>()
@@ -95,7 +96,13 @@ const forestFixture = (extraClasses: ReadonlyArray<ObjectClassName> = []) => {
         const result = findResult(
           rows.map((row) =>
             sdkFixture<Doc>(
-              state.malformed ? { ...row, collection: 1 } : state.wrongOwner ? { ...row, attachedTo: "foreign" } : row
+              state.malformed
+                ? { ...row, collection: 1 }
+                : malformedOwners.has(Schema.decodeUnknownSync(DocId)(row.attachedTo))
+                  ? { ...row, message: 1 }
+                  : state.wrongOwner
+                    ? { ...row, attachedTo: "foreign" }
+                    : row
             )
           )
         )
@@ -108,7 +115,7 @@ const forestFixture = (extraClasses: ReadonlyArray<ObjectClassName> = []) => {
       return read
     }
   })
-  return { ...f, modelState: f.state, calls, client, failedRoots, rootIds, rootReads, reads, state }
+  return { ...f, modelState: f.state, calls, client, failedRoots, rootIds, rootReads, reads, state, malformedOwners }
 }
 class ForestFixtureFailure extends Schema.TaggedError<ForestFixtureFailure>()("ForestFixtureFailure", {
   reason: Schema.String
@@ -494,14 +501,13 @@ it.effect("retains parsed records and sibling observations when a later nested p
   })
 )
 
+const WIDE_RECORD_COUNT = 20
+const LEGACY_OWNER_CAPACITY = 16
 for (const truncated of [false, true]) {
   it.effect("partitions a wider owned-record frontier and preserves exact records through per-owner fallback", () =>
     Effect.gen(function* () {
       const f = forestFixture()
-      const extra = Array.from(
-        { length: FOREST_OWNER_BATCH_SIZE - FOREST_ROOT_BATCH_SIZE },
-        (_, index) => `wide-comment-${index}`
-      )
+      const extra = Array.from({ length: WIDE_RECORD_COUNT }, (_, index) => `wide-comment-${index}`)
       for (const id of extra)
         f.docs.push(
           ownedRecord(id, String(chunter.class.ChatMessage), "root", "comments", { message: id }),
@@ -527,7 +533,7 @@ for (const truncated of [false, true]) {
       expect(observed(result).every((inspection) => inspection.discovery === "complete")).toBe(true)
       const wide = f.calls.filter((call) => call.owners.length > FOREST_ROOT_BATCH_SIZE)
       expect(wide.length).toBeGreaterThan(0)
-      expect(wide.some((call) => call.owners.length > FOREST_OWNER_BATCH_SIZE / 2)).toBe(true)
+      expect(wide.some((call) => call.owners.length > LEGACY_OWNER_CAPACITY)).toBe(true)
       expect(f.calls.every((call) => call.owners.length <= FOREST_OWNER_BATCH_SIZE)).toBe(true)
       expect(wide.some((call) => call.outgoing)).toBe(true)
       for (const id of extra) {
@@ -544,3 +550,149 @@ for (const truncated of [false, true]) {
     })
   )
 }
+
+const FLAT_ROOT_COUNT = 4
+const FLAT_RECORDS_PER_ROOT = 13
+const INDEPENDENT_CLASS_COUNT = 56
+const flatPolicy = { ...policy, queries: DEFAULT_RECORD_DISCOVERY_LIMITS.queries }
+const flatForestFixture = () => {
+  const classes = Array.from({ length: INDEPENDENT_CLASS_COUNT }, (_, index) =>
+    ObjectClassName.make(`test:class:Independent${index}`)
+  )
+  const f = forestFixture([
+    ObjectClassName.make(String(tracker.class.Issue)),
+    ObjectClassName.make(String(activity.class.ActivityMessage)),
+    ...classes
+  ])
+  const flatRoots = Array.from({ length: FLAT_ROOT_COUNT }, (_, index) => IssueId.make(`flat-root-${index}`))
+  f.docs.splice(0)
+  for (const root of flatRoots) {
+    f.rootIds.add(root)
+    for (let index = 0; index < FLAT_RECORDS_PER_ROOT; index++)
+      f.docs.push(
+        ownedRecord(`${root}-comment-${index}`, String(chunter.class.ChatMessage), root, "comments", {
+          message: "protected",
+          attachedToClass: tracker.class.Issue
+        })
+      )
+  }
+  return { ...f, flatRoots }
+}
+const logicalReads = (calls: ReturnType<typeof forestFixture>["calls"]) =>
+  calls.flatMap(({ cls, outgoing, owners }) => owners.map((owner) => JSON.stringify([cls, outgoing, owner]))).sort()
+
+it.effect(
+  "larger owner frontiers preserve ordered exhaustive proof while batching four roots and 52 flat records",
+  () =>
+    Effect.gen(function* () {
+      const f = flatForestFixture()
+      const baseline = yield* inspectTransferForest(
+        f.client,
+        f.flatRoots,
+        [],
+        undefined,
+        flatPolicy,
+        LEGACY_OWNER_CAPACITY
+      )
+      const oldCalls = [...f.calls]
+      f.calls.splice(0)
+      const result = yield* inspectTransferForest(f.client, f.flatRoots, [], undefined, flatPolicy)
+      expect(result).toEqual(baseline)
+      expect(observed(result).every((entry) => entry.discovery === "complete")).toBe(true)
+      expect(observed(result).flatMap((entry) => entry.records)).toHaveLength(FLAT_ROOT_COUNT * FLAT_RECORDS_PER_ROOT)
+      expect(logicalReads(f.calls)).toEqual(logicalReads(oldCalls))
+      expect(oldCalls).toHaveLength(320)
+      expect(f.calls).toHaveLength(128)
+      expect(f.updates).toEqual([])
+      expect(f.scopes).toEqual([])
+    })
+)
+
+for (const flag of groupedFailures) {
+  it.effect(
+    `preserves the wider flat forest through ${flag} fallback without treating incomplete totals as absence`,
+    () =>
+      Effect.gen(function* () {
+        const f = flatForestFixture()
+        const expected = yield* inspectTransferForest(
+          f.client,
+          f.flatRoots,
+          [],
+          undefined,
+          policy,
+          LEGACY_OWNER_CAPACITY
+        )
+        f.calls.splice(0)
+        f.state[flag] = true
+        const result = yield* inspectTransferForest(f.client, f.flatRoots, [], undefined, flatPolicy)
+        expect(result).toEqual(expected)
+        expect(f.calls.some((call) => call.owners.length === 1)).toBe(true)
+        expect(f.calls.some((call) => call.owners.length === FLAT_ROOT_COUNT * FLAT_RECORDS_PER_ROOT)).toBe(true)
+        expect(f.updates).toEqual([])
+      })
+  )
+}
+
+it.effect("charges every larger grouped fallback and refuses when its per-root query budget is exhausted", () =>
+  Effect.gen(function* () {
+    const f = flatForestFixture()
+    f.state.unknownGroupedTotal = true
+    const result = yield* inspectTransferForest(f.client, f.flatRoots, [], undefined, policy)
+    expect(observed(result).every((inspection) => inspection.discovery === "incomplete")).toBe(true)
+    expect(
+      observed(result).every((inspection) => inspection.blockers.includes("Owned-record query limit exhausted."))
+    ).toBe(true)
+    expect(f.updates).toEqual([])
+    expect(f.scopes).toEqual([])
+  })
+)
+
+it.effect("a malformed owner in a larger batch cannot hide healthy sibling closures", () =>
+  Effect.gen(function* () {
+    const f = flatForestFixture()
+    const first = f.flatRoots[0] ?? IssueId.make("flat-root-0")
+    f.malformedOwners.add(DocId.make(first))
+    const result = yield* inspectTransferForest(f.client, f.flatRoots, [], undefined, flatPolicy)
+    expect(observed(result)[0]?.discovery).toBe("incomplete")
+    for (const inspection of observed(result).slice(1)) {
+      expect(inspection.discovery).toBe("complete")
+      expect(inspection.records).toHaveLength(FLAT_RECORDS_PER_ROOT)
+    }
+    expect(f.updates).toEqual([])
+  })
+)
+
+it.effect("preserves an unknown nested-class blocker beyond the larger flat owner frontier", () =>
+  Effect.gen(function* () {
+    const f = flatForestFixture()
+    f.docs.push(ownedRecord("unknown-nested", "unknown:class:Record", "flat-root-0-comment-0", "unknown"))
+    const expected = yield* inspectTransferForest(
+      f.client,
+      f.flatRoots,
+      [],
+      undefined,
+      flatPolicy,
+      LEGACY_OWNER_CAPACITY
+    )
+    const result = yield* inspectTransferForest(f.client, f.flatRoots, [], undefined, flatPolicy)
+    expect(result).toEqual(expected)
+    expect(observed(result)[0]?.blockers.some((reason) => reason.includes("unknown:class:Record"))).toBe(true)
+    expect(observed(result)[0]?.records.some((record) => record._id === "unknown-nested")).toBe(true)
+    expect(f.updates).toEqual([])
+  })
+)
+
+it.effect("refuses foreign-owner replies from a larger batch rather than claiming complete empty closures", () =>
+  Effect.gen(function* () {
+    const f = flatForestFixture()
+    f.state.wrongOwner = true
+    const result = yield* inspectTransferForest(f.client, f.flatRoots, [], undefined, flatPolicy)
+    expect(observed(result).every((inspection) => inspection.discovery === "incomplete")).toBe(true)
+    expect(
+      observed(result).every((inspection) =>
+        inspection.blockers.includes("Owned-record collection observation is unavailable.")
+      )
+    ).toBe(true)
+    expect(f.updates).toEqual([])
+  })
+)
