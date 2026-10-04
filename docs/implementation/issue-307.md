@@ -50,7 +50,7 @@ After the Standards fixes, 74 focused movement/adapter/read tests passed (`/tmp/
 | # | Implementation and executable evidence | Live status |
 | --- | --- | --- |
 | 1 | Model collection/AttachedDoc discovery; actual attachment closure inspection; incomplete and unsupported inventory refuse before allocation, including empty blocker text. Adapter and operation tests. | Pending combined run |
-| 2 | Automatic DocUpdateMessage records migrate without rewriting historical payload/author/timestamps; fixture requires ordinary-created history. | Pending combined run |
+| 2 | Automatic DocUpdateMessage records retain historical payload, creation author/time and identity. Ordinary Huly normalizes last-modification metadata; only exact queued and persisted migration transactions authenticate those changes. The fixture requires ordinary-created history. | Combined final certification pending |
 | 3 | Stable IDs, content, creator, kind/status and relations preserved; new sequence number/identifier/rank/parent verified. Fixture includes independent document and two relation directions. | Pending combined run |
 | 4 | Destination project type, actual kind/status and parent-kind constraints checked; equal project type restriction described explicitly. Injected workflow refusal. | Server restriction confirmation pending |
 | 5 | Relevant hierarchy, permissions, ownership, workflow and unsupported attributes aggregated; null/unset attributes eligible; allocation count remains zero on refusal. | Fixture refusal pending |
