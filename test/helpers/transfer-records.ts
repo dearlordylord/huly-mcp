@@ -38,6 +38,7 @@ const definitions = new Map<string, Map<string, string>>([
   [
     String(tracker.class.Issue),
     new Map([
+      ["subIssues", String(tracker.class.Issue)],
       ["comments", String(chunter.class.ChatMessage)],
       ["attachments", String(attachment.class.Attachment)],
       ["labels", String(tags.class.TagReference)],
@@ -53,7 +54,7 @@ const definitions = new Map<string, Map<string, string>>([
     ])
   ]
 ])
-export const recordAdapterFixture = () => {
+export const recordAdapterFixture = (requireMatches = false) => {
   const history = ownedRecord("history", String(activity.class.DocUpdateMessage), "root", "docUpdateMessages", {
     objectId: "root",
     objectClass: tracker.class.Issue,
@@ -88,10 +89,15 @@ export const recordAdapterFixture = () => {
   const updates: Array<ReadonlyArray<unknown>> = []
   const conditions: Array<unknown> = []
   const scopes: Array<string | undefined> = []
+  const matches: Array<{ cls: string; query: Record<string, unknown> }> = []
   const exclusions: Array<{ cls: string; query: Record<string, unknown> }> = []
   const apply = {
-    match: (_class: unknown, query: unknown) => {
+    match: (cls: unknown, query: unknown) => {
       conditions.push(query)
+      matches.push({
+        cls: Schema.decodeUnknownSync(Schema.String)(cls),
+        query: Schema.decodeUnknownSync(Schema.Record(Schema.String, Schema.Unknown))(query)
+      })
     },
     notMatch: (cls: string, query: Record<string, unknown>) => {
       conditions.push(query)
@@ -105,6 +111,10 @@ export const recordAdapterFixture = () => {
       result:
         scopes.at(LAST_SCOPE) === undefined ||
         (!state.refused &&
+          (!requireMatches ||
+            matches.every(({ cls, query }) =>
+              docs.some((doc) => derived(String(doc._class), cls) && queryMatches(doc, query))
+            )) &&
           !exclusions.some(({ cls, query }) =>
             docs.some((doc) => derived(String(doc._class), cls) && queryMatches(doc, query))
           ))
@@ -159,13 +169,15 @@ const queryMatches = (doc: Record<string, unknown>, query: Record<string, unknow
       Schema.Struct({
         $in: Schema.optionalKey(Schema.Array(Schema.Unknown)),
         $nin: Schema.optionalKey(Schema.Array(Schema.Unknown)),
-        $ne: Schema.optionalKey(Schema.Unknown)
+        $ne: Schema.optionalKey(Schema.Unknown),
+        $exists: Schema.optionalKey(Schema.Boolean)
       })
     )(expected)
     return (
       (operation.$in === undefined || operation.$in.includes(value)) &&
       (operation.$nin === undefined || !operation.$nin.includes(value)) &&
-      (!Reflect.has(operation, "$ne") || value !== operation.$ne)
+      (!Reflect.has(operation, "$ne") || value !== operation.$ne) &&
+      (operation.$exists === undefined || operation.$exists === (value !== undefined))
     )
   })
 

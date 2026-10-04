@@ -6,6 +6,7 @@ import { HulyTransactionScope, type HulyConditionalWriteResult } from "../domain
 import { activity, tracker } from "./huly-plugins.js"
 import { toClassRef, toCorePersonId, toRef } from "./operations/sdk-boundary.js"
 import { hulyQuery } from "./operations/query-helpers.js"
+import type { MovementIssue } from "../domain/schemas/issue-movement-state.js"
 export { inspectTransferRecords } from "./issue-transfer-discovery.js"
 
 export const commitTransfer = async (
@@ -13,6 +14,16 @@ export const commitTransfer = async (
   write: TransferWrite
 ): Promise<HulyConditionalWriteResult> => {
   const apply = client.apply(HulyTransactionScope.make(`issue-transfer:${write.issueId}`))
+  await queueTransferTask(apply, write)
+  await queueTransferRootCounts(apply, write)
+  return (await apply.commit()).result ? "applied" : "condition-not-met"
+}
+
+export const queueTransferTask = async (
+  apply: ReturnType<TxOperations["apply"]>,
+  write: TransferWrite,
+  parents?: MovementIssue["parents"]
+): Promise<void> => {
   apply.match(
     tracker.class.Issue,
     hulyQuery<Issue>({
@@ -42,8 +53,24 @@ export const commitTransfer = async (
     number: write.number,
     identifier: write.identifier,
     rank: write.rank,
+    ...(parents === undefined
+      ? {}
+      : {
+          parents: parents.map((parent) => ({
+            parentId: toRef<Issue>(parent.parentId),
+            parentTitle: parent.parentTitle,
+            identifier: parent.identifier,
+            space: toRef<Project>(parent.space)
+          }))
+        }),
     ...attributeUpdates(write)
   })
+}
+
+export const queueTransferRootCounts = async (
+  apply: ReturnType<TxOperations["apply"]>,
+  write: TransferWrite
+): Promise<void> => {
   if (String(write.previousParent) !== String(tracker.ids.NoParent))
     await apply.updateDoc(tracker.class.Issue, toRef(write.sourceId), toRef(write.previousParent), {
       $inc: { subIssues: -1 }
@@ -52,13 +79,14 @@ export const commitTransfer = async (
     await apply.updateDoc(tracker.class.Issue, toRef(write.destinationId), toRef(write.parentId), {
       $inc: { subIssues: 1 }
     })
-  return (await apply.commit()).result ? "applied" : "condition-not-met"
 }
 
 // Cooperative SDK conditions guard new records even when parent modifiedOn did not change.
 const guardRecordClosure = (apply: ReturnType<TxOperations["apply"]>, write: TransferWrite) => {
   const owners = [write.issueId, ...write.records.map((record) => record._id)].map((id) => toRef<Doc>(id))
-  const known = write.records.map((record) => toRef<AttachedDoc>(record._id))
+  const known = [...write.records.map((record) => record._id), ...(write.treeIssueIds ?? [])].map((id) =>
+    toRef<AttachedDoc>(id)
+  )
   for (const cls of write.recordClasses)
     apply.notMatch(
       toClassRef<AttachedDoc>(cls),

@@ -5,10 +5,11 @@ import { IssueIdentifier, type IssueId } from "../../domain/schemas/shared.js"
 export const transferRetryCall = (
   params: MoveIssueParams,
   issueId: IssueId,
-  conflicts: ReadonlyArray<TransferConflict>
+  conflicts: ReadonlyArray<TransferConflict>,
+  issueIds: ReadonlyArray<IssueId> = [issueId]
 ): MoveIssueParams => {
   const resolutions = params.resolutions?.filter((entry, index, all) => {
-    if (entry.issueId !== issueId) return false
+    if (!issueIds.includes(entry.issueId)) return false
     if (
       all.some(
         (other, otherIndex) => otherIndex !== index && other.issueId === entry.issueId && other.field === entry.field
@@ -18,6 +19,7 @@ export const transferRetryCall = (
     return !conflicts.some(
       (conflict) =>
         "field" in conflict &&
+        conflict.issueId === entry.issueId &&
         conflict.field === entry.field &&
         (conflict.code === "stale-resolution" || conflict.code === "invalid-resolution")
     )

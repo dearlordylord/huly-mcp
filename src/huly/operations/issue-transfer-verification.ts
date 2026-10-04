@@ -135,7 +135,7 @@ export const movementNoopProblem = Effect.fn("movement.inspectNoop")(function* (
     if (parsed._tag === "None") return "No-op identity inspection failed."
     if (issue.identifier !== `${plan.source.identifier}-${parsed.value.number}`)
       return "Inconsistent issue number/identifier; not a successful no-op."
-    const records = yield* inspect(issue._id)
+    const records = yield* inspect(issue._id, plan.tree)
     const problem = ownedNoopProblem(records, issue)
     if (problem !== undefined) return problem
   }
