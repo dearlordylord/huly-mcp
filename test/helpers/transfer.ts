@@ -174,6 +174,13 @@ export const transferFixture = () => {
       return Effect.succeed("applied")
     }
   }
+  operations.commitTransferTree = (write) => {
+    const rootWrite = write.tasks.find((task) => task.issueId === write.rootId)
+    const commit = operations.commitTransfer
+    return write.tasks.length !== 1 || rootWrite === undefined || commit === undefined
+      ? Effect.succeed("condition-not-met")
+      : commit(rootWrite)
+  }
   return {
     ...fixture,
     attributeRows,
