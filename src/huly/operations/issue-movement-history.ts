@@ -1,17 +1,26 @@
 import { isDeepStrictEqual } from "node:util"
 import { Option, Schema } from "effect"
 import type { TransferHistoryRecord, TransferRecord } from "../../domain/schemas/issue-transfer.js"
-import { NonEmptyString, ObjectClassName, type DocId } from "../../domain/schemas/shared.js"
+import { ObjectClassName, type DocId } from "../../domain/schemas/shared.js"
 import type { MovementTransactionReceipt, MovementTransactions } from "../issue-movement-transactions.js"
 
 const MovementHistoryUpdatesSchema = Schema.Struct({
-  attrKey: NonEmptyString,
+  attrKey: Schema.Literals([
+    "attachedTo",
+    "parents",
+    "space",
+    "number",
+    "identifier",
+    "rank",
+    "component",
+    "milestone"
+  ]),
   attrClass: ObjectClassName,
   isMixin: Schema.Literal(false),
   set: Schema.Array(Schema.Json),
-  added: Schema.Array(Schema.Json),
-  removed: Schema.Array(Schema.Json),
-  prevValue: Schema.optionalKey(Schema.Json)
+  added: Schema.Array(Schema.Never),
+  removed: Schema.Array(Schema.Never),
+  prevValue: Schema.optionalKey(Schema.Never)
 })
 const parseUpdates = Schema.decodeUnknownOption(Schema.fromJsonString(MovementHistoryUpdatesSchema))
 
@@ -28,10 +37,7 @@ export const movementHistoryMatches = (
     return false
   const updates = parseUpdates(history.attributeUpdates)
   if (Option.isNone(updates)) return false
-  const changed = updates.value
-  const value = transaction.operations[changed.attrKey]
-  if (value === undefined || changed.added.length > 0 || changed.removed.length > 0) return false
-  return isDeepStrictEqual(changed.set, Array.isArray(value) ? value : [value])
+  return historyDeltaMatches(updates.value, transaction)
 }
 
 const historyIdentityMatches = (
@@ -49,4 +55,18 @@ const historyIdentityMatches = (
 const historyMetadataMatches = (record: TransferHistoryRecord, transaction: MovementTransactionReceipt): boolean =>
   record.collection === "docUpdateMessages" &&
   record.modifiedOn === transaction.modifiedOn &&
-  record.modifiedBy === transaction.modifiedBy
+  record.modifiedBy === transaction.modifiedBy &&
+  record.history.createdOn === transaction.modifiedOn &&
+  record.history.createdBy === transaction.modifiedBy &&
+  record.history.updateCollection === undefined
+
+const historyDeltaMatches = (
+  changed: Schema.Schema.Type<typeof MovementHistoryUpdatesSchema>,
+  transaction: MovementTransactionReceipt
+): boolean => {
+  const metadata = transaction.historyAttributes.find((attribute) => attribute.attrKey === changed.attrKey)
+  if (metadata?.attrClass !== changed.attrClass) return false
+  const value = transaction.operations[changed.attrKey]
+  if (value === undefined) return false
+  return isDeepStrictEqual(changed.set, Array.isArray(value) ? value : [value])
+}
