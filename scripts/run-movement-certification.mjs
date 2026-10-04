@@ -1,14 +1,14 @@
 import { createHash } from 'node:crypto'
 import { spawn, execFileSync } from 'node:child_process'
-import { appendFile, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { Clock, Effect, Schema } from 'effect'
+import { Clock, Effect, Redacted, Schema } from 'effect'
 
 export const suites = ['issue_movement', 'issue_transfer', 'issue_attributes', 'issue_tree', 'issue_movement_concurrency']
 const ReceiptSchema = Schema.Struct({ suite: Schema.NonEmptyString, fingerprint: Schema.NonEmptyString,
   sourceCommit: Schema.NonEmptyString, commonFingerprint: Schema.NonEmptyString, suiteFingerprint: Schema.NonEmptyString, environmentFingerprint: Schema.NonEmptyString, log: Schema.NonEmptyString, logHash: Schema.NonEmptyString, started: Schema.Number, ended: Schema.Number,
-  exit: Schema.Number, clean: Schema.Boolean, diagnostic: Schema.optionalKey(Schema.NonEmptyString) })
+  exit: Schema.Number, clean: Schema.Boolean, inputsStable: Schema.Boolean, diagnostic: Schema.optionalKey(Schema.NonEmptyString) })
 const CampaignSchema = Schema.Struct({ deadline: Schema.Number, expired: Schema.Boolean })
 const parseReceipt = Schema.decodeUnknownSync(Schema.fromJsonString(ReceiptSchema))
 const parseCampaign = Schema.decodeUnknownSync(Schema.fromJsonString(CampaignSchema))
@@ -17,13 +17,19 @@ const MAX_CAMPAIGN_MS = 1_200_000
 const TIMEOUT_EXIT = 124
 const INTERRUPTED_EXIT = 130
 const SIGNAL_EXIT = 128
-const QUEUE_POLL_MS = 100
 const CLEANUP_POLL_MS = 50
 const ARGV_START = 2
 const JS_EXTENSION_LENGTH = 3
 const now = () => Effect.runSync(Clock.currentTimeMillis)
 const CLEANUP_MS = 10_000
-const pause = ms => new Promise(resolve => setTimeout(resolve, ms))
+export const realTime = { now, schedule: (callback, milliseconds) => setTimeout(callback, milliseconds), cancel: timer => clearTimeout(timer), pause: milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)) }
+const EnvironmentSchema = Schema.Record(Schema.String, Schema.RedactedFromValue(Schema.String))
+const parseEnvironment = () => Schema.decodeUnknownSync(EnvironmentSchema)(Object.fromEntries(Object.entries(process.env).filter(([key]) => key.startsWith('HULY_') || ['NODE_OPTIONS', 'MCP_AUTO_EXIT', 'HULY_TOOL_MODE'].includes(key))))
+const atomicState = async (file, state) => {
+  const temporary = `${file}.${process.pid}.tmp`
+  await writeFile(temporary, JSON.stringify(state))
+  await rename(temporary, file)
+}
 const missing = error => error?.code === 'ENOENT'
 const optionalFile = async file => { try { return await readFile(file, 'utf8') } catch (error) { if (missing(error)) return undefined; throw error } }
 const walk = async directory => {
@@ -60,50 +66,59 @@ export const fingerprintSuite = async (root, suite, prepare) => {
     ...(await walk(path.join(root, 'dist'))).map(file => path.relative(root, file)),
     ...(await walk(path.join(root, 'packages/huly-cli/dist'))).map(file => path.relative(root, file))]
   if (prepare !== undefined) commonFiles.push(...await dependencies(root, prepare))
-  const environment = Object.entries(process.env).filter(([key]) => key.startsWith('HULY_') || ['NODE_OPTIONS', 'MCP_AUTO_EXIT', 'HULY_TOOL_MODE'].includes(key)).sort(([a], [b]) => a.localeCompare(b))
+  const environment = parseEnvironment()
   const packageData = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.JsonObject))(await readFile(path.join(root, 'package.json'), 'utf8'))
   const scripts = packageData['scripts']
   const buildScripts = typeof scripts === 'object' && scripts !== null && !Array.isArray(scripts)
     ? Object.fromEntries(Object.entries(scripts).filter(([key]) => key.startsWith('build') && !key.includes('readme'))) : {}
   const packageProjection = ['name', 'version', 'type', 'dependencies', 'devDependencies', 'engines', 'packageManager'].map(key => [key, packageData[key] ?? null])
-  const commonFingerprint = hash(JSON.stringify({ packageProjection, buildScripts, bytes: await byteFingerprint(root, [...new Set(commonFiles)].sort((a, b) => a.localeCompare(b))) }))
+  const cliPackage = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.JsonObject))(await readFile(path.join(root, 'packages/huly-cli/package.json'), 'utf8'))
+  const cliProjection = cliPackage
+  const commonFingerprint = hash(JSON.stringify({ packageProjection, cliProjection, buildScripts, bytes: await byteFingerprint(root, [...new Set(commonFiles)].sort((a, b) => a.localeCompare(b))) }))
   const suiteFingerprint = await byteFingerprint(root, await dependencies(root, `scripts/integration_test_${suite}.sh`))
-  const environmentFingerprint = hash(JSON.stringify(environment))
+  const environmentFingerprint = hash(JSON.stringify(Object.entries(environment).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => [key, hash(Redacted.value(value))])))
   return { commonFingerprint, suiteFingerprint, environmentFingerprint, fingerprint: hash(JSON.stringify({ common: commonFingerprint, suite: suiteFingerprint, environment: environmentFingerprint, runtime: [process.version, process.platform, process.arch] })) }
 }
-const reusableLog = async receipt => {
+const reusableLog = async (receipt, time) => {
   const content = await optionalFile(receipt.log)
-  return content !== undefined && hash(content) === receipt.logHash && receipt.started <= receipt.ended && receipt.ended <= now()
+  return content !== undefined && hash(content) === receipt.logHash && receipt.started <= receipt.ended && receipt.ended <= time.now()
 }
 const groupAlive = pid => { try { process.kill(-pid, 0); return true } catch (error) { if (error.code === 'ESRCH') return false; throw error } }
 const signalGroup = (pid, signal) => { try { process.kill(-pid, signal) } catch (error) { if (error.code !== 'ESRCH') throw error } }
-export const boundedProcess = async (root, script, log, deadline) => {
-  if (now() >= deadline) return { exit: TIMEOUT_EXIT, clean: true, launched: false }
+export const boundedProcess = async (root, script, log, deadline, time = realTime) => {
+  if (time.now() >= deadline) return { exit: TIMEOUT_EXIT, clean: true, launched: false }
   const output = await import('node:fs').then(fs => fs.openSync(log, 'a'))
   const child = spawn('bash', [script], { cwd: root, detached: true, stdio: ['ignore', output, output] })
   let timedOut = false
   let interrupted = false
   let interruptionKill
-  const interrupt = () => { interrupted = true; signalGroup(child.pid, 'SIGTERM'); interruptionKill ??= setTimeout(() => signalGroup(child.pid, 'SIGKILL'), CLEANUP_MS) }
+  const interrupt = () => { interrupted = true; signalGroup(child.pid, 'SIGTERM'); interruptionKill ??= time.schedule(() => signalGroup(child.pid, 'SIGKILL'), CLEANUP_MS) }
   process.once('SIGINT', interrupt); process.once('SIGTERM', interrupt)
-  const timer = setTimeout(() => { timedOut = true; signalGroup(child.pid, 'SIGTERM') }, Math.max(1, deadline - now()))
-  const killed = setTimeout(() => signalGroup(child.pid, 'SIGKILL'), Math.max(1, deadline - now()) + CLEANUP_MS)
+  const timer = time.schedule(() => { timedOut = true; signalGroup(child.pid, 'SIGTERM') }, Math.max(1, deadline - time.now()))
+  const killed = time.schedule(() => signalGroup(child.pid, 'SIGKILL'), Math.max(1, deadline - time.now()) + CLEANUP_MS)
   const exit = await new Promise((resolve, reject) => { child.once('error', reject); child.once('exit', code => resolve(code ?? SIGNAL_EXIT)) })
-  clearTimeout(timer)
+  time.cancel(timer)
   if (groupAlive(child.pid)) {
     signalGroup(child.pid, 'SIGTERM')
-    const cleanupEnd = Math.min(deadline + CLEANUP_MS, now() + CLEANUP_MS)
-    while (groupAlive(child.pid) && now() < cleanupEnd) await pause(CLEANUP_POLL_MS)
+    const cleanupEnd = Math.min(deadline + CLEANUP_MS, time.now() + CLEANUP_MS)
+    while (groupAlive(child.pid) && time.now() < cleanupEnd) await time.pause(CLEANUP_POLL_MS)
     if (groupAlive(child.pid)) signalGroup(child.pid, 'SIGKILL')
   }
-  clearTimeout(killed); clearTimeout(interruptionKill)
+  time.cancel(killed); time.cancel(interruptionKill)
   process.removeListener('SIGINT', interrupt); process.removeListener('SIGTERM', interrupt)
   const clean = !groupAlive(child.pid)
   const fs = await import('node:fs'); fs.closeSync(output)
   return { exit: timedOut ? TIMEOUT_EXIT : interrupted ? INTERRUPTED_EXIT : exit, clean, launched: true }
 }
-export const runCertification = async ({ deadline, diagnostic, mode, prepare, root, stateDir }) => {
-  root = path.resolve(root); stateDir = path.resolve(stateDir)
+export const runCertification = async (options) => {
+  const root = path.resolve(options.root), lock = path.join(root, '.movement-certification.lock')
+  try { await mkdir(lock) } catch (error) { if (error.code === 'EEXIST') return { exit: 1, expired: false, plan: [], locked: true }; throw error }
+  const ownership = { clean: true }
+  try { return await ownedCertification({ ...options, root, time: options.time ?? realTime }, ownership) }
+  finally { if (ownership.clean) await rm(lock, { recursive: true }) }
+}
+const ownedCertification = async ({ deadline, diagnostic, mode, prepare, root, stateDir, time }, ownership) => {
+  stateDir = path.resolve(stateDir)
   const stateFile = path.join(stateDir, 'campaign.json'), receiptFile = path.join(stateDir, 'receipts.jsonl')
   const prior = await optionalFile(stateFile)
   const campaign = prior === undefined ? undefined : parseCampaign(prior)
@@ -115,59 +130,57 @@ export const runCertification = async ({ deadline, diagnostic, mode, prepare, ro
       const fingerprints = await fingerprintSuite(root, suite, prepare)
       const { fingerprint } = fingerprints
       const receipt = receipts.findLast(value => value.suite === suite && value.fingerprint === fingerprint)
-      const reusable = receipt?.exit === 0 && receipt.clean && await reusableLog(receipt)
+      const reusable = receipt?.exit === 0 && receipt.clean && receipt.inputsStable && await reusableLog(receipt, time)
       plan.push({ suite, status: reusable ? 'reuse' : receipt !== undefined ? 'blocked' : 'pending',
         ...(receipt === undefined ? {} : { sourceCommit: receipt.sourceCommit, log: receipt.log }) })
     }
     return { exit: 0, expired: campaign?.expired ?? false, plan }
   }
   if (!Number.isFinite(deadline)) throw new Error('Run requires an absolute deadline')
-  const effectiveDeadline = Math.min(deadline, campaign?.deadline ?? now() + MAX_CAMPAIGN_MS)
+  const effectiveDeadline = Math.min(deadline, campaign?.deadline ?? time.now() + MAX_CAMPAIGN_MS)
   await mkdir(stateDir, { recursive: true })
-  const state = { deadline: effectiveDeadline, expired: campaign?.expired === true || now() >= effectiveDeadline }
-  await writeFile(stateFile, JSON.stringify(parseCampaign(JSON.stringify(state))))
+  const state = { deadline: effectiveDeadline, expired: campaign?.expired === true || time.now() >= effectiveDeadline }
+  await atomicState(stateFile, parseCampaign(JSON.stringify(state)))
   if (state.expired) return { exit: TIMEOUT_EXIT, expired: true, plan: [] }
-  const lock = path.join(root, '.movement-certification.lock')
-  while (true) {
-    try { await mkdir(lock); break } catch (error) {
-      if (error.code !== 'EEXIST') throw error
-      if (now() >= effectiveDeadline) { await writeFile(stateFile, JSON.stringify({ ...state, expired: true })); return { exit: TIMEOUT_EXIT, expired: true, plan: [] } }
-      await pause(Math.min(QUEUE_POLL_MS, effectiveDeadline - now()))
-    }
-  }
   let clean = true
   try {
-    await writeFile(path.join(lock, 'owner.json'), JSON.stringify({ pid: process.pid, deadline: effectiveDeadline, stateDir }))
+    await writeFile(path.join(root, '.movement-certification.lock/owner.json'), JSON.stringify({ pid: process.pid, deadline: effectiveDeadline, stateDir }))
     if (prepare !== undefined) {
       await dependencies(root, prepare)
-      const result = await boundedProcess(root, prepare, path.join(stateDir, 'prepare.log'), effectiveDeadline)
+      const result = await boundedProcess(root, prepare, path.join(stateDir, 'prepare.log'), effectiveDeadline, time)
       clean = result.clean
-      if (result.exit !== 0) return { exit: result.exit, expired: result.exit === TIMEOUT_EXIT, plan: [] }
+      if (result.exit !== 0 || !result.clean) return { exit: result.exit || 1, expired: result.exit === TIMEOUT_EXIT, plan: [] }
     }
     const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
     const plan = []
+    const accepted = new Map()
     for (const suite of suites) {
-      if (now() >= effectiveDeadline) { state.expired = true; return { exit: TIMEOUT_EXIT, expired: true, plan } }
+      if (time.now() >= effectiveDeadline) { state.expired = true; return { exit: TIMEOUT_EXIT, expired: true, plan } }
       const fingerprints = await fingerprintSuite(root, suite, prepare)
       const { fingerprint } = fingerprints
       const receipt = receipts.findLast(value => value.suite === suite && value.fingerprint === fingerprint)
-      if (receipt?.exit === 0 && receipt.clean && await reusableLog(receipt)) { plan.push({ suite, status: 'reuse', log: receipt.log, sourceCommit: receipt.sourceCommit }); continue }
+      if (receipt?.exit === 0 && receipt.clean && receipt.inputsStable && await reusableLog(receipt, time)) { accepted.set(suite, fingerprint); plan.push({ suite, status: 'reuse', log: receipt.log, sourceCommit: receipt.sourceCommit }); continue }
       const admission = diagnostic?.startsWith(`${suite}:`) === true ? diagnostic.slice(suite.length + 1).trim() : undefined
       if (receipt !== undefined && !admission) return { exit: 1, expired: false, plan: [...plan, { suite, status: 'blocked', log: receipt.log }] }
-      const started = now(), log = path.join(stateDir, `${suite}-${started}.log`)
-      const result = await boundedProcess(root, `scripts/integration_test_${suite}.sh`, log, effectiveDeadline)
+      const started = time.now(), log = path.join(stateDir, `${suite}-${started}.log`)
+      const result = await boundedProcess(root, `scripts/integration_test_${suite}.sh`, log, effectiveDeadline, time)
       clean = result.clean
-      const evidence = parseReceipt(JSON.stringify({ suite, ...fingerprints, sourceCommit, log, logHash: hash(await readFile(log)), started, ended: now(), exit: result.exit, clean,
+      const inputsStable = (await fingerprintSuite(root, suite, prepare)).fingerprint === fingerprint
+      const evidence = parseReceipt(JSON.stringify({ suite, ...fingerprints, sourceCommit, log, logHash: hash(await readFile(log)), started, ended: time.now(), exit: result.exit, clean, inputsStable,
         ...(admission ? { diagnostic: admission } : {}) }))
       await appendFile(receiptFile, JSON.stringify(evidence) + '\n'); receipts.push(evidence)
-      plan.push({ suite, status: result.exit === 0 ? 'passed' : 'failed', log })
-      if (result.exit !== 0 || !clean) { state.expired ||= result.exit === TIMEOUT_EXIT; return { exit: result.exit || 1, expired: state.expired, plan } }
+      plan.push({ suite, status: result.exit === 0 && inputsStable ? 'passed' : 'failed', log })
+      if (result.exit !== 0 || !clean || !inputsStable) { state.expired ||= result.exit === TIMEOUT_EXIT; return { exit: result.exit || 1, expired: state.expired, plan } }
+      accepted.set(suite, fingerprint)
     }
-    return { exit: 0, expired: false, plan }
+    for (const [suite, fingerprint] of accepted) {
+      if ((await fingerprintSuite(root, suite, prepare)).fingerprint !== fingerprint) return { exit: 1, expired: false, plan, drift: true }
+    }
+    return { exit: time.now() >= effectiveDeadline ? TIMEOUT_EXIT : 0, expired: time.now() >= effectiveDeadline, plan }
   } finally {
-    state.expired ||= now() >= effectiveDeadline
-    await writeFile(stateFile, JSON.stringify(state))
-    if (clean) await rm(lock, { recursive: true })
+    state.expired ||= time.now() >= effectiveDeadline
+    await atomicState(stateFile, state)
+    ownership.clean = clean
   }
 }
 if (process.argv[1] !== undefined && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

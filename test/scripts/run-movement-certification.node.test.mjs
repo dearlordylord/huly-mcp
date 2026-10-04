@@ -5,18 +5,18 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import os from 'node:os'
-import { runCertification, suites } from '../../scripts/run-movement-certification.mjs'
+import { realTime, runCertification, suites } from '../../scripts/run-movement-certification.mjs'
 
 const now = () => Effect.runSync(Clock.currentTimeMillis)
-const TEST_BUDGET_MS = 10_000
+const TEST_BUDGET_MS = 60_000
 const TIMEOUT_EXIT = 124
 const FAILURE_EXIT = 7
-const QUEUE_BUDGET_MS = 100
-const CHILD_BUDGET_MS = 150
 
 const fixture = async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'movement-certification-'))
   await mkdir(path.join(root, 'scripts'))
+  await mkdir(path.join(root, 'packages/huly-cli'), { recursive: true })
+  await writeFile(path.join(root, 'packages/huly-cli/package.json'), '{}')
   for (const file of ['package.json', 'pnpm-lock.yaml', 'tsconfig.json']) await writeFile(path.join(root, file), '{}')
   for (const suite of suites) await writeFile(path.join(root, `scripts/integration_test_${suite}.sh`), '#!/bin/bash\necho ran >> launches\n')
   execFileSync('git', ['init', '-q', root])
@@ -76,12 +76,13 @@ test('malformed receipts fail closed and plan does not launch', async () => {
   } finally { await rm(f.root, { recursive: true }) }
 })
 
-test('lock queue consumes deadline without launching or removing another owner lock', async () => {
+test('exclusive lock fails fast without reading state or removing another owner lock', async () => {
   const f = await fixture()
   try {
     await mkdir(path.join(f.root, '.movement-certification.lock'))
-    const result = await runCertification({ ...f, deadline: now() + QUEUE_BUDGET_MS })
-    assert.equal(result.exit, TIMEOUT_EXIT)
+    const result = await runCertification(f)
+    assert.equal(result.locked, true)
+    await assert.rejects(readFile(path.join(f.stateDir, 'campaign.json')), { code: 'ENOENT' })
     await assert.rejects(readFile(path.join(f.root, 'launches')), { code: 'ENOENT' })
     await (await import('node:fs/promises')).stat(path.join(f.root, '.movement-certification.lock'))
   } finally { await rm(f.root, { recursive: true }) }
@@ -91,7 +92,18 @@ test('deadline terminates real process group and permits bounded fixture cleanup
   const f = await fixture()
   try {
     await writeFile(path.join(f.root, 'scripts/integration_test_issue_movement.sh'), '#!/bin/bash\ntrap \'echo cleaned >> cleanup; exit 0\' TERM\necho running >> launches\nsleep 30\n')
-    const result = await runCertification({ ...f, deadline: now() + CHILD_BUDGET_MS })
+    const state = { clock: now(), scheduled: 0 }
+    const time = { ...realTime, now: () => state.clock, schedule: (callback, milliseconds) => {
+      state.scheduled++
+      if (state.scheduled !== 1) return realTime.schedule(callback, TEST_BUDGET_MS)
+      const waitForLaunch = async () => {
+        try { await readFile(path.join(f.root, 'launches')); state.clock += milliseconds; callback() }
+        catch (error) { if (error.code !== 'ENOENT') throw error; await realTime.pause(10); await waitForLaunch() }
+      }
+      void waitForLaunch()
+      return undefined
+    } }
+    const result = await runCertification({ ...f, time, deadline: state.clock + TEST_BUDGET_MS })
     assert.equal(result.exit, TIMEOUT_EXIT)
     assert.equal((await readFile(path.join(f.root, 'cleanup'), 'utf8')).trim(), 'cleaned')
     assert.equal((await runCertification(f)).exit, TIMEOUT_EXIT)
@@ -104,5 +116,17 @@ test('modified historical log refuses reuse rather than inventing passed evidenc
     const passed = await runCertification(f)
     await writeFile(passed.plan[0].log, 'tampered evidence')
     assert.equal((await runCertification(f)).plan[0].status, 'blocked')
+  } finally { await rm(f.root, { recursive: true }) }
+})
+
+test('changed suite inputs during child execution never create reusable pass evidence', async () => {
+  const f = await fixture()
+  try {
+    await writeFile(path.join(f.root, 'scripts/integration_test_issue_movement.sh'), '#!/bin/bash\necho changed >> scripts/integration_test_issue_movement.sh\nexit 0\n')
+    const result = await runCertification(f)
+    assert.equal(result.exit, 1)
+    const receipt = JSON.parse((await readFile(path.join(f.stateDir, 'receipts.jsonl'), 'utf8')).trim())
+    assert.equal(receipt.exit, 0)
+    assert.equal(receipt.inputsStable, false)
   } finally { await rm(f.root, { recursive: true }) }
 })
