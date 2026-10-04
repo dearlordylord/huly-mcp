@@ -2,7 +2,7 @@ import { it } from "@effect/vitest"
 import type { Class, Doc, DocumentQuery, FindOptions, Ref, TxOperations } from "@hcengineering/core"
 import { Effect, Schema } from "effect"
 import { expect } from "vitest"
-import { IssueId } from "../../src/domain/schemas/shared.js"
+import { IssueId, ObjectClassName } from "../../src/domain/schemas/shared.js"
 import { TransferWriteSchema } from "../../src/domain/schemas/issue-transfer.js"
 import { activity, chunter } from "../../src/huly/huly-plugins.js"
 import { commitTransfer, inspectTransferRecords } from "../../src/huly/issue-transfer-adapter.js"
@@ -54,8 +54,9 @@ it.effect(
 
 it.effect("refuses an inherited outgoing reference class whose extra ownership semantics are unaudited", () =>
   Effect.gen(function* () {
-    const customClass = "fixture:class:CustomReference"
-    const f = recordAdapterFixture(false, new Map([[customClass, String(activity.class.ActivityReference)]]))
+    const customClass = Schema.decodeUnknownSync(ObjectClassName)("fixture:class:CustomReference")
+    const parentClass = Schema.decodeUnknownSync(ObjectClassName)(String(activity.class.ActivityReference))
+    const f = recordAdapterFixture(false, new Map([[customClass, parentClass]]))
     f.docs.push(
       ownedRecord("custom-reference", customClass, "independent-target", "references", {
         attachedToClass: "document:class:Document",
