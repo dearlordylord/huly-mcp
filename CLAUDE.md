@@ -217,6 +217,12 @@ Task identity and prerequisite mapping:
 
 Before acceptance, invoke $code-review against the immutable base_sha from the Dalph task prompt. Use separate parallel Standards and Spec reviewer sub-agents. Consult .claude/review-rules.md and parent GitHub issue305 in addition to your task issue. Record both review reports and validation evidence in docs/implementation/issue-NNN.md. Resolve blocking findings before returning an accepted commit.
 
+## Implementation responsibility and retained307 investigation
+
+The task body is an instruction to implement the complete assigned feature, not a request for investigation or a plan. Persist through implementation, executable fixtures, unit/property tests, check-all and fresh reviews. Complexity, missing existing APIs that this task must add, or the fact that the feature is currently unimplemented are not external blockers. Do not end the attempt with an investigation-only report or merely run the unchanged baseline gate. Return a failure only when a concrete external dependency prevents further authorized work; record that dependency and attempted recovery accurately.
+
+For307, read /tmp/hulymcp-dalph-306-311/issue-307-retained-investigation.md before repeating research. The previous attempt found the reference collection walker and sequence/batch APIs and identified stable-ID public recovery as part of this task, but wrote no feature code. Its baseline gate failed on three CLI harness timeout observations; all eight focused tests subsequently passed. Do not count that focused pass as a full gate pass. Implement307, then run the full gate on your actual candidate and fix any reproducible failure through the existing seams without weakening thresholds or timeouts. Live integration remains deferred as described below.
+
 ## User-directed validation cadence: live integration only at the end
 
 The user explicitly changed the integration cadence: run live Huly integration only after all six306–311 slices are implemented and integrated. This overrides earlier per-feature and per-slice integration scheduling instructions in this checkout and linked issues. Keep every behavioral acceptance criterion; defer its real-server execution evidence to final certification, rather than discarding the requirement. Do not launch any new live Huly suite, including focused movement suites, during intermediate slices.
