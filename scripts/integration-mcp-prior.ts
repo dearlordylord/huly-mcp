@@ -1,4 +1,4 @@
-import { specTypeSchemas, type DiscoverResult } from "@modelcontextprotocol/client"
+import { specTypeSchemas, type DiscoverResult, type ListToolsResult } from "@modelcontextprotocol/client"
 import { Effect, Redacted, Schema, SchemaIssue } from "effect"
 import { createHash } from "node:crypto"
 import { execFileSync } from "node:child_process"
@@ -12,6 +12,12 @@ export const NativeDiscoverySchema = Schema.declareConstructor<DiscoverResult>()
   return parsed.issues === undefined
     ? Effect.succeed(parsed.value)
     : Effect.fail(new SchemaIssue.InvalidValue({ message: "Invalid native discovery" }))
+})
+export const NativeToolListSchema = Schema.declareConstructor<ListToolsResult>()([], () => (input) => {
+  const parsed = specTypeSchemas.ListToolsResult["~standard"].validate(input)
+  return parsed.issues === undefined
+    ? Effect.succeed(parsed.value)
+    : Effect.fail(new SchemaIssue.InvalidValue({ message: "Invalid native tool list" }))
 })
 const Digest = Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/))
 const Commit = Schema.String.check(Schema.isPattern(/^[a-f0-9]{40}$/))
@@ -40,9 +46,13 @@ export interface PriorProcessOptions {
 export const normalizeIntegrationEnvironment = (input: NodeJS.ProcessEnv) =>
   Schema.decodeUnknownSync(Environment)(
     Object.fromEntries(
-      Object.entries({ ...input, HULY_TOOL_MODE: "native", LAZY_ENVS: "true" }).filter(
-        ([key, value]) => value !== undefined && key !== PRIOR_CACHE_ENV
-      )
+      Object.entries({
+        ...input,
+        HULY_TOOL_MODE: "native",
+        LAZY_ENVS: "true",
+        HULY_MCP_TELEMETRY: "0",
+        HULY_CLI_TELEMETRY: "0"
+      }).filter(([key, value]) => value !== undefined && key !== PRIOR_CACHE_ENV)
     )
   )
 export const makePriorIdentity = (options: PriorProcessOptions) =>

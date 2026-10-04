@@ -2,6 +2,7 @@ import { Effect, Schema } from "effect"
 import { resolve } from "node:path"
 import {
   integrationMcpCall,
+  integrationMcpListTools,
   IntegrationMcpCallError,
   IntegrationMcpPhaseSchema,
   integrationMcpClock
@@ -20,7 +21,13 @@ const main = async (): Promise<void> => {
     const options = {
       command: process.execPath,
       args: [resolve("dist/index.cjs")],
-      environment: { ...process.env, HULY_TOOL_MODE: "native", LAZY_ENVS: "true" }
+      environment: {
+        ...process.env,
+        HULY_TOOL_MODE: "native",
+        LAZY_ENVS: "true",
+        HULY_MCP_TELEMETRY: "0",
+        HULY_CLI_TELEMETRY: "0"
+      }
     }
     if (process.argv[ARGUMENT_OFFSET] === "--prepare-prior") {
       const path = await Effect.runPromise(prepareIntegrationMcpPrior(process.argv[ARGUMENT_OFFSET + 1], options))
@@ -34,11 +41,12 @@ const main = async (): Promise<void> => {
         : await Effect.runPromise(
             makePriorIdentity(options).pipe(Effect.flatMap((identity) => readPriorCache(cachePath, identity)))
           )
-    const result = await integrationMcpCall(
-      process.argv.slice(ARGUMENT_OFFSET),
-      { ...options, ...(prior === undefined ? {} : { prior }) },
-      { now: integrationMcpClock, publish }
-    )
+    const callOptions = { ...options, ...(prior === undefined ? {} : { prior }) }
+    const telemetry = { now: integrationMcpClock, publish }
+    const result =
+      process.argv[ARGUMENT_OFFSET] === "--list-tools"
+        ? await integrationMcpListTools(callOptions, telemetry)
+        : await integrationMcpCall(process.argv.slice(ARGUMENT_OFFSET), callOptions, telemetry)
     process.stdout.write(`${JSON.stringify(result)}\n`)
   } catch (error) {
     process.stderr.write(

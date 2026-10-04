@@ -1,6 +1,10 @@
 import { Client } from "@modelcontextprotocol/client"
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"
-import { NativeDiscoverySchema, normalizeIntegrationEnvironment } from "./integration-mcp-prior.js"
+import {
+  NativeDiscoverySchema,
+  NativeToolListSchema,
+  normalizeIntegrationEnvironment
+} from "./integration-mcp-prior.js"
 import { Clock, Effect, Redacted, Schema } from "effect"
 
 const CONNECT_TIMEOUT_MILLISECONDS_VALUE = 10_000
@@ -120,42 +124,87 @@ export const makeIntegrationMcpSession = (options: ProcessOptions) => {
   )
   return { client, transport }
 }
-export const captureIntegrationMcpDiscovery = async (
-  options: ProcessOptions,
-  timers: IntegrationMcpTimers = realTimers
-) => {
-  const { client, transport } = makeIntegrationMcpSession({
-    ...options,
-    environment: { ...options.environment, HULY_TOOL_MODE: "native", LAZY_ENVS: "true" }
-  })
-  let connecting: Promise<void> | undefined
-  try {
-    await boundedPhase(
-      "connect",
-      CONNECT_TIMEOUT_MILLISECONDS,
-      timers,
-      (signal) =>
-        (connecting = client.connect(transport, {
-          signal,
-          timeout: CONNECT_TIMEOUT_MILLISECONDS,
-          maxTotalTimeout: CONNECT_TIMEOUT_MILLISECONDS
-        }))
-    )
-    if (client.getNegotiatedProtocolVersion() !== "2026-07-28") throw new IntegrationMcpCallError("connect")
-    const raw: unknown = client.getDiscoverResult()
-    return Schema.decodeUnknownSync(NativeDiscoverySchema)(raw)
-  } finally {
-    await transport.close()
-    await connecting?.catch(() => {})
-    await client.close()
-  }
-}
 export const integrationMcpCall = async (
   input: unknown,
   options: ProcessOptions,
   telemetry: IntegrationMcpTelemetry = quietTelemetry,
   timers: IntegrationMcpTimers = realTimers
 ): Promise<Schema.Schema.Type<typeof EnvelopeSchema>> => {
+  const parsed = Schema.decodeUnknownOption(InputSchema)(input)
+  if (parsed._tag === "None") throw new IntegrationMcpCallError("input")
+  return withNativeClient(options, telemetry, timers, async (client, step) => {
+    step("list")
+    const definition = (await listNativeTools(client, timers)).tools.find((tool) => tool.name === parsed.value[0])
+    if (definition === undefined) throw new IntegrationMcpCallError("call")
+    step("call")
+    const raw = await boundedPhase("call", CALL_TIMEOUT_MILLISECONDS, timers, (signal) =>
+      client.callTool(
+        { name: parsed.value[0], arguments: parsed.value[1] },
+        {
+          signal,
+          toolDefinition: definition,
+          timeout: CALL_TIMEOUT_MILLISECONDS,
+          maxTotalTimeout: CALL_TIMEOUT_MILLISECONDS
+        }
+      )
+    )
+    step("reply")
+    const reply = Schema.decodeUnknownSync(ReplySchema)(raw)
+    if (reply.isError !== true) Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Json))(reply.content[0].text)
+    return Schema.decodeUnknownSync(EnvelopeSchema)({ jsonrpc: "2.0", id: RESPONSE_ID, result: reply })
+  })
+}
+const listNativeTools = (client: Client, timers: IntegrationMcpTimers) =>
+  boundedPhase("list", LIST_TIMEOUT_MILLISECONDS, timers, (signal) =>
+    client.listTools(undefined, {
+      signal,
+      timeout: LIST_TIMEOUT_MILLISECONDS,
+      maxTotalTimeout: LIST_TIMEOUT_MILLISECONDS
+    })
+  )
+const ToolListEnvelope = Schema.Struct({
+  jsonrpc: Schema.Literal("2.0"),
+  id: Schema.Literal(RESPONSE_ID),
+  result: NativeToolListSchema
+})
+export const integrationMcpListTools = (
+  options: ProcessOptions,
+  telemetry: IntegrationMcpTelemetry = quietTelemetry,
+  timers: IntegrationMcpTimers = realTimers
+) =>
+  withNativeClient(options, telemetry, timers, async (client, step) => {
+    step("list")
+    const raw: unknown = await listNativeTools(client, timers)
+    const result = Schema.decodeUnknownSync(NativeToolListSchema)(raw)
+    step("reply")
+    const envelope: unknown = { jsonrpc: "2.0", id: RESPONSE_ID, result }
+    return Schema.decodeUnknownSync(ToolListEnvelope)(envelope)
+  })
+export const captureIntegrationMcpDiscovery = (options: ProcessOptions, timers: IntegrationMcpTimers = realTimers) =>
+  withNativeClient(
+    {
+      ...options,
+      environment: {
+        ...options.environment,
+        HULY_TOOL_MODE: "native",
+        LAZY_ENVS: "true",
+        HULY_MCP_TELEMETRY: "0",
+        HULY_CLI_TELEMETRY: "0"
+      }
+    },
+    quietTelemetry,
+    timers,
+    async (client) => {
+      const raw: unknown = client.getDiscoverResult()
+      return Schema.decodeUnknownSync(NativeDiscoverySchema)(raw)
+    }
+  )
+const withNativeClient = async <A>(
+  options: ProcessOptions,
+  telemetry: IntegrationMcpTelemetry,
+  timers: IntegrationMcpTimers,
+  use: (client: Client, step: (phase: "list" | "call" | "reply") => void) => Promise<A>
+): Promise<A> => {
   const started = telemetry.now()
   const emit = (phase: IntegrationMcpPhase["phase"]): void =>
     telemetry.publish(
@@ -164,8 +213,6 @@ export const integrationMcpCall = async (
         elapsedMilliseconds: IntegrationElapsedMilliseconds.make(telemetry.now() - started)
       })
     )
-  const parsed = Schema.decodeUnknownOption(InputSchema)(input)
-  if (parsed._tag === "None") throw new IntegrationMcpCallError("input")
   const { client, transport } = makeIntegrationMcpSession(options)
   let phase: "connect" | "list" | "call" | "reply" | "close" = "connect"
   let connecting: Promise<void> | undefined
@@ -185,37 +232,13 @@ export const integrationMcpCall = async (
     )
     if (client.getNegotiatedProtocolVersion() !== "2026-07-28") throw new IntegrationMcpCallError("connect")
     emit("connect-ready")
-    phase = "list"
-    emit("list-start")
-    const definition = (
-      await boundedPhase("list", LIST_TIMEOUT_MILLISECONDS, timers, (signal) =>
-        client.listTools(undefined, {
-          signal,
-          timeout: LIST_TIMEOUT_MILLISECONDS,
-          maxTotalTimeout: LIST_TIMEOUT_MILLISECONDS
-        })
-      )
-    ).tools.find((tool) => tool.name === parsed.value[0])
-    emit("list-ready")
-    if (definition === undefined) throw new IntegrationMcpCallError("call")
-    phase = "call"
-    emit("call-start")
-    const raw = await boundedPhase("call", CALL_TIMEOUT_MILLISECONDS, timers, (signal) =>
-      client.callTool(
-        { name: parsed.value[0], arguments: parsed.value[1] },
-        {
-          signal,
-          toolDefinition: definition,
-          timeout: CALL_TIMEOUT_MILLISECONDS,
-          maxTotalTimeout: CALL_TIMEOUT_MILLISECONDS
-        }
-      )
-    )
-    emit("call-reply")
-    phase = "reply"
-    const reply = Schema.decodeUnknownSync(ReplySchema)(raw)
-    if (reply.isError !== true) Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Json))(reply.content[0].text)
-    return Schema.decodeUnknownSync(EnvelopeSchema)({ jsonrpc: "2.0", id: RESPONSE_ID, result: reply })
+    const step = (next: "list" | "call" | "reply") => {
+      if (phase === "list") emit("list-ready")
+      if (next === "reply" && phase === "call") emit("call-reply")
+      if (next !== "reply") emit(next === "list" ? "list-start" : "call-start")
+      phase = next
+    }
+    return use(client, step)
   }
   const close = async () => {
     emit("close-start")
