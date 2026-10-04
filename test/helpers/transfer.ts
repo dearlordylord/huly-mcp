@@ -135,7 +135,7 @@ export const transferFixture = () => {
       return Effect.succeed(
         Schema.decodeUnknownSync(TransferInspectionSchema)({
           discovery: "complete",
-          classes: [],
+          classes: [...new Set(records.map((record) => record._class))],
           records: records.map((record) => ({ ...record })),
           blockers: state.recordsBlockers,
           limitation: "Fixture inspects model-owned records; unsupported structure is not a complete inventory."
