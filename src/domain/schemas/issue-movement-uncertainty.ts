@@ -20,6 +20,20 @@ export const MovementDiscoveryEvidenceSchema = Schema.Union([
   Schema.Struct({ status: Schema.Literal("complete") }),
   Schema.Struct({ status: Schema.Literal("incomplete"), reason: NonEmptyString })
 ])
+const ObservationPresenceSchema = Schema.Struct({
+  tasks: Schema.Array(MovementObservedTaskSchema),
+  absentIssueIds: Schema.optionalKey(
+    Schema.Array(IssueId).annotate({
+      description:
+        "Stable IDs confirmed absent by successful reads, retained despite later limitations. Unread or unparseable tasks are not absent."
+    })
+  )
+})
+const isDisjointObservation = (observation: Schema.Schema.Type<typeof ObservationPresenceSchema>) =>
+  (observation.absentIssueIds ?? []).every((absentId) => observation.tasks.every((task) => task.issueId !== absentId))
+const disjointObservation = Schema.makeFilter(isDisjointObservation, {
+  message: "An issue cannot be both observed present and confirmed absent in one verification observation"
+})
 export const MovementVerificationEvidenceSchema = Schema.Union([
   Schema.Struct({ status: Schema.Literal("not-attempted") }),
   Schema.Struct({ status: Schema.Literal("unavailable"), reason: NonEmptyString }),
@@ -31,32 +45,21 @@ export const MovementVerificationEvidenceSchema = Schema.Union([
     records: Schema.Array(MovementObservedRecordSchema)
   }).annotate({ parseOptions: { onExcessProperty: "error" } }),
   Schema.Struct({
+    ...ObservationPresenceSchema.fields,
     status: Schema.Literal("observed"),
     completeness: Schema.Literal("complete"),
     consistency: Schema.Literal("inconsistent"),
-    absentIssueIds: Schema.optionalKey(
-      Schema.Array(IssueId).annotate({
-        description:
-          "Stable issue IDs whose successful verification reads explicitly returned no document. Unread or unparseable tasks are not absent."
-      })
-    ),
     reason: NonEmptyString,
-    tasks: Schema.Array(MovementObservedTaskSchema),
     records: Schema.Array(MovementObservedRecordSchema)
-  }),
+  }).check(disjointObservation),
   Schema.Struct({
+    ...ObservationPresenceSchema.fields,
     status: Schema.Literal("observed"),
     completeness: Schema.Literal("incomplete"),
     consistency: Schema.Literal("inconsistent"),
-    absentIssueIds: Schema.optionalKey(
-      Schema.Array(IssueId).annotate({
-        description: "Confirmed absent stable issue IDs retained even when other verification reads are unavailable."
-      })
-    ),
     reason: NonEmptyString,
-    tasks: Schema.Array(MovementObservedTaskSchema),
     records: Schema.Array(MovementObservedRecordSchema)
-  }),
+  }).check(disjointObservation),
   Schema.Struct({
     status: Schema.Literal("observed"),
     completeness: Schema.Literal("incomplete"),

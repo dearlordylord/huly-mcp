@@ -10,6 +10,20 @@ const decode = Schema.decodeUnknownOption(MovementUncertaintyEvidenceSchema)
 const decodeVerification = Schema.decodeUnknownOption(MovementVerificationEvidenceSchema)
 
 for (const completeness of ["complete", "incomplete"]) {
+  it(`rejects contradictory present and absent IDs in ${completeness} verification`, () => {
+    const task = { issueId: "root", projectId: "source", parentId: null, identifier: "SOURCE-1", number: 1 }
+    const facts = {
+      status: "observed",
+      completeness,
+      consistency: "inconsistent",
+      reason: "Another task is absent",
+      tasks: [task],
+      records: []
+    }
+    expect(decodeVerification({ ...facts, absentIssueIds: ["child"] })._tag).toBe("Some")
+    expect(decodeVerification({ ...facts, absentIssueIds: ["root"] })._tag).toBe("None")
+  })
+
   it(`retains confirmed absence with ${completeness} verification without inventing task payloads`, () => {
     const result = decodeVerification({
       status: "observed",
