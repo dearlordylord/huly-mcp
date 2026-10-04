@@ -82,6 +82,8 @@ const ConditionalReplySchema = Schema.Union([
   Schema.Struct({ success: Schema.Literal(true), serverTime: Schema.Number })
 ])
 const TransportReplySchema = Schema.Struct({ status: PositiveInteger, body: Schema.String })
+const HTTP_STATUS_OK_MIN = 200
+const HTTP_STATUS_REDIRECT_MIN = 300
 const TransportRequestSchema = Schema.Struct({ ...MovementTransportConfigSchema.fields, body: Schema.String })
 type TransportRequest = Schema.Schema.Type<typeof TransportRequestSchema>
 type TransportReply = Schema.Schema.Type<typeof TransportReplySchema>
@@ -162,7 +164,7 @@ export const sendMovementTransaction = Effect.fn("movement.sendTransaction")(fun
           })
     )
   )
-  if (reply.status < 200 || reply.status >= 300)
+  if (reply.status < HTTP_STATUS_OK_MIN || reply.status >= HTTP_STATUS_REDIRECT_MIN)
     return yield* new MovementTransportError({
       phase: "after-send",
       reason: NonEmptyString.make(

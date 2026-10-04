@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect"
-import { NonEmptyString, PositiveInteger, UrlString, WorkspaceVersion } from "../../src/domain/schemas/shared.js"
+import { NonEmptyString, PositiveInteger, type UrlString, WorkspaceVersion } from "../../src/domain/schemas/shared.js"
 import { FixtureBoundaryError } from "./fixture-errors.js"
 
 export const DeploymentVersionSchema = Schema.Struct({ VERSION: NonEmptyString, MODEL_VERSION: WorkspaceVersion })
@@ -24,6 +24,8 @@ export const ServerVersionEvidenceSchema = Schema.Struct({
 )
 export type ServerVersionEvidence = Schema.Schema.Type<typeof ServerVersionEvidenceSchema>
 const ConfigReplySchema = Schema.Struct({ status: PositiveInteger, body: Schema.String })
+const HTTP_STATUS_OK_MIN = 200
+const HTTP_STATUS_REDIRECT_MIN = 300
 
 export const readDeploymentVersion = Effect.fn("fixture.readDeploymentVersion")(function* (upstream: UrlString) {
   const reply = yield* Effect.tryPromise({
@@ -37,7 +39,7 @@ export const readDeploymentVersion = Effect.fn("fixture.readDeploymentVersion")(
         reason: NonEmptyString.make("Ordinary deployment configuration response unavailable")
       })
   })
-  if (reply.status < 200 || reply.status >= 300)
+  if (reply.status < HTTP_STATUS_OK_MIN || reply.status >= HTTP_STATUS_REDIRECT_MIN)
     return yield* new FixtureBoundaryError({
       stage: "config-read",
       httpStatus: reply.status,

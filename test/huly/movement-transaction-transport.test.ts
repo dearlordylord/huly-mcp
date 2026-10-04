@@ -1,6 +1,6 @@
 import type { Tx, TxOperations } from "@hcengineering/core"
 import { it } from "@effect/vitest"
-import { Effect, Fiber, Redacted } from "effect"
+import { Effect, Fiber, Redacted, Schema } from "effect"
 import { describe, expect } from "vitest"
 import {
   MovementTransportConfigSchema,
@@ -12,7 +12,6 @@ import {
   type MovementHttpPort
 } from "../../src/huly/movement-transaction-transport.js"
 import { NonEmptyString, PositiveInteger, UrlString } from "../../src/domain/schemas/shared.js"
-import { Schema } from "effect"
 import { TestClock } from "effect/testing"
 import { sdkFixture } from "../helpers/huly-sdk.js"
 

@@ -9,9 +9,10 @@ import { runPublic } from "./public-process.js"
 import { readStableIssue, runMutation } from "./mutation.js"
 import { FixtureBoundaryError } from "./fixture-errors.js"
 import { NonEmptyString } from "../../src/domain/schemas/shared.js"
+const MOVEMENT_REQUEST_ID = 2
 
 const McpResponse = Schema.Struct({
-  id: Schema.Literal(2),
+  id: Schema.Literal(MOVEMENT_REQUEST_ID),
   result: Schema.Struct({
     isError: Schema.optionalKey(Schema.Boolean),
     content: Schema.Array(Schema.Struct({ type: Schema.Literal("text"), text: Schema.String }))
@@ -104,7 +105,12 @@ const main = async (args: ScenarioArguments, signal: AbortSignal) => {
           },
           id: 1
         },
-        { jsonrpc: "2.0", method: "tools/call", params: { name: "move_issue", arguments: args.movement }, id: 2 }
+        {
+          jsonrpc: "2.0",
+          method: "tools/call",
+          params: { name: "move_issue", arguments: args.movement },
+          id: MOVEMENT_REQUEST_ID
+        }
       ]
         .map((request) => JSON.stringify(request))
         .join("\n") + "\n"
