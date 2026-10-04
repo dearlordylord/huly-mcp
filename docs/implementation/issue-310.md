@@ -76,3 +76,16 @@ fixture now contains every actual task/ancestor/owned-record snapshot, evaluates
 all match and notMatch conditions in strict mode, and checks that an actual
 changed grandchild timestamp refuses the batch. No test success is claimed for
 this successor until the scheduled rerun.
+
+Scheduled verification at immutable 9b777554d9aee381444107d9f4dd6f165d4a19e3:
+`GOMAXPROCS=2 pnpm typecheck` exited 0; TypeScript passed and strict Effect
+checked 1089 files with zero errors, warnings or messages within the unchanged
+120-second budget. The seven focused tree files exited 0: 23 tests passed in
+5.23s, including SDK-port batching/ancestry and conditional-refusal evidence,
+partial/malformed/unknown-total conflict preservation, exact task ownership,
+complete tree mappings, generated properties and TestClock phase bounds. Logs:
+`/tmp/hulymcp-dalph-306-311/takeover/issue-310-types-9b7.log` and
+`/tmp/hulymcp-dalph-306-311/takeover/issue-310-focused-9b7.log`.
+Both independent source review axes passed that immutable candidate. These
+focused checks do not certify the complete harness, strict coverage or deployed
+Huly behavior; combined gates and the final authorized live suite remain pending.
