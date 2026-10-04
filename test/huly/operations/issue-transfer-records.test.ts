@@ -136,12 +136,16 @@ it.effect("no-op refuses unavailable ownership inspection instead of claiming ve
     const f = transferFixture()
     yield* move(f.input).pipe(Effect.provide(f.layer))
     const { inspectTransferRecords: _inspect, ...ports } = f.operations
+    expect(_inspect).toBeDefined()
+    expect(ports).not.toHaveProperty("inspectTransferRecords")
     const layer = HulyClient.testLayer(ports)
-    expect(yield* move(f.input).pipe(Effect.provide(layer))).toMatchObject({
-      outcome: "blocked",
-      changed: false,
-      reason: expect.stringContaining("inspection unavailable")
-    })
+    const result = yield* move(f.input).pipe(Effect.provide(layer))
+    expect(result).toMatchObject({ outcome: "blocked", changed: false, discovery: "incomplete" })
+    if (result.outcome === "blocked") {
+      expect(result.inspection).toContain("MCP get_issue")
+      expect(result.inspection).toContain(f.root._id)
+      expect(result.issueIds).toContain(f.input.issue)
+    }
     expect(f.state.allocated).toBe(1)
     expect(f.state.sent).toBe(1)
   })
