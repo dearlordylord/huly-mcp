@@ -6,15 +6,13 @@ import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement
 import { HulyClient } from "../../../src/huly/client.js"
 import { inspectTransferPlan } from "../../../src/huly/operations/issue-transfer-preflight.js"
 import { task, tracker } from "../../../src/huly/huly-plugins.js"
-import { DocId } from "../../../src/domain/schemas/shared.js"
+import { DocId, UNKNOWN_TOTAL } from "../../../src/domain/schemas/shared.js"
 import { transferFixture } from "../../helpers/transfer.js"
 import { sdkFixture } from "../../helpers/huly-sdk.js"
 import { assertExists } from "../../../src/utils/assertions.js"
 
 const issueSnapshot = (input: unknown) => Schema.decodeUnknownSync(MovementIssueSchema)(input)
 const projectSnapshot = (input: unknown) => Schema.decodeUnknownSync(MovementProjectSchema)(input)
-
-const UNKNOWN_TOTAL = -1
 
 const modes = [
   "archivedRestricted",

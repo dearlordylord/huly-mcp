@@ -4,7 +4,7 @@ import { expect } from "vitest"
 import { MovementIssueSchema, MovementProjectSchema } from "../../../src/domain/schemas/issue-movement-state.js"
 import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"
 import { TransferInspectionSchema, TransferWriteSchema } from "../../../src/domain/schemas/issue-transfer.js"
-import { DocId } from "../../../src/domain/schemas/shared.js"
+import { DocId, ObjectClassName } from "../../../src/domain/schemas/shared.js"
 import { HulyClient } from "../../../src/huly/client.js"
 import { moveIssue } from "../../../src/huly/operations/issue-movement.js"
 import { inspectTransferPlan } from "../../../src/huly/operations/issue-transfer-preflight.js"
@@ -34,7 +34,9 @@ const mutations = [
   "foreignRecord",
   "incompleteSource",
   "incompleteTarget",
-  "closureChange"
+  "closureChange",
+  "unsupportedRecord",
+  "missingIdentity"
 ]
 
 for (const mutation of mutations) {
@@ -78,13 +80,25 @@ for (const mutation of mutations) {
       if (mutation === "wrongRank") f.root.rank = "0|zzzzzz:"
       if (mutation === "changedKind") f.root.kind = sdkFixture("different-kind")
       if (mutation === "changedTitle") f.root.title = "Changed after commit"
-      const currentRecords = mutation === "missingHistory" ? [] : [...f.records]
+      const currentRecords: Array<unknown> = mutation === "missingHistory" ? [] : [...f.records]
       if (mutation === "foreignRecord") {
         const old = f.records[0]
         expect(old).toBeDefined()
         if (old !== undefined)
           currentRecords.push({ ...old, _id: DocId.make("new-record"), space: DocId.make(f.source._id) })
       }
+      if (mutation === "unsupportedRecord") {
+        const old = f.records[0]
+        if (old !== undefined)
+          currentRecords.push({
+            ...old,
+            kind: "unsupported",
+            _class: ObjectClassName.make("chunter:class:ChatMessage"),
+            _id: DocId.make("unsupported-new-record")
+          })
+      }
+      const originalFindOne = f.operations.findOne
+      assertExists(originalFindOne)
       const inspection = Schema.decodeUnknownSync(TransferInspectionSchema)({
         discovery: mutation === "incompleteRecords" ? "incomplete" : "complete",
         records: currentRecords,
@@ -96,6 +110,10 @@ for (const mutation of mutations) {
       assertExists(originalFindAll)
       const observed = HulyClient.testLayer({
         ...withoutInspector,
+        findOne: (cls, query, options) =>
+          mutation === "missingIdentity" && Reflect.get(query, "_id") === f.root._id
+            ? Effect.succeed(undefined)
+            : originalFindOne(cls, query, options),
         findAll: (cls, query, options) =>
           originalFindAll(cls, query, options).pipe(
             Effect.map((rows) => {
@@ -111,7 +129,18 @@ for (const mutation of mutations) {
         ...(mutation === "missingInspector" ? {} : { inspectTransferRecords: () => Effect.succeed(inspection) })
       })
       const observedClient = yield* HulyClient.pipe(Effect.provide(observed))
-      expect(yield* verifyTransfer(observedClient, prepared, destination, write)).toBeUndefined()
+      expect(yield* verifyTransfer(observedClient, prepared, destination, write)).toMatchObject({
+        state: [
+          "invalidIdentity",
+          "missingInspector",
+          "incompleteRecords",
+          "incompleteSource",
+          "incompleteTarget",
+          "closureChange"
+        ].includes(mutation)
+          ? "unavailable"
+          : "inconsistent"
+      })
       expect(f.state.sent).toBe(1)
     })
   )

@@ -4,11 +4,9 @@ import { Effect, Schema } from "effect"
 import { expect } from "vitest"
 import { inspectTransferRecords, commitTransfer } from "../../src/huly/issue-transfer-adapter.js"
 import { TransferWriteSchema } from "../../src/domain/schemas/issue-transfer.js"
-import { IssueId } from "../../src/domain/schemas/shared.js"
+import { IssueId, UNKNOWN_TOTAL } from "../../src/domain/schemas/shared.js"
 import { activity, attachment, core, tracker } from "../../src/huly/huly-plugins.js"
 import { sdkFixture, findResult } from "../helpers/huly-sdk.js"
-
-const UNKNOWN_TOTAL = -1
 
 const adapterFixture = () => {
   const history = {
@@ -198,7 +196,7 @@ it.effect("refuses unknown owned and nested inventory counts even when the SDK r
       const inspected = yield* inspectTransferRecords(f.client, IssueId.make("root"))
       expect(inspected.blockers.join(" ")).toContain("Incomplete")
       expect(f.updates).toEqual([])
-      if (mode === "unknownOwnedTotal") expect(inspected.discovery).toBe("incomplete")
+      expect(inspected.discovery).toBe("incomplete")
     }
   })
 )

@@ -10,6 +10,7 @@ import {
 import type { Issue, Project } from "@hcengineering/tracker"
 import { Effect } from "effect"
 
+import { UNKNOWN_TOTAL } from "../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
 import { HulyAuthError } from "../../src/huly/errors-base.js"
 import { tracker } from "../../src/huly/huly-plugins.js"
@@ -73,8 +74,6 @@ const updateAggregates = (issues: Array<Issue>): void => {
       .map((child) => ({ childId: child._id, estimation: child.estimation, reportedTime: child.reportedTime }))
   }
 }
-
-const UNKNOWN_TOTAL = -1
 
 export interface MovementFixtureOptions {
   selectorTotal?: number

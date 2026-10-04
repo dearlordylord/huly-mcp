@@ -64,7 +64,9 @@ export const inspectTransferRecords = Effect.fn("transfer.inspectRecords")(funct
         blockers.push(`Unsupported owned record ${parsed._id} (${parsed._class}); only automatic history is supported.`)
     }
   }
-  blockers.push(...(yield* inspectNestedHistory(client, classes, [...records.values()])))
+  const nested = yield* inspectNestedHistory(client, classes, [...records.values()])
+  blockers.push(...nested.blockers)
+  if (nested.incomplete) discovery.incomplete = true
   const inspection: TransferInspection = {
     discovery: discovery.incomplete ? "incomplete" : "complete",
     records: [...records.values()],
@@ -96,9 +98,13 @@ const inspectNestedHistory = Effect.fn("transfer.inspectNestedHistory")(function
   client: TxOperations,
   classes: ReadonlySet<ReturnType<typeof toClassRef<AttachedDoc>>>,
   observed: TransferInspection["records"]
-): Effect.fn.Return<ReadonlyArray<TransferInspection["blockers"][number]>, HulyClientError> {
+): Effect.fn.Return<
+  { readonly blockers: ReadonlyArray<TransferInspection["blockers"][number]>; readonly incomplete: boolean },
+  HulyClientError
+> {
   const records = new Map(observed.map((record) => [record._id, record]))
   const blockers: Array<string> = []
+  let incomplete = false
   for (const record of [...records.values()].filter((record) => record.kind === "history")) {
     for (const cls of classes) {
       const nested = yield* Effect.tryPromise({
@@ -110,11 +116,14 @@ const inspectNestedHistory = Effect.fn("transfer.inspectNestedHistory")(function
           ),
         catch: (cause) => makeOperationConnectionError("findAll", cause)
       })
-      if (nested.total < 0) blockers.push(`Incomplete nested ownership discovery on history ${record._id}.`)
+      if (nested.total < 0) {
+        incomplete = true
+        blockers.push(`Incomplete nested ownership discovery on history ${record._id}.`)
+      }
       if (nested.length > 0 || nested.total > 0) blockers.push(`Unsupported nested records on history ${record._id}.`)
     }
   }
-  return blockers
+  return { blockers, incomplete }
 })
 
 export const commitTransfer = async (
