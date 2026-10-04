@@ -32,7 +32,7 @@ export const movementHistoryMatches = (
   if (record.kind !== "history" || destinationId === undefined) return false
   const history = record.history
   const transaction = transactions.find((value) => value.txId === history.txId)
-  if (transaction === undefined) return false
+  if (transaction === undefined || "target" in transaction) return false
   if (!historyIdentityMatches(record, transaction, destinationId) || !historyMetadataMatches(record, transaction))
     return false
   const updates = parseUpdates(history.attributeUpdates)
