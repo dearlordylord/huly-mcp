@@ -1,6 +1,13 @@
 import { type Effect, Schema } from "effect"
 import { SocialIdentityId } from "../domain/schemas/person-administration.js"
-import { DocId, IssueId, NonEmptyString, ObjectClassName, Timestamp } from "../domain/schemas/shared.js"
+import {
+  DocId,
+  HulyTransactionScope,
+  IssueId,
+  NonEmptyString,
+  ObjectClassName,
+  Timestamp
+} from "../domain/schemas/shared.js"
 
 export const MovementHistoryAttributeSchema = Schema.Struct({ attrKey: NonEmptyString, attrClass: ObjectClassName })
 export type MovementHistoryAttribute = Schema.Schema.Type<typeof MovementHistoryAttributeSchema>
@@ -54,5 +61,15 @@ export const MovementTransactionsSchema = Schema.Array(
   Schema.Union([MovementTransactionReceiptSchema, MovementRecordTransactionReceiptSchema])
 )
 export type MovementTransactions = Schema.Schema.Type<typeof MovementTransactionsSchema>
+export const MovementTransactionBatchSchema = Schema.Struct({
+  kind: Schema.Literal("single-scoped-apply"),
+  rootId: IssueId,
+  scope: HulyTransactionScope,
+  transactionIds: Schema.Array(DocId)
+})
+export type MovementTransactionBatch = Schema.Schema.Type<typeof MovementTransactionBatchSchema>
 // Internal awaited observer of queued intent, not acknowledgement or durable commit evidence.
-export type MovementTransactionProgress = (transactions: MovementTransactions) => Effect.Effect<void>
+export type MovementTransactionProgress = (
+  transactions: MovementTransactions,
+  batch?: MovementTransactionBatch
+) => Effect.Effect<void>
