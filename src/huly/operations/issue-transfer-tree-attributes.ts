@@ -10,15 +10,25 @@ export interface TransferTaskSnapshot {
   readonly protectedIssue: TransferIssue
 }
 
-export const resolveTransferTreeAttributes = (
+const unavailableTaskConsent = (
+  root: MovementIssue,
+  discovered: ReadonlyArray<MovementIssue>,
+  resolution: NonNullable<MoveIssueParams["resolutions"]>[number]
+): TransferConflict => ({
+  code: "invalid-resolution",
+  issueId: resolution.issueId,
+  identifier: discovered.find((issue) => issue._id === resolution.issueId)?.identifier ?? root.identifier,
+  reason:
+    "This task's protected payload is unavailable; its expected value and replacement consent cannot be admitted. Reinspect the stable task ID before retry."
+})
+
+const inspectTreeResolutions = (
   root: MovementIssue,
   tasks: ReadonlyArray<TransferTaskSnapshot>,
-  inventories: ReadonlyArray<AttributeInventory>,
-  resolutions: MoveIssueParams["resolutions"],
-  discovered: ReadonlyArray<MovementIssue> = tasks.map((task) => task.issue)
-) => {
+  discovered: ReadonlyArray<MovementIssue>,
+  resolutions: MoveIssueParams["resolutions"]
+): Array<TransferConflict> => {
   const conflicts: Array<TransferConflict> = []
-  const changes: Array<TransferAttributeChange> = []
   const ids = new Set(discovered.map((issue) => issue._id))
   const parsedIds = new Set(tasks.map((task) => task.issue._id))
   const seen = new Set<string>()
@@ -32,15 +42,21 @@ export const resolveTransferTreeAttributes = (
         reason: `Duplicate or out-of-tree resolution ${key}. Consent applies only to the addressed task and expected value.`
       })
     if (ids.has(resolution.issueId) && !parsedIds.has(resolution.issueId))
-      conflicts.push({
-        code: "invalid-resolution",
-        issueId: resolution.issueId,
-        identifier: discovered.find((issue) => issue._id === resolution.issueId)?.identifier ?? root.identifier,
-        reason:
-          "This task's protected payload is unavailable; its expected value and replacement consent cannot be admitted. Reinspect the stable task ID before retry."
-      })
+      conflicts.push(unavailableTaskConsent(root, discovered, resolution))
     seen.add(key)
   }
+  return conflicts
+}
+
+export const resolveTransferTreeAttributes = (
+  root: MovementIssue,
+  tasks: ReadonlyArray<TransferTaskSnapshot>,
+  inventories: ReadonlyArray<AttributeInventory>,
+  resolutions: MoveIssueParams["resolutions"],
+  discovered: ReadonlyArray<MovementIssue> = tasks.map((task) => task.issue)
+) => {
+  const conflicts = inspectTreeResolutions(root, tasks, discovered, resolutions)
+  const changes: Array<TransferAttributeChange> = []
   for (const task of tasks) {
     const resolved = resolveTransferAttributes(
       task.issue,

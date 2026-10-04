@@ -16,6 +16,28 @@ const parseRows = (input: unknown) =>
     Effect.mapError((cause) => new HulyDataInvalidError({ operation: "move_issue", entity: "tree attachments", cause }))
   )
 
+const parseAttachmentRows = (inputs: ReadonlyArray<unknown>) => {
+  const rows: Array<MovementIssue> = []
+  const reasons: Array<string> = []
+  for (const input of inputs) {
+    const issue = Schema.decodeUnknownOption(MovementIssueSchema)(input)
+    if (issue._tag === "None")
+      reasons.push("An attached task payload is invalid; usable siblings are inspected independently.")
+    else rows.push(issue.value)
+  }
+  return { rows, reasons }
+}
+
+const attachmentDiscoveryProblem = (totalInput: unknown, rawCount: number, capacity: boolean): string | undefined => {
+  const total = Schema.decodeUnknownOption(Count)(totalInput)
+  return total._tag === "None" || total.value !== rawCount || capacity
+    ? `Attachment discovery is incomplete or exceeds the ${MAX_TRANSFER_TASKS}-task safety limit; no prefix can move.`
+    : undefined
+}
+
+const discoveredTreeResult = (tree: TransferTree, reasons: ReadonlyArray<string>): TransferTree =>
+  reasons.length === 0 ? tree : { complete: false, issues: tree.issues, reasons: [...new Set(reasons)] }
+
 export const inspectTransferTree = Effect.fn("transfer.inspectTree")(function* (
   client: HulyClient["Service"],
   root: MovementIssue
@@ -32,26 +54,18 @@ export const inspectTransferTree = Effect.fn("transfer.inspectTree")(function* (
       { limit: MAX_TRANSFER_TASKS + 1, total: true }
     )
     const parsed = yield* parseRows({ rows: raw, total: raw.total })
-    const rows: Array<MovementIssue> = []
-    for (const input of parsed.rows) {
-      const issue = Schema.decodeUnknownOption(MovementIssueSchema)(input)
-      if (issue._tag === "None")
-        reasons.push("An attached task payload is invalid; usable siblings are inspected independently.")
-      else rows.push(issue.value)
-    }
-    const total = Schema.decodeUnknownOption(Count)(parsed.total)
+    const observation = parseAttachmentRows(parsed.rows)
+    reasons.push(...observation.reasons)
+    const { rows } = observation
     const capacity = inventory.length + rows.length > MAX_TRANSFER_TASKS
-    if (total._tag === "None" || total.value !== parsed.rows.length || capacity)
-      reasons.push(
-        `Attachment discovery is incomplete or exceeds the ${MAX_TRANSFER_TASKS}-task safety limit; no prefix can move.`
-      )
+    const problem = attachmentDiscoveryProblem(parsed.total, parsed.rows.length, capacity)
+    if (problem !== undefined) reasons.push(problem)
     inventory.push(...rows.slice(0, MAX_TRANSFER_TASKS - inventory.length))
     const tree = discoverTransferTree(root, inventory)
     if (!tree.complete) reasons.push(...tree.reasons)
-    if (capacity) return { complete: false, issues: tree.issues, reasons: [...new Set(reasons)] }
+    if (capacity) return discoveredTreeResult(tree, reasons)
     pending = rows.filter((issue) => !visited.has(issue._id))
     for (const issue of pending) visited.add(issue._id)
   }
-  const tree = discoverTransferTree(root, inventory)
-  return reasons.length === 0 ? tree : { complete: false, issues: tree.issues, reasons: [...new Set(reasons)] }
+  return discoveredTreeResult(discoverTransferTree(root, inventory), reasons)
 })
