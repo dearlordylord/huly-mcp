@@ -28,7 +28,10 @@ export const movementFailureResult = (
   const issueIds = [
     ...new Set([
       ...plan.tree.map((issue) => issue._id),
-      ...(evidence.verification.status === "observed" ? evidence.verification.tasks.map((task) => task.issueId) : [])
+      ...(evidence.verification.status === "observed" ? evidence.verification.tasks.map((task) => task.issueId) : []),
+      ...(evidence.verification.status === "observed" && evidence.verification.consistency === "inconsistent"
+        ? (evidence.verification.absentIssueIds ?? [])
+        : [])
     ])
   ]
   return {
