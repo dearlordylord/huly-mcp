@@ -1,9 +1,72 @@
 import { Schema } from "effect"
 import { describe, expect, it } from "vitest"
-import { MovementUncertaintyEvidenceSchema } from "../../../src/domain/schemas/issue-movement-uncertainty.js"
+import {
+  MovementUncertaintyEvidenceSchema,
+  MovementVerificationEvidenceSchema
+} from "../../../src/domain/schemas/issue-movement-uncertainty.js"
 
 const destination = { projectId: "destination", parentId: "existing-parent" }
 const decode = Schema.decodeUnknownOption(MovementUncertaintyEvidenceSchema)
+const decodeVerification = Schema.decodeUnknownOption(MovementVerificationEvidenceSchema)
+
+for (const completeness of ["complete", "incomplete"]) {
+  it(`rejects contradictory present and absent IDs in ${completeness} verification`, () => {
+    const task = { issueId: "root", projectId: "source", parentId: null, identifier: "SOURCE-1", number: 1 }
+    const facts = {
+      status: "observed",
+      completeness,
+      consistency: "inconsistent",
+      reason: "Another task is absent",
+      tasks: [task],
+      records: []
+    }
+    expect(decodeVerification({ ...facts, absentIssueIds: ["child"] })._tag).toBe("Some")
+    expect(decodeVerification({ ...facts, absentIssueIds: ["root"] })._tag).toBe("None")
+  })
+
+  it(`retains confirmed absence with ${completeness} verification without inventing task payloads`, () => {
+    const result = decodeVerification({
+      status: "observed",
+      completeness,
+      consistency: "inconsistent",
+      reason: "Child read confirmed absence; another task could not be read.",
+      absentIssueIds: ["child"],
+      tasks: [],
+      records: []
+    })
+    expect(result._tag).toBe("Some")
+    if (result._tag === "Some" && result.value.status === "observed" && result.value.consistency === "inconsistent") {
+      expect(result.value.absentIssueIds).toEqual(["child"])
+      expect(result.value.tasks).toEqual([])
+    }
+  })
+}
+
+it("does not accept confirmed absence as consistent or merely undetermined verification", () => {
+  const facts = { status: "observed", absentIssueIds: ["child"], tasks: [], records: [] }
+  expect(decodeVerification({ ...facts, completeness: "complete", consistency: "consistent" })._tag).toBe("None")
+  expect(
+    decodeVerification({
+      ...facts,
+      completeness: "incomplete",
+      consistency: "undetermined",
+      reason: "Other task could not be read"
+    })._tag
+  ).toBe("None")
+})
+
+it("keeps unread verification undetermined without asserting an absence", () => {
+  const result = decodeVerification({
+    status: "observed",
+    completeness: "incomplete",
+    consistency: "undetermined",
+    reason: "Task request unavailable",
+    tasks: [],
+    records: []
+  })
+  expect(result._tag).toBe("Some")
+  if (result._tag === "Some") expect(result.value).not.toHaveProperty("absentIssueIds")
+})
 
 describe("movement uncertainty evidence contract", () => {
   it("records a lost allocation response without guessing a number or a historical mapping", () => {
