@@ -1,3 +1,6 @@
+import { Option, Schema } from "effect"
+import { HulyDataInvalidError } from "./errors-base.js"
+import { MovementTransactionsSchema, type MovementTransactions } from "./issue-movement-transactions.js"
 import type { Issue } from "@hcengineering/tracker"
 import type { TxOperations } from "@hcengineering/core"
 import type { TransferTreeTaskWrite, TransferTreeWrite } from "../domain/schemas/issue-transfer-tree.js"
@@ -9,7 +12,8 @@ import { toRef, toClassRef } from "./operations/sdk-boundary.js"
 
 export const commitTransferTree = async (
   client: TxOperations,
-  write: TransferTreeWrite
+  write: TransferTreeWrite,
+  publishQueuedTransactions?: (transactions: MovementTransactions) => Promise<void>
 ): Promise<HulyConditionalWriteResult> => {
   const apply = client.apply(HulyTransactionScope.make(`issue-transfer:${write.rootId}`))
   const root = write.tasks.find((task) => task.issueId === write.rootId)
@@ -35,6 +39,7 @@ export const commitTransferTree = async (
   }
   await queueRemovedAncestorInformation(apply, write)
   await queueTransferRootCounts(apply, root)
+  if (publishQueuedTransactions !== undefined) await publishQueuedTransactions(parseQueuedTransactions(apply))
   return (await apply.commit()).result ? "applied" : "condition-not-met"
 }
 
@@ -88,4 +93,23 @@ const matchProtectedTask = (apply: ReturnType<TxOperations["apply"]>, task: Tran
             : toRef(original.milestone)
     })
   )
+}
+
+const parseQueuedTransactions = (apply: ReturnType<TxOperations["apply"]>): MovementTransactions => {
+  const input: unknown = apply.txes
+    .filter((tx) => String(tx._class) === "core:class:TxUpdateDoc" && String(tx.objectClass) === "tracker:class:Issue")
+    .map((tx) => ({
+      txId: tx._id,
+      transactionClass: tx._class,
+      objectId: tx.objectId,
+      objectClass: tx.objectClass,
+      objectSpace: tx.objectSpace,
+      modifiedOn: tx.modifiedOn,
+      modifiedBy: tx.modifiedBy,
+      operations: Reflect.get(tx, "operations")
+    }))
+  const parsed = Schema.decodeUnknownOption(MovementTransactionsSchema)(input)
+  if (Option.isNone(parsed))
+    throw new HulyDataInvalidError({ operation: "move_issue", entity: "queued movement transactions" })
+  return parsed.value
 }

@@ -449,14 +449,25 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
         const operations: HulyClientOperations = {
           inspectTransferRecords: (issueId, tree) => inspectTransferRecords(client, issueId, undefined, tree),
           inspectTransferForest: (roots, tree, publish) => inspectTransferForest(client, roots, tree, publish),
-          commitTransferTree: (write) =>
-            withMovementWriteClient(
-              client,
-              movementTransportConfig,
-              sdk.movementHttp,
-              "conditionalUpdateDoc",
-              (movement) => commitTransferTree(movement, write)
-            ),
+          commitTransferTree: (write, publishQueuedTransactions) =>
+            Effect.gen(function* () {
+              const context = yield* Effect.context<never>()
+              return yield* withMovementWriteClient(
+                client,
+                movementTransportConfig,
+                sdk.movementHttp,
+                "conditionalUpdateDoc",
+                (movement, signal) =>
+                  commitTransferTree(
+                    movement,
+                    write,
+                    publishQueuedTransactions === undefined
+                      ? undefined
+                      : (transactions) =>
+                          Effect.runPromiseWith(context)(publishQueuedTransactions(transactions), { signal })
+                  )
+              )
+            }),
           commitTransfer: (write) =>
             withMovementWriteClient(
               client,
