@@ -1,6 +1,6 @@
 import { Client } from "@modelcontextprotocol/client"
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"
-import { Redacted, Schema } from "effect"
+import { Clock, Effect, Redacted, Schema } from "effect"
 
 const CALL_TIMEOUT_MILLISECONDS = 45_000
 const InputSchema = Schema.Tuple([Schema.NonEmptyString, Schema.fromJsonString(Schema.JsonObject)])
@@ -15,6 +15,30 @@ export class IntegrationMcpCallError extends Error {
     super(`Integration MCP call failed during ${phase}; no automatic mutation retry performed.`)
   }
 }
+export const IntegrationMcpPhaseSchema = Schema.Struct({
+  phase: Schema.Literals([
+    "bundle-ready",
+    "connect-start",
+    "connect-ready",
+    "list-start",
+    "list-ready",
+    "call-start",
+    "call-reply",
+    "close-start",
+    "closed"
+  ]),
+  elapsedMilliseconds: Schema.Number
+})
+export type IntegrationMcpPhase = Schema.Schema.Type<typeof IntegrationMcpPhaseSchema>
+// Internal clock/output ports; serialized phase events are owned by the schema above.
+export interface IntegrationMcpTelemetry {
+  readonly now: () => number
+  readonly publish: (event: IntegrationMcpPhase) => void
+}
+const NANOSECONDS_PER_MILLISECOND = 1_000_000
+export const integrationMcpClock = (): number =>
+  Number(Effect.runSync(Clock.monotonicTimeNanos)) / NANOSECONDS_PER_MILLISECOND
+const quietTelemetry: IntegrationMcpTelemetry = { now: integrationMcpClock, publish: () => {} }
 // Internal process adapter seam; protocol input and output remain schema-owned.
 interface ProcessOptions {
   readonly command: string
@@ -28,8 +52,14 @@ const EnvelopeSchema = Schema.Struct({
 })
 export const integrationMcpCall = async (
   input: unknown,
-  options: ProcessOptions
+  options: ProcessOptions,
+  telemetry: IntegrationMcpTelemetry = quietTelemetry
 ): Promise<Schema.Schema.Type<typeof EnvelopeSchema>> => {
+  const started = telemetry.now()
+  const emit = (phase: IntegrationMcpPhase["phase"]): void =>
+    telemetry.publish(
+      Schema.decodeUnknownSync(IntegrationMcpPhaseSchema)({ phase, elapsedMilliseconds: telemetry.now() - started })
+    )
   const parsed = Schema.decodeUnknownOption(InputSchema)(input)
   if (parsed._tag === "None") throw new IntegrationMcpCallError("input")
   const environment = Schema.decodeUnknownSync(EnvironmentSchema)(
@@ -49,22 +79,30 @@ export const integrationMcpCall = async (
   )
   let phase: "connect" | "call" | "reply" | "close" = "connect"
   const exchange = async () => {
+    emit("connect-start")
     await client.connect(transport)
+    emit("connect-ready")
     phase = "call"
+    emit("list-start")
     const definition = (await client.listTools()).tools.find((tool) => tool.name === parsed.value[0])
+    emit("list-ready")
     if (definition === undefined) throw new IntegrationMcpCallError("call")
+    emit("call-start")
     const raw = await client.callTool(
       { name: parsed.value[0], arguments: parsed.value[1] },
       { toolDefinition: definition, timeout: CALL_TIMEOUT_MILLISECONDS, maxTotalTimeout: CALL_TIMEOUT_MILLISECONDS }
     )
+    emit("call-reply")
     phase = "reply"
     const reply = Schema.decodeUnknownSync(ReplySchema)(raw)
     if (reply.isError !== true) Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Json))(reply.content[0].text)
     return Schema.decodeUnknownSync(EnvelopeSchema)({ jsonrpc: "2.0", id: RESPONSE_ID, result: reply })
   }
   const close = async () => {
+    emit("close-start")
     try {
       await client.close()
+      emit("closed")
     } catch {
       throw new IntegrationMcpCallError("close")
     }

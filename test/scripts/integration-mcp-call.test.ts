@@ -3,7 +3,7 @@ import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { test, expect } from "vitest"
-import { integrationMcpCall } from "../../scripts/integration-mcp-call.js"
+import { integrationMcpCall, type IntegrationMcpPhase } from "../../scripts/integration-mcp-call.js"
 
 for (const isError of [false, true]) {
   test(`keeps stdin open until the actual ${isError ? "error" : "success"} tool reply`, async () => {
@@ -26,11 +26,35 @@ for (const isError of [false, true]) {
     `
     )
     try {
-      const reply = await integrationMcpCall(["move_issue", "{}"], {
-        command: process.execPath,
-        args: [server],
-        environment: { INTEGRATION_FIXTURE_VALUE: "typed-private-value", ABSENT_FIXTURE_VALUE: undefined }
-      })
+      const events: Array<IntegrationMcpPhase> = []
+      const clock = { value: 0 }
+      const reply = await integrationMcpCall(
+        ["move_issue", "{}"],
+        {
+          command: process.execPath,
+          args: [server],
+          environment: { INTEGRATION_FIXTURE_VALUE: "typed-private-value", ABSENT_FIXTURE_VALUE: undefined }
+        },
+        {
+          now: () => clock.value++,
+          publish: (event) => {
+            events.push(event)
+          }
+        }
+      )
+      expect(events.map((event) => event.phase)).toEqual([
+        "connect-start",
+        "connect-ready",
+        "list-start",
+        "list-ready",
+        "call-start",
+        "call-reply",
+        "close-start",
+        "closed"
+      ])
+      expect(events.map((event) => event.elapsedMilliseconds)).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
+      expect(JSON.stringify(events)).not.toContain("typed-private-value")
+      expect(JSON.stringify(events)).not.toContain("move_issue")
       expect(reply.result.isError).toBe(isError)
       if (isError) expect(reply.result.content[0].text).toBe("fixture failure")
       else expect(JSON.parse(reply.result.content[0].text)).toEqual({ received: true })
