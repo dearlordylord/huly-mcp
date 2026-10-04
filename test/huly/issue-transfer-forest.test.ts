@@ -425,6 +425,8 @@ it.effect("refuses unavailable model metadata without declaring complete empty o
     const f = forestFixture()
     f.modelState.failModel = true
     const result = yield* inspectTransferForest(f.client, roots, [], undefined, policy)
+    expect(result.map((entry) => entry.ownerId)).toEqual(roots)
+    expect(observed(result)).toHaveLength(roots.length)
     expect(observed(result).every((inspection) => inspection.discovery === "incomplete")).toBe(true)
     expect(
       observed(result).every((inspection) =>
