@@ -533,7 +533,8 @@ not an assertion that an earlier run executed the newer commit.
 
 The movement coordinator uses one absolute deadline, a worktree lock, retained
 logs and input fingerprints. The package command includes final-gate preparation
-inside the same deadline. Inspect `pnpm integration:movement --plan`
+inside the same deadline. Preparation removes inherited `HULY_*` values from
+the unit-test subprocess; the parent retains them for live suites. Inspect `pnpm integration:movement --plan`
 before running. After process preparation, the user’s delivery budget is twenty
 minutes including the final gate, queueing, diagnosis and live work. Never reset
 that budget for a new commit or subtask. Expiry is an incomplete outcome, never

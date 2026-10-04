@@ -71,7 +71,7 @@
     "update-readme": "tsx scripts/update-readme-tools.mjs",
     "verify-readme": "tsx scripts/update-readme-tools.mjs --check",
     "verify-movement-fixtures": "node scripts/verify-movement-fixtures.mjs",
-    "test:movement-process": "node --test scripts/verify-movement-fixtures.test.mjs test/scripts/run-movement-certification.node.test.mjs",
+    "test:movement-process": "node --test --test-reporter=dot scripts/verify-movement-fixtures.test.mjs test/scripts/run-movement-certification.node.test.mjs",
     "integration:movement": "node scripts/run-movement-certification.mjs --prepare scripts/prepare-movement-certification.sh"
   },
   "bin": {
