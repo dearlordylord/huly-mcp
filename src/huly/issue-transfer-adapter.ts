@@ -10,7 +10,7 @@ import {
   TransferRecordSchema,
   type TransferWrite
 } from "../domain/schemas/issue-transfer.js"
-import { ObjectClassName, type HulyConditionalWriteResult } from "../domain/schemas/shared.js"
+import { ObjectClassName, HulyTransactionScope, type HulyConditionalWriteResult } from "../domain/schemas/shared.js"
 import type { HulyClientError } from "./client.js"
 import { HulyDataInvalidError, makeOperationConnectionError } from "./errors-base.js"
 import { core, tracker } from "./huly-plugins.js"
@@ -120,7 +120,7 @@ export const commitTransfer = async (
   client: TxOperations,
   write: TransferWrite
 ): Promise<HulyConditionalWriteResult> => {
-  const apply = client.apply()
+  const apply = client.apply(HulyTransactionScope.make(`issue-transfer:${write.issueId}`))
   apply.match(
     tracker.class.Issue,
     hulyQuery<Issue>({
