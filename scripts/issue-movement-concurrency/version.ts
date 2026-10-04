@@ -3,10 +3,10 @@ import { WorkspaceInfoSchema } from "../../src/domain/schemas/workspace.js"
 import { NonEmptyString, UrlString, WorkspaceVersion } from "../../src/domain/schemas/shared.js"
 import { runPublic } from "./public-process.js"
 import { FixtureBoundaryError } from "./fixture-errors.js"
+import { makeServerVersionEvidence, readDeploymentVersion } from "./version-evidence.js"
 
 const VERSION_READ_TIMEOUT_MS = 30_000
 const upstream = Schema.decodeUnknownSync(UrlString)(process.argv[2])
-const VersionEvidence = Schema.Struct({ workspaceVersion: WorkspaceVersion })
 void Effect.runPromise(
   Effect.gen(function* () {
     const result = yield* Effect.tryPromise({
@@ -27,7 +27,7 @@ void Effect.runPromise(
           })
       )
     )
-    return yield* Schema.decodeUnknownEffect(VersionEvidence)({ workspaceVersion: workspace.version }).pipe(
+    const workspaceVersion = yield* Schema.decodeUnknownEffect(WorkspaceVersion)(workspace.version).pipe(
       Effect.mapError(
         () =>
           new FixtureBoundaryError({
@@ -36,6 +36,8 @@ void Effect.runPromise(
           })
       )
     )
+    const deployment = yield* readDeploymentVersion(upstream)
+    return yield* makeServerVersionEvidence(deployment, workspaceVersion)
   }).pipe(Effect.timeout(VERSION_READ_TIMEOUT_MS))
 ).then(
   (evidence) => process.stdout.write(`${JSON.stringify(evidence)}\n`),
