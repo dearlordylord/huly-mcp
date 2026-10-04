@@ -1,10 +1,12 @@
 import type { ActivityReference } from "@hcengineering/activity"
+import type { Doc, TxUpdateDoc } from "@hcengineering/core"
 import type { Issue, Project } from "@hcengineering/tracker"
 import { Effect, Schema } from "effect"
+import { SocialIdentityId } from "../src/domain/schemas/person-administration.js"
 import { MovementIssueSchema } from "../src/domain/schemas/issue-movement-state.js"
 import { TransferIssueSchema, TransferProjectSchema } from "../src/domain/schemas/issue-transfer.js"
-import { DocId, IssueId, ProjectIdentifier, Count } from "../src/domain/schemas/shared.js"
-import { activity, tracker } from "../src/huly/huly-plugins.js"
+import { DocId, IssueId, ProjectIdentifier, Count, ObjectClassName, Timestamp } from "../src/domain/schemas/shared.js"
+import { activity, core, tracker } from "../src/huly/huly-plugins.js"
 import { inspectTransferForest } from "../src/huly/issue-transfer-forest.js"
 import { hulyQuery } from "../src/huly/operations/query-helpers.js"
 import { toRef } from "../src/huly/operations/sdk-boundary.js"
@@ -13,7 +15,13 @@ import { connectIntegrationHuly } from "./integration-huly-client.js"
 const INCOMING_REFERENCE_PROBE_LIMIT = 10_001
 
 const Arguments = Schema.fromJsonString(
-  Schema.Struct({ issues: Schema.Array(IssueId), projects: Schema.Array(ProjectIdentifier) })
+  Schema.Struct({
+    issues: Schema.Array(IssueId),
+    projects: Schema.Array(ProjectIdentifier),
+    migrationEvidence: Schema.optionalKey(
+      Schema.Struct({ destinationSpace: DocId, beforeRecordIds: Schema.Array(DocId) })
+    )
+  })
 )
 const IssueSnapshot = Schema.Struct({ ...MovementIssueSchema.fields, ...TransferIssueSchema.fields })
 const ProjectSnapshot = Schema.Struct({
@@ -24,6 +32,17 @@ const ProjectSnapshot = Schema.Struct({
 })
 const parseSnapshot = <A>(schema: Schema.ConstraintDecoder<A>, input: unknown): A =>
   Schema.decodeUnknownSync(schema)(input)
+
+const MigrationTransaction = Schema.Struct({
+  _id: DocId,
+  objectId: DocId,
+  objectClass: ObjectClassName,
+  objectSpace: DocId,
+  modifiedOn: Timestamp,
+  modifiedBy: SocialIdentityId,
+  // Preserve every operation key for exact space-only proof in the independent assertion.
+  operations: Schema.Record(Schema.String, Schema.Json)
+})
 
 const run = async () => {
   const args = Schema.decodeUnknownSync(Arguments)(process.argv[2])
@@ -64,7 +83,25 @@ const run = async () => {
         )
       )
     )
-    process.stdout.write(`${JSON.stringify({ issues, projects })}\n`)
+    const evidence = args.migrationEvidence
+    const migrationTransactions =
+      evidence === undefined
+        ? undefined
+        : await (async () => {
+            const rows = await client.findAll<TxUpdateDoc<Doc>>(
+              core.class.TxUpdateDoc,
+              hulyQuery<TxUpdateDoc<Doc>>({ objectId: { $in: evidence.beforeRecordIds.map((id) => toRef<Doc>(id)) } }),
+              { limit: INCOMING_REFERENCE_PROBE_LIMIT, total: true }
+            )
+            if (rows.total !== rows.length || rows.length >= INCOMING_REFERENCE_PROBE_LIMIT)
+              throw new Error("Incomplete migration transaction snapshot")
+            return rows
+              .map((row) => parseSnapshot(MigrationTransaction, row))
+              .filter((tx) => tx.operations["space"] === evidence.destinationSpace)
+          })()
+    process.stdout.write(
+      `${JSON.stringify({ issues, projects, ...(migrationTransactions === undefined ? {} : { migrationTransactions }) })}\n`
+    )
   } finally {
     await client.close()
   }

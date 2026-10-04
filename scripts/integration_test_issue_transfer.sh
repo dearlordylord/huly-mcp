@@ -97,15 +97,18 @@ for transport in mcp cli; do
     jq -c '{expected:"completed",outcome,changed,reason,discovery,verificationStatus:.verification.status,verificationConsistency:.verification.consistency}' <<<"$RESULT" >&2
     exit 1
   fi
-  AFTER=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$ARGS")
-  jq -e --argjson before "$BEFORE" --arg root "$ROOT_ID" --arg parent "$PARENT_ID" '
+  AFTER_ARGS=$(jq -nc --argjson args "$ARGS" --argjson before "$BEFORE" --arg destination "$DESTINATION" '$args + {migrationEvidence:{destinationSpace:($before.projects[]|select(.identifier==$destination)|._id),beforeRecordIds:[$before.issues[].owned.records[]._id]}}')
+  AFTER=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$AFTER_ARGS")
+  jq -L scripts -e --argjson before "$BEFORE" --arg root "$ROOT_ID" --arg parent "$PARENT_ID" '
+    include "issue-transfer-record-preservation";
+    .migrationTransactions as $transactions |
     (.issues[] | select(.issue._id == $root)) as $after |
     ($before.issues[] | select(.issue._id == $root)) as $old |
     ($after.issue | del(.space,.identifier,.number,.rank,.attachedTo,.parents,.modifiedOn)) == ($old.issue | del(.space,.identifier,.number,.rank,.attachedTo,.parents,.modifiedOn)) and
     $after.issue.attachedTo == $parent and
     $after.incomingReferences == $old.incomingReferences and
     (.projects | map(del(.sequence))) == ($before.projects | map(del(.sequence))) and
-    all($old.owned.records[]; . as $record | any($after.owned.records[]; ._id == $record._id and (del(.space) == ($record | del(.space))) and .space == $after.issue.space))' >/dev/null <<<"$AFTER"
+    all($old.owned.records[]; . as $record | any($after.owned.records[]; ._id == $record._id and preserved_record($record; .; $transactions) and .space == $after.issue.space))' >/dev/null <<<"$AFTER"
   jq -e --argjson before "$BEFORE" --arg root "$ROOT_ID" --arg old "$OLD_ID" --arg parent "$PARENT_ID" --arg existing "$EXISTING_ID" --arg counterpart "$COUNTERPART_ID" '
     (.issues[] | select(.issue._id == $old) | .issue) as $sourceParent |
     (.issues[] | select(.issue._id == $parent) | .issue) as $targetParent |
@@ -131,7 +134,7 @@ for transport in mcp cli; do
   done
   REPEAT=$(mcp move_issue "$(jq -nc --arg issue "$ROOT_ID" --argjson destination "$DEST" '{issue:$issue,destination:$destination}')")
   jq -e '.outcome == "no-op" and .changed == false' >/dev/null <<<"$REPEAT"
-  [[ "$(jq -Sc . <<<"$AFTER")" == "$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$ARGS" | jq -Sc .)" ]]
+  [[ "$(jq -Sc 'del(.migrationTransactions)' <<<"$AFTER")" == "$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$ARGS" | jq -Sc .)" ]]
   # Ordinary destination callers can still read comments/history and download unchanged blobs.
   mcp get_activity_message "$(jq -nc --arg messageId "$COMMENT" '{messageId:$messageId}')" | jq -e --arg id "$COMMENT" '.id == $id' >/dev/null
   mcp list_comments "$(jq -nc --arg project "$DESTINATION" --arg issueIdentifier "$ROOT_ID" '{project:$project,issueIdentifier:$issueIdentifier}')" | jq -e --arg id "$COMMENT" 'any(.[]; .id == $id)' >/dev/null
