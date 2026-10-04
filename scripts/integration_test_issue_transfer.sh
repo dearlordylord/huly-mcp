@@ -93,7 +93,10 @@ for transport in mcp cli; do
   jq -e --arg root "$ROOT_ID" '.issues[] | select(.issue._id == $root) | .owned.records | any(.kind == "history")' >/dev/null <<<"$BEFORE"
   DEST=$(jq -nc --arg project "$DESTINATION" --arg parent "$PARENT_ID" '{project:$project,parent:$parent}')
   if [[ "$transport" == mcp ]]; then RESULT=$(mcp move_issue "$(jq -nc --arg issue "$ROOT_ID" --argjson destination "$DEST" '{issue:$issue,destination:$destination}')"); else RESULT=$("${CLI[@]}" issues move "$ROOT_ID" --destination "$DEST" --json); fi
-  jq -e --arg old "$ROOT" --arg root "$ROOT_ID" --arg parent "$PARENT_ID" '.outcome == "completed" and .changed and .issueId == $root and .parentId == $parent and .tasks[0].previousIdentifier == $old and .tasks[0].identifier != $old and (.tasks[0].url | startswith("http"))' >/dev/null <<<"$RESULT"
+  if ! jq -e --arg old "$ROOT" --arg root "$ROOT_ID" --arg parent "$PARENT_ID" '.outcome == "completed" and .changed and .issueId == $root and .parentId == $parent and .tasks[0].previousIdentifier == $old and .tasks[0].identifier != $old and (.tasks[0].url | startswith("http"))' >/dev/null <<<"$RESULT"; then
+    jq -c '{expected:"completed",outcome,changed,reason,discovery,verificationStatus:.verification.status,verificationConsistency:.verification.consistency}' <<<"$RESULT" >&2
+    exit 1
+  fi
   AFTER=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$ARGS")
   jq -e --argjson before "$BEFORE" --arg root "$ROOT_ID" --arg parent "$PARENT_ID" '
     (.issues[] | select(.issue._id == $root)) as $after |
