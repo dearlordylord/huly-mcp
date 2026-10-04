@@ -133,15 +133,17 @@ test.skipIf(process.platform === "win32")(
     `
 
     try {
-      await expect(
-        runBoundedCommand({
-          args: ["-e", leader],
-          executable: process.execPath,
-          name: "resistant descendant fixture",
-          terminationGraceMilliseconds: Milliseconds.make(100),
-          timeoutMilliseconds: COMMAND_TIMEOUT
-        })
-      ).rejects.toThrow("resistant descendant fixture exceeded 2 seconds")
+      const custodyDirectory = join(directory, "custody")
+      const program = `
+      const {runBoundedCommand,Milliseconds}=await import('./scripts/run-bounded-command.ts');
+      try { await runBoundedCommand({executable:process.execPath,args:['-e',${JSON.stringify(leader)}],name:'resistant descendant fixture',timeoutMilliseconds:Milliseconds.make(${COMMAND_TIMEOUT}),terminationGraceMilliseconds:Milliseconds.make(100)}); }
+      catch(error) { console.log(error.message); }
+    `
+      const { stdout } = await execFileAsync(process.execPath, ["--import", "tsx", "--eval", program], {
+        env: { ...process.env, MOVEMENT_CUSTODY_DIR: custodyDirectory }
+      })
+      expect(stdout).toContain("resistant descendant fixture exceeded 2 seconds")
+      expect(await readdir(custodyDirectory)).toEqual([])
 
       const descendantPid = Number(await readFile(pidFile, "utf8"))
       await expect.poll(() => processExists(descendantPid), { interval: 20, timeout: 2_000 }).toBe(false)

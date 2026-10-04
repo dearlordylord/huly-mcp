@@ -245,6 +245,7 @@ export const runBoundedCommand = ({
       try {
         await proveStoppedGroup(child, cleanup, terminationGraceMilliseconds, stop, name)
         checkRegistration()
+        clearTimeout(settlementTimer)
         if (custody !== undefined) unlinkSync(custody)
       } catch (error) {
         retainUnconfirmed()
