@@ -96,6 +96,7 @@ import {
   withMovementWriteClient,
   type MovementWriteError
 } from "./movement-write-client.js"
+import type { TransferForestInspection, TransferForestProgress } from "./issue-transfer-forest-state.js"
 import type { TransferInspection, TransferWrite } from "../domain/schemas/issue-transfer.js"
 
 // --- Connection helpers ---
@@ -226,6 +227,11 @@ interface HulyClientContext {
 }
 
 export interface HulyClientOperations extends HulyClientContext {
+  readonly inspectTransferForest?: (
+    roots: ReadonlyArray<IssueId>,
+    tree?: ReadonlyArray<MovementIssue>,
+    publish?: TransferForestProgress
+  ) => Effect.Effect<TransferForestInspection, HulyClientError | HulyDataInvalidError>
   readonly inspectTransferRecords?: (
     issueId: IssueId,
     tree?: ReadonlyArray<MovementIssue>
