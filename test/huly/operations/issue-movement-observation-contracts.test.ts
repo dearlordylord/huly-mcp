@@ -273,7 +273,7 @@ for (const change of ["payload-unavailable", "wrong-project", "wrong-owner"]) {
   )
 }
 
-for (const capability of ["available", "unavailable"]) {
+for (const capability of ["available", "unavailable", "omitted-optional-changes"]) {
   it.effect(`read-only tree verification with ${capability} record inspection needs no progress publisher`, () =>
     Effect.gen(function* () {
       const f = transferTreeFixture()
@@ -301,13 +301,18 @@ for (const capability of ["available", "unavailable"]) {
       ).toBe("completed")
       const { inspectTransferRecords: _inspect, ...withoutInspection } = f.operations
       const reader = yield* HulyClient.pipe(
-        Effect.provide(HulyClient.testLayer(capability === "available" ? f.operations : withoutInspection))
+        Effect.provide(HulyClient.testLayer(capability !== "unavailable" ? f.operations : withoutInspection))
       )
-      const verification = yield* verifyTransferTree(reader, prepared, destination, assertExists(writes[0]))
+      const captured = assertExists(writes[0])
+      const write =
+        capability === "omitted-optional-changes"
+          ? { ...captured, tasks: captured.tasks.map(({ attributeChanges: _changes, ...task }) => task) }
+          : captured
+      const verification = yield* verifyTransferTree(reader, prepared, destination, write)
       expect(verification).toMatchObject({
         status: "observed",
-        completeness: capability === "available" ? "complete" : "incomplete",
-        consistency: capability === "available" ? "consistent" : "undetermined"
+        completeness: capability !== "unavailable" ? "complete" : "incomplete",
+        consistency: capability !== "unavailable" ? "consistent" : "undetermined"
       })
       expect(f.state.sent).toBe(1)
       expect(f.state.allocated).toBe(3)
