@@ -21,6 +21,7 @@ import {
 } from "./issue-movement-hierarchy.js"
 import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
+import { inspectTransferTree } from "./issue-transfer-tree-inspection.js"
 
 const DISCOVERY_LIMIT = 10_001
 export type MovementError = HulyClientError | HulyDataInvalidError
@@ -33,6 +34,14 @@ export interface MovementPlan {
   readonly tree: ReadonlyArray<Issue>
   readonly relevant: ReadonlyArray<Issue>
 }
+export interface MovementPlanRefusal {
+  readonly reason: string
+  readonly issueIds: ReadonlyArray<Issue["_id"]>
+}
+const planRefusal = (root: Issue, reason: string, issues: ReadonlyArray<Issue> = [root]): MovementPlanRefusal => ({
+  reason,
+  issueIds: issues.map((issue) => issue._id)
+})
 
 // Internal SDK result metadata check; record payloads are parsed separately below.
 const completeDiscovery = (result: { readonly total: number; readonly length: number }) =>
@@ -131,21 +140,26 @@ export const inspectMovementPlan = Effect.fn("movement.inspectPlan")(function* (
   root: Issue,
   parent: Issue | undefined,
   source: Project
-): Effect.fn.Return<MovementPlan | string, MovementError> {
+): Effect.fn.Return<MovementPlan | MovementPlanRefusal, MovementError> {
   const hierarchy = yield* inspectMovementProject(client, root)
-  if (hierarchy === undefined) return "Incomplete or duplicate project discovery; safety limit may have been exceeded."
+  if (hierarchy === undefined)
+    return planRefusal(root, "Incomplete or duplicate project discovery; safety limit may have been exceeded.")
   const observedRoot = hierarchy.byId.get(root._id)
-  if (observedRoot === undefined) return "Root changed during inspection."
+  if (observedRoot === undefined) return planRefusal(root, "Root changed during inspection.")
+  const discovered = yield* inspectTransferTree(client, observedRoot)
+  if (!discovered.complete) return planRefusal(root, discovered.reasons.join(" "), discovered.issues)
+  const tree = discovered.issues
   const snapshotProblem = inspectedSnapshotProblem(root, observedRoot, parent, hierarchy)
-  if (snapshotProblem !== undefined) return snapshotProblem
-  const tree = descendantsOf(hierarchy, observedRoot)
+  if (snapshotProblem !== undefined) return planRefusal(root, snapshotProblem, tree)
   const relevant = [...tree, ...(ancestorsOf(hierarchy, observedRoot) ?? []), ...parentHierarchy(hierarchy, parent)]
   const inconsistent = relevant
     .map((issue) => hierarchyProblem(hierarchy, issue))
     .find((reason) => reason !== undefined)
-  if (inconsistent !== undefined) return inconsistent
+  if (inconsistent !== undefined) return planRefusal(root, inconsistent, tree)
   const closureProblem = yield* inspectMovementClosure(client, hierarchy, relevant)
-  return closureProblem ?? { root: observedRoot, parent, source, tree, relevant }
+  return closureProblem === undefined
+    ? { root: observedRoot, parent, source, tree, relevant }
+    : planRefusal(root, closureProblem, tree)
 })
 
 const parentHierarchy = (hierarchy: ReturnType<typeof movementHierarchy>, parent: Issue | undefined) =>

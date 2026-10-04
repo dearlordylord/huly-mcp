@@ -87,6 +87,7 @@ import { inspectNativePersonReferences, migrateNativePersonReferences } from "./
 import { commitTransfer, inspectTransferRecords } from "./issue-transfer-adapter.js"
 import { commitTransferTree } from "./issue-transfer-tree-adapter.js"
 import type { TransferTreeWrite } from "../domain/schemas/issue-transfer-tree.js"
+import type { MovementIssue } from "../domain/schemas/issue-movement-state.js"
 import type { TransferInspection, TransferWrite } from "../domain/schemas/issue-transfer.js"
 
 // --- Connection helpers ---
@@ -218,7 +219,8 @@ interface HulyClientContext {
 
 export interface HulyClientOperations extends HulyClientContext {
   readonly inspectTransferRecords?: (
-    issueId: IssueId
+    issueId: IssueId,
+    tree?: ReadonlyArray<MovementIssue>
   ) => Effect.Effect<TransferInspection, HulyClientError | HulyDataInvalidError>
   readonly commitTransfer?: (write: TransferWrite) => Effect.Effect<HulyConditionalWriteResult, HulyClientError>
   readonly commitTransferTree?: (write: TransferTreeWrite) => Effect.Effect<HulyConditionalWriteResult, HulyClientError>
@@ -412,7 +414,7 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
           Effect.tryPromise({ try: () => op(client), catch: (error) => makeOperationConnectionError(operation, error) })
 
         const operations: HulyClientOperations = {
-          inspectTransferRecords: (issueId) => inspectTransferRecords(client, issueId),
+          inspectTransferRecords: (issueId, tree) => inspectTransferRecords(client, issueId, undefined, tree),
           commitTransfer: (write) => withClient((client) => commitTransfer(client, write), "conditionalUpdateDoc"),
           commitTransferTree: (write) =>
             withClient((client) => commitTransferTree(client, write), "conditionalUpdateDoc"),

@@ -7,6 +7,7 @@ import type { MovementError } from "./issue-movement-preflight.js"
 import { inspectTransferPlan } from "./issue-transfer-preflight.js"
 import { transferRetryCall } from "./issue-transfer-retry.js"
 import { executeTransferTree } from "./issue-transfer-tree-execution.js"
+import { TRANSFER_DISCOVERY_BUDGET } from "./issue-transfer-tree.js"
 
 const guidance = (root: MovementIssue, destination: MovementProject) =>
   `Inspect stable ID with MCP get_issue ${JSON.stringify({ project: destination.identifier, identifier: root._id })} or CLI huly issues get ${destination.identifier} ${root._id} --json. Stable-ID lookup searches the workspace. Do not automatically repeat movement; sequence gaps may remain.`
@@ -20,7 +21,11 @@ export const transferIssue = Effect.fn("transferIssue")(function* (
   params: MoveIssueParams
 ): Effect.fn.Return<MoveIssueResult, MovementError> {
   const inspection = guidance(root, destination)
-  const preparedResult = yield* Effect.result(inspectTransferPlan(client, root, parent, source, destination, params))
+  const preparedResult = yield* Effect.result(
+    inspectTransferPlan(client, root, parent, source, destination, params).pipe(
+      Effect.timeout(TRANSFER_DISCOVERY_BUDGET)
+    )
+  )
   if (preparedResult._tag === "Failure")
     return {
       outcome: "blocked",

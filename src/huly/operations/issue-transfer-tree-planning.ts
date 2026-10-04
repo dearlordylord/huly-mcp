@@ -1,9 +1,10 @@
 import { makeRank } from "@hcengineering/rank"
-import type { MovementProject } from "../../domain/schemas/issue-movement-state.js"
+import type { MovementIssue, MovementProject } from "../../domain/schemas/issue-movement-state.js"
 import type { TransferTreeWrite } from "../../domain/schemas/issue-transfer-tree.js"
 import { IssueIdentifier, NonEmptyString, type PositiveInteger } from "../../domain/schemas/shared.js"
 import type { TransferPlan } from "./issue-transfer-preflight.js"
 import { transferTreeParent } from "./issue-transfer-tree.js"
+import { movementNoParent } from "./issue-movement-hierarchy.js"
 
 export const planTransferTreeWrites = (
   prepared: TransferPlan,
@@ -30,20 +31,55 @@ export const planTransferTreeWrites = (
       rank,
       records: task.records,
       recordClasses: task.recordClasses,
+      treeIssueIds: prepared.tasks.map((snapshot) => snapshot.issue._id),
       attributeChanges: prepared.attributeChanges.filter((change) => change.issueId === task.issue._id),
       expectedIssue: task.protectedIssue,
-      expectedHierarchy: task.issue
+      expectedHierarchy: task.issue,
+      finalParents: []
     })
     previousRank = rank
   }
   const movedIds = new Set(tasks.map((task) => task.issueId))
-  return {
-    rootId: prepared.plan.root._id,
-    tasks,
-    ancestors: [
-      ...new Map(
-        prepared.plan.relevant.filter((issue) => !movedIds.has(issue._id)).map((issue) => [issue._id, issue])
-      ).values()
-    ]
+  const ancestors = [
+    ...new Map(
+      prepared.plan.relevant.filter((issue) => !movedIds.has(issue._id)).map((issue) => [issue._id, issue])
+    ).values()
+  ]
+  const finalTasks: Array<TransferTreeWrite["tasks"][number]> = []
+  for (const task of tasks) {
+    const parents = plannedAncestry(task, tasks, ancestors)
+    if (parents === undefined) return undefined
+    finalTasks.push({ ...task, finalParents: parents })
   }
+  return { rootId: prepared.plan.root._id, tasks: finalTasks, ancestors }
+}
+
+const plannedAncestry = (
+  task: TransferTreeWrite["tasks"][number],
+  tasks: TransferTreeWrite["tasks"],
+  ancestors: ReadonlyArray<MovementIssue>
+): MovementIssue["parents"] | undefined => {
+  const parents: Array<MovementIssue["parents"][number]> = []
+  const visited = new Set([task.issueId])
+  let parentId = task.parentId
+  while (parentId !== movementNoParent) {
+    if (visited.has(parentId)) return undefined
+    visited.add(parentId)
+    const moved = tasks.find((candidate) => candidate.issueId === parentId)
+    const existing = ancestors.find((candidate) => candidate._id === parentId)
+    if (moved === undefined && existing === undefined) return undefined
+    if (moved !== undefined) {
+      parents.push({
+        parentId,
+        identifier: moved.identifier,
+        parentTitle: moved.expectedHierarchy.title,
+        space: moved.destinationId
+      })
+      parentId = moved.parentId
+    } else if (existing !== undefined) {
+      parents.push({ parentId, identifier: existing.identifier, parentTitle: existing.title, space: existing.space })
+      parentId = existing.attachedTo
+    }
+  }
+  return parents
 }

@@ -104,6 +104,7 @@ export const TransferWriteSchema = Schema.Struct({
   rank: NonEmptyString,
   records: Schema.Array(TransferSupportedRecordSchema),
   recordClasses: Schema.Array(ObjectClassName),
+  treeIssueIds: Schema.optionalKey(Schema.Array(IssueId)),
   attributeChanges: Schema.optionalKey(Schema.Array(TransferAttributeChangeSchema))
 })
 export type TransferWrite = Schema.Schema.Type<typeof TransferWriteSchema>

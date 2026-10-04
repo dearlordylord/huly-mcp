@@ -34,6 +34,7 @@ export const transferTreeFixture = () => {
       return Effect.succeed(
         parseInspection({
           discovery: "complete",
+          classes: [...new Set(f.records.map((record) => record._class))],
           records: f.records.filter((record) => record.attachedTo === issueId),
           blockers: f.state.recordsBlockers,
           limitation: "Deterministic independently owned task record closure."

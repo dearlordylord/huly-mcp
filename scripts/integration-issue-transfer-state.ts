@@ -27,11 +27,15 @@ const run = async () => {
   const args = Schema.decodeUnknownSync(Arguments)(process.argv[2])
   const { client } = await connectIntegrationHuly()
   try {
+    const rawIssues = await Promise.all(
+      args.issues.map((id) => client.findOne<Issue>(tracker.class.Issue, hulyQuery<Issue>({ _id: toRef<Issue>(id) })))
+    )
+    const inspectedTree = rawIssues.map((raw) => parseSnapshot(MovementIssueSchema, raw))
     const issues = await Promise.all(
-      args.issues.map(async (id) => {
-        const raw = await client.findOne<Issue>(tracker.class.Issue, hulyQuery<Issue>({ _id: toRef<Issue>(id) }))
+      args.issues.map(async (id, index) => {
+        const raw = rawIssues[index]
         const issue = parseSnapshot(IssueSnapshot, raw)
-        const owned = await Effect.runPromise(inspectTransferRecords(client, id))
+        const owned = await Effect.runPromise(inspectTransferRecords(client, id, undefined, inspectedTree))
         const references = await client.findAll<ActivityReference>(
           activity.class.ActivityReference,
           hulyQuery<ActivityReference>({ attachedTo: toRef(id) }),

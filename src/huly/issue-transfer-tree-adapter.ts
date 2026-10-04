@@ -5,7 +5,7 @@ import { HulyTransactionScope, type HulyConditionalWriteResult } from "../domain
 import { tracker } from "./huly-plugins.js"
 import { queueTransferRootCounts, queueTransferTask } from "./issue-transfer-adapter.js"
 import { hulyQuery } from "./operations/query-helpers.js"
-import { toRef } from "./operations/sdk-boundary.js"
+import { toRef, toClassRef } from "./operations/sdk-boundary.js"
 
 export const commitTransferTree = async (
   client: TxOperations,
@@ -31,10 +31,30 @@ export const commitTransferTree = async (
     )
   for (const task of write.tasks) {
     matchProtectedTask(apply, task)
-    await queueTransferTask(apply, task)
+    await queueTransferTask(apply, task, task.finalParents)
   }
+  await queueRemovedAncestorInformation(apply, write)
   await queueTransferRootCounts(apply, root)
   return (await apply.commit()).result ? "applied" : "condition-not-met"
+}
+
+const queueRemovedAncestorInformation = async (
+  apply: ReturnType<TxOperations["apply"]>,
+  write: TransferTreeWrite
+): Promise<void> => {
+  for (const ancestor of write.ancestors) {
+    const removed = write.tasks
+      .filter(
+        (task) =>
+          task.expectedHierarchy.parents.some((parent) => parent.parentId === ancestor._id) &&
+          !task.finalParents.some((parent) => parent.parentId === ancestor._id)
+      )
+      .map((task) => toRef<Issue>(task.issueId))
+    if (removed.length > 0)
+      await apply.updateDoc(tracker.class.Issue, toRef(ancestor.space), toRef<Issue>(ancestor._id), {
+        $pull: { childInfo: { childId: { $in: removed } } }
+      })
+  }
 }
 
 const matchProtectedTask = (apply: ReturnType<TxOperations["apply"]>, task: TransferTreeTaskWrite) => {
@@ -50,6 +70,8 @@ const matchProtectedTask = (apply: ReturnType<TxOperations["apply"]>, task: Tran
       estimation: task.expectedHierarchy.estimation,
       reportedTime: task.expectedHierarchy.reportedTime,
       subIssues: task.expectedHierarchy.subIssues,
+      attachedToClass: toClassRef(task.expectedHierarchy.attachedToClass),
+      collection: task.expectedHierarchy.collection,
       component:
         original.component === undefined
           ? { $exists: false }

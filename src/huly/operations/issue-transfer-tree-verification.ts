@@ -6,7 +6,12 @@ import { TransferIssueSchema } from "../../domain/schemas/issue-transfer.js"
 import type { TransferTreeTaskWrite, TransferTreeWrite } from "../../domain/schemas/issue-transfer-tree.js"
 import type { HulyClient } from "../client.js"
 import { tracker } from "../huly-plugins.js"
-import { descendantsOf, hierarchyProblem, movementHierarchy } from "./issue-movement-hierarchy.js"
+import {
+  descendantsOf,
+  hierarchyProblem,
+  movementHierarchy,
+  type MovementHierarchy
+} from "./issue-movement-hierarchy.js"
 import { inspectMovementClosure, inspectMovementProject, type MovementError } from "./issue-movement-preflight.js"
 import type { TransferPlan } from "./issue-transfer-preflight.js"
 import { hulyQuery } from "./query-helpers.js"
@@ -37,31 +42,58 @@ export const verifyTransferTree = Effect.fn("transfer.verifyTree")(function* (
   })
   const inconsistent = (reason: string): TransferTreeVerification => ({ status: "inconsistent", tasks, reason })
   if (tasks.length !== write.tasks.length) return inconsistent("Some inspected tasks are absent from both projects.")
-  for (const task of write.tasks) {
-    const current = hierarchy.byId.get(task.issueId)
-    if (
-      current === undefined ||
-      current.space !== destination._id ||
-      current.identifier !== task.identifier ||
-      current.attachedTo !== task.parentId
-    )
-      return inconsistent(`Task ${task.issueId} does not satisfy its planned destination, identifier and parent.`)
-    const preservation = yield* inspectTaskPreservation(client, task)
-    if (preservation !== undefined) return inconsistent(preservation)
-  }
-  const root = hierarchy.byId.get(write.rootId)
-  if (root === undefined || descendantsOf(hierarchy, root).length !== write.tasks.length)
-    return inconsistent("Observed descendant closure differs from the complete planned tree.")
-  for (const issue of prepared.plan.relevant) {
-    const current = hierarchy.byId.get(issue._id)
-    if (current === undefined) return inconsistent(`Affected ancestor/task ${issue._id} is absent.`)
-    const problem = hierarchyProblem(hierarchy, current)
-    if (problem !== undefined) return inconsistent(problem)
-  }
+  const taskProblem = yield* inspectTreeTasks(client, hierarchy, destination, write)
+  if (taskProblem !== undefined) return inconsistent(taskProblem)
+  const hierarchyState = treeHierarchyProblem(prepared, hierarchy, write)
+  if (hierarchyState !== undefined) return inconsistent(hierarchyState)
   const closureProblem = yield* inspectMovementClosure(client, hierarchy, prepared.plan.relevant)
   if (closureProblem !== undefined) return inconsistent(closureProblem)
   return yield* inspectTreeRecords(client, prepared, destination, tasks)
 })
+
+const taskDestinationMatches = (
+  current: MovementIssue | undefined,
+  destination: MovementProject,
+  task: TransferTreeTaskWrite
+) =>
+  current !== undefined &&
+  current.space === destination._id &&
+  current.identifier === task.identifier &&
+  current.attachedTo === task.parentId &&
+  isDeepStrictEqual(current.parents, task.finalParents)
+
+const inspectTreeTasks = Effect.fn("transfer.inspectTreeTasks")(function* (
+  client: HulyClient["Service"],
+  hierarchy: MovementHierarchy,
+  destination: MovementProject,
+  write: TransferTreeWrite
+): Effect.fn.Return<string | undefined, MovementError> {
+  for (const task of write.tasks) {
+    const current = hierarchy.byId.get(task.issueId)
+    if (!taskDestinationMatches(current, destination, task))
+      return `Task ${task.issueId} does not satisfy its planned destination, identifier and parent.`
+    const preservation = yield* inspectTaskPreservation(client, task)
+    if (preservation !== undefined) return preservation
+  }
+  return undefined
+})
+
+const treeHierarchyProblem = (
+  prepared: TransferPlan,
+  hierarchy: MovementHierarchy,
+  write: TransferTreeWrite
+): string | undefined => {
+  const root = hierarchy.byId.get(write.rootId)
+  if (root === undefined || descendantsOf(hierarchy, root).length !== write.tasks.length)
+    return "Observed descendant closure differs from the complete planned tree."
+  for (const issue of prepared.plan.relevant) {
+    const current = hierarchy.byId.get(issue._id)
+    if (current === undefined) return `Affected ancestor/task ${issue._id} is absent.`
+    const problem = hierarchyProblem(hierarchy, current)
+    if (problem !== undefined) return problem
+  }
+  return undefined
+}
 
 const inspectTaskPreservation = Effect.fn("transfer.inspectTaskPreservation")(function* (
   client: HulyClient["Service"],
@@ -86,7 +118,7 @@ const inspectTreeRecords = Effect.fn("transfer.inspectTreeRecords")(function* (
   const inspect = client.inspectTransferRecords
   if (inspect === undefined) return { status: "unavailable", reason: "Owned-record verifier is unavailable." }
   for (const task of prepared.tasks) {
-    const current = yield* inspect(task.issue._id)
+    const current = yield* inspect(task.issue._id, tasks)
     if (current.discovery === "incomplete")
       return { status: "unavailable", reason: `Record closure of ${task.issue._id} is incomplete.` }
     if (

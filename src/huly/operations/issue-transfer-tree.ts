@@ -4,6 +4,10 @@ import { movementNoParent } from "./issue-movement-hierarchy.js"
 
 // One response must contain every mapping and conflict; never transfer a prefix.
 export const MAX_TRANSFER_TASKS = 1000
+export const MAX_TRANSFER_RECORDS = 10_000
+export const MAX_TRANSFER_CONFLICT_ENTRIES = 10_000
+export const TRANSFER_DISCOVERY_BUDGET = "10 seconds"
+export const TRANSFER_EXECUTION_BUDGET = "30 seconds"
 
 // Internal deterministic inspection result; boundary rows are already schema parsed.
 export type TransferTree =

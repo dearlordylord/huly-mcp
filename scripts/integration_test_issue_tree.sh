@@ -57,7 +57,7 @@ component() { mcp set_issue_component "$(jq -nc --arg project "$SOURCE" --arg id
 rich_records() {
   local issue="$1" comment space
   comment=$(mcp add_comment "$(jq -nc --arg project "$SOURCE" --arg issueIdentifier "$issue" '{project:$project,issueIdentifier:$issueIdentifier,body:"Each descendant retains nested supporting data"}')" | jq -r .commentId)
-  space=$(mcp get_project "$(jq -nc --arg project "$SOURCE" '{project:$project}')" | jq -r .id)
+  space=$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$(jq -nc --arg issue "$issue" --arg source "$SOURCE" --arg target "$TARGET" '{issues:[$issue],projects:[$source,$target]}')" | jq -r '.issues[0].issue.space')
   mcp add_attachment "$(jq -nc --arg objectId "$comment" --arg space "$space" '{objectId:$objectId,objectClass:"chunter:class:ChatMessage",space:$space,filename:"nested.txt",contentType:"text/plain",data:"dHJlZS1ibG9i"}')" >/dev/null
   mcp add_issue_attachment "$(jq -nc --arg project "$SOURCE" --arg identifier "$issue" '{project:$project,identifier:$identifier,filename:"task.txt",contentType:"text/plain",data:"dHJlZS1ibG9i"}')" >/dev/null
   mcp add_issue_label "$(jq -nc --arg project "$SOURCE" --arg identifier "$issue" '{project:$project,identifier:$identifier,label:"Complete tree certification"}')" >/dev/null

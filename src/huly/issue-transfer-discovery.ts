@@ -14,6 +14,7 @@ import { DocId, ListTotal, ObjectClassName } from "../domain/schemas/shared.js"
 import type { HulyClientError } from "./client.js"
 import { HulyDataInvalidError, makeOperationConnectionError } from "./errors-base.js"
 import { activity, core, tracker } from "./huly-plugins.js"
+import { MovementIssueSchema, type MovementIssue } from "../domain/schemas/issue-movement-state.js"
 import {
   OwnershipSchema,
   RecordOwnerSchema,
@@ -45,6 +46,7 @@ interface Visit {
   readonly path: ReadonlyArray<DocId>
 }
 interface DiscoveryState {
+  readonly tree: ReadonlyMap<string, MovementIssue>
   readonly records: Map<DocId, TransferRecord>
   readonly queue: Array<Visit>
   readonly blockers: Set<string>
@@ -60,10 +62,12 @@ const refuse = (state: DiscoveryState, reason: string) => {
 export const inspectTransferRecords = Effect.fn("transfer.inspectRecords")(function* (
   client: TxOperations,
   issueId: TransferWrite["issueId"],
-  limits: RecordDiscoveryLimits = DEFAULT_LIMITS
+  limits: RecordDiscoveryLimits = DEFAULT_LIMITS,
+  tree: ReadonlyArray<MovementIssue> = []
 ): Effect.fn.Return<TransferInspection, HulyClientError | HulyDataInvalidError> {
   const root = yield* inspectRuntimeRoot(client, issueId)
   const state: DiscoveryState = {
+    tree: new Map(tree.map((issue) => [issue._id, issue])),
     records: new Map(),
     classes: new Set(),
     queue: [{ owner: root, path: [root._id] }],
@@ -169,6 +173,14 @@ const inspectRow = Effect.fn("transfer.inspectRecordEdge")(function* (
   outgoing: boolean
 ): Effect.fn.Return<void, HulyDataInvalidError> {
   const ownership = yield* parseTransferBoundary(OwnershipSchema, row)
+  if (
+    state.tree.size > 0 &&
+    (yield* readModel(() => client.getHierarchy().isDerived(toClassRef<Doc>(ownership._class), tracker.class.Issue)))
+  ) {
+    yield* readModel(() => auditAttachedEdge(client, state, visit.owner, ownership, collections))
+    yield* inspectTaskEdge(state, visit.owner, row)
+    return
+  }
   const reference = ownership._class === String(activity.class.ActivityReference)
   const owner = reference ? yield* referenceOwner(row) : visit.owner
   if (reference && owner._id !== visit.owner._id) return // Incoming independent source owns its own routing.
@@ -179,6 +191,26 @@ const inspectRow = Effect.fn("transfer.inspectRecordEdge")(function* (
   yield* readModel(() => auditEdge(client, state, visit, ownership, owner, collections, reference))
   const record = yield* parseTransferRecord(row, owner)
   registerRecord(state, visit, record, limits)
+})
+
+const inspectTaskEdge = Effect.fn("transfer.inspectTaskEdge")(function* (
+  state: DiscoveryState,
+  owner: RecordOwner,
+  row: AttachedDoc
+): Effect.fn.Return<void, HulyDataInvalidError> {
+  const current = yield* parseTransferBoundary(MovementIssueSchema, row)
+  const expected = state.tree.get(current._id)
+  if (expected === undefined || !state.tree.has(owner._id)) {
+    refuse(state, `Uninspected task ownership edge ${current._id} under ${owner._id}; rebuild the complete tree.`)
+    return
+  }
+  if (
+    current.attachedTo !== owner._id ||
+    current.attachedToClass !== String(tracker.class.Issue) ||
+    current.collection !== "subIssues" ||
+    !isDeepStrictEqual(current, expected)
+  )
+    refuse(state, `Changed or invalid task ownership edge ${current._id}; inspect hierarchy before retry.`)
 })
 
 const declaredEdge = (

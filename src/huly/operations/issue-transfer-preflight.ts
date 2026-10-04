@@ -1,6 +1,8 @@
 import { inspectTransferAttributes } from "./issue-transfer-attribute-inspection.js"
+import { isDeepStrictEqual } from "node:util"
 import { resolveTransferTreeAttributes, type TransferTaskSnapshot } from "./issue-transfer-tree-attributes.js"
 import { inspectTransferTree } from "./issue-transfer-tree-inspection.js"
+import { MAX_TRANSFER_RECORDS, MAX_TRANSFER_CONFLICT_ENTRIES } from "./issue-transfer-tree.js"
 import type { TransferAttributeChange } from "../../domain/schemas/issue-transfer-attributes.js"
 import type { Issue, Project } from "@hcengineering/tracker"
 import type { ProjectType, TaskType } from "@hcengineering/task"
@@ -37,10 +39,12 @@ export interface TransferPlan {
   readonly protectedIssue: TransferIssue
   readonly records: ReadonlyArray<TransferSupportedRecord>
   readonly recordClasses: TransferInspection["classes"]
-  readonly tasks: ReadonlyArray<TransferTaskSnapshot & {
-    readonly records: ReadonlyArray<TransferSupportedRecord>
-    readonly recordClasses: TransferInspection["classes"]
-  }>
+  readonly tasks: ReadonlyArray<
+    TransferTaskSnapshot & {
+      readonly records: ReadonlyArray<TransferSupportedRecord>
+      readonly recordClasses: TransferInspection["classes"]
+    }
+  >
 }
 export interface TransferRefusal {
   readonly issueIds?: ReadonlyArray<MovementIssue["_id"]>
@@ -76,7 +80,7 @@ const hierarchyConflicts = (
   const conflicts: Array<TransferConflict> = []
   for (const issue of relevant) {
     const observed = hierarchy.byId.get(issue._id)
-    if (observed === undefined || observed.modifiedOn !== issue.modifiedOn)
+    if (observed === undefined || !isDeepStrictEqual(observed, issue))
       conflicts.push(conflict(root, "discovery", `Issue changed during inspection: ${issue._id}.`))
     const problem = hierarchyProblem(hierarchy, issue)
     if (problem !== undefined) conflicts.push(conflict(root, "discovery", problem))
@@ -229,16 +233,18 @@ const inspectWorkflow = Effect.fn("transfer.inspectWorkflow")(function* (
   return { protectedIssue, conflicts }
 })
 
-export const inspectTransferPlan = Effect.fn("transfer.inspectPlan")(function* (
+interface TransferContext {
+  readonly hierarchy: MovementHierarchy
+  readonly tree: ReadonlyArray<MovementIssue>
+  readonly relevant: ReadonlyArray<MovementIssue>
+}
+const inspectTransferContext = Effect.fn("transfer.inspectContext")(function* (
   client: HulyClient["Service"],
   root: MovementIssue,
   parent: MovementIssue | undefined,
-  source: MovementProject,
-  destination: MovementProject,
-  params: MoveIssueParams
-): Effect.fn.Return<TransferPlan | TransferRefusal, MovementError> {
-  const inspectRecords = client.inspectTransferRecords
-  if (inspectRecords === undefined || client.commitTransfer === undefined)
+  destination: MovementProject
+): Effect.fn.Return<TransferContext | TransferRefusal, MovementError> {
+  if (client.commitTransfer === undefined && client.commitTransferTree === undefined)
     return {
       conflicts: [conflict(root, "discovery", "Transfer adapter unavailable; no writes performed.")],
       limitation: "Inspection unavailable."
@@ -259,16 +265,27 @@ export const inspectTransferPlan = Effect.fn("transfer.inspectPlan")(function* (
       discovery: "incomplete",
       limitation: "Complete attachment discovery is required; no writes performed."
     }
-  const tree = discovered.issues
-  const relevant = [...tree, ...related(hierarchy, root, parent)]
-  const closureProblem = yield* inspectMovementClosure(client, hierarchy, relevant)
-  const inventories = yield* inspectTransferAttributes(client, source, destination)
+  return { hierarchy, tree: discovered.issues, relevant: [...discovered.issues, ...related(hierarchy, root, parent)] }
+})
+
+const inspectTransferTasks = Effect.fn("transfer.inspectTasks")(function* (
+  client: HulyClient["Service"],
+  inspectRecords: NonNullable<HulyClient["Service"]["inspectTransferRecords"]>,
+  tree: ReadonlyArray<MovementIssue>,
+  root: MovementIssue,
+  parent: MovementIssue | undefined,
+  source: MovementProject,
+  destination: MovementProject
+): Effect.fn.Return<
+  { readonly tasks: TransferPlan["tasks"]; readonly conflicts: ReadonlyArray<TransferConflict> },
+  MovementError
+> {
   const tasks: Array<TransferPlan["tasks"][number]> = []
-  const conflicts = hierarchyConflicts(root, hierarchy, relevant)
+  const conflicts: Array<TransferConflict> = []
   for (const issue of tree) {
     const taskParent = issue._id === root._id ? parent : tree.find((candidate) => candidate._id === issue.attachedTo)
     const workflow = yield* inspectWorkflow(client, issue, taskParent, source, destination)
-    const records = yield* inspectRecords(issue._id)
+    const records = yield* inspectRecords(issue._id, tree)
     conflicts.push(...workflow.conflicts, ...ownedRecordConflicts(issue, records))
     tasks.push({
       issue,
@@ -277,9 +294,43 @@ export const inspectTransferPlan = Effect.fn("transfer.inspectPlan")(function* (
       records: records.records.filter((record) => record.kind !== "unsupported")
     })
   }
+  return { tasks, conflicts }
+})
+
+export const inspectTransferPlan = Effect.fn("transfer.inspectPlan")(function* (
+  client: HulyClient["Service"],
+  root: MovementIssue,
+  parent: MovementIssue | undefined,
+  source: MovementProject,
+  destination: MovementProject,
+  params: MoveIssueParams
+): Effect.fn.Return<TransferPlan | TransferRefusal, MovementError> {
+  const inspectRecords = client.inspectTransferRecords
+  if (inspectRecords === undefined)
+    return {
+      conflicts: [conflict(root, "discovery", "Transfer adapter unavailable; no writes performed.")],
+      limitation: "Inspection unavailable."
+    }
+  const context = yield* inspectTransferContext(client, root, parent, destination)
+  if ("conflicts" in context) return context
+  const { hierarchy, tree, relevant } = context
+  const closureProblem = yield* inspectMovementClosure(client, hierarchy, relevant)
+  const inventories = yield* inspectTransferAttributes(client, source, destination)
+  const inspectedTasks = yield* inspectTransferTasks(client, inspectRecords, tree, root, parent, source, destination)
+  const { tasks } = inspectedTasks
+  const conflicts = [...hierarchyConflicts(root, hierarchy, relevant), ...inspectedTasks.conflicts]
   const attributes = resolveTransferTreeAttributes(root, tasks, inventories, params.resolutions)
   conflicts.push(...attributes.conflicts)
   if (closureProblem !== undefined) conflicts.push(conflict(root, "discovery", closureProblem))
+  const capacityProblem = transferCapacityProblem(tasks, conflicts)
+  if (capacityProblem !== undefined)
+    return {
+      issueIds: tree.map((issue) => issue._id),
+      conflicts: [conflict(root, "discovery", capacityProblem)],
+      discovery: "incomplete",
+      limitation:
+        "Response/execution safety limits prevent a complete supported plan. No task prefix or writes are permitted."
+    }
   if (conflicts.length > 0)
     return {
       issueIds: tree.map((issue) => issue._id),
@@ -302,6 +353,24 @@ export const inspectTransferPlan = Effect.fn("transfer.inspectPlan")(function* (
     records: tasks.flatMap((task) => task.records)
   }
 })
+
+const transferCapacityProblem = (
+  tasks: TransferPlan["tasks"],
+  conflicts: ReadonlyArray<TransferConflict>
+): string | undefined => {
+  const records = tasks.flatMap((task) => task.records)
+  if (records.length > MAX_TRANSFER_RECORDS)
+    return `Tree exceeds the supported ${MAX_TRANSFER_RECORDS}-owned-record execution limit.`
+  if (new Set(records.map((record) => record._id)).size !== records.length)
+    return "A supporting record appears under multiple task closures; inspect ownership before retry."
+  const entries = conflicts.reduce(
+    (count, entry) => count + 1 + ("candidates" in entry ? entry.candidates.length : 0),
+    0
+  )
+  return entries > MAX_TRANSFER_CONFLICT_ENTRIES
+    ? `Complete conflicts/candidates exceed the supported ${MAX_TRANSFER_CONFLICT_ENTRIES}-entry response limit; no truncated conflict inventory is returned.`
+    : undefined
+}
 
 const ownedRecordConflicts = (root: MovementIssue, records: TransferInspection): ReadonlyArray<TransferConflict> => [
   ...(records.discovery === "incomplete"

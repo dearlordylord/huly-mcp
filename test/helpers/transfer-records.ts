@@ -38,6 +38,7 @@ const definitions = new Map<string, Map<string, string>>([
   [
     String(tracker.class.Issue),
     new Map([
+      ["subIssues", String(tracker.class.Issue)],
       ["comments", String(chunter.class.ChatMessage)],
       ["attachments", String(attachment.class.Attachment)],
       ["labels", String(tags.class.TagReference)],

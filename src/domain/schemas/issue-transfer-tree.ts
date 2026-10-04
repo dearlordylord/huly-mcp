@@ -6,7 +6,8 @@ import { IssueId } from "./shared.js"
 export const TransferTreeTaskWriteSchema = Schema.Struct({
   ...TransferWriteSchema.fields,
   expectedIssue: TransferIssueSchema,
-  expectedHierarchy: MovementIssueSchema
+  expectedHierarchy: MovementIssueSchema,
+  finalParents: MovementIssueSchema.fields.parents
 })
 export type TransferTreeTaskWrite = Schema.Schema.Type<typeof TransferTreeTaskWriteSchema>
 export const TransferTreeWriteSchema = Schema.Struct({

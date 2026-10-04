@@ -7,10 +7,34 @@ import { moveIssue } from "../../../src/huly/operations/issue-movement.js"
 import { transferTreeFixture } from "../../helpers/transfer-tree.js"
 import { sdkFixture } from "../../helpers/huly-sdk.js"
 import { initializeHierarchy, movementIssue } from "../../helpers/movement.js"
+import { tracker } from "../../../src/huly/huly-plugins.js"
+import { MAX_TRANSFER_RECORDS } from "../../../src/huly/operations/issue-transfer-tree.js"
+import { DocId } from "../../../src/domain/schemas/shared.js"
 
 const call = (f: ReturnType<typeof transferTreeFixture>, input: unknown = f.input) =>
   parseMoveIssueParams(input).pipe(Effect.flatMap(moveIssue), Effect.provide(f.layer))
 const parseResult = (input: unknown) => Schema.decodeUnknownSync(MoveIssueResultSchema)(input)
+
+it.effect("combined owned-record capacity refuses every task before sequence reservation", () =>
+  Effect.gen(function* () {
+    const f = transferTreeFixture()
+    const original = f.records[0]
+    expect(original).toBeDefined()
+    if (original === undefined) return
+    for (let index = 0; index < MAX_TRANSFER_RECORDS; index++)
+      f.records.push({ ...original, _id: DocId.make(`bounded-history-${index}`) })
+    const result = yield* call(f)
+    expect(result).toMatchObject({
+      outcome: "blocked",
+      changed: false,
+      discovery: "incomplete",
+      issueIds: [f.root._id, f.child._id, f.grandchild._id]
+    })
+    expect(JSON.stringify(result)).toContain("owned-record execution limit")
+    expect(f.state.allocated).toBe(0)
+    expect(f.state.sent).toBe(0)
+  })
+)
 
 it.effect("moves a three-level tree in one call, retaining identity, edges, payload and both ancestor chains", () =>
   Effect.gen(function* () {
@@ -150,5 +174,70 @@ it.effect("workflow and independent descendant attributes aggregate before any r
     ).toEqual([f.root._id, f.child._id, f.grandchild._id])
     expect(f.state.allocated).toBe(0)
     expect(f.state.sent).toBe(0)
+  })
+)
+
+it.effect("top-level and nested source-parent fixtures retain all internal edges under destination ancestors", () =>
+  Effect.gen(function* () {
+    for (const placement of ["top-level", "nested"]) {
+      const f = transferTreeFixture()
+      const destinationAncestor = movementIssue("destination-ancestor", {
+        space: f.destination._id,
+        identifier: sdkFixture("OTHER-8"),
+        number: 8,
+        rank: f.parent.rank,
+        component: null,
+        milestone: null
+      })
+      f.parent.attachedTo = destinationAncestor._id
+      f.issues.push(destinationAncestor)
+      if (placement === "top-level") f.root.attachedTo = tracker.ids.NoParent
+      else {
+        const sourceAncestor = movementIssue("source-ancestor", {
+          number: 8,
+          rank: f.root.rank,
+          component: null,
+          milestone: null
+        })
+        f.old.attachedTo = sourceAncestor._id
+        f.issues.push(sourceAncestor)
+      }
+      initializeHierarchy(f.issues)
+      expect(yield* call(f)).toMatchObject({
+        outcome: "completed",
+        tasks: [{ issueId: f.root._id }, { issueId: f.child._id }, { issueId: f.grandchild._id }]
+      })
+      expect(f.grandchild.parents.map((parent) => parent.parentId)).toEqual([
+        f.child._id,
+        f.root._id,
+        f.parent._id,
+        destinationAncestor._id
+      ])
+      expect(destinationAncestor.childInfo.map((child) => child.childId)).toContain(f.grandchild._id)
+      expect(f.old.childInfo).toEqual([])
+    }
+  })
+)
+
+it.effect("a partially moved no-op tree refuses with stable-ID inspection guidance and no new numbers", () =>
+  Effect.gen(function* () {
+    const f = transferTreeFixture()
+    expect(yield* call(f)).toMatchObject({ outcome: "completed" })
+    f.grandchild.space = f.source._id
+    initializeHierarchy(f.issues)
+    const refused = parseResult(yield* call(f))
+    expect(refused).toMatchObject({
+      outcome: "blocked",
+      changed: false,
+      discovery: "incomplete",
+      issueIds: [f.root._id, f.child._id, f.grandchild._id]
+    })
+    if (refused.outcome === "blocked") {
+      expect(refused.conflicts?.[0]?.code).toBe("discovery")
+      expect(refused.inspection).toContain(f.grandchild._id)
+      expect(refused.inspection).toContain("huly issues get")
+    }
+    expect(f.state.allocated).toBe(3)
+    expect(f.state.sent).toBe(1)
   })
 )
