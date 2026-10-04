@@ -76,7 +76,6 @@ const plannedAncestry = (
     visited.add(parentId)
     const moved = tasks.find((candidate) => candidate.issueId === parentId)
     const existing = ancestors.find((candidate) => candidate._id === parentId)
-    if (moved === undefined && existing === undefined) return undefined
     if (moved !== undefined) {
       parents.push({
         parentId,
@@ -85,7 +84,8 @@ const plannedAncestry = (
         space: moved.destinationId
       })
       parentId = moved.parentId
-    } else if (existing !== undefined) {
+    } else {
+      if (existing === undefined) return undefined
       parents.push({ parentId, identifier: existing.identifier, parentTitle: existing.title, space: existing.space })
       parentId = existing.attachedTo
     }

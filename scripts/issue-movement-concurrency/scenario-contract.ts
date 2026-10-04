@@ -1,11 +1,10 @@
 import { Schema } from "effect"
 import { MoveIssueParamsSchema } from "../../src/domain/schemas/issue-movement.js"
-import { MoveIssueResultSchema } from "../../src/domain/schemas/issues-results.js"
+import { CreateIssueResultSchema, MoveIssueResultSchema } from "../../src/domain/schemas/issues-results.js"
 import { IssueSchema } from "../../src/domain/schemas/issues.js"
 import { AddCommentResultSchema } from "../../src/domain/schemas/comments.js"
 import { SetIssueComponentResultSchema } from "../../src/domain/schemas/components.js"
 import { LogTimeResultSchema } from "../../src/domain/schemas/time.js"
-import { CreateIssueResultSchema } from "../../src/domain/schemas/issues-results.js"
 import {
   IssueId,
   NonEmptyString,

@@ -10,6 +10,40 @@ const limits = { records: 100, queries: 1000, depth: 32, result: 101 }
 const inspect = (fixture: ReturnType<typeof recordAdapterFixture>, policy = limits) =>
   inspectTransferRecords(fixture.client, IssueId.make("root"), policy)
 
+it.effect("refuses when query budget ends before outgoing reference discovery without attempting writes", () =>
+  Effect.gen(function* () {
+    const f = recordAdapterFixture()
+    f.docs.splice(0)
+    const complete = yield* inspect(f)
+    expect(complete.discovery).toBe("complete")
+    const incomplete = yield* inspect(f, { ...limits, queries: complete.classes.length })
+    expect(incomplete.discovery).toBe("incomplete")
+    expect(incomplete.blockers.join(" ")).toContain("query limit exhausted")
+    expect(f.scopes).toEqual([])
+    expect(f.updates).toEqual([])
+  })
+)
+
+it.effect("refuses truncated outgoing references even when attached collection queries completed", () =>
+  Effect.gen(function* () {
+    const f = recordAdapterFixture()
+    f.docs.splice(0)
+    f.docs.push(
+      ownedRecord("outgoing", String(activity.class.ActivityReference), "independent-target", "references", {
+        attachedToClass: "document:class:Document",
+        srcDocId: "root",
+        srcDocClass: String(tracker.class.Issue),
+        message: "link"
+      })
+    )
+    const incomplete = yield* inspect(f, { ...limits, result: 1 })
+    expect(incomplete.discovery).toBe("incomplete")
+    expect(incomplete.blockers.join(" ")).toContain(String(activity.class.ActivityReference))
+    expect(f.scopes).toEqual([])
+    expect(f.updates).toEqual([])
+  })
+)
+
 it.effect(
   "preserves every standard class, nested files/thread references and historical/collaborative payloads with deduplication",
   () =>

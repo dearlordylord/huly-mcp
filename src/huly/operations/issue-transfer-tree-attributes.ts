@@ -11,13 +11,12 @@ export interface TransferTaskSnapshot {
 }
 
 const unavailableTaskConsent = (
-  root: MovementIssue,
-  discovered: ReadonlyArray<MovementIssue>,
+  discoveredIssue: MovementIssue,
   resolution: NonNullable<MoveIssueParams["resolutions"]>[number]
 ): TransferConflict => ({
   code: "invalid-resolution",
   issueId: resolution.issueId,
-  identifier: discovered.find((issue) => issue._id === resolution.issueId)?.identifier ?? root.identifier,
+  identifier: discoveredIssue.identifier,
   reason:
     "This task's protected payload is unavailable; its expected value and replacement consent cannot be admitted. Reinspect the stable task ID before retry."
 })
@@ -29,20 +28,20 @@ const inspectTreeResolutions = (
   resolutions: MoveIssueParams["resolutions"]
 ): Array<TransferConflict> => {
   const conflicts: Array<TransferConflict> = []
-  const ids = new Set(discovered.map((issue) => issue._id))
   const parsedIds = new Set(tasks.map((task) => task.issue._id))
   const seen = new Set<string>()
   for (const resolution of resolutions ?? []) {
     const key = `${resolution.issueId}:${resolution.field}`
-    if (seen.has(key) || !ids.has(resolution.issueId))
+    const discoveredIssue = discovered.find((issue) => issue._id === resolution.issueId)
+    if (seen.has(key) || discoveredIssue === undefined)
       conflicts.push({
         code: "invalid-resolution",
         issueId: root._id,
         identifier: root.identifier,
         reason: `Duplicate or out-of-tree resolution ${key}. Consent applies only to the addressed task and expected value.`
       })
-    if (ids.has(resolution.issueId) && !parsedIds.has(resolution.issueId))
-      conflicts.push(unavailableTaskConsent(root, discovered, resolution))
+    if (discoveredIssue !== undefined && !parsedIds.has(resolution.issueId))
+      conflicts.push(unavailableTaskConsent(discoveredIssue, resolution))
     seen.add(key)
   }
   return conflicts

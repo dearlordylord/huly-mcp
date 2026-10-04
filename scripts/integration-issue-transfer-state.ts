@@ -10,6 +10,8 @@ import { hulyQuery } from "../src/huly/operations/query-helpers.js"
 import { toRef } from "../src/huly/operations/sdk-boundary.js"
 import { connectIntegrationHuly } from "./integration-huly-client.js"
 
+const INCOMING_REFERENCE_PROBE_LIMIT = 10_001
+
 const Arguments = Schema.fromJsonString(
   Schema.Struct({ issues: Schema.Array(IssueId), projects: Schema.Array(ProjectIdentifier) })
 )
@@ -39,9 +41,9 @@ const run = async () => {
         const references = await client.findAll<ActivityReference>(
           activity.class.ActivityReference,
           hulyQuery<ActivityReference>({ attachedTo: toRef(id) }),
-          { limit: 10_001, total: true }
+          { limit: INCOMING_REFERENCE_PROBE_LIMIT, total: true }
         )
-        if (references.total !== references.length || references.length >= 10_001)
+        if (references.total !== references.length || references.length >= INCOMING_REFERENCE_PROBE_LIMIT)
           throw new Error("Incomplete incoming reference snapshot")
         const incomingReferences = references
           .filter((reference) => reference.srcDocId !== toRef(id))

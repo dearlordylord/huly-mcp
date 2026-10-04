@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # Final integrated 306–311 certification only. Creates disposable ordinary Huly fixtures.
 set -euo pipefail
-source "$(dirname "${BASH_SOURCE[0]}")/test-telemetry-env.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/test-telemetry-env.sh" || exit 1
 : "${HULY_URL:?Set ordinary local Huly URL}"
-: "${HULY_SERVER_BUILD:?Set exact running server image digest/build revision from deployment inspection}"
 CLI=(node packages/huly-cli/dist/index.cjs)
 TSX=(node node_modules/tsx/dist/cli.mjs)
 printf -v SOURCE 'C%04X' "$RANDOM"
@@ -31,7 +30,7 @@ cleanup() {
 }
 trap cleanup EXIT
 VERSION=$("${TSX[@]}" scripts/issue-movement-concurrency/version.ts "$HULY_URL")
-jq -nc --argjson server "$VERSION" --arg build "$HULY_SERVER_BUILD" '{server:$server,serverBuild:$build,transportBoundary:"ordinary REST; no custom extension",unobservable:["inside server batch execution; request boundaries do not prove partial-write isolation"]}'
+jq -nc --argjson server "$VERSION" '{server:$server,transportBoundary:"ordinary REST; no custom extension",unobservable:["inside server batch execution; request boundaries do not prove partial-write isolation","config.json VERSION and model APIs do not establish transactor image identity"]}'
 for project in "$SOURCE" "$DESTINATION"; do
   mcp create_project "$(jq -nc --arg identifier "$project" '{identifier:$identifier,name:("Disposable movement concurrency " + $identifier)}')" >/dev/null
   PROJECTS+=("$project")

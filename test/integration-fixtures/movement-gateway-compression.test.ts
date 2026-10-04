@@ -11,7 +11,8 @@ for (const encoding of ["gzip", "snappy"]) {
   it(`preserves REST response semantics for a real HTTP ${encoding} upstream`, async () => {
     const json = Buffer.from('{"success":true}')
     // Snappy raw block: length varint followed by one literal tag and its bytes.
-    const compressed = encoding === "gzip" ? gzipSync(json) : Buffer.concat([Buffer.from([json.length, (json.length - 1) * 4]), json])
+    const compressed =
+      encoding === "gzip" ? gzipSync(json) : Buffer.concat([Buffer.from([json.length, (json.length - 1) * 4]), json])
     const upstream = createServer((_request, response) => {
       response.writeHead(200, { "content-type": "application/json", "content-encoding": encoding })
       response.end(compressed)
@@ -19,10 +20,15 @@ for (const encoding of ["gzip", "snappy"]) {
     await new Promise<void>((resolve) => upstream.listen(0, "127.0.0.1", resolve))
     const address = upstream.address()
     if (address === null || typeof address === "string") throw new Error("Fixture upstream address unavailable")
-    const gateway = spawn(process.execPath, [
-      "node_modules/tsx/dist/cli.mjs", "scripts/issue-movement-concurrency/gateway.ts",
-      JSON.stringify({ upstream: `http://127.0.0.1:${address.port}` })
-    ], { stdio: ["pipe", "pipe", "ignore"] })
+    const gateway = spawn(
+      process.execPath,
+      [
+        "node_modules/tsx/dist/cli.mjs",
+        "scripts/issue-movement-concurrency/gateway.ts",
+        JSON.stringify({ upstream: `http://127.0.0.1:${address.port}` })
+      ],
+      { stdio: ["pipe", "pipe", "ignore"] }
+    )
     const events = createInterface({ input: gateway.stdout })
     try {
       const [line] = await once(events, "line")
@@ -38,7 +44,9 @@ for (const encoding of ["gzip", "snappy"]) {
       await once(gateway, "exit")
       events.close()
       upstream.closeAllConnections()
-      await new Promise<void>((resolve, reject) => upstream.close((error) => error === undefined ? resolve() : reject(error)))
+      await new Promise<void>((resolve, reject) =>
+        upstream.close((error) => (error === undefined ? resolve() : reject(error)))
+      )
     }
   })
 }

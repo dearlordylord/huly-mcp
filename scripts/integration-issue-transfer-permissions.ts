@@ -15,7 +15,7 @@ const parseResult = (input: unknown) => Schema.decodeUnknownSync(Result)(input)
 const parseProject = (input: unknown) => Schema.decodeUnknownSync(ProjectState)(input)
 const main = async () => {
   const args = Schema.decodeUnknownSync(Arguments)(process.argv[2])
-  const { client, accountUuid } = await connectIntegrationHuly()
+  const { accountUuid, client } = await connectIntegrationHuly()
   try {
     const project = parseProject(
       await client.findOne<Project>(tracker.class.Project, hulyQuery<Project>({ identifier: args.project }))
