@@ -22,7 +22,7 @@ export const movementProject = (id = "project-1", identifier = "TEST"): Project 
 const NUMBER_HASH_RADIX = 31
 const NUMBER_HASH_LIMIT = 1_000_000
 const fixtureNumber = (id: string) =>
-  [...id].reduce((number, char) => (number * NUMBER_HASH_RADIX + char.charCodeAt(0)) % NUMBER_HASH_LIMIT, 1) + 1
+  id.split("").reduce((number, char) => (number * NUMBER_HASH_RADIX + char.charCodeAt(0)) % NUMBER_HASH_LIMIT, 1) + 1
 
 export const movementIssue = (id: string, overrides: Partial<Issue> = {}): Issue =>
   ({

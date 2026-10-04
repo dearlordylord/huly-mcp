@@ -10,7 +10,7 @@ import {
   type TransferRecord,
   type TransferWrite
 } from "../domain/schemas/issue-transfer.js"
-import { DocId, ListTotal, ObjectClassName } from "../domain/schemas/shared.js"
+import { type DocId, ListTotal, ObjectClassName } from "../domain/schemas/shared.js"
 import type { HulyClientError } from "./client.js"
 import { HulyDataInvalidError, makeOperationConnectionError } from "./errors-base.js"
 import { activity, core, tracker } from "./huly-plugins.js"

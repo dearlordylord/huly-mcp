@@ -192,7 +192,7 @@ const completedTransferResult = (
   destination: MovementProject,
   observed: MovementIssue
 ): MoveIssueResult => {
-  const { root, parent } = prepared.plan
+  const { parent, root } = prepared.plan
   return {
     outcome: "completed",
     changed: true,
@@ -220,7 +220,7 @@ const makeTransferWrite = (
   number: TransferWrite["number"],
   lastRank: string | undefined
 ): TransferWrite => {
-  const { root, parent, source } = prepared.plan
+  const { parent, root, source } = prepared.plan
   return {
     issueId: root._id,
     sourceId: source._id,
@@ -228,7 +228,7 @@ const makeTransferWrite = (
     previousParent: root.attachedTo,
     parentId: parent?._id ?? movementNoParent,
     modifiedOn: root.modifiedOn,
-    number: number,
+    number,
     identifier: IssueIdentifier.make(`${destination.identifier}-${number}`),
     rank: NonEmptyString.make(makeRank(lastRank, undefined)),
     records: prepared.records,
