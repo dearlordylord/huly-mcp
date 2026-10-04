@@ -54,7 +54,10 @@ const forestFixture = (extraClasses: ReadonlyArray<ObjectClassName> = []) => {
   const rootReads: Array<IssueId> = []
   const originalHierarchy = f.client.getHierarchy()
   const hierarchy = sdkFixture<ReturnType<TxOperations["getHierarchy"]>>({
-    ...originalHierarchy,
+    getAllAttributes: originalHierarchy.getAllAttributes.bind(originalHierarchy),
+    isDerived: originalHierarchy.isDerived.bind(originalHierarchy),
+    isMixin: originalHierarchy.isMixin.bind(originalHierarchy),
+    findDomain: originalHierarchy.findDomain.bind(originalHierarchy),
     getDescendants: (cls: Parameters<ReturnType<TxOperations["getHierarchy"]>["getDescendants"]>[0]) => [
       ...originalHierarchy.getDescendants(cls),
       ...extraClasses.map(toClassRef<Doc>)
