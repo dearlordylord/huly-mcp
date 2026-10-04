@@ -36,6 +36,10 @@ tree_mcp_reply() {
     printf 'FAIL: tree MCP tool=%s phase=envelope-error\n' "$tool" >&2
     return 1
   fi
+  if ! jq -e '(.result.content | type=="array" and length==1) and (.result.content[0] | type=="object" and .type=="text" and (.text | type=="string" and length>0)) and ((.result | has("isError") | not) or (.result.isError | type=="boolean"))' >/dev/null 2>&1 <<<"$response"; then
+    printf 'FAIL: tree MCP tool=%s phase=result-shape\n' "$tool" >&2
+    return 1
+  fi
   text=$(jq -er '.result.content[0].text | select(type=="string" and length>0)' 2>/dev/null <<<"$response") || {
     printf 'FAIL: tree MCP tool=%s phase=result-text\n' "$tool" >&2
     return 1
