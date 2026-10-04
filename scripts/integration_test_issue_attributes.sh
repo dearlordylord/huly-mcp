@@ -58,22 +58,22 @@ for TRANSPORT in mcp cli; do
     STATE_ARGS=$(jq -nc --arg root "$ROOT" --arg source "$SOURCE" --arg target "$TARGET" '{issues:[$root],projects:[$source,$target]}')
   }
   create "$SC" "$SM"
-  BEFORE=$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$STATE_ARGS")
+  BEFORE=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$STATE_ARGS")
   BLOCKED=$(move "$CALL")
   jq -e --arg root "$ROOT" '.outcome == "blocked" and .changed == false and .discovery == "complete" and ([.conflicts[]|select(.code=="attribute")]|length)==2 and all(.conflicts[]; .issueId==$root and .clearingAllowed)' >/dev/null <<<"$BLOCKED"
-  [[ "$(jq -Sc . <<<"$BEFORE")" == "$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$STATE_ARGS" | jq -Sc .)" ]]
+  [[ "$(jq -Sc . <<<"$BEFORE")" == "$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$STATE_ARGS" | jq -Sc .)" ]]
   # Construct the accepted next call using only response field names and candidate IDs.
   RETRY=$(jq -c '.nextCall + {resolutions:[.conflicts[]|select(.code=="attribute")|{issueId,field,from,to:(if .field=="milestone" then null else .candidates[0]._id end)}]}' <<<"$BLOCKED")
   # Change the current source reference after the blocked response; stale consent cannot clear it.
   mcp set_issue_component "$(jq -nc --arg project "$SOURCE" --arg identifier "$IDENTIFIER" --arg component "$EXSC" '{project:$project,identifier:$identifier,component:$component}')" >/dev/null
-  STALE_BEFORE=$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$STATE_ARGS")
+  STALE_BEFORE=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$STATE_ARGS")
   STALE=$(move "$RETRY")
   jq -e --arg current "$EXSC" '.outcome=="blocked" and any(.conflicts[];.code=="stale-resolution" and .from==$current)' >/dev/null <<<"$STALE"
-  [[ "$(jq -Sc . <<<"$STALE_BEFORE")" == "$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$STATE_ARGS" | jq -Sc .)" ]]
+  [[ "$(jq -Sc . <<<"$STALE_BEFORE")" == "$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$STATE_ARGS" | jq -Sc .)" ]]
   mcp set_issue_component "$(jq -nc --arg project "$SOURCE" --arg identifier "$IDENTIFIER" --arg component "$SC" '{project:$project,identifier:$identifier,component:$component}')" >/dev/null
   COMPLETED=$(move "$RETRY")
   jq -e '.outcome=="completed" and any(.attributeChanges[];.field=="milestone" and .to==null and .reason=="explicit-clear") and any(.attributeChanges[];.field=="component" and .reason=="explicit-replacement")' >/dev/null <<<"$COMPLETED"
-  AFTER=$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$STATE_ARGS")
+  AFTER=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$STATE_ARGS")
   jq -e --argjson retry "$RETRY" '.issues[0].issue.milestone==null and .issues[0].issue.component==($retry.resolutions[]|select(.field=="component")|.to)' >/dev/null <<<"$AFTER"
   create "$EXSC" "$EXSM"
   EXACT=$(move "$CALL")

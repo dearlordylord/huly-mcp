@@ -5,6 +5,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/test-telemetry-env.sh" || exit 1
 : "${HULY_URL:?Set ordinary local Huly URL}"
 CLI=(node packages/huly-cli/dist/index.cjs)
 TSX=(node node_modules/tsx/dist/cli.mjs)
+BUNDLED=(node scripts/run-bundled.mjs)
 printf -v SOURCE 'C%04X' "$RANDOM"
 printf -v DESTINATION 'R%04X' "$RANDOM"
 PROJECTS=()
@@ -64,11 +65,11 @@ for transport in mcp cli; do
       ancestry) MUTATION='["issues","move","@ISSUE_ID","--destination","@PARENT_DESTINATION"]' ;;
     esac
     SNAPSHOT_ARGS=$(jq -nc --arg root "$ROOT_ID" --arg child "$CHILD_ID" --arg grandchild "$GRANDCHILD_ID" --arg source "$SOURCE" --arg destination "$DESTINATION" '{issues:[$root,$child,$grandchild],projects:[$source,$destination]}')
-    BEFORE=$("${TSX[@]}" scripts/integration-issue-transfer-state.ts "$SNAPSHOT_ARGS")
+    BEFORE=$("${BUNDLED[@]}" scripts/integration-issue-transfer-state.ts "$SNAPSHOT_ARGS")
     ARGS=$(jq -nc --argjson entry "$entry" --arg upstream "$HULY_URL" --arg transport "$transport" --arg root "$ROOT_ID" --arg source "$SOURCE" --arg destination "$DESTINATION" --arg sourceParent "$SOURCE_PARENT" --arg destinationParent "$DESTINATION_PARENT" --argjson mutation "$MUTATION" '$entry + {upstream:$upstream,transport:$transport,movement:{issue:$root,destination:{project:$destination}},timeoutMs:90000,mutationTarget:{project:$source,issueId:$root},mutationParents:{($source):$sourceParent,($destination):$destinationParent},mutationArgs:$mutation} | del(.name,.expectedLocation)')
-    RESULT=$("${TSX[@]}" scripts/issue-movement-concurrency/scenario.ts "$ARGS")
+    RESULT=$("${BUNDLED[@]}" scripts/issue-movement-concurrency/scenario.ts "$ARGS")
     jq -e '.observation.status == "result" and any(.gatewayEvents[]; .event == "barrier")' >/dev/null <<<"$RESULT"
-    AFTER=$("${TSX[@]}" scripts/integration-issue-transfer-state.ts "$SNAPSHOT_ARGS")
+    AFTER=$("${BUNDLED[@]}" scripts/integration-issue-transfer-state.ts "$SNAPSHOT_ARGS")
     EXPECTED=$(jq -r .expectedLocation <<<"$entry")
     PROJECT="$SOURCE"; [[ "$EXPECTED" == destination ]] && PROJECT="$DESTINATION"
     jq -e --arg id "$ROOT_ID" --arg project "$PROJECT" '.mutation.after.issueId == $id and .mutation.after.project == $project' >/dev/null <<<"$RESULT"

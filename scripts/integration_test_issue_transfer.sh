@@ -64,25 +64,25 @@ for transport in mcp cli; do
   mcp log_time "$(jq -nc --arg project "$SOURCE" --arg identifier "$ROOT" '{project:$project,identifier:$identifier,value:1.25,description:"Stable report payload"}')" >/dev/null
   ISSUE_FILE=$(mcp add_issue_attachment "$(jq -nc --arg project "$SOURCE" --arg identifier "$ROOT" '{project:$project,identifier:$identifier,filename:"issue.txt",contentType:"text/plain",data:"cHJlc2VydmVkIGJsb2I="}')" | jq -r .attachmentId)
   # The state helper supplies the SDK project ID; public get_issue is a presentation projection.
-  SOURCE_SPACE=$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$ARGS" | jq -r --arg root "$ROOT_ID" '.issues[] | select(.issue._id == $root) | .issue.space')
+  SOURCE_SPACE=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$ARGS" | jq -r --arg root "$ROOT_ID" '.issues[] | select(.issue._id == $root) | .issue.space')
   NESTED_FILE=$(mcp add_attachment "$(jq -nc --arg objectId "$COMMENT" --arg space "$SOURCE_SPACE" '{objectId:$objectId,objectClass:"chunter:class:ChatMessage",space:$space,filename:"comment.txt",contentType:"text/plain",data:"cHJlc2VydmVkIGJsb2I="}')" | jq -r .attachmentId)
   REPLY_FILE=$(mcp add_attachment "$(jq -nc --arg objectId "$REPLY" --arg space "$SOURCE_SPACE" '{objectId:$objectId,objectClass:"chunter:class:ThreadMessage",space:$space,filename:"reply.txt",contentType:"text/plain",data:"cHJlc2VydmVkIGJsb2I="}')" | jq -r .attachmentId)
-  pnpm exec tsx scripts/integration-issue-transfer-records.ts "$(jq -nc --arg issue "$ROOT_ID" --arg document "$DOCUMENT" '{issue:$issue,document:$document,mode:"references"}')" >/dev/null
+  node scripts/run-bundled.mjs scripts/integration-issue-transfer-records.ts "$(jq -nc --arg issue "$ROOT_ID" --arg document "$DOCUMENT" '{issue:$issue,document:$document,mode:"references"}')" >/dev/null
   # Exercise the normal account against private/member-only destination permissions.
   # A restricted destination refuses before all movement effects, including allocation.
-  pnpm exec tsx scripts/integration-issue-transfer-permissions.ts "$(jq -nc --arg project "$DESTINATION" '{project:$project,restricted:true}')" >/dev/null
-  PERMISSION_BEFORE=$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$ARGS")
+  node scripts/run-bundled.mjs scripts/integration-issue-transfer-permissions.ts "$(jq -nc --arg project "$DESTINATION" '{project:$project,restricted:true}')" >/dev/null
+  PERMISSION_BEFORE=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$ARGS")
   PERMISSION_DEST=$(jq -nc --arg project "$DESTINATION" --arg parent "$PARENT_ID" '{project:$project,parent:$parent}')
   if [[ "$transport" == mcp ]]; then PERMISSION_RESULT=$(mcp move_issue "$(jq -nc --arg issue "$ROOT_ID" --argjson destination "$PERMISSION_DEST" '{issue:$issue,destination:$destination}')"); else PERMISSION_RESULT=$("${CLI[@]}" issues move "$ROOT_ID" --destination "$PERMISSION_DEST" --json); fi
   jq -e '.outcome == "blocked" and .changed == false and (.reason | contains("Restricted project permissions"))' >/dev/null <<<"$PERMISSION_RESULT"
-  [[ "$(jq -Sc . <<<"$PERMISSION_BEFORE")" == "$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$ARGS" | jq -Sc .)" ]]
-  pnpm exec tsx scripts/integration-issue-transfer-permissions.ts "$(jq -nc --arg project "$DESTINATION" '{project:$project,restricted:false}')" >/dev/null
-  BEFORE=$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$ARGS")
+  [[ "$(jq -Sc . <<<"$PERMISSION_BEFORE")" == "$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$ARGS" | jq -Sc .)" ]]
+  node scripts/run-bundled.mjs scripts/integration-issue-transfer-permissions.ts "$(jq -nc --arg project "$DESTINATION" '{project:$project,restricted:false}')" >/dev/null
+  BEFORE=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$ARGS")
   jq -e --arg root "$ROOT_ID" '.issues[] | select(.issue._id == $root) | .owned.records | any(.kind == "history")' >/dev/null <<<"$BEFORE"
   DEST=$(jq -nc --arg project "$DESTINATION" --arg parent "$PARENT_ID" '{project:$project,parent:$parent}')
   if [[ "$transport" == mcp ]]; then RESULT=$(mcp move_issue "$(jq -nc --arg issue "$ROOT_ID" --argjson destination "$DEST" '{issue:$issue,destination:$destination}')"); else RESULT=$("${CLI[@]}" issues move "$ROOT_ID" --destination "$DEST" --json); fi
   jq -e --arg old "$ROOT" --arg root "$ROOT_ID" --arg parent "$PARENT_ID" '.outcome == "completed" and .changed and .issueId == $root and .parentId == $parent and .tasks[0].previousIdentifier == $old and .tasks[0].identifier != $old and (.tasks[0].url | startswith("http"))' >/dev/null <<<"$RESULT"
-  AFTER=$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$ARGS")
+  AFTER=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$ARGS")
   jq -e --argjson before "$BEFORE" --arg root "$ROOT_ID" --arg parent "$PARENT_ID" '
     (.issues[] | select(.issue._id == $root)) as $after |
     ($before.issues[] | select(.issue._id == $root)) as $old |
@@ -116,7 +116,7 @@ for transport in mcp cli; do
   done
   REPEAT=$(mcp move_issue "$(jq -nc --arg issue "$ROOT_ID" --argjson destination "$DEST" '{issue:$issue,destination:$destination}')")
   jq -e '.outcome == "no-op" and .changed == false' >/dev/null <<<"$REPEAT"
-  [[ "$(jq -Sc . <<<"$AFTER")" == "$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$ARGS" | jq -Sc .)" ]]
+  [[ "$(jq -Sc . <<<"$AFTER")" == "$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$ARGS" | jq -Sc .)" ]]
   # Ordinary destination callers can still read comments/history and download unchanged blobs.
   mcp get_activity_message "$(jq -nc --arg messageId "$COMMENT" '{messageId:$messageId}')" | jq -e --arg id "$COMMENT" '.id == $id' >/dev/null
   mcp list_comments "$(jq -nc --arg project "$DESTINATION" --arg issueIdentifier "$ROOT_ID" '{project:$project,issueIdentifier:$issueIdentifier}')" | jq -e --arg id "$COMMENT" 'any(.[]; .id == $id)' >/dev/null
@@ -130,12 +130,12 @@ for transport in mcp cli; do
   done
   # A real unaudited attached class still refuses before sequence or record writes.
   create "$SOURCE" ''; REFUSED_ID="$CREATED_ID"
-  pnpm exec tsx scripts/integration-issue-transfer-records.ts "$(jq -nc --arg issue "$REFUSED_ID" --arg document "$DOCUMENT" '{issue:$issue,document:$document,mode:"unsupported"}')" >/dev/null
+  node scripts/run-bundled.mjs scripts/integration-issue-transfer-records.ts "$(jq -nc --arg issue "$REFUSED_ID" --arg document "$DOCUMENT" '{issue:$issue,document:$document,mode:"unsupported"}')" >/dev/null
   REFUSED_ARGS=$(jq -nc --arg issue "$REFUSED_ID" --arg source "$SOURCE" --arg target "$DESTINATION" '{issues:[$issue],projects:[$source,$target]}')
-  REFUSED_BEFORE=$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$REFUSED_ARGS")
+  REFUSED_BEFORE=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$REFUSED_ARGS")
   BLOCKED=$(mcp move_issue "$(jq -nc --arg issue "$REFUSED_ID" --arg project "$DESTINATION" '{issue:$issue,destination:{project:$project}}')")
   jq -e '.outcome == "blocked" and .changed == false and (.reason | contains("Unsupported owned record"))' >/dev/null <<<"$BLOCKED"
-  [[ "$(jq -Sc . <<<"$REFUSED_BEFORE")" == "$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$REFUSED_ARGS" | jq -Sc .)" ]]
+  [[ "$(jq -Sc . <<<"$REFUSED_BEFORE")" == "$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$REFUSED_ARGS" | jq -Sc .)" ]]
   echo "PASS: $transport rich leaf, nested files, labels/time, immutable history, independent/dangling references, aggregates, no-op and unknown-class refusal"
 done
 [[ "$(jq -Sc . <<<"$DOC_BEFORE")" == "$(mcp get_document "$(jq -nc --arg teamspace "$TEAMSPACE" --arg document "$DOCUMENT" '{teamspace:$teamspace,document:$document}')" | jq -Sc .)" ]]

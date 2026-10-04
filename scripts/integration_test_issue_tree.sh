@@ -57,12 +57,12 @@ component() { mcp set_issue_component "$(jq -nc --arg project "$SOURCE" --arg id
 rich_records() {
   local issue="$1" comment space
   comment=$(mcp add_comment "$(jq -nc --arg project "$SOURCE" --arg issueIdentifier "$issue" '{project:$project,issueIdentifier:$issueIdentifier,body:"Each descendant retains nested supporting data"}')" | jq -r .commentId)
-  space=$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$(jq -nc --arg issue "$issue" --arg source "$SOURCE" --arg target "$TARGET" '{issues:[$issue],projects:[$source,$target]}')" | jq -r '.issues[0].issue.space')
+  space=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$(jq -nc --arg issue "$issue" --arg source "$SOURCE" --arg target "$TARGET" '{issues:[$issue],projects:[$source,$target]}')" | jq -r '.issues[0].issue.space')
   mcp add_attachment "$(jq -nc --arg objectId "$comment" --arg space "$space" '{objectId:$objectId,objectClass:"chunter:class:ChatMessage",space:$space,filename:"nested.txt",contentType:"text/plain",data:"dHJlZS1ibG9i"}')" >/dev/null
   mcp add_issue_attachment "$(jq -nc --arg project "$SOURCE" --arg identifier "$issue" '{project:$project,identifier:$identifier,filename:"task.txt",contentType:"text/plain",data:"dHJlZS1ibG9i"}')" >/dev/null
   mcp add_issue_label "$(jq -nc --arg project "$SOURCE" --arg identifier "$issue" '{project:$project,identifier:$identifier,label:"Complete tree certification"}')" >/dev/null
   mcp log_time "$(jq -nc --arg project "$SOURCE" --arg identifier "$issue" '{project:$project,identifier:$identifier,value:1.25,description:"Per-task preserved report"}')" >/dev/null
-  pnpm exec tsx scripts/integration-issue-transfer-records.ts "$(jq -nc --arg issue "$issue" --arg document "$DOCUMENT" '{issue:$issue,document:$document,mode:"references"}')" >/dev/null
+  node scripts/run-bundled.mjs scripts/integration-issue-transfer-records.ts "$(jq -nc --arg issue "$issue" --arg document "$DOCUMENT" '{issue:$issue,document:$document,mode:"references"}')" >/dev/null
 }
 for TRANSPORT in mcp cli; do
   create "$SOURCE" '' "Source grandparent $TRANSPORT"; OLD_ANCESTOR="$CREATED"
@@ -80,20 +80,20 @@ for TRANSPORT in mcp cli; do
   CALL=$(jq -nc --arg issue "$ROOT" --arg project "$TARGET" --arg parent "$NEW_PARENT" '{issue:$issue,destination:{project:$project,parent:$parent}}')
   IDS=$(jq -nc --arg root "$ROOT" --arg child "$CHILD" --arg grandchild "$GRANDCHILD" --arg op "$OLD_PARENT" --arg oa "$OLD_ANCESTOR" --arg np "$NEW_PARENT" --arg na "$NEW_ANCESTOR" '[$root,$child,$grandchild,$op,$oa,$np,$na]')
   STATE=$(jq -nc --argjson issues "$IDS" --arg source "$SOURCE" --arg target "$TARGET" '{issues:$issues,projects:[$source,$target]}')
-  BEFORE=$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$STATE")
+  BEFORE=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$STATE")
   BLOCKED=$(move "$CALL")
   jq -e --arg root "$ROOT" --arg child "$CHILD" '.outcome=="blocked" and .changed==false and .discovery=="complete" and ([.conflicts[]|select(.code=="attribute")|.issueId]|sort)==([$root,$child]|sort)' >/dev/null <<<"$BLOCKED"
-  [[ "$(jq -Sc . <<<"$BEFORE")" == "$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$STATE" | jq -Sc .)" ]]
+  [[ "$(jq -Sc . <<<"$BEFORE")" == "$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$STATE" | jq -Sc .)" ]]
   RETRY=$(jq -c --arg root "$ROOT" --arg target "$TC" '.nextCall + {resolutions:[.conflicts[]|select(.code=="attribute")|{issueId,field,from,to:(if .issueId==$root then null else $target end)}]}' <<<"$BLOCKED")
   create "$SOURCE" "$ROOT" "New descendant $TRANSPORT"; ADDED="$CREATED"; component "$ADDED"; rich_records "$ADDED"
   NEW_BLOCKED=$(move "$RETRY")
   jq -e --arg added "$ADDED" '.outcome=="blocked" and .changed==false and any(.conflicts[];.code=="attribute" and .issueId==$added)' >/dev/null <<<"$NEW_BLOCKED"
   FINAL=$(jq -c --arg target "$TC" '.nextCall + {resolutions:(.nextCall.resolutions + [.conflicts[]|select(.code=="attribute")|{issueId,field,from,to:$target}])}' <<<"$NEW_BLOCKED")
   IDS=$(jq -c --arg added "$ADDED" '.+[$added]' <<<"$IDS"); STATE=$(jq -c --argjson issues "$IDS" '.issues=$issues' <<<"$STATE")
-  BEFORE=$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$STATE")
+  BEFORE=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$STATE")
   COMPLETED=$(move "$FINAL")
   jq -e --arg root "$ROOT" --arg child "$CHILD" --arg grandchild "$GRANDCHILD" --arg added "$ADDED" --arg milestone "$TM" '.outcome=="completed" and (.tasks|length)==4 and ([.tasks[].issueId]|sort)==([$root,$child,$grandchild,$added]|sort) and ([.tasks[].identifier]|unique|length)==4 and any(.attributeChanges[];.issueId==$root and .to==null and .reason=="explicit-clear") and any(.attributeChanges[];.issueId==$grandchild and .to==$milestone and .reason=="exact-name")' >/dev/null <<<"$COMPLETED"
-  AFTER=$(pnpm exec tsx scripts/integration-issue-transfer-state.ts "$STATE")
+  AFTER=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$STATE")
   jq -e --argjson before "$BEFORE" --argjson moved "$COMPLETED" 'all($moved.tasks[]; . as $task | ($before.issues[]|select(.issue._id==$task.issueId)) as $old | (.issues[]|select(.issue._id==$task.issueId)) as $new | $new.issue.identifier==$task.identifier and $new.issue.attachedTo==($task.parentId // "tracker:ids:NoParent") and ($new.issue|del(.space,.identifier,.number,.rank,.attachedTo,.parents,.modifiedOn,.component,.milestone))==($old.issue|del(.space,.identifier,.number,.rank,.attachedTo,.parents,.modifiedOn,.component,.milestone)) and all($old.owned.records[]; . as $record | any($new.owned.records[]; ._id==$record._id and del(.space)==($record|del(.space)) and .space==$new.issue.space)))' >/dev/null <<<"$AFTER"
   jq -e --arg op "$OLD_PARENT" --arg oa "$OLD_ANCESTOR" --arg np "$NEW_PARENT" --arg na "$NEW_ANCESTOR" --arg root "$ROOT" --arg child "$CHILD" --arg gc "$GRANDCHILD" --arg added "$ADDED" 'all(.issues[]|select(.issue._id==$op or .issue._id==$oa); .issue.subIssues==(if .issue._id==$op then 0 else 1 end) and (.issue.childInfo|all(.childId!=$root and .childId!=$child and .childId!=$gc and .childId!=$added))) and all(.issues[]|select(.issue._id==$np or .issue._id==$na); (.issue.childInfo|map(.childId)|contains([$root,$child,$gc,$added])))' >/dev/null <<<"$AFTER"
   NOOP=$(jq -c 'del(.resolutions)' <<<"$FINAL")
