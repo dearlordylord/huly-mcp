@@ -152,10 +152,14 @@ const commitAndVerify = Effect.fn("transfer.commitAndVerify")(function* (
       prepared.records
     )
   const verified = yield* verifyTransfer(client, prepared, destination, write).pipe(
-    Effect.repeat({ schedule: Schedule.spaced("200 millis"), times: 4, while: (value) => value === undefined }),
+    Effect.repeat({
+      schedule: Schedule.spaced("200 millis"),
+      times: 4,
+      while: (value) => value.state !== "consistent"
+    }),
     Effect.result
   )
-  if (verified._tag === "Failure")
+  if (verified._tag === "Failure" || verified.success.state === "unavailable")
     return failure(
       "indeterminate",
       "Post-send state unavailable; inspect before retry.",
@@ -163,7 +167,7 @@ const commitAndVerify = Effect.fn("transfer.commitAndVerify")(function* (
       destination,
       prepared.records
     )
-  if (verified.success === undefined)
+  if (verified.success.state === "inconsistent")
     return failure(
       "incomplete",
       "Observed movement state remained inconsistent after bounded verification.",
@@ -181,10 +185,10 @@ const commitAndVerify = Effect.fn("transfer.commitAndVerify")(function* (
       {
         issueId: IssueId.make(root._id),
         previousIdentifier: root.identifier,
-        identifier: IssueIdentifier.make(verified.success.identifier),
-        parentId: verified.success.attachedTo === movementNoParent ? null : verified.success.attachedTo,
+        identifier: IssueIdentifier.make(verified.success.issue.identifier),
+        parentId: verified.success.issue.attachedTo === movementNoParent ? null : verified.success.issue.attachedTo,
         url: UrlString.make(
-          `${client.workbenchUrlConfig.baseUrl.replace(/\/+$/, "")}/workbench/${client.workbenchUrlConfig.workspaceUrlSlug}/tracker/${encodeURIComponent(verified.success.identifier)}`
+          `${client.workbenchUrlConfig.baseUrl.replace(/\/+$/, "")}/workbench/${client.workbenchUrlConfig.workspaceUrlSlug}/tracker/${encodeURIComponent(verified.success.issue.identifier)}`
         )
       }
     ]

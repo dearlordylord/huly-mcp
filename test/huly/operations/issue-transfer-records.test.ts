@@ -50,14 +50,18 @@ const richFixture = () => {
       })
     ].map((row) => ({ ...row, space: f.source._id }))
   )
-  const state = { corrupt: false }
+  const state = { corrupt: false, unavailableAfterWrite: false }
   const layer = HulyClient.testLayer({
     ...f.operations,
     inspectTransferRecords: () => {
       const inspect = f.operations.inspectTransferRecords
       if (inspect === undefined) return Effect.die("Fixture inspection is required")
       return inspect(f.input.issue).pipe(
-        Effect.map((inspection) => ({ ...inspection, records: [...inspection.records, ...extra] }))
+        Effect.map((inspection) => ({
+          ...inspection,
+          discovery: state.unavailableAfterWrite && f.state.sent > 0 ? "incomplete" : inspection.discovery,
+          records: [...inspection.records, ...extra]
+        }))
       )
     },
     commitTransfer: (write) => {
@@ -134,5 +138,19 @@ it.effect("no-op refuses unavailable ownership inspection instead of claiming ve
     })
     expect(f.state.allocated).toBe(1)
     expect(f.state.sent).toBe(1)
+  })
+)
+
+it.effect("unavailable post-write record totals report indeterminate while preserving known write effects", () =>
+  Effect.gen(function* () {
+    const fixture = richFixture()
+    fixture.state.unavailableAfterWrite = true
+    const task = yield* Effect.forkChild(move(fixture.f.input).pipe(Effect.provide(fixture.layer)))
+    yield* TestClock.adjust("2 seconds")
+    const result = yield* Fiber.join(task)
+    expect(result).toMatchObject({ outcome: "indeterminate" })
+    expect(result).not.toMatchObject({ changed: false })
+    expect(fixture.f.state.sent).toBe(1)
+    expect(fixture.read().every((record) => record.space === fixture.f.destination._id)).toBe(true)
   })
 )

@@ -9,6 +9,7 @@ PROJECTS=()
 ISSUES=()
 TEAMSPACE=''
 DOCUMENT=''
+DOWNLOAD_DIR=$(mktemp -d)
 INIT='{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"leaf-transfer-certification","version":"1.0"}},"id":1}'
 mcp() {
   local request response
@@ -18,6 +19,7 @@ mcp() {
   jq -r '.result.content[0].text' <<<"$response"
 }
 cleanup() {
+  rm -rf "$DOWNLOAD_DIR"
   for ((i=${#ISSUES[@]}-1; i>=0; i--)); do
     for project in "$SOURCE" "$DESTINATION"; do
       mcp delete_issue "$(jq -nc --arg project "$project" --arg identifier "${ISSUES[$i]}" '{project:$project,identifier:$identifier}')" >/dev/null 2>&1 || true
@@ -121,7 +123,10 @@ for transport in mcp cli; do
   mcp get_time_report "$(jq -nc --arg project "$DESTINATION" --arg identifier "$ROOT_ID" '{project:$project,identifier:$identifier}')" | jq -e '.totalTime == 1.25' >/dev/null
   for attachment in "$ISSUE_FILE" "$NESTED_FILE" "$REPLY_FILE"; do
     DOWNLOAD=$(mcp download_attachment "$(jq -nc --arg attachmentId "$attachment" '{attachmentId:$attachmentId}')" | jq -r .url)
-    [[ "$(curl --fail --silent "$DOWNLOAD")" == 'preserved blob' ]]
+    [[ -n "$DOWNLOAD" ]]
+    "${CLI[@]}" attachments download "$attachment" --output "$DOWNLOAD_DIR/blob.txt" --json >/dev/null
+    [[ "$(cat "$DOWNLOAD_DIR/blob.txt")" == 'preserved blob' ]]
+    rm "$DOWNLOAD_DIR/blob.txt"
   done
   # A real unaudited attached class still refuses before sequence or record writes.
   create "$SOURCE" ''; REFUSED_ID="$CREATED_ID"
