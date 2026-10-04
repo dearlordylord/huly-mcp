@@ -173,7 +173,7 @@ export const runBoundedCommand = ({
         return
       }
       /* v8 ignore stop */
-      escalationTimer = setTimeout(() => {
+      escalationTimer ??= setTimeout(() => {
         try {
           terminate(child, "SIGKILL")
         } catch (error) {

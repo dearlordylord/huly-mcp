@@ -5,6 +5,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import os from 'node:os'
+import { createRequire } from 'node:module'
 import { realTime, runCertification, suites } from '../../scripts/run-movement-certification.mjs'
 
 const now = () => Effect.runSync(Clock.currentTimeMillis)
@@ -93,7 +94,9 @@ test('deadline terminates real process group and permits bounded fixture cleanup
   try {
     await writeFile(path.join(f.root, `scripts/integration_test_${suites[0]}.sh`), '#!/bin/bash\ntrap \'echo cleaned >> cleanup; exit 0\' TERM\necho running >> launches\nsleep 30\n')
     const state = { clock: now(), scheduled: 0 }
-    const time = { ...realTime, now: () => state.clock, schedule: (callback, milliseconds) => {
+    const time = { ...realTime, now: () => state.clock,
+      pause: async milliseconds => { state.clock += milliseconds; await realTime.pause(milliseconds) },
+      schedule: (callback, milliseconds) => {
       state.scheduled++
       if (state.scheduled !== 1) return realTime.schedule(callback, TEST_BUDGET_MS)
       const waitForLaunch = async () => {
@@ -165,5 +168,32 @@ test('preparation cannot qualify a harness changed during its execution', async 
     assert.equal(result.exit, 1)
     assert.equal(result.drift, true)
     await assert.rejects(readFile(path.join(f.root, 'launches')), { code: 'ENOENT' })
+  } finally { await rm(f.root, { recursive: true }) }
+})
+
+
+test('real detached quality-stage custody survives a successful preparation leader and blocks live work', async () => {
+  const f = await fixture()
+  try {
+    const runner = new URL('../../scripts/run-bounded-command.ts', import.meta.url).href
+    const loader = createRequire(import.meta.url).resolve('tsx')
+    const parent = path.join(f.root, 'scripts/parent.mjs')
+    const leader = "const {spawn}=require('node:child_process'); const child=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});child.unref()"
+    await writeFile(parent, `
+      import {runBoundedCommand, Milliseconds} from ${JSON.stringify(runner)};
+      const clock={value:0};
+      try { await runBoundedCommand({ executable:process.execPath,args:['-e',${JSON.stringify(leader)}],name:'nested custody',timeoutMilliseconds:Milliseconds.make(30000),cleanup:{now:()=>clock.value,pause:async()=>{clock.value+=10000}} }); }
+      catch(error) { console.log(error.message); }
+    `)
+    const quote = value => "'" + value.replaceAll("'", "'\\''") + "'"
+    await writeFile(path.join(f.root, 'scripts/prepare.sh'), `#!/bin/bash\n${quote(process.execPath)} --import ${quote(loader)} ${quote(parent)}\n`)
+    const result = await runCertification({ ...f, prepare: 'scripts/prepare.sh' })
+    assert.equal(result.exit, 1)
+    await assert.rejects(readFile(path.join(f.root, 'launches')), { code: 'ENOENT' })
+    const custody = path.join(f.stateDir, 'prepare.log.custody')
+    const entries = await (await import('node:fs/promises')).readdir(custody)
+    assert.equal(entries.length, 1)
+    assert.equal(JSON.parse(await readFile(path.join(custody, entries[0]), 'utf8')).state, 'unconfirmed')
+    assert.equal((await runCertification({ ...f, mode: 'plan' })).locked, true)
   } finally { await rm(f.root, { recursive: true }) }
 })
