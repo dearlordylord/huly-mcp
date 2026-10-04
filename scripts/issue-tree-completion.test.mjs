@@ -1,6 +1,8 @@
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
-import { readFileSync } from "node:fs"
+import { readFileSync, mkdtempSync, mkdirSync, statSync, rmSync, symlinkSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { test } from "node:test"
 
 const source = readFileSync(new URL("./integration_test_issue_tree.sh", import.meta.url), "utf8")
@@ -58,4 +60,37 @@ test("unrecognized enum values cannot leak through the summary", () => {
   assert.equal(summary.commitConfirmation, null)
   assert.equal(summary.verificationStatus, null)
   assert.ok(!result.stderr.includes("SECRET_MARKER"))
+})
+
+const retention = source.slice(source.indexOf("retain_tree_result() {"), source.indexOf("assert_tree_completion() {"))
+const retain = (directory, result) => spawnSync("bash", ["-c", `${retention}\nretain_tree_result "$1" mcp`, "fixture-test", result], { env: { ...process.env, MOVEMENT_PRIVATE_EVIDENCE_DIR: directory }, encoding: "utf8", timeout: 5000, killSignal: "SIGKILL" })
+test("retains exact private reply once without printing its contents", () => {
+  const directory = mkdtempSync(join(tmpdir(), "tree-private-evidence-"))
+  try {
+    const result = '{"outcome":"incomplete","reason":"SECRET_MARKER"}'
+    const saved = retain(directory, result)
+    assert.equal(saved.status, 0)
+    assert.equal(saved.stdout, "")
+    assert.equal(saved.stderr, "")
+    const path = join(directory, "tree-final-mcp.json")
+    assert.equal(readFileSync(path, "utf8"), `${result}\n`)
+    assert.equal(statSync(path).mode & 0o777, 0o600)
+    assert.equal(retain(directory, "replacement").status, 1)
+    assert.equal(readFileSync(path, "utf8"), `${result}\n`)
+  } finally { rmSync(directory, { recursive: true }) }
+})
+test("rejects public or symlink evidence directories and preserves default behavior", () => {
+  const directory = mkdtempSync(join(tmpdir(), "tree-evidence-policy-"))
+  try {
+    const publicDirectory = join(directory, "public")
+    mkdirSync(publicDirectory, { mode: 0o755 })
+    assert.equal(retain(publicDirectory, "SECRET_MARKER").status, 1)
+    const link = join(directory, "link")
+    symlinkSync(directory, link)
+    assert.equal(retain(link, "SECRET_MARKER").status, 1)
+    const disabled = retain("", "SECRET_MARKER")
+    assert.equal(disabled.status, 0)
+    assert.equal(disabled.stdout, "")
+    assert.equal(disabled.stderr, "")
+  } finally { rmSync(directory, { recursive: true }) }
 })

@@ -59,6 +59,27 @@ move() {
     else "${CLI[@]}" issues move "$issue" --destination "$destination" --json; fi
   fi
 }
+retain_tree_result() {
+  local result="$1" transport="$2" directory="${MOVEMENT_PRIVATE_EVIDENCE_DIR:-}" normalized
+  [[ -z "$directory" ]] && return 0
+  if [[ "$directory" != /* || ! -d "$directory" || -L "$directory" || ! -O "$directory" ]]; then
+    printf 'FAIL: private tree evidence directory unavailable\n' >&2
+    return 1
+  fi
+  normalized=$(cd -P -- "$directory" && pwd) || return 1
+  if [[ "$normalized" != "$directory" || "$transport" != mcp && "$transport" != cli ]]; then
+    printf 'FAIL: private tree evidence path invalid\n' >&2
+    return 1
+  fi
+  if [[ "$(stat -c '%a' "$directory" 2>/dev/null || stat -f '%Lp' "$directory")" != 700 ]]; then
+    printf 'FAIL: private tree evidence directory permissions invalid\n' >&2
+    return 1
+  fi
+  (umask 077; set -o noclobber; printf '%s\n' "$result" > "$directory/tree-final-$transport.json") 2>/dev/null || {
+    printf 'FAIL: private tree evidence write unavailable\n' >&2
+    return 1
+  }
+}
 assert_tree_completion() {
   local result="$1"
   shift
@@ -198,6 +219,7 @@ for TRANSPORT in mcp cli; do
   IDS=$(jq -c --arg added "$ADDED" '.+[$added]' <<<"$IDS"); STATE=$(jq -c --argjson issues "$IDS" '.issues=$issues' <<<"$STATE")
   BEFORE=$(node scripts/run-bundled.mjs scripts/integration-issue-transfer-state.ts "$STATE")
   COMPLETED=$(move "$FINAL")
+  retain_tree_result "$COMPLETED" "$TRANSPORT"
   assert_tree_completion "$COMPLETED" --arg root "$ROOT" --arg child "$CHILD" --arg grandchild "$GRANDCHILD" --arg added "$ADDED" --arg milestone "$TM" '.outcome=="completed" and (.tasks|length)==4 and ([.tasks[].issueId]|sort)==([$root,$child,$grandchild,$added]|sort) and ([.tasks[].identifier]|unique|length)==4 and any(.attributeChanges[];.issueId==$root and .to==null and .reason=="explicit-clear") and any(.attributeChanges[];.issueId==$grandchild and .to==$milestone and .reason=="exact-name")' || exit 1
   assert_document_unchanged
   AFTER_ARGS=$(jq -nc --argjson args "$STATE" --argjson before "$BEFORE" --arg destination "$TARGET" '$args + {migrationEvidence:{destinationSpace:($before.projects[]|select(.identifier==$destination)|._id),beforeRecordIds:[$before.issues[].owned.records[]._id]}}')
