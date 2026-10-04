@@ -29,11 +29,17 @@ export const MovementVerificationEvidenceSchema = Schema.Union([
     consistency: Schema.Literal("consistent"),
     tasks: Schema.Array(MovementObservedTaskSchema),
     records: Schema.Array(MovementObservedRecordSchema)
-  }),
+  }).annotate({ parseOptions: { onExcessProperty: "error" } }),
   Schema.Struct({
     status: Schema.Literal("observed"),
     completeness: Schema.Literal("complete"),
     consistency: Schema.Literal("inconsistent"),
+    absentIssueIds: Schema.optionalKey(
+      Schema.Array(IssueId).annotate({
+        description:
+          "Stable issue IDs whose successful verification reads explicitly returned no document. Unread or unparseable tasks are not absent."
+      })
+    ),
     reason: NonEmptyString,
     tasks: Schema.Array(MovementObservedTaskSchema),
     records: Schema.Array(MovementObservedRecordSchema)
@@ -41,11 +47,24 @@ export const MovementVerificationEvidenceSchema = Schema.Union([
   Schema.Struct({
     status: Schema.Literal("observed"),
     completeness: Schema.Literal("incomplete"),
-    consistency: Schema.Literals(["inconsistent", "undetermined"]),
+    consistency: Schema.Literal("inconsistent"),
+    absentIssueIds: Schema.optionalKey(
+      Schema.Array(IssueId).annotate({
+        description: "Confirmed absent stable issue IDs retained even when other verification reads are unavailable."
+      })
+    ),
     reason: NonEmptyString,
     tasks: Schema.Array(MovementObservedTaskSchema),
     records: Schema.Array(MovementObservedRecordSchema)
-  })
+  }),
+  Schema.Struct({
+    status: Schema.Literal("observed"),
+    completeness: Schema.Literal("incomplete"),
+    consistency: Schema.Literal("undetermined"),
+    reason: NonEmptyString,
+    tasks: Schema.Array(MovementObservedTaskSchema),
+    records: Schema.Array(MovementObservedRecordSchema)
+  }).annotate({ parseOptions: { onExcessProperty: "error" } })
 ])
 export const MovementNumberReservationSchema = Schema.Union([
   Schema.Struct({ status: Schema.Literal("confirmed"), issueId: IssueId, number: PositiveInteger }),
