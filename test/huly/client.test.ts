@@ -51,7 +51,7 @@ import {
 } from "../../src/huly/errors.js"
 import { INLINE_COMMENT_MARK_TYPE } from "../../src/huly/operations/inline-comment-mark.js"
 import { MARKDOWN_INPUT_REF_URL } from "../../src/huly/operations/markup.js"
-import { attachment, chunter, contact, core } from "../../src/huly/huly-plugins.js"
+import { attachment, chunter, contact, core, tracker } from "../../src/huly/huly-plugins.js"
 import { toClassRef, toRef } from "../../src/huly/operations/sdk-boundary.js"
 import { HulySdk, type HulySdkDependencies } from "../../src/huly/sdk-deps.js"
 import { normalizeHulyOrigin } from "../../src/huly/unavailable-diagnostics.js"
@@ -294,6 +294,7 @@ describe("HulyClient Service", () => {
   it.effect("wires model-owned transfer discovery through the live client dependency seam", () =>
     Effect.gen(function* () {
       mockGetDescendants.mockReturnValue([])
+      mockFindOne.mockResolvedValue({ _id: "root", _class: String(tracker.class.Issue) })
       const client = yield* HulyClient
       const inspectTransferRecords = assertExists(client.inspectTransferRecords)
       expect(yield* inspectTransferRecords(IssueId.make("root"))).toMatchObject({
