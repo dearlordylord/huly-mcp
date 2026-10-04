@@ -1,27 +1,31 @@
+import { transferTreeKnownRecordIds, transferTreeOwnedRecordGuidance } from "./issue-transfer-owned-recovery.js"
+import type { MovementUncertaintyEvidence } from "../../domain/schemas/issue-movement-uncertainty.js"
+import { movementRecoveryInstructions, movementFailureResult } from "./issue-movement-recovery.js"
 import type { MovementProject } from "../../domain/schemas/issue-movement-state.js"
 import type { TransferTreeWrite } from "../../domain/schemas/issue-transfer-tree.js"
 import type { MoveIssueResult } from "../../domain/schemas/issues-results.js"
 import { DocId, UrlString } from "../../domain/schemas/shared.js"
 import { movementNoParent } from "./issue-movement-hierarchy.js"
 import type { TransferPlan } from "./issue-transfer-preflight.js"
-import { transferTreeKnownRecordIds, transferTreeOwnedRecordGuidance } from "./issue-transfer-tree-recovery.js"
 import type { HulyClient } from "../client.js"
 
 export const transferTreeInspectionGuidance = (prepared: TransferPlan, destination: MovementProject) =>
-  `Inspect every stable ID before retry: ${prepared.plan.tree.map((issue) => `MCP get_issue ${JSON.stringify({ project: destination.identifier, identifier: issue._id })}; CLI huly issues get ${destination.identifier} ${issue._id} --json`).join("; ")}. Stable-ID lookup searches the workspace. Do not automatically repeat movement; reserved numbers may leave gaps. ${transferTreeOwnedRecordGuidance(prepared, destination)}`
+  movementRecoveryInstructions(prepared.plan, destination)
 
 export const transferTreeFailure = (
   outcome: "incomplete" | "indeterminate",
   reason: string,
   prepared: TransferPlan,
-  destination: MovementProject
-): MoveIssueResult => ({
-  outcome,
-  reason,
-  recordIds: transferTreeKnownRecordIds(prepared),
-  issueIds: prepared.plan.tree.map((issue) => issue._id),
-  inspection: transferTreeInspectionGuidance(prepared, destination)
-})
+  destination: MovementProject,
+  evidence: Pick<MovementUncertaintyEvidence, "execution" | "verification">
+): MoveIssueResult => {
+  const failure = movementFailureResult(outcome, reason, prepared.plan, destination, evidence)
+  return {
+    ...failure,
+    recordIds: transferTreeKnownRecordIds(prepared),
+    inspection: `${failure.inspection} ${transferTreeOwnedRecordGuidance(prepared, destination)}`
+  }
+}
 
 export const transferTreeRefusal = (
   reason: string,
@@ -43,8 +47,10 @@ export const completedTransferTreeResult = (
   destination: MovementProject,
   write: TransferTreeWrite
 ): MoveIssueResult => ({
-  outcome: "completed",
-  changed: true,
+  ...(prepared.plan.root.space === destination._id &&
+  prepared.plan.root.attachedTo === (prepared.plan.parent?._id ?? movementNoParent)
+    ? ({ outcome: "no-op", changed: false } as const)
+    : ({ outcome: "completed", changed: true } as const)),
   issueId: prepared.plan.root._id,
   projectId: DocId.make(destination._id),
   parentId: prepared.plan.parent?._id ?? null,

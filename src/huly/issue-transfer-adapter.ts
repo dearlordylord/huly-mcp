@@ -37,6 +37,7 @@ export const queueTransferTask = async (
   matchTransferAttributes(apply, write)
   for (const record of write.records) {
     matchRecord(apply, record)
+    if (write.sourceId === write.destinationId) continue
     await apply.updateDoc(
       toClassRef<AttachedDoc>(record._class),
       toRef(record.space),
@@ -48,11 +49,10 @@ export const queueTransferTask = async (
     )
   }
   await apply.updateDoc(tracker.class.Issue, toRef(write.sourceId), toRef(write.issueId), {
-    space: toRef(write.destinationId),
     attachedTo: toRef(write.parentId),
-    number: write.number,
-    identifier: write.identifier,
-    rank: write.rank,
+    ...(write.sourceId === write.destinationId
+      ? {}
+      : { space: toRef(write.destinationId), number: write.number, identifier: write.identifier, rank: write.rank }),
     ...(parents === undefined
       ? {}
       : {

@@ -18,7 +18,8 @@ export const planTransferTreeWrites = (
   for (const [index, task] of prepared.tasks.entries()) {
     const number = numbers[index]
     if (number === undefined) return undefined
-    const rank = NonEmptyString.make(makeRank(previousRank, undefined))
+    const sameProject = destination._id === prepared.plan.source._id
+    const rank = sameProject ? task.protectedIssue.rank : NonEmptyString.make(makeRank(previousRank, undefined))
     tasks.push({
       issueId: task.issue._id,
       sourceId: prepared.plan.source._id,
@@ -27,7 +28,7 @@ export const planTransferTreeWrites = (
       parentId: transferTreeParent(task.issue, prepared.plan.root, prepared.plan.parent),
       modifiedOn: task.issue.modifiedOn,
       number,
-      identifier: IssueIdentifier.make(`${destination.identifier}-${number}`),
+      identifier: sameProject ? task.issue.identifier : IssueIdentifier.make(`${destination.identifier}-${number}`),
       rank,
       records: task.records,
       recordClasses: task.recordClasses,
@@ -45,13 +46,21 @@ export const planTransferTreeWrites = (
       prepared.plan.relevant.filter((issue) => !movedIds.has(issue._id)).map((issue) => [issue._id, issue])
     ).values()
   ]
+  return finalizeAncestry(prepared.plan.root._id, tasks, ancestors)
+}
+
+const finalizeAncestry = (
+  rootId: TransferTreeWrite["rootId"],
+  tasks: TransferTreeWrite["tasks"],
+  ancestors: TransferTreeWrite["ancestors"]
+): TransferTreeWrite | undefined => {
   const finalTasks: Array<TransferTreeWrite["tasks"][number]> = []
   for (const task of tasks) {
     const parents = plannedAncestry(task, tasks, ancestors)
     if (parents === undefined) return undefined
     finalTasks.push({ ...task, finalParents: parents })
   }
-  return { rootId: prepared.plan.root._id, tasks: finalTasks, ancestors }
+  return { rootId, tasks: finalTasks, ancestors }
 }
 
 const plannedAncestry = (

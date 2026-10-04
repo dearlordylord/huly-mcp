@@ -1,3 +1,5 @@
+import { assertExists } from "../../src/utils/assertions.js"
+import { toRef } from "../../src/huly/operations/sdk-boundary.js"
 import type { Doc, DocumentQuery, FindOptions } from "@hcengineering/core"
 import { IssuePriority, type Issue } from "@hcengineering/tracker"
 import { Effect, Schema } from "effect"
@@ -5,7 +7,7 @@ import { TransferInspectionSchema, type TransferWrite } from "../../src/domain/s
 import { DocId, IssueId, ObjectClassName, Timestamp, NonEmptyString } from "../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
 import { HulyAuthError } from "../../src/huly/errors-base.js"
-import { activity, task, tracker } from "../../src/huly/huly-plugins.js"
+import { activity, core, task, tracker } from "../../src/huly/huly-plugins.js"
 import { sdkFixture, documentForTestClass, findResultForTestClass } from "./huly-sdk.js"
 import { initializeHierarchy, movementFixture, movementIssue, movementProject } from "./movement.js"
 
@@ -115,32 +117,7 @@ export const transferFixture = () => {
     return Effect.succeed(documentForTestClass<T>(found))
   }
   const attributeRows: Array<Doc> = []
-  const commitTransfer: NonNullable<HulyClientOperations["commitTransfer"]> = (write: TransferWrite) => {
-    state.sent++
-    if (state.refuseCommit) return Effect.succeed("condition-not-met")
-    if (!state.ignoreCommit) {
-      Object.assign(root, {
-        space: write.destinationId,
-        attachedTo: write.parentId,
-        identifier: write.identifier,
-        rank: write.rank,
-        number: write.number
-      })
-      for (const change of write.attributeChanges ?? []) Reflect.set(root, change.field, change.to)
-      if (state.corruptNumber) root.number++
-      if (state.corruptContent) root.description = sdkFixture("Changed content")
-      if (!state.corruptHistory) for (const record of records) record.space = write.destinationId
-      if (state.corruptHistoryPayload) for (const record of records) record.history.action = "remove"
-      if (state.corruptHistoryAuthor)
-        for (const record of records) record.modifiedBy = NonEmptyString.make("changed author")
-      if (state.corruptHistoryTime)
-        for (const record of records) record.modifiedOn = Timestamp.make(CORRUPTED_HISTORY_TIMESTAMP)
-      initializeHierarchy(issues)
-    }
-    if (state.failCommit) return unavailable()
-    return Effect.succeed("applied")
-  }
-  const operations: Partial<HulyClientOperations> = {
+  const baseOperations: Partial<HulyClientOperations> = {
     ...fixture.operations,
     findOne,
     findAll: <T extends Doc>(cls: unknown, query: DocumentQuery<T>, options?: FindOptions<T>) => {
@@ -173,11 +150,48 @@ export const transferFixture = () => {
       if (state.failAllocation) return unavailable()
       return Effect.succeed(state.invalidAllocation ? {} : { object: { sequence: state.sequence } })
     },
-    commitTransfer,
-    // Model the guarded leaf tree port explicitly, including derived ancestor cleanup.
+    commitTransfer: (write: TransferWrite) => {
+      state.sent++
+      if (state.refuseCommit) return Effect.succeed("condition-not-met")
+      if (!state.ignoreCommit) {
+        Object.assign(root, {
+          space: write.destinationId,
+          attachedTo: write.parentId,
+          identifier: write.identifier,
+          rank: write.rank,
+          number: write.number
+        })
+        for (const change of write.attributeChanges ?? []) Reflect.set(root, change.field, change.to)
+        if (state.corruptNumber) root.number++
+        if (state.corruptContent) root.description = sdkFixture("Changed content")
+        if (!state.corruptHistory) for (const record of records) record.space = write.destinationId
+        if (state.corruptHistoryPayload) for (const record of records) record.history.action = "remove"
+        if (state.corruptHistoryAuthor)
+          for (const record of records) record.modifiedBy = NonEmptyString.make("changed author")
+        if (state.corruptHistoryTime)
+          for (const record of records) record.modifiedOn = Timestamp.make(CORRUPTED_HISTORY_TIMESTAMP)
+        initializeHierarchy(issues)
+      }
+      if (state.failCommit) return unavailable()
+      return Effect.succeed("applied")
+    }
+  }
+  const operations: Partial<HulyClientOperations> = {
+    ...baseOperations,
+    allocateMovementNumber: (destinationId) =>
+      assertExists(baseOperations.updateDoc)(
+        tracker.class.Project,
+        core.space.Space,
+        toRef(destinationId),
+        { $inc: { sequence: 1 } },
+        true
+      ),
     commitTransferTree: (write) => {
-      const task = write.tasks[0]
-      return task === undefined || write.tasks.length !== 1 ? Effect.succeed("condition-not-met") : commitTransfer(task)
+      const rootWrite = write.tasks.find((task) => task.issueId === write.rootId)
+      const commit = baseOperations.commitTransfer
+      return write.tasks.length !== 1 || rootWrite === undefined || commit === undefined
+        ? Effect.succeed("condition-not-met")
+        : commit(rootWrite)
     }
   }
   return {

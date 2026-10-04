@@ -1,3 +1,5 @@
+import { toRef } from "../../src/huly/operations/sdk-boundary.js"
+import { sdkFixture } from "./huly-sdk.js"
 /* eslint-disable no-restricted-syntax -- Huly SDK fixture refs and generic injected ports are nominal; fixture casts bridge SDK types with no runtime constructors. */
 import {
   type Doc,
@@ -162,7 +164,25 @@ export const movementFixture = (issues: Array<Issue>, options: MovementFixtureOp
         limitation: "Fixture model has no owned records."
       })
     )
-  const operations = { findAll, findOne, updateDoc, inspectTransferRecords }
+  const commitTransferTree: NonNullable<HulyClientOperations["commitTransferTree"]> = (write) =>
+    Effect.gen(function* () {
+      for (const task of write.tasks)
+        yield* updateDoc(tracker.class.Issue, sdkFixture(task.sourceId), sdkFixture(task.issueId), {
+          attachedTo: toRef<Issue>(task.parentId)
+        })
+      const root = write.tasks.find((task) => task.issueId === write.rootId)
+      if (root === undefined) return "condition-not-met"
+      if (String(root.previousParent) !== String(tracker.ids.NoParent))
+        yield* updateDoc(tracker.class.Issue, sdkFixture(root.sourceId), sdkFixture(root.previousParent), {
+          $inc: { subIssues: -1 }
+        })
+      if (String(root.parentId) !== String(tracker.ids.NoParent))
+        yield* updateDoc(tracker.class.Issue, sdkFixture(root.destinationId), sdkFixture(root.parentId), {
+          $inc: { subIssues: 1 }
+        })
+      return "applied"
+    })
+  const operations = { findAll, findOne, updateDoc, inspectTransferRecords, commitTransferTree }
   return { issues, writes, operations, layer: HulyClient.testLayer(operations) }
 }
 
