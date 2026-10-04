@@ -18,7 +18,7 @@ const runAdapter = (executable: string, payload: string, imagePath: string) => {
   const stdout = execFileSync(
     "node",
     ["scripts/run-bundled.mjs", "scripts/cli-full-integration-adapter.ts", executable, payload, imagePath],
-    { encoding: "utf8", timeout: adapterProcessTimeoutMs }
+    { encoding: "utf8", timeout: adapterProcessTimeoutMs, killSignal: "SIGKILL" }
   )
   const parsed: unknown = JSON.parse(stdout)
   return Schema.decodeUnknownSync(FullIntegrationAdapterResponseSchema)(parsed)
