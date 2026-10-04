@@ -128,6 +128,11 @@ the slot. Record the handle and result before admitting the next job. A timeout
 during overlapping work is still a failed check; it does not justify increasing
 its deadline or claiming that contention caused it.
 
+Before waiting for delegated work, check that the assigned agent is running.
+`send_message` queues information for an idle agent but does not start a turn;
+use `followup_task` to start a new assignment for a completed agent. Verify the
+agent status after dispatch instead of treating a queued request as active work.
+
 The user's anti-churn retrospective request must remain part of handoff. Apply the
 Dalph-derived finite-work, discriminating-experiment and immutable-evidence
 techniques to future attempts without restarting Dalph. Judge them by recorded
