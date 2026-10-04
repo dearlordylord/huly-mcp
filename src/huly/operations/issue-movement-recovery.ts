@@ -4,11 +4,7 @@ import type { MoveIssueResult } from "../../domain/schemas/issues-results.js"
 import type { IssueId } from "../../domain/schemas/shared.js"
 import type { MovementPlan } from "./issue-movement-preflight.js"
 
-export const movementRecoveryInstructions = (
-  plan: MovementPlan,
-  destination: MovementProject,
-  issueIds: ReadonlyArray<IssueId> = plan.tree.map((issue) => issue._id)
-) =>
+export const movementStableIdReadInstructions = (destination: MovementProject, issueIds: ReadonlyArray<IssueId>) =>
   `Inspect every stable ID before retry: ${issueIds
     .map(
       (issueId) =>
@@ -17,6 +13,12 @@ export const movementRecoveryInstructions = (
     .join(
       "; "
     )}. Stable-ID lookup searches the workspace and returns each task's current project. Historical identifier mappings are not reconstructed from uncertain replies. Do not automatically repeat movement or roll back subsequent edits; reserved numbers may leave gaps.`
+
+export const movementRecoveryInstructions = (
+  plan: MovementPlan,
+  destination: MovementProject,
+  issueIds: ReadonlyArray<IssueId> = plan.tree.map((issue) => issue._id)
+) => movementStableIdReadInstructions(destination, issueIds)
 
 export const movementFailureResult = (
   outcome: "incomplete" | "indeterminate",

@@ -1,3 +1,4 @@
+import { movementStableIdReadInstructions } from "./issue-movement-recovery.js"
 import { Effect } from "effect"
 import type { MoveIssueParams } from "../../domain/schemas/issue-movement.js"
 import type { MovementIssue, MovementProject } from "../../domain/schemas/issue-movement-state.js"
@@ -9,9 +10,6 @@ import { transferRetryCall } from "./issue-transfer-retry.js"
 import { executeTransferTree } from "./issue-transfer-tree-execution.js"
 import { TRANSFER_DISCOVERY_BUDGET } from "./issue-transfer-tree.js"
 
-const guidance = (root: MovementIssue, destination: MovementProject) =>
-  `Inspect stable ID with MCP get_issue ${JSON.stringify({ project: destination.identifier, identifier: root._id })} or CLI huly issues get ${destination.identifier} ${root._id} --json. Stable-ID lookup searches the workspace. Do not automatically repeat movement; sequence gaps may remain.`
-
 export const transferIssue = Effect.fn("transferIssue")(function* (
   client: HulyClient["Service"],
   root: MovementIssue,
@@ -20,7 +18,7 @@ export const transferIssue = Effect.fn("transferIssue")(function* (
   destination: MovementProject,
   params: MoveIssueParams
 ): Effect.fn.Return<MoveIssueResult, MovementError> {
-  const inspection = guidance(root, destination)
+  const inspection = movementStableIdReadInstructions(destination, [root._id])
   const preparedResult = yield* Effect.result(
     inspectTransferPlan(client, root, parent, source, destination, params).pipe(
       Effect.timeout(TRANSFER_DISCOVERY_BUDGET)
@@ -38,7 +36,7 @@ export const transferIssue = Effect.fn("transferIssue")(function* (
     }
   const prepared = preparedResult.success
   if ("conflicts" in prepared) {
-    const issueIds = prepared.issueIds ?? [root._id]
+    const issueIds = [...new Set([root._id, ...(prepared.issueIds ?? [])])]
     return {
       outcome: "blocked",
       changed: false,
@@ -48,7 +46,7 @@ export const transferIssue = Effect.fn("transferIssue")(function* (
       conflicts: prepared.conflicts,
       destinationId: destination._id,
       issueIds,
-      inspection
+      inspection: movementStableIdReadInstructions(destination, issueIds)
     }
   }
   return yield* executeTransferTree(client, prepared, destination, params)
