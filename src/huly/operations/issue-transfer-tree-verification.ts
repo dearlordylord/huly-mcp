@@ -1,7 +1,11 @@
 import { isDeepStrictEqual } from "node:util"
 import type { Issue } from "@hcengineering/tracker"
 import { Effect, Schema } from "effect"
-import type { MovementIssue, MovementProject } from "../../domain/schemas/issue-movement-state.js"
+import {
+  MovementIssueSchema,
+  type MovementIssue,
+  type MovementProject
+} from "../../domain/schemas/issue-movement-state.js"
 import { TransferIssueSchema } from "../../domain/schemas/issue-transfer.js"
 import type { TransferTreeTaskWrite, TransferTreeWrite } from "../../domain/schemas/issue-transfer-tree.js"
 import type { HulyClient } from "../client.js"
@@ -26,6 +30,7 @@ export type TransferTreeVerification =
 type TaskObservationProblem = { readonly status: "inconsistent" | "unavailable"; readonly reason: string }
 
 const parseIssue = (input: unknown) => Schema.decodeUnknownOption(TransferIssueSchema)(input)
+const parseHierarchyIssue = (input: unknown) => Schema.decodeUnknownOption(MovementIssueSchema)(input)
 
 export const verifyTransferTree = Effect.fn("transfer.verifyTree")(function* (
   client: HulyClient["Service"],
@@ -113,11 +118,12 @@ const inspectTaskPreservation = Effect.fn("transfer.inspectTaskPreservation")(fu
   const raw = yield* client.findOne<Issue>(tracker.class.Issue, hulyQuery<Issue>({ _id: toRef<Issue>(task.issueId) }))
   if (raw === undefined) return { status: "inconsistent", reason: `Protected payload of ${task.issueId} is absent.` }
   const parsed = parseIssue(raw)
-  if (parsed._tag === "None")
+  const hierarchy = parseHierarchyIssue(raw)
+  if (parsed._tag === "None" || hierarchy._tag === "None")
     return { status: "unavailable", reason: `Protected payload of ${task.issueId} could not be parsed.` }
   const expected = { ...task.expectedIssue, number: task.number, rank: task.rank }
   for (const change of task.attributeChanges ?? []) expected[change.field] = change.to
-  return isDeepStrictEqual(expected, parsed.value) && raw?.title === task.expectedHierarchy.title
+  return isDeepStrictEqual(expected, parsed.value) && hierarchy.value.title === task.expectedHierarchy.title
     ? undefined
     : { status: "inconsistent", reason: `Protected payload of ${task.issueId} differs from approved final values.` }
 })
