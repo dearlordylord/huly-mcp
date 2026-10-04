@@ -41,7 +41,7 @@ const committedRecordTime = (
   const intent = intents.at(LAST_ENTRY)
   if (intent === undefined || persisted === undefined) return "unavailable"
   if (!queuedRecordMatches(intent, expected, destinationId)) return "unavailable"
-  const transaction = persisted.transactions.find((value) => value.txId === intent.txId)
+  const transaction = uniqueCommittedTransaction(persisted, intent)
   if (transaction === undefined) return "unavailable"
   const { modifiedOn: _queuedTime, target: _target, ...identity } = intent
   const { modifiedOn: serverTime, ...committedIdentity } = transaction
@@ -77,3 +77,11 @@ const snapshotMetadataMatches = (
   snapshot: Schema.Schema.Type<typeof Schema.JsonObject>,
   current: TransferSupportedRecord
 ): boolean => snapshot["modifiedOn"] === current.modifiedOn && snapshot["modifiedBy"] === current.modifiedBy
+
+const uniqueCommittedTransaction = (
+  persisted: MovementTransactionInspection,
+  intent: MovementRecordTransactionReceipt
+) => {
+  const matches = persisted.transactions.filter((value) => value.txId === intent.txId)
+  return matches.length === 1 ? matches[0] : undefined
+}

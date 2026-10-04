@@ -105,8 +105,8 @@ const inspectOwnerRecords = (
     else limitations.push(`Record route of ${record._id} is unavailable.`)
     const expected = previous.find((value) => value._id === record._id)
     const decision = recordPreservationDecision(record, expected, destinationId, transactions, persisted)
-    if (decision.problem !== undefined) problems.push(decision.problem)
-    if (decision.limitation !== undefined) limitations.push(decision.limitation)
+    if (decision.status === "changed") problems.push(decision.problem)
+    if (decision.status === "unavailable") limitations.push(decision.limitation)
     if (record.kind === "unsupported") limitations.push(`Protected payload of record ${record._id} is unavailable.`)
   }
   const completeness = inspectRecordCompleteness(inspection, previous)
@@ -149,24 +149,35 @@ const presentRecordProblem = (
     : `Observed protected payload or ownership of record ${current._id} differs from approved state.`
 }
 
+// Internal mutually exclusive decision from parsed observation and transaction evidence.
+type RecordPreservationDecision =
+  | { readonly status: "preserved" }
+  | { readonly status: "changed"; readonly problem: string }
+  | { readonly status: "unavailable"; readonly limitation: string }
 const recordPreservationDecision = (
   record: TransferRecord,
   expected: TransferSupportedRecord | undefined,
   destinationId: TransferTreeWrite["tasks"][number]["destinationId"] | undefined,
   transactions: MovementTransactions,
   persisted: MovementTransactionInspection | undefined
-): { readonly problem?: string; readonly limitation?: string } => {
+): RecordPreservationDecision => {
   if (expected === undefined) {
-    if (movementHistoryMatches(record, transactions, destinationId)) return {}
-    return { problem: `Unexpected owned record ${record._id} was observed after preflight.` }
+    if (movementHistoryMatches(record, transactions, destinationId)) return { status: "preserved" }
+    return { status: "changed", problem: `Unexpected owned record ${record._id} was observed after preflight.` }
   }
   if (destinationId === undefined || record.kind === "unsupported") {
     const problem = presentRecordProblem(record, expected, destinationId)
-    return problem === undefined ? {} : { problem }
+    return problem === undefined ? { status: "preserved" } : { status: "changed", problem }
   }
   const proof = movementRecordProof(record, expected, destinationId, transactions, persisted)
-  if (proof === "preserved") return {}
+  if (proof === "preserved") return { status: "preserved" }
   if (proof === "unavailable")
-    return { limitation: `Own migration metadata of record ${record._id} could not be authenticated.` }
-  return { problem: `Observed protected payload or ownership of record ${record._id} differs from approved state.` }
+    return {
+      status: "unavailable",
+      limitation: `Own migration metadata of record ${record._id} could not be authenticated.`
+    }
+  return {
+    status: "changed",
+    problem: `Observed protected payload or ownership of record ${record._id} differs from approved state.`
+  }
 }

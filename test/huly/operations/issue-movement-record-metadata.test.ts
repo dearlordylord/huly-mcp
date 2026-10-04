@@ -27,6 +27,7 @@ const scenarios = [
   "wrong-author",
   "wrong-operations",
   "wrong-tx",
+  "duplicate-evidence",
   "wrong-class",
   "wrong-source",
   "later-edit",
@@ -63,7 +64,7 @@ for (const scenario of scenarios) {
       ])
       const intent = assertExists(transactions[0])
       const { modifiedOn: _queuedTime, ...rawIntent } = intent
-      const persisted = parseInspection({
+      let persisted = parseInspection({
         discovery: scenario === "missing-transaction" ? "incomplete" : "complete",
         transactions:
           scenario === "missing-transaction"
@@ -80,6 +81,11 @@ for (const scenario of scenarios) {
                 }
               ]
       })
+      if (scenario === "duplicate-evidence")
+        persisted = parseInspection({
+          ...persisted,
+          transactions: [...persisted.transactions, assertExists(persisted.transactions[0])]
+        })
       f.state.failCommit = scenario === "reply-lost"
       const operations = {
         ...f.operations,
@@ -127,6 +133,7 @@ for (const scenario of scenarios) {
         scenario === "wrong-author" ||
         scenario === "wrong-operations" ||
         scenario === "wrong-tx" ||
+        scenario === "duplicate-evidence" ||
         scenario === "wrong-class" ||
         scenario === "wrong-source"
       ) {
