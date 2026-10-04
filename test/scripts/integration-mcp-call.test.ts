@@ -6,6 +6,7 @@ import { test, expect } from "vitest"
 import {
   integrationMcpCall,
   IntegrationMonotonicMilliseconds,
+  type IntegrationElapsedMilliseconds,
   type IntegrationMcpPhase
 } from "../../scripts/integration-mcp-call.js"
 
@@ -103,32 +104,96 @@ test("invalid tool arguments fail at the boundary before any executable starts",
   ).rejects.toThrow("failed during input")
 })
 
-for (const scenario of ["unknown-tool", "malformed-reply"] as const) {
+for (const scenario of [
+  "unknown-tool",
+  "malformed-reply",
+  "connect-timeout",
+  "list-timeout",
+  "call-timeout"
+] as const) {
   test(`${scenario} refuses without mutation retry and closes the real connection`, async () => {
     const directory = await mkdtemp(join(tmpdir(), "hulymcp-negative-stdio-"))
     const server = join(directory, "server.cjs")
     const calls = join(directory, "calls")
     const closed = join(directory, "closed")
+    const requests = join(directory, "requests")
+    const pidFile = join(directory, "server.pid")
     await writeFile(
       server,
       `
-      const fs=require('node:fs');const readline=require('node:readline');
+      const fs=require('node:fs');const readline=require('node:readline');fs.writeFileSync(${JSON.stringify(pidFile)},String(process.pid));
       process.stdin.on('end',()=>fs.writeFileSync(${JSON.stringify(closed)},'closed'));
       readline.createInterface({input:process.stdin}).on('line',line=>{
         const req=JSON.parse(line);if(req.id===undefined)return;
+        fs.appendFileSync(${JSON.stringify(requests)},req.method+'\\n');
+        if(req.method===${JSON.stringify(scenario === "connect-timeout" ? "server/discover" : scenario === "list-timeout" ? "tools/list" : "unused")})return;
         const send=result=>process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:req.id,result})+'\\n');
         if(req.method==='server/discover')send({supportedVersions:['2026-07-28'],capabilities:{tools:{}}});
         else if(req.method==='tools/list')send({resultType:'complete',ttlMs:0,cacheScope:'private',tools:${JSON.stringify(scenario === "unknown-tool" ? [] : [{ name: "move_issue", inputSchema: { type: "object" } }])}});
-        else if(req.method==='tools/call'){fs.appendFileSync(${JSON.stringify(calls)},'call\\n');send({resultType:'complete',isError:false,content:[{type:'text',text:'not JSON'}]});}
+        else if(req.method==='tools/call'){fs.appendFileSync(${JSON.stringify(calls)},'call\\n');if(${scenario === "call-timeout"})return;send({resultType:'complete',isError:false,content:[{type:'text',text:'not JSON'}]});}
       });
     `
     )
+    const timers = {
+      schedule: (callback: () => void, milliseconds: IntegrationElapsedMilliseconds) => {
+        const timer = setTimeout(callback, milliseconds)
+        const target =
+          scenario === "connect-timeout"
+            ? "server/discover"
+            : scenario === "list-timeout"
+              ? "tools/list"
+              : scenario === "call-timeout"
+                ? "tools/call"
+                : undefined
+        if (target !== undefined) {
+          const observe = async (): Promise<void> => {
+            if (!timer.hasRef()) return
+            const contents = await readFile(requests, "utf8").catch(() => "")
+            if (contents.includes(target)) {
+              clearTimeout(timer)
+              timer.unref()
+              callback()
+            } else if (!timer.hasRef()) return
+            else
+              setTimeout(() => {
+                void observe()
+              }, 20)
+          }
+          void observe()
+        }
+        return timer
+      },
+      cancel: (timer: ReturnType<typeof setTimeout>) => {
+        clearTimeout(timer)
+        timer.unref()
+      }
+    }
     try {
       await expect(
-        integrationMcpCall(["move_issue", "{}"], { command: process.execPath, args: [server], environment: {} })
-      ).rejects.toThrow(`failed during ${scenario === "unknown-tool" ? "call" : "reply"}`)
-      expect(await readFile(closed, "utf8")).toBe("closed")
-      if (scenario === "unknown-tool") await expect(readFile(calls)).rejects.toMatchObject({ code: "ENOENT" })
+        integrationMcpCall(
+          ["move_issue", "{}"],
+          { command: process.execPath, args: [server], environment: {} },
+          undefined,
+          timers
+        )
+      ).rejects.toThrow(
+        `failed during ${scenario === "unknown-tool" || scenario === "list-timeout" ? "list" : scenario === "connect-timeout" ? "connect" : scenario === "call-timeout" ? "call" : "reply"}`
+      )
+      const pid = Number(await readFile(pidFile, "utf8"))
+      await expect
+        .poll(() => {
+          try {
+            process.kill(pid, 0)
+            return true
+          } catch (error) {
+            if (error instanceof Error && "code" in error && error.code === "ESRCH") return false
+            throw error
+          }
+        })
+        .toBe(false)
+      if (scenario !== "connect-timeout") expect(await readFile(closed, "utf8")).toBe("closed")
+      if (scenario === "unknown-tool" || scenario === "connect-timeout" || scenario === "list-timeout")
+        await expect(readFile(calls)).rejects.toMatchObject({ code: "ENOENT" })
       else expect(await readFile(calls, "utf8")).toBe("call\n")
     } finally {
       await rm(directory, { recursive: true, force: true })

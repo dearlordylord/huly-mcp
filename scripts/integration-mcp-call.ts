@@ -2,7 +2,9 @@ import { Client } from "@modelcontextprotocol/client"
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"
 import { Clock, Effect, Redacted, Schema } from "effect"
 
-const CALL_TIMEOUT_MILLISECONDS = 45_000
+const CONNECT_TIMEOUT_MILLISECONDS_VALUE = 10_000
+const LIST_TIMEOUT_MILLISECONDS_VALUE = 10_000
+const CALL_TIMEOUT_MILLISECONDS_VALUE = 45_000
 const InputSchema = Schema.Tuple([Schema.NonEmptyString, Schema.fromJsonString(Schema.JsonObject)])
 const RESPONSE_ID = 2
 const EnvironmentSchema = Schema.Record(Schema.String, Schema.RedactedFromValue(Schema.String))
@@ -11,7 +13,7 @@ const ReplySchema = Schema.Struct({
   content: Schema.Tuple([Schema.Struct({ type: Schema.Literal("text"), text: Schema.NonEmptyString })])
 })
 export class IntegrationMcpCallError extends Error {
-  constructor(phase: "input" | "connect" | "call" | "reply" | "close") {
+  constructor(phase: "input" | "connect" | "list" | "call" | "reply" | "close") {
     super(`Integration MCP call failed during ${phase}; no automatic mutation retry performed.`)
   }
 }
@@ -24,6 +26,9 @@ export const IntegrationElapsedMilliseconds = FractionalMilliseconds.pipe(
   Schema.brand("IntegrationElapsedMilliseconds")
 )
 export type IntegrationElapsedMilliseconds = Schema.Schema.Type<typeof IntegrationElapsedMilliseconds>
+const CONNECT_TIMEOUT_MILLISECONDS = IntegrationElapsedMilliseconds.make(CONNECT_TIMEOUT_MILLISECONDS_VALUE)
+const LIST_TIMEOUT_MILLISECONDS = IntegrationElapsedMilliseconds.make(LIST_TIMEOUT_MILLISECONDS_VALUE)
+const CALL_TIMEOUT_MILLISECONDS = IntegrationElapsedMilliseconds.make(CALL_TIMEOUT_MILLISECONDS_VALUE)
 export const IntegrationMcpPhaseSchema = Schema.Struct({
   phase: Schema.Literals([
     "bundle-ready",
@@ -50,6 +55,35 @@ export const integrationMcpClock = (): IntegrationMonotonicMilliseconds =>
     Number(Effect.runSync(Clock.monotonicTimeNanos)) / NANOSECONDS_PER_MILLISECOND
   )
 const quietTelemetry: IntegrationMcpTelemetry = { now: integrationMcpClock, publish: () => {} }
+// Request-shell timer ports make whole-phase deadlines independently testable.
+export interface IntegrationMcpTimers {
+  readonly schedule: (
+    callback: () => void,
+    milliseconds: IntegrationElapsedMilliseconds
+  ) => ReturnType<typeof setTimeout>
+  readonly cancel: (timer: ReturnType<typeof setTimeout>) => void
+}
+const realTimers: IntegrationMcpTimers = {
+  schedule: (callback, milliseconds) => setTimeout(callback, milliseconds),
+  cancel: (timer) => clearTimeout(timer)
+}
+const boundedPhase = <A>(
+  phase: "connect" | "list" | "call",
+  milliseconds: IntegrationElapsedMilliseconds,
+  timers: IntegrationMcpTimers,
+  request: (signal: AbortSignal) => Promise<A>
+): Promise<A> => {
+  const controller = new AbortController()
+  return new Promise<A>((resolve, reject) => {
+    const timer = timers.schedule(() => {
+      controller.abort()
+      reject(new IntegrationMcpCallError(phase))
+    }, milliseconds)
+    request(controller.signal)
+      .then(resolve, reject)
+      .finally(() => timers.cancel(timer))
+  })
+}
 // Internal process adapter seam; protocol input and output remain schema-owned.
 interface ProcessOptions {
   readonly command: string
@@ -64,7 +98,8 @@ const EnvelopeSchema = Schema.Struct({
 export const integrationMcpCall = async (
   input: unknown,
   options: ProcessOptions,
-  telemetry: IntegrationMcpTelemetry = quietTelemetry
+  telemetry: IntegrationMcpTelemetry = quietTelemetry,
+  timers: IntegrationMcpTimers = realTimers
 ): Promise<Schema.Schema.Type<typeof EnvelopeSchema>> => {
   const started = telemetry.now()
   const emit = (phase: IntegrationMcpPhase["phase"]): void =>
@@ -91,20 +126,47 @@ export const integrationMcpCall = async (
     { name: "hulymcp-integration-call", version: "1.0.0" },
     { versionNegotiation: { mode: { pin: "2026-07-28" } } }
   )
-  let phase: "connect" | "call" | "reply" | "close" = "connect"
+  let phase: "connect" | "list" | "call" | "reply" | "close" = "connect"
+  let connecting: Promise<void> | undefined
   const exchange = async () => {
     emit("connect-start")
-    await client.connect(transport)
+    await boundedPhase(
+      "connect",
+      CONNECT_TIMEOUT_MILLISECONDS,
+      timers,
+      (signal) =>
+        (connecting = client.connect(transport, {
+          signal,
+          timeout: CONNECT_TIMEOUT_MILLISECONDS,
+          maxTotalTimeout: CONNECT_TIMEOUT_MILLISECONDS
+        }))
+    )
     emit("connect-ready")
-    phase = "call"
+    phase = "list"
     emit("list-start")
-    const definition = (await client.listTools()).tools.find((tool) => tool.name === parsed.value[0])
+    const definition = (
+      await boundedPhase("list", LIST_TIMEOUT_MILLISECONDS, timers, (signal) =>
+        client.listTools(undefined, {
+          signal,
+          timeout: LIST_TIMEOUT_MILLISECONDS,
+          maxTotalTimeout: LIST_TIMEOUT_MILLISECONDS
+        })
+      )
+    ).tools.find((tool) => tool.name === parsed.value[0])
     emit("list-ready")
     if (definition === undefined) throw new IntegrationMcpCallError("call")
+    phase = "call"
     emit("call-start")
-    const raw = await client.callTool(
-      { name: parsed.value[0], arguments: parsed.value[1] },
-      { toolDefinition: definition, timeout: CALL_TIMEOUT_MILLISECONDS, maxTotalTimeout: CALL_TIMEOUT_MILLISECONDS }
+    const raw = await boundedPhase("call", CALL_TIMEOUT_MILLISECONDS, timers, (signal) =>
+      client.callTool(
+        { name: parsed.value[0], arguments: parsed.value[1] },
+        {
+          signal,
+          toolDefinition: definition,
+          timeout: CALL_TIMEOUT_MILLISECONDS,
+          maxTotalTimeout: CALL_TIMEOUT_MILLISECONDS
+        }
+      )
     )
     emit("call-reply")
     phase = "reply"
@@ -115,6 +177,8 @@ export const integrationMcpCall = async (
   const close = async () => {
     emit("close-start")
     try {
+      await transport.close()
+      await connecting?.catch(() => {})
       await client.close()
       emit("closed")
     } catch {

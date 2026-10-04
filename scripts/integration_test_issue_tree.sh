@@ -36,10 +36,11 @@ tree_mcp_reply() {
   fi
   printf '%s\n' "$text"
 }
+TREE_MCP_COMMAND_TIMEOUT_SECONDS=80
 mcp() {
   local response call_status=0 category=process-exit
   printf 'PHASE: tree MCP tool=%s call\n' "$1" >&2
-  response=$(timeout 45 node scripts/run-bundled.mjs scripts/integration-mcp-call-main.ts "$1" "$2") || call_status=$?
+  response=$(timeout "$TREE_MCP_COMMAND_TIMEOUT_SECONDS" node scripts/run-bundled.mjs scripts/integration-mcp-call-main.ts "$1" "$2") || call_status=$?
   if (( call_status != 0 )); then
     [[ "$call_status" == 124 ]] && category=timeout
     printf 'FAIL: tree MCP tool=%s phase=%s exit=%s\n' "$1" "$category" "$call_status" >&2
