@@ -109,9 +109,15 @@ status and each scenario assertion. A reviewed successor is not an executed
 predecessor. A private rich single-write diagnostic is characterization, not five-suite
 qualification. Labels such as “final” add no evidence.
 
-Resource cleanup repair is pending: retain confirmed deletion acknowledgements and
-independently verify absence, while preserving uncertainty for unknown partial
-setup IDs. Final acceptance still needs the five deployed suite receipts, the
+The tree cleanup repair is authored and source-reviewed in
+`scripts/issue-tree-cleanup.ts`, `scripts/integration-issue-tree-cleanup.ts` and
+`test/scripts/issue-tree-cleanup.test.ts`. It captures stable project identities,
+checks every destructive scope, uses typed unavailable observations, and reports
+deletion acknowledgements separately from fresh complete absence queries under
+one 120-second process-group bound. Fourteen controlled tests pass; deployed
+cleanup qualification remains pending. Unknown partial setup IDs remain
+unresolved and the original scenario failure is preserved.
+Final acceptance still needs the five deployed suite receipts, the
 71-criterion audit, deployment/permission evidence and explicit inside-server
 interruption/global-isolation limitations. Do not infer these from a gate pass.
 
