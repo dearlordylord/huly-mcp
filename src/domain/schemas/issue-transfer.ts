@@ -1,6 +1,15 @@
 import { SocialIdentityId } from "./person-administration.js"
 import { Schema } from "effect"
-import { DocId, IssueId, NonEmptyString, ObjectClassName, PositiveInteger, Timestamp } from "./shared.js"
+import {
+  DocId,
+  IssueId,
+  NonEmptyString,
+  ObjectClassName,
+  PositiveInteger,
+  Timestamp,
+  AccountUuid,
+  IssueIdentifier
+} from "./shared.js"
 
 export const AutomaticHistoryClass = ObjectClassName.make("activity:class:DocUpdateMessage")
 export const TransferHistorySchema = Schema.Struct({
@@ -21,13 +30,15 @@ const RecordFields = {
   modifiedOn: Timestamp,
   modifiedBy: SocialIdentityId
 }
+export const TransferHistoryRecordSchema = Schema.Struct({
+  ...RecordFields,
+  kind: Schema.Literal("history"),
+  _class: Schema.Literal(AutomaticHistoryClass),
+  history: TransferHistorySchema
+})
+export type TransferHistoryRecord = Schema.Schema.Type<typeof TransferHistoryRecordSchema>
 export const TransferRecordSchema = Schema.Union([
-  Schema.Struct({
-    ...RecordFields,
-    kind: Schema.Literal("history"),
-    _class: Schema.Literal(AutomaticHistoryClass),
-    history: TransferHistorySchema
-  }),
+  TransferHistoryRecordSchema,
   Schema.Struct({
     ...RecordFields,
     kind: Schema.Literal("unsupported"),
@@ -50,9 +61,9 @@ export const TransferWriteSchema = Schema.Struct({
   parentId: IssueId,
   modifiedOn: Timestamp,
   number: PositiveInteger,
-  identifier: NonEmptyString,
+  identifier: IssueIdentifier,
   rank: NonEmptyString,
-  records: Schema.Array(TransferRecordSchema)
+  records: Schema.Array(TransferHistoryRecordSchema)
 })
 export type TransferWrite = Schema.Schema.Type<typeof TransferWriteSchema>
 
@@ -74,7 +85,7 @@ export const TransferProjectSchema = Schema.Struct({
   type: DocId,
   private: Schema.Boolean,
   archived: Schema.Boolean,
-  members: Schema.Array(NonEmptyString),
+  members: Schema.Array(AccountUuid),
   restricted: Schema.optionalKey(Schema.Boolean)
 })
 export const TransferWorkflowSchema = Schema.Struct({
@@ -100,7 +111,7 @@ export const TransferConflictSchema = Schema.Struct({
     "invalid-resolution"
   ]),
   issueId: IssueId,
-  identifier: NonEmptyString,
+  identifier: IssueIdentifier,
   reason: Schema.String
 })
 export type TransferConflict = Schema.Schema.Type<typeof TransferConflictSchema>

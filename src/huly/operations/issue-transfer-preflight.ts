@@ -9,7 +9,8 @@ import {
   TransferKindSchema,
   type TransferInspection,
   type TransferConflict,
-  type TransferIssue
+  type TransferIssue,
+  type TransferHistoryRecord
 } from "../../domain/schemas/issue-transfer.js"
 import type { MovementIssue, MovementProject } from "../../domain/schemas/issue-movement-state.js"
 import { HulyDataInvalidError } from "../errors-base.js"
@@ -29,13 +30,16 @@ import {
 export interface TransferPlan {
   readonly plan: MovementPlan
   readonly protectedIssue: TransferIssue
-  readonly records: TransferInspection
+  readonly records: Omit<TransferInspection, "records"> & { readonly records: ReadonlyArray<TransferHistoryRecord> }
 }
 export interface TransferRefusal {
   readonly conflicts: ReadonlyArray<TransferConflict>
   readonly limitation: TransferInspection["limitation"]
 }
-const parse = <S extends Schema.Top>(schema: S, input: unknown) =>
+const parse = <A, R>(
+  schema: Schema.ConstraintDecoder<A, R>,
+  input: unknown
+): Effect.Effect<A, HulyDataInvalidError, R> =>
   Schema.decodeUnknownEffect(schema)(input).pipe(
     Effect.mapError(
       (cause) => new HulyDataInvalidError({ operation: "move_issue", entity: "transfer preflight", cause })
@@ -100,7 +104,7 @@ const projectConflicts = (
         "Restricted project permissions are unsupported in this slice; select unrestricted projects."
       )
     )
-  if (destination.private && !destination.members.includes(String(client.getAccountUuid())))
+  if (destination.private && !destination.members.includes(client.getAccountUuid()))
     conflicts.push(
       conflict(
         root,
@@ -281,6 +285,14 @@ export const inspectTransferPlan = Effect.fn("transfer.inspectPlan")(function* (
   const conflicts = [
     ...hierarchyConflicts(root, hierarchy, relevant),
     ...workflow.conflicts,
+    ...(records.discovery === "incomplete"
+      ? [conflict(root, "discovery", "Incomplete owned-record discovery; no complete conflict inventory.")]
+      : []),
+    ...records.records
+      .filter((record) => record.kind === "unsupported")
+      .map((record) =>
+        conflict(root, "unsupported-structure", `Unsupported owned record ${record._id} (${record._class}).`)
+      ),
     ...records.blockers.map((reason) => conflict(root, "unsupported-structure", reason)),
     ...records.records
       .filter((record) => record.space !== root.space)
@@ -294,5 +306,9 @@ export const inspectTransferPlan = Effect.fn("transfer.inspectPlan")(function* (
   ]
   if (closureProblem !== undefined) conflicts.push(conflict(root, "discovery", closureProblem))
   if (conflicts.length > 0) return { conflicts, limitation: records.limitation }
-  return { plan: { root, parent, source, tree: [root], relevant }, protectedIssue: workflow.protectedIssue, records }
+  return {
+    plan: { root, parent, source, tree: [root], relevant },
+    protectedIssue: workflow.protectedIssue,
+    records: { ...records, records: records.records.filter((record) => record.kind === "history") }
+  }
 })

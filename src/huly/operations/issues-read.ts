@@ -35,12 +35,11 @@ import { findIssueAssignee } from "./issue-assignee-resolution.js"
 import { creatorForIssue, loadIssueCreatorIndex } from "./issue-creators-read.js"
 import { issueIdsMatchingLabel, labelsForIssue, loadIssueLabelIndex } from "./issue-labels-read.js"
 import { loadIssueMilestoneIndex, milestoneForIssue } from "./issue-milestones-read.js"
-import { toRef } from "./sdk-boundary.js"
 import { topLevelIssueParent } from "./issues-parent.js"
 import {
   findIssueInProject,
+  findIssueBySelector,
   findProjectWithStatuses,
-  parseIssueIdentifier,
   priorityToString,
   resolveStatusByName,
   type WorkflowStatus
@@ -230,34 +229,6 @@ const issueSummaryProjection = (
   }
 }
 
-const findIssueForRead = (
-  client: HulyClient["Service"],
-  project: ProjectWorkflowData["project"],
-  params: GetIssueParams
-): Effect.Effect<HulyIssue, HulyClientError | IssueNotFoundError> =>
-  Effect.gen(function* () {
-    const { fullIdentifier, number } = parseIssueIdentifier(params.identifier, params.project)
-    const byIdentifier = yield* client.findOne<HulyIssue>(
-      tracker.class.Issue,
-      hulyQuery<HulyIssue>({ space: project._id, identifier: fullIdentifier })
-    )
-    const byNumber =
-      byIdentifier !== undefined || number === null
-        ? undefined
-        : yield* client.findOne<HulyIssue>(tracker.class.Issue, hulyQuery<HulyIssue>({ space: project._id, number }))
-    const issue =
-      byIdentifier ??
-      byNumber ??
-      (yield* client.findOne<HulyIssue>(
-        tracker.class.Issue,
-        hulyQuery<HulyIssue>({ _id: toRef<HulyIssue>(params.identifier) })
-      ))
-    if (issue === undefined) {
-      return yield* new IssueNotFoundError({ identifier: params.identifier, project: params.project })
-    }
-    return issue
-  })
-
 const loadIssueAssignee = (
   client: HulyClient["Service"],
   issue: HulyIssue
@@ -399,7 +370,7 @@ export const getIssue = (params: GetIssueParams): Effect.Effect<Issue, GetIssueE
   Effect.gen(function* () {
     const requested = yield* findProjectWithStatuses(params.project)
     const { client } = requested
-    const issue = yield* findIssueForRead(client, requested.project, params)
+    const issue = yield* findIssueBySelector(client, requested.project, params.identifier, "workspace")
     const { project, statuses } = yield* actualIssueWorkflow(requested, issue)
     const statusName = resolveStatusName(statuses, issue.status)
     const person = yield* loadIssueAssignee(client, issue)
@@ -431,7 +402,7 @@ export const getIssue = (params: GetIssueParams): Effect.Effect<Issue, GetIssueE
 const actualIssueWorkflow = Effect.fn("getIssue.actualWorkflow")(function* (
   requested: ProjectWorkflowData,
   issue: HulyIssue
-) {
+): Effect.fn.Return<ProjectWorkflowData, GetIssueError, HulyClient | Diagnostics> {
   if (requested.project._id === issue.space) return requested
   const project = yield* requested.client.findOne<HulyProject>(
     tracker.class.Project,

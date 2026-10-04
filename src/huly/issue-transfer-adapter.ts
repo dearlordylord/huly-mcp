@@ -36,7 +36,7 @@ export const inspectTransferRecords = Effect.fn("transfer.inspectRecords")(funct
     ...declared.map((collection) => toClassRef<AttachedDoc>(collection.of)),
     ...hierarchy.getDescendants(core.class.AttachedDoc).filter((cls) => hierarchy.findDomain(cls) !== undefined)
   ])
-  const records = new Map<TransferWrite["records"][number]["_id"], TransferWrite["records"][number]>()
+  const records = new Map<TransferRecord["_id"], TransferRecord>()
   const blockers: Array<string> = []
   const discovery = { incomplete: false }
   for (const cls of classes) {

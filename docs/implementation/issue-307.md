@@ -32,4 +32,10 @@ Final certification must run this fixture, #306 movement fixtures and all subseq
 
 ## Reviews
 
-Fresh parallel Standards/Spec reviews and Dalph acceptance review pending.
+Independent parallel reviews inspected immutable candidate `d5f1611b5f27083b09d2aec51b9856b79ec0761d` against `8541d04d8dea44a17f5071e281a7d069892e795d`.
+
+Standards found a blocking admission invariant: structured incomplete discovery and unsupported record kinds could be admitted if the adapter omitted blocker text. The successor derives refusal from discovery/classification and narrows approved plans and writes to history records. Two injected-port cases prove empty blocker text cannot authorize writes. Standards also requested existing `IssueIdentifier`/`AccountUuid` schemas and one owner for identifier/number/stable-ID lookup. The successor uses those schemas and shares a resolver with explicit project/workspace scope. Successor re-review is pending.
+
+Spec found no confirmed behavioral defects across all 12 criteria and no scope expansion. A successful full quality gate remains an acceptance blocker. Dalph is disabled and has no review or acceptance role.
+
+After the Standards fixes, 74 focused movement/adapter/read tests passed (`/tmp/issue307-focused-current.log`). The first compiler-cap full gate exited 1 at the unchanged 120-second TypeScript/Effect stage bound (`/tmp/issue307-final-gate.log`). Independent compiler progress identifies the new SDK adapter as the slow diagnostic file. Investigation remains active; no timeout, inventory, diagnostics or coverage requirements changed.

@@ -345,10 +345,11 @@ export const parseIssueIdentifier = (
   return { fullIdentifier: idStr, number: null }
 }
 
-export const findIssueInProject = (
+export const findIssueBySelector = (
   client: HulyClient["Service"],
   project: HulyProject,
-  identifierStr: string
+  identifierStr: IssueIdentifier,
+  stableIdScope: "project" | "workspace"
 ): Effect.Effect<HulyIssue, IssueNotFoundError | HulyClientError> =>
   Effect.gen(function* () {
     const { fullIdentifier, number } = parseIssueIdentifier(identifierStr, project.identifier)
@@ -366,7 +367,10 @@ export const findIssueInProject = (
           )) ??
       (yield* client.findOne<HulyIssue>(
         tracker.class.Issue,
-        hulyQuery<HulyIssue>({ space: project._id, _id: toRef<HulyIssue>(IssueIdentifier.make(identifierStr)) })
+        hulyQuery<HulyIssue>({
+          ...(stableIdScope === "project" ? { space: project._id } : {}),
+          _id: toRef<HulyIssue>(identifierStr)
+        })
       ))
     if (issue === undefined) {
       return yield* new IssueNotFoundError({ identifier: identifierStr, project: project.identifier })
@@ -374,6 +378,13 @@ export const findIssueInProject = (
 
     return issue
   })
+
+export const findIssueInProject = (
+  client: HulyClient["Service"],
+  project: HulyProject,
+  identifierStr: string
+): Effect.Effect<HulyIssue, IssueNotFoundError | HulyClientError> =>
+  findIssueBySelector(client, project, IssueIdentifier.make(identifierStr), "project")
 
 export const findProjectAndIssue = (params: {
   project: string

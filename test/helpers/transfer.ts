@@ -9,6 +9,8 @@ import { activity, task, tracker } from "../../src/huly/huly-plugins.js"
 import { sdkFixture, documentForTestClass } from "./huly-sdk.js"
 import { initializeHierarchy, movementFixture, movementIssue, movementProject } from "./movement.js"
 
+const CORRUPTED_HISTORY_TIMESTAMP = Timestamp.make(2)
+
 export const transferFixture = () => {
   const source = { ...movementProject(), type: "type-1", private: false, archived: false, members: [] }
   const destination = {
@@ -145,7 +147,7 @@ export const transferFixture = () => {
         if (state.corruptHistoryPayload) for (const record of records) record.history.action = "remove"
         if (state.corruptHistoryAuthor)
           for (const record of records) record.modifiedBy = NonEmptyString.make("changed author")
-        if (state.corruptHistoryTime) for (const record of records) record.modifiedOn = Timestamp.make(2)
+        if (state.corruptHistoryTime) for (const record of records) record.modifiedOn = CORRUPTED_HISTORY_TIMESTAMP
         initializeHierarchy(issues)
       }
       if (state.failCommit) return unavailable()

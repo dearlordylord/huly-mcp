@@ -7,7 +7,14 @@ import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement
 import { MoveIssueResultSchema } from "../../../src/domain/schemas/issues-results.js"
 import { getIssue } from "../../../src/huly/operations/issues-read.js"
 import { withDiagnostics } from "../../helpers/diagnostics.js"
-import { DocId, ProjectIdentifier, IssueIdentifier } from "../../../src/domain/schemas/shared.js"
+import { SocialIdentityId } from "../../../src/domain/schemas/person-administration.js"
+import {
+  DocId,
+  ProjectIdentifier,
+  IssueIdentifier,
+  ObjectClassName,
+  Timestamp
+} from "../../../src/domain/schemas/shared.js"
 import { moveIssue } from "../../../src/huly/operations/issue-movement.js"
 import { findIssueInProject } from "../../../src/huly/operations/issues-shared.js"
 import { HulyClient } from "../../../src/huly/client.js"
@@ -164,3 +171,38 @@ it.effect("inconsistent moved records and identifier cannot be successful no-ops
     expect(f.state.allocated).toBe(1)
   })
 )
+
+for (const discovery of ["incomplete", "unsupported"] as const) {
+  it.effect(`refuses structured ${discovery} inventory even when adapter blocker text is empty`, () =>
+    Effect.gen(function* () {
+      const f = transferFixture()
+      f.layer = HulyClient.testLayer({
+        ...f.operations,
+        inspectTransferRecords: () =>
+          Effect.succeed(
+            discovery === "incomplete"
+              ? { discovery: "incomplete", records: [], blockers: [], limitation: "Limited discovery." }
+              : {
+                  discovery: "complete",
+                  records: [
+                    {
+                      kind: "unsupported",
+                      _id: DocId.make("owned-comment"),
+                      _class: ObjectClassName.make("chunter:class:ChatMessage"),
+                      attachedTo: DocId.make(f.root._id),
+                      space: DocId.make(f.source._id),
+                      modifiedOn: Timestamp.make(0),
+                      modifiedBy: SocialIdentityId.make("author")
+                    }
+                  ],
+                  blockers: [],
+                  limitation: "Unsupported collection."
+                }
+          )
+      })
+      expect(yield* call(f)).toMatchObject({ outcome: "blocked", changed: false })
+      expect(f.state.allocated).toBe(0)
+      expect(f.state.sent).toBe(0)
+    })
+  )
+}
