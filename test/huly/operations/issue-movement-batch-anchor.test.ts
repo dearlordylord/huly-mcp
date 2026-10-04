@@ -1,5 +1,5 @@
 import { it } from "@effect/vitest"
-import { Effect, Fiber, Schema } from "effect"
+import { Effect, Fiber, Ref, Schema } from "effect"
 import { TestClock } from "effect/testing"
 import { expect } from "vitest"
 import { HulyDataInvalidError } from "../../../src/huly/errors-base.js"
@@ -33,7 +33,8 @@ const scenarios = [
   "changed-creator",
   "conflicting-anchors",
   "direct-contradiction",
-  "invalid-direct-evidence"
+  "invalid-direct-evidence",
+  "invalid-then-empty"
 ] as const
 for (const scenario of scenarios) {
   it.effect(`single movement batch anchor: ${scenario}`, () =>
@@ -80,12 +81,18 @@ for (const scenario of scenarios) {
       const commit = assertExists(f.operations.commitTransferTree)
       const params = yield* parseMoveIssueParams(f.input)
       f.state.failCommit = scenario === "reply-lost"
+      const evidenceCalls = yield* Ref.make(0)
       const operations = {
         ...f.operations,
         inspectMovementTransactions: () =>
-          scenario === "invalid-direct-evidence"
-            ? Effect.fail(new HulyDataInvalidError({ operation: "move_issue", entity: "persisted transactions" }))
-            : Effect.succeed(inspectionFrom({ discovery: "incomplete", transactions: [] })),
+          Effect.gen(function* () {
+            const call = yield* Ref.updateAndGet(evidenceCalls, (value) => value + 1)
+            if (scenario === "invalid-direct-evidence" || (scenario === "invalid-then-empty" && call === 1))
+              return yield* Effect.fail(
+                new HulyDataInvalidError({ operation: "move_issue", entity: "persisted transactions" })
+              )
+            return inspectionFrom({ discovery: "incomplete", transactions: [] })
+          }),
         commitTransferTree: (write: Parameters<typeof commit>[0], publish?: MovementTransactionProgress) =>
           Effect.gen(function* () {
             const base = transactionsFrom([
