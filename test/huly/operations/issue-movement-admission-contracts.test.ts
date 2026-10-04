@@ -5,7 +5,10 @@ import { expect } from "vitest"
 import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"
 import { MovementIssueSchema, MovementProjectSchema } from "../../../src/domain/schemas/issue-movement-state.js"
 import { MAX_SUPPORTED_ATTRIBUTE_VALUES } from "../../../src/domain/schemas/issue-transfer-attributes.js"
-import { MAX_TRANSFER_CONFLICT_ENTRIES } from "../../../src/huly/operations/issue-transfer-tree.js"
+import {
+  MAX_TRANSFER_CONFLICT_ENTRIES,
+  TRANSFER_DISCOVERY_BUDGET
+} from "../../../src/huly/operations/issue-transfer-tree.js"
 import { MoveIssueResultSchema } from "../../../src/domain/schemas/issues-results.js"
 import { DocId, UNKNOWN_TOTAL } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
@@ -115,7 +118,7 @@ for (const change of ["missing-port", "snapshot-drift", "read-outage", "timeout"
       if (change === "snapshot-drift") f.root.description = sdkFixture("Concurrent edit before execution")
       const executor = yield* HulyClient.pipe(Effect.provide(HulyClient.testLayer(operations)))
       const fiber = yield* executeTransferTree(executor, prepared, destination, params).pipe(Effect.forkChild)
-      yield* TestClock.adjust("11 seconds")
+      yield* TestClock.adjust(TRANSFER_DISCOVERY_BUDGET)
       const result = yield* Fiber.join(fiber)
       expect(result).toMatchObject({ outcome: "blocked", changed: false })
       expect(f.state.allocated).toBe(0)
