@@ -302,7 +302,7 @@ const finishVerification = Effect.fn("transfer.finishVerification")(function* (
       Effect.repeat({
         schedule: Schedule.spaced("200 millis"),
         times: 4,
-        while: (value) => value.status === "observed" && value.consistency === "inconsistent"
+        while: (value) => value.status === "observed" && value.consistency !== "consistent"
       })
     )
   )

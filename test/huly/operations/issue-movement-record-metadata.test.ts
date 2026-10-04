@@ -20,6 +20,7 @@ const parseInspection = (input: unknown) => Schema.decodeUnknownSync(MovementTra
 const parseRecord = (input: unknown) => Schema.decodeUnknownSync(TransferHistoryRecordSchema)(input)
 const scenarios = [
   "acknowledged",
+  "delayed-proof",
   "other-author",
   "reply-lost",
   "missing-transaction",
@@ -102,12 +103,20 @@ for (const scenario of scenarios) {
             })
           : initialInspection
       f.state.failCommit = scenario === "reply-lost"
+      const inspectionReads = { count: 0 }
       const operations = {
         ...f.operations,
         inspectMovementTransactions: () =>
-          scenario === "read-outage"
-            ? Effect.fail(new HulyAuthError({ message: "Transaction read unavailable" }))
-            : Effect.succeed(persisted),
+          Effect.suspend(() => {
+            inspectionReads.count += 1
+            if (scenario === "read-outage")
+              return Effect.fail(new HulyAuthError({ message: "Transaction read unavailable" }))
+            return Effect.succeed(
+              scenario === "delayed-proof" && inspectionReads.count === 1
+                ? parseInspection({ discovery: "incomplete", transactions: [] })
+                : persisted
+            )
+          }),
         commitTransferTree: (write: Parameters<typeof commit>[0], publish?: MovementTransactionProgress) =>
           Effect.gen(function* () {
             yield* assertExists(publish)(transactions)
@@ -141,8 +150,10 @@ for (const scenario of scenarios) {
       yield* TestClock.adjust("2 seconds")
       const result = yield* Fiber.join(fiber)
       expect(f.state.sent).toBe(1)
-      if (scenario === "acknowledged" || scenario === "other-author") expect(result.outcome).toBe("completed")
-      else if (scenario === "reply-lost") {
+      if (scenario === "acknowledged" || scenario === "other-author" || scenario === "delayed-proof") {
+        expect(result.outcome).toBe("completed")
+        if (scenario === "delayed-proof") expect(inspectionReads.count).toBe(2)
+      } else if (scenario === "reply-lost") {
         expect(result.outcome).toBe("indeterminate")
         expect(result).toMatchObject({
           verification: { consistency: "consistent" },
@@ -164,6 +175,7 @@ for (const scenario of scenarios) {
       ) {
         expect(result.outcome).toBe("indeterminate")
         expect(result).toMatchObject({ verification: { consistency: "undetermined" } })
+        if (scenario === "missing-transaction") expect(inspectionReads.count).toBe(5)
       } else {
         expect(result.outcome).toBe("incomplete")
         expect(result).toMatchObject({ verification: { consistency: "inconsistent" } })
