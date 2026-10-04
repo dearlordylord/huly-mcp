@@ -100,7 +100,7 @@ for (const change of ["missing-port", "snapshot-drift", "read-outage"]) {
       if ("conflicts" in prepared) throw new Error("Expected admitted fixture")
       const { commitTransferTree: _commit, ...withoutCommit } = f.operations
       const findAll = assertExists(f.operations.findAll)
-      const operations =
+      const operations: Partial<HulyClientOperations> =
         change === "missing-port"
           ? withoutCommit
           : {
@@ -172,8 +172,6 @@ it.effect("a complete candidate inventory exceeding the response cap refuses the
     const movingIssues = f.issues.filter((issue) => issue.space === f.source._id && issue._id !== f.old._id)
     const fields = ["component", "milestone"]
     const candidatesPerAttribute = MAX_SUPPORTED_ATTRIBUTE_VALUES
-    expect(candidatesPerAttribute).toBeLessThanOrEqual(MAX_SUPPORTED_ATTRIBUTE_VALUES)
-    expect(movingIssues.length * fields.length * candidatesPerAttribute).toBeGreaterThan(MAX_TRANSFER_CONFLICT_ENTRIES)
     for (const issue of movingIssues) {
       issue.component = sdkFixture("dangling-component")
       issue.milestone = sdkFixture("dangling-milestone")
@@ -193,6 +191,16 @@ it.effect("a complete candidate inventory exceeding the response cap refuses the
         )
       }
     }
+    const candidateCounts = fields.map(
+      (field) =>
+        f.attributeRows.filter(
+          (row) => row._class === (field === "component" ? tracker.class.Component : tracker.class.Milestone)
+        ).length
+    )
+    for (const count of candidateCounts) expect(count).toBeLessThanOrEqual(MAX_SUPPORTED_ATTRIBUTE_VALUES)
+    expect(movingIssues.length * candidateCounts.reduce((total, count) => total + count, 0)).toBeGreaterThan(
+      MAX_TRANSFER_CONFLICT_ENTRIES
+    )
     const result = yield* run(f, f.operations)
     expect(result).toMatchObject({ outcome: "blocked", changed: false, discovery: "incomplete" })
     expect(result).toHaveProperty("conflicts", [
