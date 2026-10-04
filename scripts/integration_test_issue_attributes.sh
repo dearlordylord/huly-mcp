@@ -31,8 +31,8 @@ cleanup() {
     done
   done
   for project in "${PROJECTS[@]}"; do
-    for id in $(mcp list_components "$(jq -nc --arg project "$project" '{project:$project,limit:1000}')" | jq -r '.[].id'); do mcp delete_component "$(jq -nc --arg project "$project" --arg component "$id" '{project:$project,component:$component}')" >/dev/null || true; done
-    for id in $(mcp list_milestones "$(jq -nc --arg project "$project" '{project:$project,limit:1000}')" | jq -r '.[].id'); do mcp delete_milestone "$(jq -nc --arg project "$project" --arg milestone "$id" '{project:$project,milestone:$milestone}')" >/dev/null || true; done
+    for id in $(mcp list_components "$(jq -nc --arg project "$project" '{project:$project}')" | jq -r '.[].id'); do mcp delete_component "$(jq -nc --arg project "$project" --arg component "$id" '{project:$project,component:$component}')" >/dev/null || true; done
+    for id in $(mcp list_milestones "$(jq -nc --arg project "$project" '{project:$project}')" | jq -r '.[].id'); do mcp delete_milestone "$(jq -nc --arg project "$project" --arg milestone "$id" '{project:$project,milestone:$milestone}')" >/dev/null || true; done
     mcp delete_project "$(jq -nc --arg project "$project" '{project:$project}')" >/dev/null || true; done
 }
 trap cleanup EXIT
