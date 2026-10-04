@@ -443,11 +443,11 @@ Key response fields used by the test script for entity IDs:
 
 ## Stdio EOF and In-Flight Request Draining
 
-The stdio server always exits when stdin closes; `MCP_AUTO_EXIT` is no longer needed and cannot disable connection ownership. The server **drains in-flight tool calls before shutting down**: if a tool handler is mid-execution when stdin closes, it gets up to five seconds to complete and write its response. Wire and resource cleanup share the remainder of one ten-second global deadline.
+The stdio server always exits when stdin closes; `MCP_AUTO_EXIT` is no longer needed and cannot disable connection ownership. EOF or stdin close starts a bounded shutdown: in-flight requests have up to 30 seconds to finish, followed by concurrent wire, telemetry and client cleanup, each capped at three seconds. An independent 35-second global watchdog forces process exit 1 if shutdown has not finished. SIGINT, SIGTERM and programmatic stop instead use a two-second request drain and a ten-second global watchdog.
 
 This matters for operations that make HTTP round-trips to Huly's collaborator service (e.g., `edit_document` with content changes calls `updateMarkup`). Without draining, the stdin-close event would race against the HTTP call, and the response would be lost even though the mutation succeeded on the server.
 
-**For script authors**: the standard `printf '%s\n%s\n' | node` pattern works correctly for all tools, including slow ones. No need for `sleep` workarounds.
+**For script authors**: closing stdin starts the EOF drain deadline. A `printf` pipeline is suitable only when the request finishes within that allowance. Keep stdin open until the matching response for longer workflows, then close it and verify process cleanup. Capture process status and stderr separately; a missing reply does not prove that a mutation was refused. Movement has separate initial-inspection and execution bounds, so its total request lifetime can exceed the EOF drain allowance.
 
 **Implementation**: `src/mcp/server.ts` routes stdin EOF/close, SIGINT/SIGTERM, and programmatic stop through one idempotent shutdown coordinator. New requests are rejected after quiescing, and request completion notifications release the drain without polling timers.
 
