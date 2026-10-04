@@ -1,4 +1,5 @@
-import type { MovementTransactionBatch, MovementTransactions } from "../issue-movement-transactions.js"
+import type { MovementBatchVerification } from "./issue-movement-batch-anchor.js"
+import type { MovementTransactions } from "../issue-movement-transactions.js"
 import { projectVerification, type VerificationProof } from "./issue-transfer-verification-proof.js"
 import { Effect } from "effect"
 import type { MovementProject } from "../../domain/schemas/issue-movement-state.js"
@@ -24,7 +25,7 @@ export const verifyTransferTree = Effect.fn("transfer.verifyTree")(function* (
   write: TransferTreeWrite,
   publish: (observation: VerificationProof) => Effect.Effect<void> = () => Effect.void,
   transactions: MovementTransactions = [],
-  batch?: MovementTransactionBatch
+  batch?: MovementBatchVerification
 ): Effect.fn.Return<TransferTreeVerification, MovementError> {
   const source = yield* inspectMovementProject(client, prepared.plan.root)
   const target =

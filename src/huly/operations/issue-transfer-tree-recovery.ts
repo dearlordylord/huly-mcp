@@ -1,3 +1,4 @@
+import type { MovementBatchVerification } from "./issue-movement-batch-anchor.js"
 import type { MovementTransactionBatch, MovementTransactions } from "../issue-movement-transactions.js"
 import {
   publishVerification,
@@ -23,8 +24,14 @@ export type MovementBatchCapture =
   | { readonly status: "awaiting" }
   | { readonly status: "captured"; readonly batch: MovementTransactionBatch | undefined }
   | { readonly status: "repeated" }
-export const capturedMovementBatch = (progress: ExecutionProgress) =>
-  Ref.get(progress.batch).pipe(Effect.map((value) => (value.status === "captured" ? value.batch : undefined)))
+  | { readonly status: "invalid-evidence" }
+export const capturedMovementBatch = (progress: ExecutionProgress): Effect.Effect<MovementBatchVerification> =>
+  Ref.get(progress.batch).pipe(
+    Effect.map((value) => ({
+      batch: value.status === "captured" ? value.batch : undefined,
+      invalidate: Ref.set(progress.batch, { status: "invalid-evidence" })
+    }))
+  )
 // Request-local progress proof; no durable state or replay protocol is introduced.
 export interface ExecutionProgress {
   readonly transactions: Ref.Ref<MovementTransactions>

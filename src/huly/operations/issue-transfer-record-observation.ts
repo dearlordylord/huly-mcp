@@ -1,4 +1,9 @@
-import { movementBatchAnchor, type MovementBatchAnchor } from "./issue-movement-batch-anchor.js"
+import { HulyDataInvalidError } from "../errors-base.js"
+import {
+  movementBatchAnchor,
+  type MovementBatchAnchor,
+  type MovementBatchVerification
+} from "./issue-movement-batch-anchor.js"
 import { movementRecordProof } from "./issue-movement-record-proof.js"
 import { movementHistoryMatches } from "./issue-movement-history.js"
 import type {
@@ -47,16 +52,11 @@ export const observeTransferRecords = Effect.fn("transfer.observeRecords")(funct
   observed: ReadonlyArray<ObservedIssue>,
   publish: (observation: RecordObservation) => Effect.Effect<void>,
   transactions: MovementTransactions = [],
-  batch?: MovementTransactionBatch
+  batchContext?: MovementBatchVerification
 ): Effect.fn.Return<RecordObservation> {
   if (client.inspectTransferRecords === undefined && client.inspectTransferForest === undefined)
     return { records: [], problems: [], limitations: ["Owned-record verifier is unavailable."] }
-  const recordIntents = transactions.filter((value) => "target" in value)
-  const persistedResult =
-    recordIntents.length > 0 && client.inspectMovementTransactions !== undefined
-      ? yield* Effect.result(client.inspectMovementTransactions(recordIntents))
-      : undefined
-  const persisted = persistedResult?._tag === "Success" ? persistedResult.success : undefined
+  const { batch, persisted } = yield* inspectTransactionEvidence(client, transactions, batchContext)
   const entries = new Map<TransferForestEntry["ownerId"], TransferForestEntry>()
   const owners = [
     ...new Set([...prepared.tasks.map((task) => task.issue._id), ...observed.map((issue) => issue.hierarchy._id)])
@@ -200,3 +200,26 @@ const projectRecordObservations = (
     limitations: proofs.flatMap((value) => value.limitations)
   }
 }
+
+// Internal read outcome keeps invalid evidence distinct from absent or unavailable transaction logs.
+const inspectTransactionEvidence = Effect.fn("transfer.inspectTransactionEvidence")(function* (
+  client: HulyClient["Service"],
+  transactions: MovementTransactions,
+  context: MovementBatchVerification | undefined
+): Effect.fn.Return<{
+  readonly persisted: MovementTransactionInspection | undefined
+  readonly batch: MovementTransactionBatch | undefined
+}> {
+  const recordIntents = transactions.filter((value) => "target" in value)
+  const inspect = client.inspectMovementTransactions
+  if (recordIntents.length === 0 || inspect === undefined) return { persisted: undefined, batch: batchPayload(context) }
+  const result = yield* Effect.result(inspect(recordIntents))
+  if (result._tag === "Success") return { persisted: result.success, batch: batchPayload(context) }
+  if (result.failure instanceof HulyDataInvalidError) {
+    if (context !== undefined) yield* context.invalidate
+    return { persisted: undefined, batch: undefined }
+  }
+  return { persisted: undefined, batch: batchPayload(context) }
+})
+
+const batchPayload = (context: MovementBatchVerification | undefined) => context?.batch

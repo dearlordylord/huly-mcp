@@ -1,3 +1,4 @@
+import type { Effect } from "effect"
 import type { TransferInspection, TransferSupportedRecord } from "../../domain/schemas/issue-transfer.js"
 import { HulyTransactionScope, type DocId, type IssueId, type Timestamp } from "../../domain/schemas/shared.js"
 import { SocialIdentityId } from "../../domain/schemas/person-administration.js"
@@ -5,6 +6,11 @@ import type { MovementTransactionBatch, MovementTransactions } from "../issue-mo
 import { core } from "../huly-plugins.js"
 import { movementHistoryMatches } from "./issue-movement-history.js"
 
+// Internal request-local invalidation; parsed batch payload remains schema-owned.
+export interface MovementBatchVerification {
+  readonly batch: MovementTransactionBatch | undefined
+  readonly invalidate: Effect.Effect<void>
+}
 // Internal projection of authenticated parsed history from this request's one queued apply batch.
 export interface MovementBatchAnchor {
   readonly modifiedOn: Timestamp

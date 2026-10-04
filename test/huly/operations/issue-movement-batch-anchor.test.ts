@@ -2,6 +2,7 @@ import { it } from "@effect/vitest"
 import { Effect, Fiber, Schema } from "effect"
 import { TestClock } from "effect/testing"
 import { expect } from "vitest"
+import { HulyDataInvalidError } from "../../../src/huly/errors-base.js"
 import { HulyClient } from "../../../src/huly/client.js"
 import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"
 import { TransferHistoryRecordSchema } from "../../../src/domain/schemas/issue-transfer.js"
@@ -31,7 +32,8 @@ const scenarios = [
   "later-metadata",
   "changed-creator",
   "conflicting-anchors",
-  "direct-contradiction"
+  "direct-contradiction",
+  "invalid-direct-evidence"
 ] as const
 for (const scenario of scenarios) {
   it.effect(`single movement batch anchor: ${scenario}`, () =>
@@ -81,7 +83,9 @@ for (const scenario of scenarios) {
       const operations = {
         ...f.operations,
         inspectMovementTransactions: () =>
-          Effect.succeed(inspectionFrom({ discovery: "incomplete", transactions: [] })),
+          scenario === "invalid-direct-evidence"
+            ? Effect.fail(new HulyDataInvalidError({ operation: "move_issue", entity: "persisted transactions" }))
+            : Effect.succeed(inspectionFrom({ discovery: "incomplete", transactions: [] })),
         commitTransferTree: (write: Parameters<typeof commit>[0], publish?: MovementTransactionProgress) =>
           Effect.gen(function* () {
             const base = transactionsFrom([
