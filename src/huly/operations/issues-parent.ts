@@ -37,9 +37,6 @@ export const childIssueParent = (
   ]
 })
 
-export const hasConcreteIssueParent = (issue: Pick<HulyIssue, "attachedTo" | "attachedToClass">): boolean =>
-  issue.attachedToClass === tracker.class.Issue && issue.attachedTo !== tracker.ids.NoParent
-
 export const attachIssueChild = (
   client: HulyClient["Service"],
   project: Ref<HulyProject>,
