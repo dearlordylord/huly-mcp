@@ -302,10 +302,10 @@ it.effect("verification cannot report completed when observed attributes differ 
     f.root.component = sdkFixture("source")
     value(f, "source", "component", "API", false)
     value(f, "approved", "component", "API")
-    const commit = assertExists(f.operations.commitTransfer)
+    const commit = assertExists(f.operations.commitTransferTree)
     const layer = HulyClient.testLayer({
       ...f.operations,
-      commitTransfer: (write) =>
+      commitTransferTree: (write) =>
         commit(write).pipe(
           Effect.tap(() =>
             Effect.sync(() => {

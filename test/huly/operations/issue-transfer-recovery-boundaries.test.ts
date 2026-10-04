@@ -66,7 +66,10 @@ it.effect("malformed transfer identity is a pre-write refusal with no sequence g
     f.root.rank = sdkFixture(null)
     const result = yield* parseMoveIssueParams(f.input).pipe(Effect.flatMap(moveIssue), Effect.provide(f.layer))
     expect(result).toMatchObject({ outcome: "blocked", changed: false })
-    expect(JSON.stringify(result)).toContain("Pre-write inspection failed")
+    if (result.outcome === "blocked") {
+      expect(result.discovery).toBe("incomplete")
+      expect(result.conflicts).toEqual(expect.arrayContaining([expect.objectContaining({ code: "discovery" })]))
+    }
     expect(f.state.allocated).toBe(0)
     expect(f.state.sent).toBe(0)
   })

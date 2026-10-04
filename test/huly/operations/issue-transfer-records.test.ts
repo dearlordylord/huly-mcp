@@ -2,7 +2,7 @@ import { it } from "@effect/vitest"
 import { Effect, Fiber, Schema } from "effect"
 import { TestClock } from "effect/testing"
 import { expect } from "vitest"
-import { DocId } from "../../../src/domain/schemas/shared-refs.js"
+import { DocId, ObjectClassName } from "../../../src/domain/schemas/shared-refs.js"
 import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"
 import { TransferSupportedRecordSchema } from "../../../src/domain/schemas/issue-transfer.js"
 import { HulyClient } from "../../../src/huly/client.js"
@@ -57,22 +57,29 @@ const richFixture = () => {
   const state = { corrupt: false, unavailableAfterWrite: false }
   const layer = HulyClient.testLayer({
     ...f.operations,
-    inspectTransferRecords: () => {
+    inspectTransferRecords: (issueId) => {
       const inspect = f.operations.inspectTransferRecords
       if (inspect === undefined) return Effect.die("Fixture inspection is required")
-      return inspect(f.input.issue).pipe(
+      return inspect(issueId).pipe(
         Effect.map((inspection) => ({
           ...inspection,
           discovery: state.unavailableAfterWrite && f.state.sent > 0 ? "incomplete" : inspection.discovery,
-          records: [...inspection.records, ...extra]
+          classes: [
+            ...new Set([
+              ...inspection.classes,
+              ...(issueId === f.input.issue ? extra.map((record) => ObjectClassName.make(record._class)) : [])
+            ])
+          ],
+          records: [...inspection.records, ...(issueId === f.input.issue ? extra : [])]
         }))
       )
     },
-    commitTransfer: (write) => {
-      const commit = f.operations.commitTransfer
+    commitTransferTree: (write) => {
+      const commit = f.operations.commitTransferTree
       if (commit === undefined) return Effect.die("Fixture commit is required")
       return commit(write).pipe(
         Effect.map((result) => {
+          if (result !== "applied") return result
           extra = extra.map((record) => ({
             ...record,
             space: write.destinationId,
