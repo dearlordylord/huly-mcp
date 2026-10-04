@@ -124,6 +124,7 @@ it.effect("unknown descendant totals preserve independently discovered attribute
 it.effect("one malformed protected sibling retains other workflow, attribute and every supplied consent check", () =>
   Effect.gen(function* () {
     const f = transferTreeFixture()
+    f.kind.kind = "subtask"
     f.grandchild.status = sdkFixture("unsupported-status")
     f.grandchild.component = sdkFixture("missing-component")
     const original = assertExists(f.operations.findOne)
@@ -160,6 +161,7 @@ it.effect("one malformed protected sibling retains other workflow, attribute and
         expect.objectContaining({ code: "invalid-resolution", issueId: f.root._id })
       ])
     )
+    expect(result.conflicts?.some((entry) => entry.reason === "This kind requires a destination parent.")).toBe(false)
     expect(f.state.allocated).toBe(0)
     expect(f.state.sent).toBe(0)
   })

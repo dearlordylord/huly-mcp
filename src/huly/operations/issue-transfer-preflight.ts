@@ -129,7 +129,8 @@ const workflowConflicts = (
   issue: TransferIssue,
   projectType: Schema.Schema.Type<typeof TransferProjectSchema>["type"],
   workflow: Schema.Schema.Type<typeof TransferWorkflowSchema>,
-  kind: Schema.Schema.Type<typeof TransferKindSchema>
+  kind: Schema.Schema.Type<typeof TransferKindSchema>,
+  parentInspected: boolean
 ) => {
   const conflicts: Array<TransferConflict> = []
   if (!workflow.tasks.includes(issue.kind) || kind.parent !== projectType)
@@ -147,7 +148,7 @@ const workflowConflicts = (
         `Status ${issue.status} is unsupported for kind ${issue.kind}. Select a compatible destination; status cannot be cleared or converted.`
       )
     )
-  return [...conflicts, ...parentKindConflicts(root, parent, kind)]
+  return parentInspected ? [...conflicts, ...parentKindConflicts(root, parent, kind)] : conflicts
 }
 
 const parentKindConflicts = (
@@ -171,7 +172,8 @@ const availableWorkflowConflicts = (
   issue: TransferIssue,
   projectType: Schema.Schema.Type<typeof TransferProjectSchema>["type"],
   workflow: Schema.Schema.Type<typeof TransferWorkflowSchema> | undefined,
-  kind: Schema.Schema.Type<typeof TransferKindSchema> | undefined
+  kind: Schema.Schema.Type<typeof TransferKindSchema> | undefined,
+  parentInspected: boolean
 ) =>
   workflow === undefined || kind === undefined
     ? [
@@ -181,7 +183,7 @@ const availableWorkflowConflicts = (
           "Destination workflow metadata unavailable; select a project supporting the current kind and status."
         )
       ]
-    : workflowConflicts(root, parent, issue, projectType, workflow, kind)
+    : workflowConflicts(root, parent, issue, projectType, workflow, kind, parentInspected)
 
 const inspectWorkflow = Effect.fn("transfer.inspectWorkflow")(function* (
   client: HulyClient["Service"],
@@ -231,7 +233,15 @@ const inspectWorkflow = Effect.fn("transfer.inspectWorkflow")(function* (
   const parentIssue = parentObservation?._tag === "Success" ? parentObservation.success : undefined
   const conflicts = [
     ...projectConflicts(client, root, sourceData, destinationData),
-    ...availableWorkflowConflicts(root, parentIssue, protectedIssue, destinationData.type, workflow, kind)
+    ...availableWorkflowConflicts(
+      root,
+      parentIssue,
+      protectedIssue,
+      destinationData.type,
+      workflow,
+      kind,
+      parentObservation?._tag !== "Failure"
+    )
   ]
   if (parentObservation?._tag === "Failure")
     conflicts.push(
