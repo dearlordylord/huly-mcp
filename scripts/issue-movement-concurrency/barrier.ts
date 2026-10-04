@@ -23,7 +23,9 @@ export const makeGatewayBarrier = (emit: (event: GatewayEvent) => void) => {
       emit({ event: "barrier", point, action: arm.action })
       return arm.action
     }
-    const released = new Promise<void>((resolve) => { state.release = resolve })
+    const released = new Promise<void>((resolve) => {
+      state.release = resolve
+    })
     emit({ event: "barrier", point, action: arm.action })
     await released
     state.release = undefined
