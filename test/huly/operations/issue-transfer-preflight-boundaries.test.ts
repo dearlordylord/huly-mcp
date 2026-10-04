@@ -14,6 +14,8 @@ import { assertExists } from "../../../src/utils/assertions.js"
 const issueSnapshot = (input: unknown) => Schema.decodeUnknownSync(MovementIssueSchema)(input)
 const projectSnapshot = (input: unknown) => Schema.decodeUnknownSync(MovementProjectSchema)(input)
 
+const UNKNOWN_TOTAL = -1
+
 const modes = [
   "archivedRestricted",
   "subtaskWithoutParent",
@@ -30,7 +32,12 @@ const modes = [
   "brokenParentAncestry",
   "missingAdapter",
   "rawRootChanged",
-  "closureChanged"
+  "closureChanged",
+  "incompleteSource",
+  "incompleteDestination",
+  "unknownSourceTotal",
+  "unknownDestinationTotal",
+  "unknownClosureTotal"
 ]
 for (const mode of modes) {
   it.effect(`preflight refuses ${mode} without reserving a number`, () =>
@@ -65,8 +72,18 @@ for (const mode of modes) {
         findAll: (cls, query, options) =>
           originalFindAll(cls, query, options).pipe(
             Effect.map((rows) => {
-              if (mode === "closureChanged" && Reflect.get(query, "attachedTo") !== undefined)
+              if (
+                (mode === "closureChanged" && Reflect.get(query, "attachedTo") !== undefined) ||
+                (mode === "incompleteSource" && Reflect.get(query, "space") === f.source._id) ||
+                (mode === "incompleteDestination" && Reflect.get(query, "space") === f.destination._id)
+              )
                 rows.total = rows.length + 1
+              if (
+                (mode === "unknownSourceTotal" && Reflect.get(query, "space") === f.source._id) ||
+                (mode === "unknownDestinationTotal" && Reflect.get(query, "space") === f.destination._id) ||
+                (mode === "unknownClosureTotal" && Reflect.get(query, "attachedTo") !== undefined)
+              )
+                rows.total = UNKNOWN_TOTAL
               return rows
             })
           ),

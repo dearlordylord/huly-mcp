@@ -8,6 +8,8 @@ import { IssueId } from "../../src/domain/schemas/shared.js"
 import { activity, attachment, core, tracker } from "../../src/huly/huly-plugins.js"
 import { sdkFixture, findResult } from "../helpers/huly-sdk.js"
 
+const UNKNOWN_TOTAL = -1
+
 const adapterFixture = () => {
   const history = {
     _id: "history",
@@ -23,7 +25,15 @@ const adapterFixture = () => {
     createdOn: 1
   }
   const docs: Array<Record<string, unknown>> = [history]
-  const state = { refused: false, incomplete: false, failRead: false, failNestedRead: false, invalidMetadata: false }
+  const state = {
+    refused: false,
+    incomplete: false,
+    failRead: false,
+    failNestedRead: false,
+    invalidMetadata: false,
+    unknownOwnedTotal: false,
+    unknownNestedTotal: false
+  }
   const updates: Array<ReadonlyArray<unknown>> = []
   const conditions: Array<unknown> = []
   const scopes: Array<string | undefined> = []
@@ -49,7 +59,7 @@ const adapterFixture = () => {
       getDescendants: () => [activity.class.DocUpdateMessage, attachment.class.Attachment, "unpersisted"],
       findDomain: (cls: unknown) => (cls === "unpersisted" ? undefined : "test")
     }),
-    findAll: async (cls: unknown, query: Record<string, unknown>) => {
+    findAll: async (cls: unknown, query: Record<string, unknown>, options?: { readonly total?: boolean }) => {
       if (state.failRead || (state.failNestedRead && query.attachedTo === history._id))
         throw new Error("Unavailable read")
       const result = findResult(
@@ -58,6 +68,12 @@ const adapterFixture = () => {
           .map((doc) => sdkFixture<Doc>(doc))
       )
       if (state.incomplete) result.total = 10_002
+      if (
+        options?.total !== true ||
+        (state.unknownOwnedTotal && query.attachedTo === "root") ||
+        (state.unknownNestedTotal && query.attachedTo === history._id)
+      )
+        result.total = UNKNOWN_TOTAL
       return result
     },
     apply: (scope: string | undefined) => {
@@ -171,5 +187,18 @@ it.effect("parses historical update payloads into immutable encoded snapshots an
     Reflect.set(f.history, "attributeUpdates", () => "invalid")
     expect((yield* Effect.result(inspectTransferRecords(f.client, IssueId.make("root"))))._tag).toBe("Failure")
     expect(f.updates).toEqual([])
+  })
+)
+
+it.effect("refuses unknown owned and nested inventory counts even when the SDK returns rows", () =>
+  Effect.gen(function* () {
+    for (const mode of ["unknownOwnedTotal", "unknownNestedTotal"] as const) {
+      const f = adapterFixture()
+      f.state[mode] = true
+      const inspected = yield* inspectTransferRecords(f.client, IssueId.make("root"))
+      expect(inspected.blockers.join(" ")).toContain("Incomplete")
+      expect(f.updates).toEqual([])
+      if (mode === "unknownOwnedTotal") expect(inspected.discovery).toBe("incomplete")
+    }
   })
 )

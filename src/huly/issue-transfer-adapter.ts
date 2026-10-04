@@ -49,11 +49,11 @@ export const inspectTransferRecords = Effect.fn("transfer.inspectRecords")(funct
         client.findAll<AttachedDoc>(
           toClassRef<AttachedDoc>(cls),
           hulyQuery<AttachedDoc>({ attachedTo: toRef<Doc>(issueId) }),
-          { limit: LIMIT }
+          { limit: LIMIT, total: true }
         ),
       catch: (cause) => makeOperationConnectionError("findAll", cause)
     })
-    if (rows.total > rows.length || rows.length >= LIMIT) {
+    if (rows.total !== rows.length || rows.length >= LIMIT) {
       discovery.incomplete = true
       blockers.push(`Incomplete collection discovery for ${cls}.`)
     }
@@ -106,10 +106,11 @@ const inspectNestedHistory = Effect.fn("transfer.inspectNestedHistory")(function
           client.findAll<AttachedDoc>(
             toClassRef<AttachedDoc>(cls),
             hulyQuery<AttachedDoc>({ attachedTo: toRef<Doc>(record._id) }),
-            { limit: 1 }
+            { limit: 1, total: true }
           ),
         catch: (cause) => makeOperationConnectionError("findAll", cause)
       })
+      if (nested.total < 0) blockers.push(`Incomplete nested ownership discovery on history ${record._id}.`)
       if (nested.length > 0 || nested.total > 0) blockers.push(`Unsupported nested records on history ${record._id}.`)
     }
   }
