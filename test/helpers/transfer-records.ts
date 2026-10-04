@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 import type { Doc, TxOperations } from "@hcengineering/core"
 import { activity, attachment, chunter, core, tags, tracker } from "../../src/huly/huly-plugins.js"
+import { ObjectClassName } from "../../src/domain/schemas/shared.js"
 import { sdkFixture, findResult } from "./huly-sdk.js"
 
 const LAST_SCOPE = -1
@@ -22,18 +23,27 @@ export const ownedRecord = (
   modifiedBy: "author",
   ...payload
 })
-const parents = new Map<string, string>([
-  ["tracker:class:CustomIssue", String(tracker.class.Issue)],
-  [String(chunter.class.ThreadMessage), String(chunter.class.ChatMessage)],
-  [String(chunter.class.ChatMessage), String(activity.class.ActivityMessage)],
-  [String(activity.class.DocUpdateMessage), String(activity.class.ActivityMessage)],
-  [String(activity.class.ActivityInfoMessage), String(activity.class.ActivityMessage)],
-  [String(activity.class.ActivityReference), String(activity.class.ActivityMessage)],
-  [String(attachment.class.Photo), String(attachment.class.Attachment)],
-  [String(attachment.class.Embedding), String(attachment.class.Attachment)]
-])
-const derived = (cls: string, parent: string): boolean =>
-  cls === parent || (parents.has(cls) && derived(parents.get(cls) ?? "", parent))
+const parseClassName = Schema.decodeUnknownSync(ObjectClassName)
+const parents = new Map<ObjectClassName, ObjectClassName>(
+  Schema.decodeUnknownSync(Schema.Array(Schema.Tuple([ObjectClassName, ObjectClassName])))([
+    ["tracker:class:CustomIssue", String(tracker.class.Issue)],
+    [String(chunter.class.ThreadMessage), String(chunter.class.ChatMessage)],
+    [String(chunter.class.ChatMessage), String(activity.class.ActivityMessage)],
+    [String(activity.class.DocUpdateMessage), String(activity.class.ActivityMessage)],
+    [String(activity.class.ActivityInfoMessage), String(activity.class.ActivityMessage)],
+    [String(activity.class.ActivityReference), String(activity.class.ActivityMessage)],
+    [String(attachment.class.Photo), String(attachment.class.Attachment)],
+    [String(attachment.class.Embedding), String(attachment.class.Attachment)]
+  ])
+)
+const derived = (
+  cls: ObjectClassName,
+  parent: ObjectClassName,
+  modelParents: ReadonlyMap<ObjectClassName, ObjectClassName>
+): boolean => {
+  const ancestor = modelParents.get(cls)
+  return cls === parent || (ancestor !== undefined && derived(ancestor, parent, modelParents))
+}
 const definitions = new Map<string, Map<string, string>>([
   [
     String(tracker.class.Issue),
@@ -54,7 +64,13 @@ const definitions = new Map<string, Map<string, string>>([
     ])
   ]
 ])
-export const recordAdapterFixture = (requireMatches = false) => {
+export const recordAdapterFixture = (
+  requireMatches = false,
+  additionalParents: ReadonlyMap<ObjectClassName, ObjectClassName> = new Map<ObjectClassName, ObjectClassName>()
+) => {
+  const modelParents = new Map<ObjectClassName, ObjectClassName>([...parents, ...additionalParents])
+  const isDerived = (cls: unknown, parent: unknown) =>
+    derived(parseClassName(cls), parseClassName(parent), modelParents)
   const history = ownedRecord("history", String(activity.class.DocUpdateMessage), "root", "docUpdateMessages", {
     objectId: "root",
     objectClass: tracker.class.Issue,
@@ -64,7 +80,7 @@ export const recordAdapterFixture = (requireMatches = false) => {
   })
   const docs: Array<Record<string, unknown>> = [history]
   const classes = [
-    ...parents.keys(),
+    ...modelParents.keys(),
     activity.class.Reaction,
     tags.class.TagReference,
     tracker.class.TimeSpendReport,
@@ -113,10 +129,10 @@ export const recordAdapterFixture = (requireMatches = false) => {
         (!state.refused &&
           (!requireMatches ||
             matches.every(({ cls, query }) =>
-              docs.some((doc) => derived(String(doc._class), cls) && queryMatches(doc, query))
+              docs.some((doc) => isDerived(String(doc._class), cls) && queryMatches(doc, query))
             )) &&
           !exclusions.some(({ cls, query }) =>
-            docs.some((doc) => derived(String(doc._class), cls) && queryMatches(doc, query))
+            docs.some((doc) => isDerived(String(doc._class), cls) && queryMatches(doc, query))
           ))
     })
   }
@@ -131,19 +147,19 @@ export const recordAdapterFixture = (requireMatches = false) => {
         if (state.invalidMetadata) return new Map([["bad", { type: { _class: core.class.Collection } }]])
         const edges = new Map<string, unknown>([["scalar", { type: { _class: core.class.TypeString } }]])
         for (const [base, declared] of definitions) {
-          if (derived(cls, base))
+          if (isDerived(cls, base))
             for (const [name, of] of declared) edges.set(name, { type: { _class: core.class.Collection, of } })
         }
         return edges
       },
-      isDerived: derived,
+      isDerived,
       getDescendants: () => classes,
       findDomain: (cls: string) => (cls === "unpersisted" ? undefined : "test")
     }),
     findAll: async (cls: string, query: Record<string, unknown>) => {
       if (state.failRead) throw new Error("Unavailable read")
       const rows = docs.filter(
-        (doc) => derived(String(doc._class), cls) && Object.entries(query).every(([key, value]) => doc[key] === value)
+        (doc) => isDerived(String(doc._class), cls) && Object.entries(query).every(([key, value]) => doc[key] === value)
       )
       const duplicated = state.duplicate
         ? rows.flatMap((row) => [row, state.conflict ? { ...row, modifiedOn: 2 } : row])

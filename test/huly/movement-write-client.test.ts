@@ -1,7 +1,7 @@
 import { it } from "@effect/vitest"
 import { TxOperations, type Client } from "@hcengineering/core"
 import type { Project } from "@hcengineering/tracker"
-import { Effect, Redacted } from "effect"
+import { Effect, Redacted, Schema } from "effect"
 import { describe, expect } from "vitest"
 import { NonEmptyString, PositiveInteger } from "../../src/domain/schemas/shared.js"
 import { core, tracker } from "../../src/huly/huly-plugins.js"
@@ -17,6 +17,10 @@ const configuration = {
   token: Redacted.make(NonEmptyString.make("private-token")),
   timeoutMs: 1000
 }
+
+class OrdinarySdkReadFailure extends Schema.TaggedError<OrdinarySdkReadFailure>()("OrdinarySdkReadFailure", {
+  message: Schema.String
+}) {}
 
 for (const endpoint of [
   "http://ordinary-huly.invalid",
@@ -80,6 +84,45 @@ const allocate = (client: TxOperations) =>
   )
 
 describe("movement-only client boundary", () => {
+  it.effect("sanitizes ordinary delegated SDK failures while retaining operation and HTTP status context", () =>
+    Effect.gen(function* () {
+      const calls: Array<unknown> = []
+      const ordinary = new TxOperations(
+        sdkFixture<Client>({
+          searchFulltext: async (...args: Array<unknown>) => {
+            calls.push(args)
+            throw new OrdinarySdkReadFailure({ message: "HTTP error 503 private-token" })
+          }
+        }),
+        corePersonId("person")
+      )
+      const config = yield* parseMovementTransportConfig(configuration)
+      const http: MovementHttpPort = {
+        send: () =>
+          Effect.fail(
+            new MovementTransportError({
+              phase: "before-send",
+              reason: NonEmptyString.make("Unexpected write during delegated search")
+            })
+          )
+      }
+      const result = yield* Effect.result(
+        withMovementWriteClient(ordinary, config, http, "findAll", (movement) =>
+          movement.searchFulltext({ query: "root" }, { limit: 1 })
+        )
+      )
+      expect(result._tag).toBe("Failure")
+      if (result._tag === "Failure") {
+        expect(result.failure).toBeInstanceOf(HulyConnectionError)
+        if (result.failure instanceof HulyConnectionError) {
+          expect(result.failure.diagnostic).toEqual({ operation: "findAll", httpStatus: 503 })
+          expect(result.failure.message).toBe("findAll failed with HTTP 503")
+        }
+        expect(JSON.stringify(result.failure)).not.toContain("private-token")
+      }
+      expect(calls).toEqual([[{ query: "root" }, { limit: 1 }]])
+    })
+  )
   it.effect("preserves confirmed no-send failure rather than normalizing away its phase", () =>
     Effect.gen(function* () {
       const { ordinary, state } = clientFixture()

@@ -2,7 +2,7 @@ import { isDeepStrictEqual } from "node:util"
 import type { Issue } from "@hcengineering/tracker"
 import type { ActivityReference } from "@hcengineering/activity"
 import type { AttachedDoc, Doc, TxOperations } from "@hcengineering/core"
-import { Effect, Schema } from "effect"
+import { Array as EffectArray, Effect, Schema } from "effect"
 import {
   AutomaticHistoryClass,
   TransferInspectionSchema,
@@ -25,6 +25,7 @@ import {
 } from "./issue-transfer-records.js"
 import { hulyQuery } from "./operations/query-helpers.js"
 import { toClassRef, toRef } from "./operations/sdk-boundary.js"
+import { OWNER_CLASS_READ_CONCURRENCY, readAttachedClassWindow } from "./issue-transfer-class-reads.js"
 
 const readModel = <A>(read: () => A): Effect.Effect<A, HulyDataInvalidError> =>
   Effect.try({
@@ -107,22 +108,8 @@ const inspectOwner = Effect.fn("transfer.inspectOwner")(function* (
       )
     ))
   ])
-  for (const cls of classes) {
-    state.classes.add(cls)
-    if (!admitQuery(state, limits)) return
-    const rows = yield* Effect.tryPromise({
-      try: () =>
-        client.findAll<AttachedDoc>(
-          toClassRef<AttachedDoc>(cls),
-          hulyQuery<AttachedDoc>({ attachedTo: toRef<Doc>(visit.owner._id) }),
-          { limit: limits.result, total: true }
-        ),
-      catch: (cause) => makeOperationConnectionError("findAll", cause)
-    })
-    const total = yield* parseTransferBoundary(ListTotal, rows.total)
-    if (!completeResult(state, rows.length, total, limits, cls)) return
-    for (const row of rows) yield* inspectRow(client, state, visit, row, collections, limits, false)
-  }
+  yield* inspectClassCollections(client, state, visit, limits, collections, classes)
+  if (state.incomplete) return
   if (!admitQuery(state, limits)) return
   const refs = yield* Effect.tryPromise({
     try: () =>
@@ -139,6 +126,46 @@ const inspectOwner = Effect.fn("transfer.inspectOwner")(function* (
   )
     return
   for (const row of refs) yield* inspectRow(client, state, visit, row, collections, limits, true)
+})
+
+const admitClassWindow = (
+  state: DiscoveryState,
+  limits: RecordDiscoveryLimits,
+  classes: ReadonlyArray<ObjectClassName>
+) => {
+  const admitted: Array<ObjectClassName> = []
+  for (const cls of classes) {
+    state.classes.add(cls)
+    if (state.queries >= limits.queries) break
+    state.queries++
+    admitted.push(cls)
+  }
+  return admitted
+}
+
+const inspectClassCollections = Effect.fn("transfer.inspectClassCollections")(function* (
+  client: TxOperations,
+  state: DiscoveryState,
+  visit: Visit,
+  limits: RecordDiscoveryLimits,
+  collections: ReadonlyMap<string, ObjectClassName>,
+  classes: ReadonlySet<ObjectClassName>
+): Effect.fn.Return<void, HulyClientError | HulyDataInvalidError> {
+  for (const chunk of EffectArray.chunksOf([...classes], OWNER_CLASS_READ_CONCURRENCY)) {
+    const window = admitClassWindow(state, limits, chunk)
+    const replies = yield* readAttachedClassWindow(client, visit.owner, window, limits.result)
+    for (const { cls, result } of replies) {
+      const rows = yield* Effect.fromResult(result)
+      const total = yield* parseTransferBoundary(ListTotal, rows.total)
+      if (!completeResult(state, rows.length, total, limits, cls)) return
+      for (const row of rows) yield* inspectRow(client, state, visit, row, collections, limits, false)
+      if (state.incomplete) return
+    }
+    if (window.length < chunk.length) {
+      refuse(state, "Owned-record query limit exhausted.")
+      return
+    }
+  }
 })
 
 const admitQuery = (state: DiscoveryState, limits: RecordDiscoveryLimits) => {
