@@ -40,7 +40,10 @@ const cleanupRecords = async (client: TxOperations, recordIds: ReadonlyArray<Doc
       const raw = await client.findOne<Doc>(core.class.Doc, hulyQuery<Doc>({ _id: toRef<Doc>(id) }))
       if (raw === undefined) continue
       const record = parseAttachedLocation(raw)
-      if (record._class !== activity.class.ActivityReference && record._class !== time.class.ToDo)
+      if (
+        record._class !== ObjectClassName.make(activity.class.ActivityReference) &&
+        record._class !== ObjectClassName.make(time.class.ToDo)
+      )
         throw new Error(`Unexpected fixture record class for ${id}`)
       await client.removeCollection<Doc, AttachedDoc>(
         toClassRef<AttachedDoc>(record._class),
