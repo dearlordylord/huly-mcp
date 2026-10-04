@@ -1,7 +1,8 @@
+import { MoveIssueResultSchema } from "../../../src/domain/schemas/issues-results.js"
 import { NodeServices } from "@effect/platform-node"
 import { it } from "@effect/vitest"
 import { Ajv } from "ajv"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 import { expect } from "vitest"
 import { cliCommandCatalog } from "../../../packages/huly-cli/src/catalog.js"
 import { parseCliCommandLine } from "../../../packages/huly-cli/src/cli-options.js"
@@ -26,7 +27,7 @@ for (const transport of ["mcp", "cli"]) {
         const client = yield* HulyClient.pipe(Effect.provide(f.layer))
         const storage = yield* HulyStorageClient.pipe(Effect.provide(HulyStorageClient.testLayer({})))
         const first = yield* tool.operation.execute(f.input, client, storage)
-        const blocked = first.result
+        const blocked = Schema.decodeUnknownSync(MoveIssueResultSchema)(first.result)
         if (blocked.outcome !== "blocked" || blocked.conflicts === undefined)
           throw new Error("Expected actionable conflicts")
         const retry = {
