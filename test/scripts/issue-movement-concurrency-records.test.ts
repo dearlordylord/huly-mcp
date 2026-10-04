@@ -3,6 +3,16 @@ import { execFileSync } from "node:child_process"
 import { Schema } from "effect"
 import { describe, expect, it } from "vitest"
 
+import { DocId, Timestamp } from "../../src/domain/schemas/shared.js"
+import { SocialIdentityId } from "../../src/domain/schemas/person-administration.js"
+
+const sourceSpace = DocId.make("source")
+const destinationSpace = DocId.make("destination")
+const originalModifiedOn = Timestamp.make(2)
+const migrationModifiedOn = Timestamp.make(10)
+const originalEditor = SocialIdentityId.make("old-editor")
+const migrationAuthor = SocialIdentityId.make("migration-author")
+
 const encode = Schema.encodeSync(Schema.fromJsonString(Schema.Json))
 const parse = Schema.decodeUnknownSync(
   Schema.fromJsonString(
@@ -19,27 +29,27 @@ const payload = {
   createdOn: 1,
   message: "Preserved content"
 }
-const record = (space: string, modifiedOn: number, modifiedBy: string, message = payload.message) => ({
+const record = (space: DocId, modifiedOn: Timestamp, modifiedBy: SocialIdentityId, message = payload.message) => ({
   ...payload,
   space,
   modifiedOn,
   modifiedBy,
   snapshot: encode({ ...payload, message, modifiedOn, modifiedBy })
 })
-const oldRecord = record("source", 2, "old-editor")
-const movedRecord = record("destination", 10, "migration-author")
-const owner = (space: string, records: Schema.Json[], incomingReferences: Schema.Json[] = []) => ({
+const oldRecord = record(sourceSpace, originalModifiedOn, originalEditor)
+const movedRecord = record(destinationSpace, migrationModifiedOn, migrationAuthor)
+const owner = (space: DocId, records: Schema.Json[], incomingReferences: Schema.Json[] = []) => ({
   issue: {
     _id: "issue",
     space,
     attachedTo: "tracker:ids:NoParent",
-    number: space === "source" ? 1 : 2,
-    identifier: space === "source" ? "SRC-1" : "DST-2"
+    number: space === sourceSpace ? 1 : 2,
+    identifier: space === sourceSpace ? "SRC-1" : "DST-2"
   },
   owned: { records },
   incomingReferences
 })
-const before = { issues: [owner("source", [oldRecord])] }
+const before = { issues: [owner(sourceSpace, [oldRecord])] }
 const receipt = {
   objectId: "record",
   objectClass: payload._class,
@@ -72,36 +82,43 @@ const check = (after: Schema.Json) =>
 // Real fixture assertions execute in jq; synthetic state does not claim any Huly write.
 describe("concurrency fixture record evidence", () => {
   it("keeps source refusals fully unchanged", () => {
-    expect(check({ issues: [owner("source", [oldRecord])] })).toEqual({
+    expect(check({ issues: [owner(sourceSpace, [oldRecord])] })).toEqual({
       valid: true,
       lastModificationEvidence: "observed"
     })
   })
   it("authenticates migration metadata using exact persisted transaction evidence", () => {
-    expect(check({ issues: [owner("destination", [movedRecord])], migrationTransactions: [receipt] })).toEqual({
+    expect(check({ issues: [owner(destinationSpace, [movedRecord])], migrationTransactions: [receipt] })).toEqual({
       valid: true,
       lastModificationEvidence: "observed"
     })
   })
   it("reports unavailable metadata while independently proving immutable payload after a lost reply", () => {
-    expect(check({ issues: [owner("destination", [movedRecord])], migrationTransactions: [] })).toEqual({
+    expect(check({ issues: [owner(destinationSpace, [movedRecord])], migrationTransactions: [] })).toEqual({
       valid: true,
       lastModificationEvidence: "unavailable"
     })
   })
   it("rejects corrupted content even when metadata evidence is unavailable", () => {
     expect(
-      check({ issues: [owner("destination", [record("destination", 10, "migration-author", "Changed content")])] })
-        .valid
+      check({
+        issues: [
+          owner(destinationSpace, [record(destinationSpace, migrationModifiedOn, migrationAuthor, "Changed content")])
+        ]
+      }).valid
     ).toBe(false)
   })
   it("rejects contradictory transaction evidence", () => {
     expect(
-      check({ issues: [owner("destination", [movedRecord])], migrationTransactions: [{ ...receipt, modifiedOn: 9 }] })
-        .valid
+      check({
+        issues: [owner(destinationSpace, [movedRecord])],
+        migrationTransactions: [{ ...receipt, modifiedOn: 9 }]
+      }).valid
     ).toBe(false)
   })
   it("preserves incoming independent reference routing", () => {
-    expect(check({ issues: [owner("source", [oldRecord], [{ _id: "incoming", space: "changed" }])] }).valid).toBe(false)
+    expect(check({ issues: [owner(sourceSpace, [oldRecord], [{ _id: "incoming", space: "changed" }])] }).valid).toBe(
+      false
+    )
   })
 })
