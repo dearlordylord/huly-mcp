@@ -17,7 +17,8 @@ import {
   IssueIdentifier,
   Count,
   PositiveInteger,
-  NonEmptyString
+  NonEmptyString,
+  Timestamp
 } from "../../src/domain/schemas/shared.js"
 import { commitTransferTree } from "../../src/huly/issue-transfer-tree-adapter.js"
 import { HulyClient } from "../../src/huly/client.js"
