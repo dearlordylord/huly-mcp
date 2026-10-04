@@ -34,12 +34,12 @@ const parseObservedIssue = (input: unknown): Option.Option<ObservedIssue> =>
     return { hierarchy, protectedIssue }
   })
 type Observation = Extract<TransferTreeVerification, { readonly status: "observed" }>
-const observedTask = ({ hierarchy: issue }: ObservedIssue): Observation["tasks"][number] => ({
+const observedTask = ({ hierarchy: issue, protectedIssue }: ObservedIssue): Observation["tasks"][number] => ({
   issueId: issue._id,
   projectId: issue.space,
   parentId: issue.attachedTo === movementNoParent ? null : issue.attachedTo,
   identifier: issue.identifier,
-  number: issue.number
+  number: protectedIssue.number
 })
 const parseObservedRecord = (input: unknown) => Schema.decodeUnknownOption(MovementObservedRecordSchema)(input)
 const observedRecord = (record: TransferRecord) =>
