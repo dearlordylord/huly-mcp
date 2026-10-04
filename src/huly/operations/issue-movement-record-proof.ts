@@ -105,3 +105,15 @@ const anchoredRecordMetadata = (
   if (anchor === undefined || anchor.modifiedBy !== intent.modifiedBy) return "unavailable"
   return current.modifiedOn === anchor.modifiedOn && current.modifiedBy === intent.modifiedBy ? "preserved" : "changed"
 }
+
+const protectedRouteMatches = (
+  current: TransferSupportedRecord,
+  expected: TransferSupportedRecord,
+  destinationId: DocId
+): boolean => {
+  const { modifiedBy: _oldAuthor, modifiedOn: _oldTime, snapshot: _beforeSnapshot, ...beforeRoute } = expected
+  const { modifiedBy: _newAuthor, modifiedOn: _newTime, snapshot: _afterSnapshot, ...afterRoute } = current
+  return isDeepStrictEqual(afterRoute, { ...beforeRoute, space: destinationId })
+}
+const hasQueuedRecordIntent = (queued: MovementTransactions, expected: TransferSupportedRecord): boolean =>
+  queued.some((value) => "target" in value && value.objectId === expected._id)
