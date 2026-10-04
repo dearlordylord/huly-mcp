@@ -10,7 +10,6 @@ import {
   selectMovementIssue,
   selectMovementProject
 } from "./issue-movement-preflight.js"
-import { movementNoParent } from "./issue-movement-hierarchy.js"
 import { transferIssue } from "./issue-transfer.js"
 
 const refusal = (reason: string, root?: MovementPlan["root"]): MoveIssueResult => ({
@@ -33,11 +32,6 @@ export const moveIssue = Effect.fn("moveIssue")(function* (
   const selected = yield* selectMovementContext(client, root, params)
   if (selected.status === "refused") return refusal(selected.reason, root)
   const { destination, parent, source } = selected
-  if (satisfiedConsent(root, parent, source, destination, params))
-    return refusal(
-      "Destination is already satisfied. Omit resolutions and inspect the complete tree for a verified no-op; supplied consent must not be reused.",
-      root
-    )
   return yield* transferIssue(client, root, parent, source, destination, params)
 })
 
@@ -84,13 +78,3 @@ const selectMovementContext = Effect.fn("movement.selectContext")(function* (
   if (destination === undefined) return { status: "refused", reason: "Destination project metadata is unavailable." }
   return { status: "ready", parent, source, destination }
 })
-const satisfiedConsent = (
-  root: MovementPlan["root"],
-  parent: MovementPlan["parent"],
-  source: MovementPlan["source"],
-  destination: MovementPlan["source"],
-  params: MoveIssueParams
-) =>
-  destination._id === source._id &&
-  root.attachedTo === (parent?._id ?? movementNoParent) &&
-  params.resolutions !== undefined

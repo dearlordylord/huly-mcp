@@ -66,7 +66,7 @@ const definitions = new Map<string, Map<string, string>>([
 ])
 export const recordAdapterFixture = (
   requireMatches = false,
-  additionalParents: ReadonlyMap<ObjectClassName, ObjectClassName> = new Map()
+  additionalParents: ReadonlyMap<ObjectClassName, ObjectClassName> = new Map<ObjectClassName, ObjectClassName>()
 ) => {
   const modelParents = new Map<ObjectClassName, ObjectClassName>([...parents, ...additionalParents])
   const isDerived = (cls: unknown, parent: unknown) =>
