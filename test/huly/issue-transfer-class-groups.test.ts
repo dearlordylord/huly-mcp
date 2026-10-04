@@ -5,7 +5,7 @@ import { expect } from "vitest"
 import { IssueId, ObjectClassName } from "../../src/domain/schemas/shared.js"
 import { groupTransferClassQueries, type ClassCoverageModel } from "../../src/huly/issue-transfer-class-groups.js"
 import { inspectTransferRecords } from "../../src/huly/issue-transfer-discovery.js"
-import { activity, chunter } from "../../src/huly/huly-plugins.js"
+import { chunter } from "../../src/huly/huly-plugins.js"
 import { toClassRef } from "../../src/huly/operations/sdk-boundary.js"
 import { sdkFixture } from "../helpers/huly-sdk.js"
 import { ownedRecord, recordAdapterFixture } from "../helpers/transfer-records.js"
@@ -94,10 +94,10 @@ it.effect("preserves full guard inventory while removing concrete descendant req
     const result = yield* inspectTransferRecords(f.client, IssueId.make("root"), policy)
     expect(result.discovery).toBe("complete")
     expect(result.blockers).toEqual([])
-    expect(result.records.map((row) => row._id)).toEqual(["history", "comment"])
+    expect(result.records.map((row) => row._id)).toEqual(["comment", "history"])
     expect(result.classes).toContain(String(chunter.class.ThreadMessage))
     expect(f.calls).not.toContain(String(chunter.class.ThreadMessage))
-    expect(f.calls).toContain(String(activity.class.ActivityMessage))
+    expect(f.calls).toContain(String(chunter.class.ChatMessage))
     expect(f.scopes).toEqual([])
     expect(f.updates).toEqual([])
   })

@@ -1,3 +1,5 @@
+import type { Doc, DocumentQuery, FindOptions, TxOperations } from "@hcengineering/core"
+import { sdkFixture } from "../helpers/huly-sdk.js"
 import { it } from "@effect/vitest"
 import { Effect } from "effect"
 import { expect } from "vitest"
@@ -14,9 +16,21 @@ it.effect("refuses when query budget ends before outgoing reference discovery wi
   Effect.gen(function* () {
     const f = recordAdapterFixture()
     f.docs.splice(0)
-    const complete = yield* inspect(f)
+    const state = { requests: 0 }
+    const client = sdkFixture<TxOperations>({
+      getHierarchy: () => f.client.getHierarchy(),
+      findOne: (...args: Parameters<TxOperations["findOne"]>) => f.client.findOne(...args),
+      findAll: (cls: Parameters<TxOperations["findAll"]>[0], query: DocumentQuery<Doc>, options?: FindOptions<Doc>) => {
+        state.requests++
+        return f.client.findAll(cls, query, options)
+      }
+    })
+    const complete = yield* inspectTransferRecords(client, IssueId.make("root"), limits)
     expect(complete.discovery).toBe("complete")
-    const incomplete = yield* inspect(f, { ...limits, queries: complete.classes.length })
+    const incomplete = yield* inspectTransferRecords(client, IssueId.make("root"), {
+      ...limits,
+      queries: state.requests - 1
+    })
     expect(incomplete.discovery).toBe("incomplete")
     expect(incomplete.blockers.join(" ")).toContain("query limit exhausted")
     expect(f.scopes).toEqual([])
