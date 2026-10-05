@@ -12,6 +12,8 @@ CONCURRENCY_PROFILE=${HULY_MOVEMENT_CONCURRENCY_PROFILE:-routine}
 case "$CONCURRENCY_PROFILE" in routine|expanded) ;; *) echo "Invalid concurrency profile: use routine or expanded" >&2; exit 1 ;; esac
 # Selection is validated before any fixture writes; absence retains the full profile.
 CASE_SELECTION=$(node scripts/issue-movement-concurrency/select-cases.mjs) || exit 1
+# The orchestration selector is local state, not part of the native child identity.
+unset HULY_MOVEMENT_CONCURRENCY_CASES
 jq -c '{phase:"concurrency-case-scope",scope,cases,caseCount:(.cases|length)}' <<<"$CASE_SELECTION"
 select_concurrency_cases() {
   jq -c --arg transport "$1" --argjson selected "$CASE_SELECTION" 'select(($transport+":"+.name) as $key | $selected.cases | index($key)!=null)'
