@@ -137,3 +137,37 @@ The user's anti-churn retrospective request must remain part of handoff. Apply t
 Dalph-derived finite-work, discriminating-experiment and immutable-evidence
 techniques to future attempts without restarting Dalph. Judge them by recorded
 attempts and outcomes, not policy text alone.
+
+
+## Hot retrospective: quality reuse and scenario continuation
+
+The `77f66` candidate passed the complete quality gate: 401 files, 5348 tests,
+and all 99% coverage thresholds. The next preparation failed before Huly calls
+because a heap-only `NODE_OPTIONS` value violated native-prior identity. Check
+that environment before expensive preparation. The durable quality receipt and
+its reuse rules are owned by
+[verified movement quality evidence](../../INTEGRATION_TESTING.md#reusing-verified-movement-quality-evidence),
+with regression tests in `test/scripts/run-movement-certification.node.test.mjs`.
+A historical gate stays attributed to its executed candidate; reviewed tooling
+changes and unchanged production bytes do not create a new full-gate receipt.
+
+The subsequent concurrency attempt completed twelve scenario assertions, then
+failed the successful-batch-reply-lost oracle. Its terminal result was exit one
+with clean custody, stable inputs, and successful final artifact/log audits.
+Preserve that failure. A successful HTTP response followed by a dropped reply
+does not alone prove the resulting task tree or record ownership. Retain fresh
+verification snapshots before the first assertion, and qualify the scenario only
+with complete independent task/record evidence and single-send evidence.
+
+Continue at the smallest reviewed evidence boundary. Reuse completed scenario
+assertions only when the production runtime and their effective assertions are
+unchanged and their retained results, log hashes, and terminal custody remain
+verifiable. Label selected runs with their actual transport/case scope. The
+required case union, all five suites, and the 71-criterion audit still determine
+completion. A passing selected run never establishes the full suite by itself.
+
+Recheck delegated execution state after dispatch. This session queued a message
+to a completed integrator without starting its next assignment; explicit
+`followup_task` corrected that idle interval. A queued message is not running
+work. Record an immutable checkpoint before review and source cessation before
+launching live qualification.

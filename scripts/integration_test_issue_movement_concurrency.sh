@@ -10,9 +10,11 @@ TSX=(node node_modules/tsx/dist/cli.mjs)
 BUNDLED=(node scripts/run-bundled.mjs)
 CONCURRENCY_PROFILE=${HULY_MOVEMENT_CONCURRENCY_PROFILE:-routine}
 case "$CONCURRENCY_PROFILE" in routine|expanded) ;; *) echo "Invalid concurrency profile: use routine or expanded" >&2; exit 1 ;; esac
-# All unique cases remain on MCP; CLI retains refusal, both lost replies and outage/recovery.
+# Selection is validated before any fixture writes; absence retains the full profile.
+CASE_SELECTION=$(node scripts/issue-movement-concurrency/select-cases.mjs) || exit 1
+jq -c '{phase:"concurrency-case-scope",scope,cases,caseCount:(.cases|length)}' <<<"$CASE_SELECTION"
 select_concurrency_cases() {
-  jq -c --arg transport "$1" --arg profile "$CONCURRENCY_PROFILE" 'select($profile=="expanded" or $transport=="mcp" or (.name as $name | ["refuse-stale-attribute","allocated-reply-lost","successful-batch-reply-lost","verification-outage"] | index($name)!=null))'
+  jq -c --arg transport "$1" --argjson selected "$CASE_SELECTION" 'select(($transport+":"+.name) as $key | $selected.cases | index($key)!=null)'
 }
 ALL_CASE_NAMES='["refuse-stale-child","preserve-later-child","refuse-stale-comment","preserve-later-comment","refuse-stale-time","preserve-later-time","refuse-stale-attribute","preserve-later-attribute","refuse-stale-ancestry","preserve-later-ancestry","before-allocation-send","allocated-reply-lost","successful-batch-reply-lost","verification-outage"]'
 ROUTINE_CLI_NAMES='["refuse-stale-attribute","allocated-reply-lost","successful-batch-reply-lost","verification-outage"]'
@@ -55,9 +57,9 @@ create "$SOURCE" 'Alternative source ancestor'; SOURCE_PARENT="$CREATED_ID"
 create "$DESTINATION" 'Alternative destination ancestor'; DESTINATION_PARENT="$CREATED_ID"
 for transport in mcp cli; do
   SELECTED_CASES=$(select_concurrency_cases "$transport" <<<"$CASE_MATRIX") || exit 1
-  EXPECTED_CASE_NAMES="$ALL_CASE_NAMES"
-  if [[ "$CONCURRENCY_PROFILE" == routine && "$transport" == cli ]]; then EXPECTED_CASE_NAMES="$ROUTINE_CLI_NAMES"; fi
+  EXPECTED_CASE_NAMES=$(jq -c --arg transport "$transport" '[.cases[] | select(startswith($transport+":")) | split(":")[1]]' <<<"$CASE_SELECTION")
   jq -es --argjson expected "$EXPECTED_CASE_NAMES" 'length==($expected|length) and (map(.name)|sort)==($expected|sort)' >/dev/null <<<"$SELECTED_CASES"
+  [[ -n "$SELECTED_CASES" ]] || continue
   while IFS= read -r entry; do
     NAME=$(jq -r .name <<<"$entry")
     FIXTURE_PHASE="$transport:$NAME:setup"
@@ -135,3 +137,4 @@ for transport in mcp cli; do
     jq -nc --arg transport "$transport" --arg name "$NAME" --argjson result "$RESULT" '{transport:$transport,case:$name,evidence:$result}'
   done <<<"$SELECTED_CASES"
 done
+jq -c '{phase:"concurrency-cases-passed",scope,cases,caseCount:(.cases|length)}' <<<"$CASE_SELECTION"
