@@ -341,3 +341,17 @@ test('unsupported prior environment fails before any preparation side effect', a
     await assert.rejects(readFile(path.join(f.root, 'launches')), { code: 'ENOENT' })
   } finally { await rm(f.root, { recursive: true }) }
 })
+
+for (const file of ['README.md', 'packages/huly-cli/README.md', 'packages/huly-cli/skills/huly-cli/references/automation.md']) test(`gate-read document ${file} invalidates quality reuse`, async () => {
+  const f = await fixture()
+  try {
+    await mkdir(path.dirname(path.join(f.root, file)), { recursive: true })
+    await writeFile(path.join(f.root, file), 'synchronized documentation')
+    await writeFile(path.join(f.root, 'scripts/prepare.sh'), '#!/bin/bash\necho quality >> checks\n')
+    const options = { ...f, prepare: 'scripts/prepare.sh' }
+    assert.equal((await runCertification(options)).exit, 0)
+    await writeFile(path.join(f.root, file), 'stale documentation')
+    assert.equal((await runCertification(options)).exit, 0)
+    assert.equal(await readFile(path.join(f.root, 'checks'), 'utf8'), 'quality\nquality\n')
+  } finally { await rm(f.root, { recursive: true }) }
+})
