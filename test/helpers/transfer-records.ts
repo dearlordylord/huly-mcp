@@ -69,8 +69,17 @@ export const recordAdapterFixture = (
   additionalParents: ReadonlyMap<ObjectClassName, ObjectClassName> = new Map<ObjectClassName, ObjectClassName>()
 ) => {
   const modelParents = new Map<ObjectClassName, ObjectClassName>([...parents, ...additionalParents])
-  const isDerived = (cls: unknown, parent: unknown) =>
-    derived(parseClassName(cls), parseClassName(parent), modelParents)
+  // This fixture copies its parent graph once; derivations cannot change within it.
+  const derivations = new Map<unknown, Map<unknown, boolean>>()
+  const isDerived = (cls: unknown, parent: unknown): boolean => {
+    const cached = derivations.get(cls)?.get(parent)
+    if (cached !== undefined) return cached
+    const result = derived(parseClassName(cls), parseClassName(parent), modelParents)
+    const ancestors = derivations.get(cls) ?? new Map<unknown, boolean>()
+    ancestors.set(parent, result)
+    derivations.set(cls, ancestors)
+    return result
+  }
   const history = ownedRecord("history", String(activity.class.DocUpdateMessage), "root", "docUpdateMessages", {
     objectId: "root",
     objectClass: tracker.class.Issue,
