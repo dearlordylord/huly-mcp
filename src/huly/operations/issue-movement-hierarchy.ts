@@ -53,19 +53,6 @@ export const descendantsOf = (hierarchy: MovementHierarchy, root: Issue): Readon
   return [...discovered.values()]
 }
 
-const sameParents = (actual: Issue["parents"], expected: ReadonlyArray<Issue>): boolean =>
-  actual.length === expected.length &&
-  actual.every((info, index) => {
-    const parent = expected[index]
-    return (
-      parent !== undefined &&
-      info.parentId === parent._id &&
-      info.identifier === parent.identifier &&
-      info.parentTitle === parent.title &&
-      info.space === parent.space
-    )
-  })
-
 const childInformationMatches = (hierarchy: MovementHierarchy, issue: Issue): boolean => {
   const descendants = descendantsOf(hierarchy, issue).filter((child) => child._id !== issue._id)
   return (
@@ -79,13 +66,15 @@ const childInformationMatches = (hierarchy: MovementHierarchy, issue: Issue): bo
   )
 }
 
+/**
+ * Structural integrity only. `parents` is a derived cache (see
+ * issue-tree-reconciliation.ts); drift there is repaired by writers, not refused.
+ */
 export const hierarchyProblem = (hierarchy: MovementHierarchy, issue: Issue): string | undefined => {
-  const ancestors = ancestorsOf(hierarchy, issue)
-  if (ancestors === undefined) return `Missing ancestor or cycle at ${issue._id}`
+  if (ancestorsOf(hierarchy, issue) === undefined) return `Missing ancestor or cycle at ${issue._id}`
   if (issue.attachedToClass !== ObjectClassName.make(String(tracker.class.Issue)) || issue.collection !== "subIssues") {
     return `Invalid collection attachment at ${issue._id}`
   }
-  if (!sameParents(issue.parents, ancestors)) return `Inconsistent ancestry at ${issue._id}`
   const children = hierarchy.issues.filter((child) => child.attachedTo === issue._id)
   if (children.length !== issue.subIssues) return `Inconsistent child count at ${issue._id}`
   if (!childInformationMatches(hierarchy, issue)) return `Inconsistent time/estimation aggregate at ${issue._id}`

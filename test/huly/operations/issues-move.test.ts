@@ -271,7 +271,6 @@ for (const options of [
 }
 
 for (const corruption of [
-  "ancestry",
   "count",
   "aggregate",
   "collection",
@@ -283,7 +282,6 @@ for (const corruption of [
   it.effect(`refuses inconsistent hierarchy ${corruption} including no-ops`, () =>
     Effect.gen(function* () {
       const tree = threeLevelMovementFixture()
-      if (corruption === "ancestry") tree.leaf.parents = []
       if (corruption === "count") tree.root.subIssues = 0
       if (corruption === "aggregate") tree.old.childInfo = []
       if (corruption === "collection") tree.root.collection = "issues"

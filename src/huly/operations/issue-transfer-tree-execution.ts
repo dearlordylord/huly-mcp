@@ -14,7 +14,7 @@ import type { HulyClient } from "../client.js"
 import { tracker } from "../huly-plugins.js"
 import type { MovementError } from "./issue-movement-preflight.js"
 import { inspectTransferPlan, type TransferPlan } from "./issue-transfer-preflight.js"
-import { planTransferTreeWrites } from "./issue-transfer-tree-planning.js"
+import { planTransferTreeWrites, writeRepairsAncestry } from "./issue-transfer-tree-planning.js"
 import { verifyTransferTree, type TransferTreeVerification } from "./issue-transfer-tree-verification.js"
 import { hulyQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
@@ -139,7 +139,7 @@ const executePlannedWrite = Effect.fn("transfer.executePlannedWrite")(function* 
 ): Effect.fn.Return<MoveIssueResult, MovementError> {
   if (admission.mode === "same-project") {
     const { plan } = admission.inspected
-    if (plan.root.attachedTo === (plan.parent?._id ?? movementNoParent))
+    if (plan.root.attachedTo === (plan.parent?._id ?? movementNoParent) && !writeRepairsAncestry(write))
       return yield* finishVerification(client, prepared, destination, write, progress)
     return yield* commitAndVerify(client, prepared, destination, write, progress, admission.commit)
   }

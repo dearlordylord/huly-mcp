@@ -7,6 +7,7 @@ import type { MoveIssueResult } from "../../domain/schemas/issues-results.js"
 import { DocId, UrlString } from "../../domain/schemas/shared.js"
 import { movementNoParent } from "./issue-movement-hierarchy.js"
 import type { TransferPlan } from "./issue-transfer-preflight.js"
+import { writeRepairsAncestry } from "./issue-transfer-tree-planning.js"
 import type { HulyClient } from "../client.js"
 
 export const transferTreeInspectionGuidance = (prepared: TransferPlan, destination: MovementProject) =>
@@ -48,7 +49,8 @@ export const completedTransferTreeResult = (
   write: TransferTreeWrite
 ): MoveIssueResult => ({
   ...(prepared.plan.root.space === destination._id &&
-  prepared.plan.root.attachedTo === (prepared.plan.parent?._id ?? movementNoParent)
+  prepared.plan.root.attachedTo === (prepared.plan.parent?._id ?? movementNoParent) &&
+  !writeRepairsAncestry(write)
     ? ({ outcome: "no-op", changed: false } as const)
     : ({ outcome: "completed", changed: true } as const)),
   issueId: prepared.plan.root._id,

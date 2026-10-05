@@ -5,9 +5,10 @@ import { Effect } from "effect"
 import type { UpdateIssueParams } from "../../domain/schemas.js"
 import type { UpdateIssueResult } from "../../domain/schemas/issues-results.js"
 import { UPDATE_ISSUE_FIELDS } from "../../domain/schemas/issues.js"
+import { IssueDescendantAncestryStaleWarningCode } from "../../domain/schemas/tool-warnings.js"
 import { IssueIdentifier } from "../../domain/schemas/shared.js"
 import type { ConnectionError, HulyClient, HulyClientError } from "../client.js"
-import type { Diagnostics } from "../diagnostics.js"
+import { Diagnostics } from "../diagnostics.js"
 import type {
   HulyConnectionError,
   HulyError,
@@ -21,6 +22,7 @@ import type {
 } from "../errors.js"
 import { tracker } from "../huly-plugins.js"
 import { textContentOrClear } from "./clear-field-updates.js"
+import { repairIssueTreeAncestry } from "./issue-tree-ancestry-repair.js"
 import { renderIssueDescriptionForWrite } from "./issue-native-references.js"
 import { findProjectAndIssue, findProjectWithStatuses, resolveStatusByName, stringToPriority } from "./issues-shared.js"
 import { chooseStatusForTaskType, resolveAssignee, resolveTaskTypeWorkflow } from "./issues-write-shared.js"
@@ -198,6 +200,30 @@ export const updateIssue = (
     if (Object.keys(updateOps).length > 0) {
       yield* client.updateDoc(tracker.class.Issue, project._id, issue._id, updateOps)
     }
+    yield* repairRenamedTreeAncestry(client, issue, params.title)
 
     return { identifier: IssueIdentifier.make(issue.identifier), updated: true }
+  })
+
+// Huly's rename trigger does not refresh descendants' cached parent titles on every backend.
+const repairRenamedTreeAncestry = (
+  client: HulyClient["Service"],
+  issue: HulyIssue,
+  title: string | undefined
+): Effect.Effect<void, never, Diagnostics> =>
+  Effect.gen(function* () {
+    if (title === undefined || title === issue.title || issue.subIssues === 0) return
+    const diagnostics = yield* Diagnostics
+    const outcome = yield* Effect.result(repairIssueTreeAncestry(client, issue._id, { title }))
+    const reason =
+      outcome._tag === "Failure"
+        ? outcome.failure.message
+        : outcome.success._tag === "Incomplete"
+          ? outcome.success.reason
+          : undefined
+    if (reason === undefined) return
+    yield* diagnostics.warnAgent({
+      code: IssueDescendantAncestryStaleWarningCode,
+      message: `Title updated, but sub-issues may still show the previous parent title: ${reason}`
+    })
   })

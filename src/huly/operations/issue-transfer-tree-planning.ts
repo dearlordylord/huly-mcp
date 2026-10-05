@@ -1,10 +1,13 @@
+import { isDeepStrictEqual } from "node:util"
+
 import { makeRank } from "@hcengineering/rank"
 import type { MovementIssue, MovementProject } from "../../domain/schemas/issue-movement-state.js"
 import type { TransferTreeWrite } from "../../domain/schemas/issue-transfer-tree.js"
 import { IssueIdentifier, NonEmptyString, type PositiveInteger } from "../../domain/schemas/shared.js"
 import type { TransferPlan } from "./issue-transfer-preflight.js"
 import { transferTreeParent } from "./issue-transfer-tree.js"
-import { movementNoParent } from "./issue-movement-hierarchy.js"
+import { movementHierarchy } from "./issue-movement-hierarchy.js"
+import { canonicalParents } from "./issue-tree-reconciliation.js"
 
 export const planTransferTreeWrites = (
   prepared: TransferPlan,
@@ -54,41 +57,25 @@ const finalizeAncestry = (
   tasks: TransferTreeWrite["tasks"],
   ancestors: TransferTreeWrite["ancestors"]
 ): TransferTreeWrite | undefined => {
+  const planned = tasks.map(plannedIssue)
+  const hierarchy = movementHierarchy([...ancestors, ...planned])
   const finalTasks: Array<TransferTreeWrite["tasks"][number]> = []
-  for (const task of tasks) {
-    const parents = plannedAncestry(task, tasks, ancestors)
+  for (const [index, task] of tasks.entries()) {
+    const issue = planned[index]
+    const parents = issue === undefined ? undefined : canonicalParents(hierarchy, issue)
     if (parents === undefined) return undefined
     finalTasks.push({ ...task, finalParents: parents })
   }
   return { rootId, tasks: finalTasks, ancestors }
 }
 
-const plannedAncestry = (
-  task: TransferTreeWrite["tasks"][number],
-  tasks: TransferTreeWrite["tasks"],
-  ancestors: ReadonlyArray<MovementIssue>
-): MovementIssue["parents"] | undefined => {
-  const parents: Array<MovementIssue["parents"][number]> = []
-  const visited = new Set([task.issueId])
-  let parentId = task.parentId
-  while (parentId !== movementNoParent) {
-    if (visited.has(parentId)) return undefined
-    visited.add(parentId)
-    const moved = tasks.find((candidate) => candidate.issueId === parentId)
-    const existing = ancestors.find((candidate) => candidate._id === parentId)
-    if (moved !== undefined) {
-      parents.push({
-        parentId,
-        identifier: moved.identifier,
-        parentTitle: moved.expectedHierarchy.title,
-        space: moved.destinationId
-      })
-      parentId = moved.parentId
-    } else {
-      if (existing === undefined) return undefined
-      parents.push({ parentId, identifier: existing.identifier, parentTitle: existing.title, space: existing.space })
-      parentId = existing.attachedTo
-    }
-  }
-  return parents
-}
+const plannedIssue = (task: TransferTreeWrite["tasks"][number]): MovementIssue => ({
+  ...task.expectedHierarchy,
+  attachedTo: task.parentId,
+  identifier: task.identifier,
+  space: task.destinationId
+})
+
+/** True when the plan rewrites a stale `parents` cache even if no task changes placement. */
+export const writeRepairsAncestry = (write: TransferTreeWrite): boolean =>
+  write.tasks.some((task) => !isDeepStrictEqual(task.expectedHierarchy.parents, task.finalParents))

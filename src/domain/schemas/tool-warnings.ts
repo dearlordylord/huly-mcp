@@ -14,6 +14,8 @@ export const CustomFieldMetadataDegradedWarningCode = "custom_field_metadata_deg
 export const ExternalPublicationTargetMetadataDegradedWarningCode =
   "external_publication_target_metadata_degraded" as const
 
+export const IssueDescendantAncestryStaleWarningCode = "issue_descendant_ancestry_stale" as const
+
 export const ToolWarningCodeSchema = Schema.Literals([
   "status_metadata_unresolved",
   "space_role_assignments_degraded",
@@ -33,6 +35,7 @@ export const ToolWarningCodeSchema = Schema.Literals([
   "issue_relation_metadata_degraded",
   "class_collaborator_metadata_degraded",
   PlannerDocumentMetadataDegradedWarningCode,
+  IssueDescendantAncestryStaleWarningCode,
   ExternalChannelRuntimeUnsupportedWarningCode,
   SupportRuntimeUnsupportedWarningCode,
   SupportStatusMetadataDegradedWarningCode,

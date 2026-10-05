@@ -72,7 +72,7 @@ const queueRemovedAncestorInformation = async (
     const removed = write.tasks
       .filter(
         (task) =>
-          task.expectedHierarchy.parents.some((parent) => parent.parentId === ancestor._id) &&
+          ancestor.childInfo.some((info) => info.childId === task.issueId) &&
           !task.finalParents.some((parent) => parent.parentId === ancestor._id)
       )
       .map((task) => toRef<Issue>(task.issueId))
