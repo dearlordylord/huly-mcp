@@ -10,6 +10,7 @@ import { HulyConnectionError } from "../../src/huly/errors-base.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
 import { HttpServerFactoryService } from "../../src/mcp/http-transport.js"
+import type { MovementStageObserver } from "../../src/mcp/movement-stage-observer.js"
 import { PROXY_TOOL_NAMES } from "../../src/mcp/proxy-tools.js"
 import type { ClientBundle } from "../../src/mcp/server.js"
 import { McpServerService } from "../../src/mcp/server.js"
@@ -116,6 +117,7 @@ const toolNames = (response: Schema.Schema.Type<typeof JsonRpcResponse>): Readon
 }
 
 const startServer = async (options?: {
+  readonly observeMovement?: MovementStageObserver
   readonly configValues?: Readonly<Record<string, unknown>>
   readonly token?: string
   readonly closeClients?: () => Promise<void>
@@ -136,6 +138,7 @@ const startServer = async (options?: {
     httpPort: 0,
     httpHost: "127.0.0.1",
     resolveClients: async () => Exit.succeed(bundle),
+    ...(options?.observeMovement === undefined ? {} : { observeMovement: options.observeMovement }),
     ...(options?.token === undefined ? {} : { mcpAuthToken: Redacted.make(options.token) }),
     ...(options?.closeClients === undefined ? {} : { closeClients: options.closeClients }),
     ...(options?.writeError === undefined ? {} : { writeError: options.writeError }),
@@ -706,4 +709,46 @@ describe("McpServerService Effect HTTP integration", () => {
     expect(shutdownOrder).toEqual(["telemetry", "clients"])
     expect(errors).toEqual(["MCP HTTP server drain failed: client cleanup failed\n"])
   })
+})
+
+it("forwards the opt-in movement observer through the real HTTP lifecycle without changing typed tool failure", async () => {
+  const state = { observed: 0, finalized: 0 }
+  const resolveLease = async () => ({
+    bundle: Exit.fail(new HulyConnectionError({ message: "Movement client unavailable" })),
+    close: () => {}
+  })
+  const baseline = await startServer({ resolveLease })
+  const instrumented = await startServer({
+    resolveLease,
+    observeMovement: (operation) =>
+      Effect.sync(() => {
+        state.observed++
+      }).pipe(
+        Effect.andThen(operation),
+        Effect.ensuring(
+          Effect.sync(() => {
+            state.finalized++
+          })
+        )
+      )
+  })
+  try {
+    const context = await fetch(
+      instrumented.endpoint,
+      modernRequest("tools/call", { name: "get_huly_context", arguments: {} }, "claude-code")
+    )
+    expect(context.status).toBe(200)
+    expect(state).toEqual({ observed: 0, finalized: 0 })
+    const params = { name: "move_issue", arguments: { issue: "root", destination: { parent: null } } }
+    const original = await fetch(baseline.endpoint, modernRequest("tools/call", params, "claude-code"))
+    const observed = await fetch(instrumented.endpoint, modernRequest("tools/call", params, "claude-code"))
+    const originalBody = Schema.decodeUnknownSync(JsonRpcResponse)(await original.json())
+    const observedBody = Schema.decodeUnknownSync(JsonRpcResponse)(await observed.json())
+    expect(observed.status).toBe(original.status)
+    expect(observedBody).toEqual(originalBody)
+    expect(observedBody.result?.isError).toBe(true)
+    expect(state).toEqual({ observed: 1, finalized: 1 })
+  } finally {
+    await Promise.all([baseline.stop(), instrumented.stop()])
+  }
 })
