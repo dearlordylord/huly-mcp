@@ -74,6 +74,7 @@ describe("Main Entry Point", () => {
     "HULY_PASSWORD",
     "HULY_TOKEN",
     "HULY_WORKSPACE",
+    "HULY_PROFILE",
     "HULY_CONNECTION_TIMEOUT",
     "MCP_TRANSPORT",
     "MCP_HTTP_PORT",
