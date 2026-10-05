@@ -1,3 +1,13 @@
+# Final completion addendum — issues 306–311
+
+All 71 original criteria passed independent final Standards and Spec adjudication. See [the completion report](completion-306-311.md) and [per-criterion evidence ledger](completion-306-311.json). The executed source was `96204ed887b5ef087d5215e348ca070233bc7d84`; the actual quality gate was `77f66d096fa472958648894232de51138301a287`, reused with explicitly reviewed production/runtime transition evidence. All five live suites and final custody/input/artifact audits passed. Concurrency coverage combines 12 historical passing cases with six fresh cases, explicitly covering 14 MCP and four CLI cases.
+
+The five practical evidence limits and cleanup scope remain stated in the report. This documentation publication does not represent another runtime execution.
+
+## Historical provisional integration record
+
+The following original record is preserved as historical evidence; its pending statuses and earlier failures are not current completion status.
+
 # Provisional movement source integration
 
 This branch combines reviewed source only. It is not an accepted candidate: current-source typechecking, complete unchanged quality gate, fresh combined Standards/Spec review and final live MCP/CLI certification remain pending. All 71 criteria and 99% coverage thresholds remain required.
