@@ -4,16 +4,18 @@ import { join, resolve } from "node:path"
 import { execFileSync } from "node:child_process"
 import { Effect, Schema } from "effect"
 import { expect, test } from "vitest"
-import { integrationMcpCall } from "../../scripts/integration-mcp-call.js"
+import { integrationMcpCall, integrationMcpListTools } from "../../scripts/integration-mcp-call.js"
 import { prepareIntegrationMcpPrior } from "../../scripts/integration-mcp-prior-prepare.js"
 import {
   makePriorIdentity,
   readPriorCache,
   PriorCacheSchema,
-  NativeToolListSchema
+  NativeToolListSchema,
+  NativeDiscoverySchema,
+  writePriorCache
 } from "../../scripts/integration-mcp-prior.js"
 
-const fixture = async () => {
+const fixture = async (changeArtifact = false) => {
   const directory = await mkdtemp(join(tmpdir(), "hulymcp-native-prior-"))
   await chmod(directory, 0o700)
   const entry = join(directory, "server.cjs")
@@ -27,6 +29,7 @@ let ended=false;process.stdin.on('end',()=>{ended=true});
 readline.createInterface({input:process.stdin}).on('line',line=>{
  const request=JSON.parse(line);if(request.id===undefined)return;
  fs.appendFileSync(${JSON.stringify(events)},JSON.stringify({event:request.method,pid:process.pid})+'\\n');
+ if(${changeArtifact}&&request.method==='server/discover')fs.appendFileSync(__filename,'\\n// changed during discovery');
  const result=request.method==='server/discover'?{supportedVersions:['2026-07-28'],capabilities:{tools:{}}}:request.method==='tools/list'?{resultType:'complete',ttlMs:0,cacheScope:'private',tools:[{name:'move_issue',inputSchema:{type:'object'}}]}:{resultType:'complete',content:[{type:'text',text:JSON.stringify({stdinEnded:ended})}]};
  process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:request.id,result})+'\\n');
 });`
@@ -183,3 +186,113 @@ test(
     }
   }
 )
+
+for (const codec of [NativeDiscoverySchema, NativeToolListSchema]) {
+  test(`native SDK codec rejects malformed boundary data (${codec === NativeDiscoverySchema ? "discovery" : "tools"})`, () => {
+    expect(() => Schema.decodeUnknownSync(codec)({ private: "private-fixture-token" })).toThrow()
+  })
+}
+for (const configuration of [
+  { args: [] },
+  { environment: { HULY_PROFILE: "profile" } },
+  { environment: { NODE_OPTIONS: "--require private-fixture-token" } }
+]) {
+  test(`rejects unsupported identity configuration ${JSON.stringify(Object.keys(configuration))}`, async () => {
+    const failure = await Effect.runPromise(
+      makePriorIdentity({ command: process.execPath, args: ["unused-entry"], environment: {}, ...configuration }).pipe(
+        Effect.flip
+      )
+    )
+    expect(failure.phase).toBe("identity")
+    expect(JSON.stringify(failure)).not.toContain("private-fixture-token")
+  })
+}
+test("preparation rejects missing directory input and failed discovery without a cache", async () => {
+  const setup = await fixture()
+  try {
+    const invalidInput = await Effect.runPromise(prepareIntegrationMcpPrior("", setup.options).pipe(Effect.flip))
+    expect(invalidInput.phase).toBe("cache")
+    const unavailable = await Effect.runPromise(
+      prepareIntegrationMcpPrior(setup.directory, { ...setup.options, command: "/missing-native-server" }).pipe(
+        Effect.flip
+      )
+    )
+    expect(unavailable.phase).toBe("cache")
+    await expect(readFile(join(setup.directory, "native-discovery.json"))).rejects.toMatchObject({ code: "ENOENT" })
+  } finally {
+    await rm(setup.directory, { recursive: true, force: true })
+  }
+})
+test("preparation refuses an artifact changed by its actual discovery child", { timeout: 15_000 }, async () => {
+  const setup = await fixture(true)
+  try {
+    const failure = await Effect.runPromise(
+      prepareIntegrationMcpPrior(setup.directory, setup.options).pipe(Effect.flip)
+    )
+    expect(failure.phase).toBe("cache")
+    await expect(readFile(join(setup.directory, "native-discovery.json"))).rejects.toMatchObject({ code: "ENOENT" })
+  } finally {
+    await rm(setup.directory, { recursive: true, force: true })
+  }
+})
+test(
+  "private cache refuses directory exposure, missing reads and accidental overwrite",
+  { timeout: 15_000 },
+  async () => {
+    const setup = await fixture()
+    try {
+      const identity = await Effect.runPromise(makePriorIdentity(setup.options))
+      const discover = Schema.decodeUnknownSync(NativeDiscoverySchema)({
+        supportedVersions: ["2026-07-28"],
+        capabilities: { tools: {} }
+      })
+      await chmod(setup.directory, 0o755)
+      expect(
+        (await Effect.runPromise(writePriorCache(setup.directory, identity, discover).pipe(Effect.flip))).phase
+      ).toBe("permissions")
+      await chmod(setup.directory, 0o700)
+      expect(
+        (await Effect.runPromise(readPriorCache(join(setup.directory, "missing.json"), identity).pipe(Effect.flip)))
+          .phase
+      ).toBe("cache")
+      const path = await Effect.runPromise(writePriorCache(setup.directory, identity, discover))
+      const original = await readFile(path, "utf8")
+      expect(
+        (await Effect.runPromise(writePriorCache(setup.directory, identity, discover).pipe(Effect.flip))).phase
+      ).toBe("cache")
+      expect(await readFile(path, "utf8")).toBe(original)
+    } finally {
+      await rm(setup.directory, { recursive: true, force: true })
+    }
+  }
+)
+test("public native list uses default bounded lifecycle without invoking a tool", { timeout: 15_000 }, async () => {
+  const setup = await fixture()
+  try {
+    const reply = await integrationMcpListTools({
+      ...setup.options,
+      environment: { ...setup.options.environment, HULY_MCP_TELEMETRY: "0", HULY_CLI_TELEMETRY: "0" }
+    })
+    expect(reply.result.tools.map((tool) => tool.name)).toEqual(["move_issue"])
+    expect(await readFile(setup.events, "utf8")).not.toContain("tools/call")
+  } finally {
+    await rm(setup.directory, { recursive: true, force: true })
+  }
+})
+test("stale negotiated prior version refuses before list or mutation", { timeout: 15_000 }, async () => {
+  const setup = await fixture()
+  try {
+    const prior = Schema.decodeUnknownSync(NativeDiscoverySchema)({
+      supportedVersions: ["2025-11-25"],
+      capabilities: { tools: {} }
+    })
+    await expect(integrationMcpCall(["move_issue", "{}"], { ...setup.options, prior })).rejects.toThrow(
+      "failed during connect"
+    )
+    const events = await readFile(setup.events, "utf8").catch(() => "")
+    expect(events).not.toContain("tools/list")
+    expect(events).not.toContain("tools/call")
+  } finally {
+    await rm(setup.directory, { recursive: true, force: true })
+  }
+})

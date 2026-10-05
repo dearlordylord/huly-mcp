@@ -12,8 +12,13 @@ import {
   type IntegrationMcpPhase
 } from "../../scripts/integration-mcp-call.js"
 
-for (const isError of [false, true]) {
-  test(`keeps stdin open until the actual ${isError ? "error" : "success"} tool reply`, async () => {
+for (const { isError, sink } of [
+  { isError: false, sink: "record" },
+  { isError: true, sink: "record" },
+  { isError: false, sink: "default" },
+  { isError: false, sink: "failure" }
+]) {
+  test(`keeps stdin open until the actual ${isError ? "error" : "success"} tool reply (${sink} diagnostic sink)`, async () => {
     const directory = await mkdtemp(join(tmpdir(), "hulymcp-open-stdin-"))
     const server = join(directory, "server.cjs")
     const marker = join(directory, "reply-state")
@@ -40,7 +45,14 @@ for (const isError of [false, true]) {
       const reply = await integrationMcpCall(
         ["move_issue", "{}"],
         {
-          publishObserverStatus: (status) => observerStatuses.push(status),
+          ...(sink === "default"
+            ? {}
+            : {
+                publishObserverStatus: (status: MovementObserverStatus) => {
+                  observerStatuses.push(status)
+                  if (sink === "failure") throw new Error("PRIVATE_RAW_DIAGNOSTIC_DO_NOT_FORWARD")
+                }
+              }),
           command: process.execPath,
           args: [server],
           environment: {
@@ -59,7 +71,9 @@ for (const isError of [false, true]) {
           }
         }
       )
-      expect(observerStatuses).toEqual([{ observerStatus: "recorded" }, { observerStatus: "unavailable" }])
+      expect(observerStatuses).toEqual(
+        sink === "default" ? [] : [{ observerStatus: "recorded" }, { observerStatus: "unavailable" }]
+      )
       expect(JSON.stringify(observerStatuses)).not.toContain("PRIVATE_RAW_DIAGNOSTIC_DO_NOT_FORWARD")
       expect(events.map((event) => event.phase)).toEqual([
         "connect-start",
