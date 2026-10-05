@@ -14,6 +14,13 @@ import { sdkFixture } from "../../helpers/huly-sdk.js"
 import { initializeHierarchy, movementIssue } from "../../helpers/movement.js"
 import { transferTreeFixture } from "../../helpers/transfer-tree.js"
 
+// SDK DTOs and DocumentQuery allow shapes/brands distinct from our domain snapshots.
+// Parse their actual boundary values; downstream code consumes schema-derived domain types.
+const parseIssueSnapshot = (input: unknown) => Schema.decodeUnknownEffect(MovementIssueSchema)(input)
+const parseProjectSnapshot = (input: unknown) => Schema.decodeUnknownEffect(MovementProjectSchema)(input)
+const IssueQuerySchema = Schema.Struct({ _id: IssueId })
+const parseIssueQuery = (input: unknown) => Schema.decodeUnknownSync(IssueQuerySchema)(input)
+
 for (const failSibling of [false, true]) {
   it.effect(`overlaps four protected workflows and retains ordered sibling observations (${failSibling})`, () =>
     Effect.gen(function* () {
@@ -35,19 +42,16 @@ for (const failSibling of [false, true]) {
             if (state.active === expected.length) yield* Deferred.succeed(ready, undefined)
             yield* Deferred.await(release)
             state.active--
-            if (
-              failSibling &&
-              Schema.decodeUnknownSync(Schema.Struct({ _id: IssueId }))(query)._id === IssueId.make(sibling._id)
-            )
+            if (failSibling && parseIssueQuery(query)._id === IssueId.make(sibling._id))
               return yield* Effect.fail(new HulyAuthError({ message: "Sibling observation unavailable" }))
           }
           return yield* original<T>(sdkFixture(cls), query)
         })
       const params = yield* parseMoveIssueParams(f.input)
-      const root = yield* Schema.decodeUnknownEffect(MovementIssueSchema)(f.root)
-      const parent = yield* Schema.decodeUnknownEffect(MovementIssueSchema)(f.parent)
-      const source = yield* Schema.decodeUnknownEffect(MovementProjectSchema)(f.source)
-      const destination = yield* Schema.decodeUnknownEffect(MovementProjectSchema)(f.destination)
+      const root = yield* parseIssueSnapshot(f.root)
+      const parent = yield* parseIssueSnapshot(f.parent)
+      const source = yield* parseProjectSnapshot(f.source)
+      const destination = yield* parseProjectSnapshot(f.destination)
       const fiber = yield* Effect.gen(function* () {
         const client = yield* HulyClient
         return yield* inspectTransferPlan(client, root, parent, source, destination, params)
