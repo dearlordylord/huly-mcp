@@ -602,16 +602,23 @@ The current cleanup receipt proves absence only for its explicitly inspected
 resource kinds; retaining nested IDs does not prove their absence or authorize
 broader deletion.
 
-The authorized no-overall-deadline continuation may run the unresolved tree
-fixture first, then the fresh ordinary `pnpm check-all` and the remaining four
-suites on the same frozen candidate. A passing early tree receipt keeps its
-original commit, log, environment, generated-bundle and input fingerprints.
-Only a successful current-candidate gate plus all five successful suite receipts
-and final fingerprint/log/artifact checks qualifies the candidate. If the gate
-changes the tested bundle or any dependency, the early receipt cannot qualify
-that changed input. Stop on failure; this ordering does not authorize automatic
-mutation retries, increase any operation or process deadline, reuse a predecessor
-candidate's gate, or certify a subset of criteria.
+Current qualification must run the fresh ordinary `pnpm check-all` successfully
+before any live fixture writes. The stock `pnpm integration:movement` preparation
+already enforces this order. For the authorized no-overall-deadline continuation,
+run the same-candidate gate first, then one read-only native prior preparation,
+then all five feature suites serially on that frozen candidate. Build and cheap
+process checks may precede the gate; they do not replace it. A failed lint,
+typecheck or coverage stage stops before live setup and cannot be carried forward
+as a passing prerequisite.
+
+The earlier authorized tree-first repair feedback order is historical. It helped
+establish that the rich MCP/CLI tree scenarios were reachable, but it also spent
+live setup time before discovering a gate failure. Do not use that order for the
+next qualification. Retain its original receipts without retagging them. Only a
+successful current-candidate gate, all five successful suite receipts and final
+source, environment, runtime, log, file and directory artifact audits qualify the
+candidate. Stop on failure. This order does not authorize mutation retries,
+increase deadlines, reuse a predecessor gate or certify a subset of criteria.
 
 The movement coordinator uses one absolute deadline, a worktree lock, retained
 logs and input fingerprints. The package command includes final-gate preparation
