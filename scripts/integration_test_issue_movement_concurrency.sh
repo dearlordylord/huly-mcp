@@ -86,6 +86,11 @@ for transport in mcp cli; do
     jq -e '.observation.status == "result" and any(.gatewayEvents[]; .event == "barrier")' >/dev/null <<<"$RESULT"
     AFTER_ARGS=$(jq -nc --argjson args "$SNAPSHOT_ARGS" --argjson before "$BEFORE" --arg destination "$DESTINATION" '$args + {migrationEvidence:{destinationSpace:($before.projects[]|select(.identifier==$destination)|._id),beforeRecordIds:[$before.issues[].owned.records[]._id]}}')
     AFTER=$("${BUNDLED[@]}" scripts/integration-issue-transfer-state.ts "$AFTER_ARGS")
+    RECORD_EVIDENCE=$(jq -L scripts -c --argjson before "$BEFORE" --arg root "$ROOT_ID" -f scripts/issue-movement-concurrency/assert-record-preservation.jq <<<"$AFTER")
+    if [[ -n "${MOVEMENT_PRIVATE_EVIDENCE_DIR:-}" ]]; then
+      VERIFICATION_RECEIPT=$(jq -nc --arg directory "$MOVEMENT_PRIVATE_EVIDENCE_DIR" --arg transport "$transport" --arg case "$NAME" --argjson before "$BEFORE" --argjson after "$AFTER" --argjson recordEvidence "$RECORD_EVIDENCE" '{directory:$directory,transport:$transport,case:$case,before:$before,after:$after,recordEvidence:$recordEvidence}')
+      "${BUNDLED[@]}" scripts/issue-movement-concurrency/retain-verification-main.ts "$VERIFICATION_RECEIPT"
+    fi
     EXPECTED=$(jq -r .expectedLocation <<<"$entry")
     PROJECT="$SOURCE"; [[ "$EXPECTED" == destination ]] && PROJECT="$DESTINATION"
     jq -e --arg id "$ROOT_ID" --arg project "$PROJECT" '.mutation.after.issueId == $id and .mutation.after.project == $project' >/dev/null <<<"$RESULT"
@@ -107,7 +112,6 @@ for transport in mcp cli; do
       jq -e --arg root "$ROOT_ID" --arg component "${COMPONENTS[$PROJECT]}" '.issues[] | select(.issue._id == $root) | .issue.component == $component' >/dev/null <<<"$AFTER"
     fi
     # Baseline descendant-owned IDs must survive every race and interruption.
-    RECORD_EVIDENCE=$(jq -L scripts -c --argjson before "$BEFORE" --arg root "$ROOT_ID" -f scripts/issue-movement-concurrency/assert-record-preservation.jq <<<"$AFTER")
     jq -c '{phase:"owned-record-preservation",valid,lastModificationEvidence,recordCount:(.records|length)}' <<<"$RECORD_EVIDENCE" >&2
     jq -e '.valid' >/dev/null <<<"$RECORD_EVIDENCE"
     # Unavailable metadata never authenticates completed movement; uncertainty remains explicit.
@@ -124,7 +128,7 @@ for transport in mcp cli; do
     DESTINATION_ID=$(jq -er --arg destination "$DESTINATION" '.projects[] | select(.identifier == $destination) | ._id' <<<"$AFTER")
     PREVIOUS_SEQUENCE=$(jq -er --arg destination "$DESTINATION" '.projects[] | select(.identifier == $destination) | .sequence' <<<"$BEFORE")
     IDS=$(jq -nc --arg root "$ROOT_ID" --arg child "$CHILD_ID" --arg grandchild "$GRANDCHILD_ID" '[$root,$child,$grandchild]')
-    jq -e --arg name "$NAME" --arg destinationId "$DESTINATION_ID" --argjson ids "$IDS" --argjson previousSequence "$PREVIOUS_SEQUENCE" --argjson after "$AFTER" -f scripts/issue-movement-concurrency/assert-outcome.jq >/dev/null <<<"$RESULT"
+    jq -e --arg name "$NAME" --arg destinationId "$DESTINATION_ID" --argjson ids "$IDS" --argjson previousSequence "$PREVIOUS_SEQUENCE" --argjson after "$AFTER" --argjson before "$BEFORE" --argjson recordEvidence "$RECORD_EVIDENCE" --arg destinationIdentifier "$DESTINATION" -f scripts/issue-movement-concurrency/assert-outcome.jq >/dev/null <<<"$RESULT"
     if [[ "$NAME" == allocated-reply-lost || "$NAME" == successful-batch-reply-lost ]]; then
       jq -e '.observation.result.outcome == "indeterminate" and all(.gatewayEvents[]; .event != "retry-suppressed")' >/dev/null <<<"$RESULT"
     fi

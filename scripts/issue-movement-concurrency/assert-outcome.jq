@@ -5,6 +5,38 @@ def uncertainty:
   .destination.projectId == $destinationId and .destination.parentId == null and
   .discovery.status == "complete" and
   all($ids[]; . as $id | any($current.issueIds[]; . == $id));
+def independent_lost_success($evidence):
+  . as $current |
+  $current.verification.status == "observed" and
+  $current.verification.completeness == "incomplete" and
+  ($current.verification.consistency == "inconsistent" or $current.verification.consistency == "undetermined") and
+  $recordEvidence.valid == true and $recordEvidence.lastModificationEvidence == "observed" and
+  ([$before.issues[].owned.records[]._id] | sort | unique) ==
+    ([$recordEvidence.records[].recordId] | sort | unique) and
+  all($recordEvidence.records[]; .status == "authenticated" or .status == "unchanged") and
+  all($before.issues[]; . as $owner | all($owner.owned.records[]; . as $record |
+    [$recordEvidence.records[] | select(.recordId == $record._id)] as $proof |
+    ($proof | length) == 1 and $proof[0].ownerId == $owner.issue._id)) and
+  all($before.issues[]; . as $old |
+    [$after.issues[] | select(.issue._id == $old.issue._id)] as $currentOwner |
+    ($currentOwner | length) == 1 and
+    all($old.owned.records[]; . as $record |
+      ([$currentOwner[0].owned.records[] | select(._id == $record._id)] | length) == 1)) and
+  ($after.issues | length) == ($ids | length) and
+  all($ids | to_entries[]; . as $entry |
+    [$after.issues[].issue | select(._id == $entry.value)] as $actual |
+    [$current.execution.reservations[] | select(.issueId == $entry.value)] as $reserved |
+    ($actual | length) == 1 and ($reserved | length) == 1 and
+    $actual[0].space == $destinationId and $actual[0].number == $reserved[0].number and
+    $actual[0].subIssues == (if $entry.key == (($ids | length) - 1) then 0 else 1 end) and
+    $actual[0].identifier == ($destinationIdentifier + "-" + ($reserved[0].number | tostring)) and
+    $actual[0].attachedTo == (if $entry.key == 0 then "tracker:ids:NoParent" else $ids[$entry.key - 1] end) and
+    any($after.issues[]; .issue._id == $entry.value and .owned.discovery == "complete" and .owned.blockers == [])) and
+  $evidence.mutation.action.kind == "none" and
+  ([$evidence.gatewayEvents[] | select(.event == "forwarded" and .point == "commit-after")] | length) == 1 and
+  any($evidence.gatewayEvents[]; .event == "forwarded" and .point == "commit-after" and .status == 200 and .attempt == 1) and
+  ([$evidence.gatewayEvents[] | select(.event == "barrier" and .point == "commit-after" and .action == "drop")] | length) == 1 and
+  all($evidence.gatewayEvents[]; .event != "retry-suppressed");
 def confirmed_reservations:
   (.execution.reservations | length) == ($ids | length) and
   all(.execution.reservations[]; .status == "confirmed") and
@@ -67,8 +99,8 @@ elif $name == "verification-outage" then
 elif $name == "successful-batch-reply-lost" then
   .outcome == "indeterminate" and uncertainty and confirmed_reservations and
   .execution.phase == "commit" and .execution.commit == "reply-lost" and
-  .verification.status == "observed" and .verification.completeness == "complete" and
-  .verification.consistency == "consistent"
+  ((.verification.status == "observed" and .verification.completeness == "complete" and
+    .verification.consistency == "consistent") or independent_lost_success($evidence))
 elif $name == "before-allocation-send" or $name == "allocated-reply-lost" then
   # Gateway refusal is before upstream forwarding, after the application's HTTP send.
   .outcome == "indeterminate" and uncertainty and

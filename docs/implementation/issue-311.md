@@ -83,3 +83,15 @@ still fail. This narrow branch preserves the existing complete-proof branch and
 does not apply to other race cases. It reflects retained known inconsistency plus
 unavailable later reads; it does not relabel partial observations complete or
 change product retries, guards or deadlines.
+
+
+Lost-success reply qualification preserves an indeterminate public outcome. A
+partial recovery read may qualify only through the independent fresh snapshot:
+all original task IDs have their reserved destination numbers and identifiers,
+exact planned parent chain and child counts; every owned closure is complete;
+every baseline owned record survives with authenticated migration metadata. The
+gateway must prove exactly one HTTP-200 task batch followed by the intended reply
+drop, with no resend. BEFORE, AFTER and record-proof inputs are retained privately
+before the outcome assertion. The earlier failed run did not retain its AFTER
+snapshot and is not retroactively qualified. Product guards, budgets and recovery
+behavior are unchanged.

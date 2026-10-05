@@ -2,6 +2,8 @@
 # Pure jq predicate smoke. No process connects to Huly or substitutes SDK behavior.
 set -euo pipefail
 PREDICATE="$(dirname "${BASH_SOURCE[0]}")/assert-outcome.jq"
+PROOF_BEFORE='{}'
+RECORD_PROOF='{}'
 IDS='["root","child","grandchild"]'
 AFTER='{"issues":[{"issue":{"_id":"root","space":"source","number":1}},{"issue":{"_id":"child","space":"source","number":2}},{"issue":{"_id":"grandchild","space":"source","number":3}}]}'
 BASE=$(jq -nc --argjson ids "$IDS" '{
@@ -11,7 +13,7 @@ BASE=$(jq -nc --argjson ids "$IDS" '{
 }')
 COMPLETED=$(jq -nc --argjson ids "$IDS" '{outcome:"completed",changed:true,issueId:"root",projectId:"destination",parentId:null,tasks:[$ids | to_entries[] | {issueId:.value,previousIdentifier:("SOURCE-"+((.key+1)|tostring)),identifier:("DEST-"+((.key+21)|tostring)),parentId:null,url:("http://localhost/"+.value)}]}')
 check() {
-  jq -e --arg name "$1" --arg destinationId destination --argjson ids "$IDS" --argjson previousSequence 20 --argjson after "${3:-$AFTER}" -f "$PREDICATE" >/dev/null <<<"$2"
+  jq -e --arg name "$1" --arg destinationId destination --argjson ids "$IDS" --argjson previousSequence 20 --argjson after "${3:-$AFTER}" --argjson before "$PROOF_BEFORE" --argjson recordEvidence "$RECORD_PROOF" --arg destinationIdentifier DEST -f "$PREDICATE" >/dev/null <<<"$2"
 }
 reject() {
   if check "$1" "$2" "${3:-$AFTER}"; then echo "Predicate falsely accepted $1" >&2; exit 1; fi
@@ -73,3 +75,25 @@ for filter in '.issues[0].issue.attachedTo="different-parent"' '.issues[0].issue
 done
 reject preserve-later-comment "$PARTIAL" "$PARTIAL_AFTER"
 echo 'PASS: partial later-ancestry proof and single-send/actor-state/deadline counterexamples'
+
+PROOF_BEFORE='{"issues":[{"issue":{"_id":"child"},"owned":{"records":[{"_id":"known-record"}]}}]}'
+RECORD_PROOF='{"valid":true,"lastModificationEvidence":"observed","records":[{"recordId":"known-record","ownerId":"child","status":"authenticated"}]}'
+LOST_AFTER=$(jq -nc --argjson ids "$IDS" '{issues:[$ids|to_entries[]|{issue:{_id:.value,space:"destination",number:(21+.key),identifier:("DEST-"+((21+.key)|tostring)),attachedTo:(if .key==0 then "tracker:ids:NoParent" else $ids[.key-1] end),subIssues:(if .key==2 then 0 else 1 end)},owned:{discovery:"complete",blockers:[],records:(if .key==1 then [{_id:"known-record"}] else [] end)}}]}')
+PARTIAL_LOST=$(jq -c '.observation.result.verification.completeness="incomplete" | .observation.result.verification.consistency="undetermined" | .gatewayEvents=[{event:"forwarded",point:"commit-after",status:200,attempt:1},{event:"barrier",point:"commit-after",action:"drop"}]' <<<"$LOST")
+check successful-batch-reply-lost "$PARTIAL_LOST" "$LOST_AFTER"
+for filter in '.issues[1].issue.attachedTo="foreign"' '.issues[1].issue.number=99' '.issues[1].issue.identifier="DEST-99"' '.issues[1].owned.discovery="incomplete"' '.issues[1].owned.records=[]' '.issues[0].issue.subIssues=2' '.issues|=map(select(.issue._id!="child"))'; do
+  reject successful-batch-reply-lost "$PARTIAL_LOST" "$(jq -c "$filter" <<<"$LOST_AFTER")"
+done
+for filter in '.gatewayEvents[0].status=503' '.gatewayEvents += [.gatewayEvents[0]]' '.gatewayEvents[1].action="pause"' '.gatewayEvents += [{event:"retry-suppressed"}]' '.observation.result.execution.commit="not-sent"'; do
+  reject successful-batch-reply-lost "$(jq -c "$filter" <<<"$PARTIAL_LOST")" "$LOST_AFTER"
+done
+RECORD_PROOF='{"valid":true,"lastModificationEvidence":"unavailable","records":[{"recordId":"known-record","ownerId":"child","status":"metadata-unavailable"}]}'
+reject successful-batch-reply-lost "$PARTIAL_LOST" "$LOST_AFTER"
+RECORD_PROOF='{"valid":true,"lastModificationEvidence":"observed","records":[]}'
+reject successful-batch-reply-lost "$PARTIAL_LOST" "$LOST_AFTER"
+echo 'PASS: independent lost-success proof and ancestry/number/ownership/send counterexamples'
+
+RECORD_PROOF='{"valid":true,"lastModificationEvidence":"observed","records":[{"recordId":"known-record","ownerId":"foreign","status":"authenticated"}]}'
+reject successful-batch-reply-lost "$PARTIAL_LOST" "$LOST_AFTER"
+RECORD_PROOF='{"valid":true,"lastModificationEvidence":"observed","records":[{"recordId":"known-record","ownerId":"child","status":"authenticated"},{"recordId":"known-record","ownerId":"child","status":"authenticated"}]}'
+reject successful-batch-reply-lost "$PARTIAL_LOST" "$LOST_AFTER"
