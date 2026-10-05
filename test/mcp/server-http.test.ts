@@ -718,37 +718,41 @@ it("forwards the opt-in movement observer through the real HTTP lifecycle withou
     close: () => {}
   })
   const baseline = await startServer({ resolveLease })
-  const instrumented = await startServer({
-    resolveLease,
-    observeMovement: (operation) =>
-      Effect.sync(() => {
-        state.observed++
-      }).pipe(
-        Effect.andThen(operation),
-        Effect.ensuring(
-          Effect.sync(() => {
-            state.finalized++
-          })
-        )
-      )
-  })
   try {
-    const context = await fetch(
-      instrumented.endpoint,
-      modernRequest("tools/call", { name: "get_huly_context", arguments: {} }, "claude-code")
-    )
-    expect(context.status).toBe(200)
-    expect(state).toEqual({ observed: 0, finalized: 0 })
-    const params = { name: "move_issue", arguments: { issue: "root", destination: { parent: null } } }
-    const original = await fetch(baseline.endpoint, modernRequest("tools/call", params, "claude-code"))
-    const observed = await fetch(instrumented.endpoint, modernRequest("tools/call", params, "claude-code"))
-    const originalBody = Schema.decodeUnknownSync(JsonRpcResponse)(await original.json())
-    const observedBody = Schema.decodeUnknownSync(JsonRpcResponse)(await observed.json())
-    expect(observed.status).toBe(original.status)
-    expect(observedBody).toEqual(originalBody)
-    expect(observedBody.result?.isError).toBe(true)
-    expect(state).toEqual({ observed: 1, finalized: 1 })
+    const instrumented = await startServer({
+      resolveLease,
+      observeMovement: (operation) =>
+        Effect.sync(() => {
+          state.observed++
+        }).pipe(
+          Effect.andThen(operation),
+          Effect.ensuring(
+            Effect.sync(() => {
+              state.finalized++
+            })
+          )
+        )
+    })
+    try {
+      const context = await fetch(
+        instrumented.endpoint,
+        modernRequest("tools/call", { name: "get_huly_context", arguments: {} }, "claude-code")
+      )
+      expect(context.status).toBe(200)
+      expect(state).toEqual({ observed: 0, finalized: 0 })
+      const params = { name: "move_issue", arguments: { issue: "root", destination: { parent: null } } }
+      const original = await fetch(baseline.endpoint, modernRequest("tools/call", params, "claude-code"))
+      const observed = await fetch(instrumented.endpoint, modernRequest("tools/call", params, "claude-code"))
+      const originalBody = Schema.decodeUnknownSync(JsonRpcResponse)(await original.json())
+      const observedBody = Schema.decodeUnknownSync(JsonRpcResponse)(await observed.json())
+      expect(observed.status).toBe(original.status)
+      expect(observedBody).toEqual(originalBody)
+      expect(observedBody.result?.isError).toBe(true)
+      expect(state).toEqual({ observed: 1, finalized: 1 })
+    } finally {
+      await instrumented.stop()
+    }
   } finally {
-    await Promise.all([baseline.stop(), instrumented.stop()])
+    await baseline.stop()
   }
 })
