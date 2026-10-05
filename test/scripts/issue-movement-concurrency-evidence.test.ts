@@ -93,8 +93,24 @@ test("rejects malformed results and path traversal labels through the schema wit
 test("scenario persistence precedes stdout and shell domain assertions", async () => {
   const scenario = await readFile("scripts/issue-movement-concurrency/scenario.ts", "utf8")
   const shell = await readFile("scripts/integration_test_issue_movement_concurrency.sh", "utf8")
-  expect(scenario.indexOf("await Effect.runPromise(retainConcurrencyEvidence(")).toBeLessThan(
-    scenario.indexOf("process.stdout.write(`${JSON.stringify(evidence)}")
-  )
+  const retention = /await\s+Effect\.runPromise\(\s*retainConcurrencyEvidence\(/
+  const output = "process.stdout.write(`${JSON.stringify(evidence)}"
+  const retained = retention.exec(scenario)
+  const printed = scenario.indexOf(output)
+  expect(retained).not.toBeNull()
+  expect(printed).toBeGreaterThanOrEqual(0)
+  if (retained === null || printed < 0) return
+  expect(retained.index).toBeGreaterThanOrEqual(0)
+  expect(retained.index).toBeLessThan(printed)
+  const hasRetentionBeforeOutput = (source: string) => {
+    const saved = retention.exec(source)
+    const stdout = source.indexOf(output)
+    return saved !== null && stdout >= 0 && saved.index < stdout
+  }
+  expect(hasRetentionBeforeOutput(scenario)).toBe(true)
+  const removed = scenario.replace(retention, "removedRetention(")
+  expect(hasRetentionBeforeOutput(removed)).toBe(false)
+  expect(hasRetentionBeforeOutput(`${removed}\n${retained[0]}`)).toBe(false)
+  expect(hasRetentionBeforeOutput(scenario.replace(output, "removedOutput("))).toBe(false)
   expect(shell).toContain('RESULT=$(MOVEMENT_CONCURRENCY_CASE="$NAME"')
 })
