@@ -32,6 +32,7 @@ import { contact, tracker } from "../huly-plugins.js"
 import { findComponentByIdOrLabel } from "./components.js"
 import { findPersonByIdOrExactEmailOrName } from "./contacts-shared.js"
 import { findIssueAssignee } from "./issue-assignee-resolution.js"
+import { componentForIssue, loadIssueComponentIndex } from "./issue-components-read.js"
 import { creatorForIssue, loadIssueCreatorIndex } from "./issue-creators-read.js"
 import { issueIdsMatchingLabel, labelsForIssue, loadIssueLabelIndex } from "./issue-labels-read.js"
 import { loadIssueMilestoneIndex, milestoneForIssue } from "./issue-milestones-read.js"
@@ -248,11 +249,13 @@ const loadIssueDescription = (
 const issueDetailRelationshipFields = (
   issue: HulyIssue,
   person: Person | undefined,
+  component: ReturnType<typeof componentForIssue>,
   milestone: ReturnType<typeof milestoneForIssue>,
   creator: ReturnType<typeof creatorForIssue>
 ) => {
   const directParent = issue.parents.find((parent) => parent.parentId === issue.attachedTo)
   return {
+    ...(component === undefined ? {} : { component }),
     assigneeRef: person ? { id: person._id, name: person.name } : undefined,
     ...(creator === undefined ? {} : { creator }),
     ...(milestone === undefined ? {} : { milestone }),
@@ -273,6 +276,7 @@ const issueDetailProjection = (
   person: Person | undefined,
   description: string | undefined,
   labels: ReturnType<typeof labelsForIssue>,
+  component: ReturnType<typeof componentForIssue>,
   milestone: ReturnType<typeof milestoneForIssue>,
   creator: ReturnType<typeof creatorForIssue>
 ) => {
@@ -284,7 +288,7 @@ const issueDetailProjection = (
     status: statusName,
     priority: priorityToString(issue.priority),
     assignee: person?.name,
-    ...issueDetailRelationshipFields(issue, person, milestone, creator),
+    ...issueDetailRelationshipFields(issue, person, component, milestone, creator),
     labels,
     project: params.project,
     ...issueDetailMetricFields(issue),
@@ -377,6 +381,7 @@ export const getIssue = (params: GetIssueParams): Effect.Effect<Issue, GetIssueE
     const description = yield* loadIssueDescription(client, issue)
 
     const labelIndex = yield* loadIssueLabelIndex(client, project._id, [issue._id])
+    const componentIndex = yield* loadIssueComponentIndex(client, project, [issue])
     const milestoneIndex = yield* loadIssueMilestoneIndex(client, project, [issue])
     const creatorIndex = yield* loadIssueCreatorIndex(client, [issue])
     const milestone = milestoneForIssue(milestoneIndex, issue)
@@ -389,6 +394,7 @@ export const getIssue = (params: GetIssueParams): Effect.Effect<Issue, GetIssueE
       person,
       description,
       labelsForIssue(labelIndex, issue._id),
+      componentForIssue(componentIndex, issue),
       milestone,
       creator
     )

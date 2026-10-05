@@ -10,8 +10,8 @@ import type { TransferPlan } from "./issue-transfer-preflight.js"
 import { writeRepairsAncestry } from "./issue-transfer-tree-planning.js"
 import type { HulyClient } from "../client.js"
 
-export const transferTreeInspectionGuidance = (prepared: TransferPlan, destination: MovementProject) =>
-  movementRecoveryInstructions(prepared.plan, destination)
+export const transferTreeInspectionGuidance = (prepared: TransferPlan) =>
+  movementRecoveryInstructions(prepared.plan, prepared.plan.source)
 
 export const transferTreeFailure = (
   outcome: "incomplete" | "indeterminate",
@@ -39,7 +39,7 @@ export const transferTreeRefusal = (
   destinationId: destination._id,
   reason,
   issueIds: prepared.plan.tree.map((issue) => issue._id),
-  inspection: transferTreeInspectionGuidance(prepared, destination)
+  inspection: transferTreeInspectionGuidance(prepared)
 })
 
 export const completedTransferTreeResult = (

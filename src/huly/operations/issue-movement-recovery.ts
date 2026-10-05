@@ -4,15 +4,15 @@ import type { MoveIssueResult } from "../../domain/schemas/issues-results.js"
 import type { IssueId } from "../../domain/schemas/shared.js"
 import type { MovementPlan } from "./issue-movement-preflight.js"
 
-export const movementStableIdReadInstructions = (destination: MovementProject, issueIds: ReadonlyArray<IssueId>) =>
+export const movementStableIdReadInstructions = (project: MovementProject, issueIds: ReadonlyArray<IssueId>) =>
   `Inspect every stable ID before retry: ${issueIds
     .map(
       (issueId) =>
-        `MCP get_issue ${JSON.stringify({ project: destination.identifier, identifier: issueId })}; CLI huly issues get ${destination.identifier} ${issueId} --json`
+        `MCP get_issue ${JSON.stringify({ project: project.identifier, identifier: issueId })}; CLI huly issues get ${project.identifier} ${issueId} --json`
     )
     .join(
       "; "
-    )}. Stable-ID lookup searches the workspace and returns each task's current project. Historical identifier mappings are not reconstructed from uncertain replies. Do not automatically repeat movement or roll back subsequent edits; reserved numbers may leave gaps.`
+    )}. Stable-ID lookup searches the workspace and returns each task's current project. Historical identifier mappings are not reconstructed from uncertain replies. Do not automatically repeat movement or roll back subsequent edits.`
 
 export const movementRecoveryInstructions = (
   plan: MovementPlan,
@@ -43,6 +43,6 @@ export const movementFailureResult = (
     destination: { projectId: destination._id, parentId: plan.parent?._id ?? null },
     discovery: { status: "complete" },
     ...evidence,
-    inspection: movementRecoveryInstructions(plan, destination, issueIds)
+    inspection: `${movementRecoveryInstructions(plan, destination, issueIds)}${evidence.execution.reservations.length === 0 ? "" : " Reserved numbers may leave gaps."}`
   }
 }

@@ -16,7 +16,7 @@ import { moveIssue } from "../../../src/huly/operations/issues-move.js"
 import { issueIdentifier, projectIdentifier } from "../../helpers/brands.js"
 import { movementFixture, movementIssue, threeLevelMovementFixture } from "../../helpers/movement.js"
 
-const parseIssue = (input: Issue) => Schema.decodeUnknownSync(MovementIssueSchema)(input)
+const parseIssue = (input: unknown) => Schema.decodeUnknownSync(MovementIssueSchema)(input)
 
 const staleTitles = (issue: Issue) => {
   issue.parents = issue.parents.map((parent) => ({ ...parent, parentTitle: "stale" }))

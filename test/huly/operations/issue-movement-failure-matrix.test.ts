@@ -65,6 +65,8 @@ describe("public movement uncertainty and concurrent state", () => {
         allocateMovementNumber: () => Effect.fail(unavailable("before-send"))
       })
       expect(result).toMatchObject({ outcome: "blocked", changed: false })
+      expect(JSON.stringify(result).toLowerCase()).not.toContain("gaps")
+      expect(result).toHaveProperty("inspection", expect.stringContaining(`"project":"${f.source.identifier}"`))
       expect(f.state.allocated).toBe(0)
       expect(f.state.sent).toBe(0)
     })
@@ -263,6 +265,7 @@ describe("public movement uncertainty and concurrent state", () => {
         }
       })
       assertRecovery(result, [f.root._id])
+      expect(result).toHaveProperty("inspection", expect.stringContaining("Reserved numbers may leave gaps"))
       expect(f.root.space).toBe(f.source._id)
       expect(f.state.allocated).toBe(3)
       expect(f.state.sent).toBe(0)

@@ -1,6 +1,7 @@
 import { Effect, Schema, SchemaGetter, SchemaIssue } from "effect"
 
 import { normalizeForComparison } from "../../utils/normalize.js"
+import { IssueComponentRefSchema } from "./issue-component-ref.js"
 import { clearableText } from "./clearable.js"
 import { toDraft07JsonSchema } from "./json-schema.js"
 import {
@@ -140,6 +141,7 @@ export const IssueSchema = Schema.Struct({
       "Attached labels sorted by title. Empty when no usable label attachments exist; duplicate titles are collapsed case-insensitively, preferring a reference with a valid color."
   }),
   milestone: Schema.optionalKey(IssueMilestoneRefSchema),
+  component: Schema.optionalKey(IssueComponentRefSchema),
   project: ProjectIdentifier,
   parentIssue: Schema.optional(IssueIdentifier),
   subIssues: Schema.optional(Count),

@@ -96,6 +96,7 @@ it.effect("a later scoped-condition refusal preserves the intervening writer's e
     expect(result.outcome).toBe("incomplete")
     if (result.outcome !== "incomplete") throw new Error("Expected scoped refusal")
     expect(result.execution).toMatchObject({ phase: "commit", commit: "refused", reservations: [] })
+    expect(`${result.reason} ${result.inspection}`.toLowerCase()).not.toContain("gaps")
     expect(f.child.title).toBe("Intervening writer's title")
     expect(f.state.allocated).toBe(0)
     expect(f.state.sent).toBe(1)
@@ -125,6 +126,7 @@ it.effect("cross-project reinspection still refuses a task changed during sequen
       "confirmed",
       "confirmed"
     ])
+    expect(result.inspection).toContain("Reserved numbers may leave gaps")
     expect(f.root.title).toBe("Changed during sequence allocation")
     expect(f.state.allocated).toBe(3)
     expect(f.state.sent).toBe(0)

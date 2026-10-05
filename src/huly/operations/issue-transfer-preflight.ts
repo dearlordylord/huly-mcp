@@ -5,7 +5,7 @@ import { inspectTransferAttributes } from "./issue-transfer-attribute-inspection
 import { isDeepStrictEqual } from "node:util"
 import { resolveTransferTreeAttributes, type TransferTaskSnapshot } from "./issue-transfer-tree-attributes.js"
 import { inspectTransferTree } from "./issue-transfer-tree-inspection.js"
-import { MAX_TRANSFER_RECORDS, MAX_TRANSFER_CONFLICT_ENTRIES } from "./issue-transfer-tree.js"
+import { MAX_TRANSFER_RECORDS, MAX_TRANSFER_CONFLICT_ENTRIES, type TransferTree } from "./issue-transfer-tree.js"
 import type { TransferAttributeChange } from "../../domain/schemas/issue-transfer-attributes.js"
 import type { Issue } from "@hcengineering/tracker"
 import { Effect } from "effect"
@@ -51,11 +51,33 @@ export interface TransferPlan {
   >
 }
 export interface TransferRefusal {
+  readonly destinationParentId?: MovementIssue["_id"]
   readonly issueIds?: ReadonlyArray<MovementIssue["_id"]>
   readonly conflicts: ReadonlyArray<TransferConflict>
   readonly discovery?: TransferInspection["discovery"]
   readonly limitation: TransferInspection["limitation"]
 }
+const destinationCycleRefusal = (
+  root: MovementIssue,
+  parent: MovementIssue | undefined,
+  discovered: TransferTree
+): TransferRefusal | undefined => {
+  if (parent === undefined || !discovered.issues.some((issue) => issue._id === parent._id)) return undefined
+  return {
+    destinationParentId: parent._id,
+    issueIds: discovered.issues.map((issue) => issue._id),
+    conflicts: [
+      transferConflict(
+        root,
+        "unsupported-structure",
+        `Destination parent ${parent.identifier} (${parent._id}) is inside the moved tree rooted at ${root.identifier} (${root._id}); it would become its own ancestor. Choose a parent outside that tree, or {"parent": null}.`
+      )
+    ],
+    discovery: discovered.complete ? "complete" : "incomplete",
+    limitation: "No move-related write or number allocation was sent."
+  }
+}
+
 const related = (hierarchy: MovementHierarchy, root: MovementIssue, parent: MovementIssue | undefined) => [
   root,
   ...(ancestorsOf(hierarchy, root) ?? []),
@@ -111,6 +133,8 @@ const inspectTransferContext = Effect.fn("transfer.inspectContext")(function* (
       : [...sourceHierarchy.issues, ...destinationHierarchy.issues]
   )
   const discovered = yield* inspectTransferTree(client, root)
+  const cycle = destinationCycleRefusal(root, parent, discovered)
+  if (cycle !== undefined) return cycle
   return {
     hierarchy,
     tree: discovered.issues,

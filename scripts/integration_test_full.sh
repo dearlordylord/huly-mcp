@@ -4737,6 +4737,11 @@ if [ $? -eq 0 ]; then
     SET_COMP_ISSUE=$(echo "$SET_COMP_TEXT" | jq -r '.identifier' 2>/dev/null)
     run_test "set_issue_component($SET_COMP_ISSUE)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_issue_component\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$SET_COMP_ISSUE\",\"component\":\"Updated Comp\"}},\"id\":2}"
+    wait_for_json_array_contains_to_var SET_COMP_GET_TEXT "get_issue projects assigned component ID" \
+      "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$SET_COMP_ISSUE\"}},\"id\":2}" \
+      "[.component.id]" "$COMP_ID"
+    assert_json_field_equals "get_issue projects assigned component label" "$SET_COMP_GET_TEXT" \
+      ".component.label" "Updated Comp"
     run_test "delete_issue(comp_test:$SET_COMP_ISSUE)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_issue\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$SET_COMP_ISSUE\"}},\"id\":2}"
   fi

@@ -76,6 +76,8 @@ RESULT=$("${CLI[@]}" issues move "$ROOT" --destination "$(jq -nc --arg project "
 assert_result "$RESULT" completed
 RESULT=$("${CLI[@]}" issues move "$ROOT" --destination "$(jq -nc --arg parent "$LEAF" '{parent:$parent}')" --json)
 assert_result "$RESULT" blocked
+LEAF_ID=$(jq -r --arg identifier "$LEAF" '.[] | select(.preserved.identifier == $identifier) | .preserved._id' <<<"$BEFORE")
+jq -e --arg parent "$LEAF_ID" --arg root "$ROOT_ID" '.changed == false and .destinationParentId == $parent and (.issueIds | index($root)) != null and (.reason | contains("inside the moved tree")) and (.reason | contains("Choose a parent outside")) and ((.reason + .inspection | ascii_downcase | contains("gaps")) | not)' >/dev/null <<<"$RESULT"
 FINAL=$(snapshot)
 jq -e --argjson after "$AFTER" '([.[].preserved] | sort_by(._id)) == ([$after[].preserved] | sort_by(._id))' >/dev/null <<<"$FINAL"
 echo "PASS: CLI destination forms, stable IDs, cycle refusal and real Huly preserved data"

@@ -45,6 +45,7 @@ export const MoveIssueResultSchema = Schema.Union([
     nextCall: Schema.optionalKey(MoveIssueParamsSchema),
     conflicts: Schema.optionalKey(Schema.Array(TransferConflictSchema)),
     destinationId: Schema.optionalKey(DocId),
+    destinationParentId: Schema.optionalKey(IssueId),
     outcome: Schema.Literal("blocked"),
     changed: Schema.Literal(false),
     reason: Schema.String,

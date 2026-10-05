@@ -120,7 +120,7 @@ const executeWithinBudget = Effect.fn("transfer.executeWithinBudget")(function* 
   if (write === undefined)
     return yield* stoppedResult(
       "incomplete",
-      "Identifier plan is incomplete or duplicate; task batch was not sent. Reserved numbers may leave gaps.",
+      "Identifier plan is incomplete or duplicate; task batch was not sent.",
       prepared,
       destination,
       progress
@@ -261,7 +261,7 @@ const commitAndVerify = Effect.fn("transfer.commitAndVerify")(function* (
     yield* observeFailure(client, prepared, destination, write, progress)
     return yield* stoppedResult(
       "incomplete",
-      "Scoped conditions refused the task batch. Prior allocations may leave gaps; inspect concurrent state before a new call.",
+      "Scoped conditions refused the task batch; inspect concurrent state before a new call.",
       prepared,
       destination,
       progress

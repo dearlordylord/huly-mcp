@@ -16,6 +16,7 @@ import type {
 import type { TagElement, TagReference } from "@hcengineering/tags"
 import type { TaskType } from "@hcengineering/task"
 import {
+  type Component as HulyComponent,
   type Issue as HulyIssue,
   type IssueParentInfo,
   IssuePriority,
@@ -280,6 +281,7 @@ interface MockConfig {
   projects?: Array<HulyProject>
   issues?: Array<HulyIssue>
   statuses?: Array<Status>
+  components?: Array<HulyComponent>
   milestones?: Array<HulyMilestone>
   captureMilestoneQueries?: Array<unknown>
   persons?: Array<Person>
@@ -347,6 +349,18 @@ const createTestLayerWithMocks = (config: MockConfig) => {
     }
     if (_class === tracker.class.IssueStatus) {
       return Effect.succeed(toFindResult(statuses))
+    }
+    if (_class === tracker.class.Component) {
+      const components = config.components ?? []
+      return Effect.succeed(
+        toFindResult(
+          components.filter(
+            (component) =>
+              component.space === queryField(query, "space") &&
+              matchesQueryValue(component._id, queryField(query, "_id"))
+          )
+        )
+      )
     }
     if (_class === tracker.class.Milestone) {
       config.captureMilestoneQueries?.push(query)
@@ -1243,6 +1257,49 @@ describe("getIssue", () => {
         expect(result.identifier).toBe("TEST-5")
       })
     )
+
+    for (const state of ["assigned", "absent", "undefined", "deleted", "malformed"]) {
+      it.effect(`projects component metadata for ${state} reference`, () =>
+        Effect.gen(function* () {
+          const project = makeProject()
+          const component: HulyComponent = {
+            _id: docRef<HulyComponent>("component-1"),
+            _class: tracker.class.Component,
+            space: project._id,
+            label: state === "malformed" ? "" : "Backend",
+            description: "",
+            lead: null,
+            comments: 0,
+            modifiedBy: corePersonId("user-1"),
+            modifiedOn: 0,
+            createdBy: corePersonId("user-1"),
+            createdOn: 0
+          }
+          const issue = makeIssue({ component: state === "absent" ? null : component._id })
+          if (state === "undefined") Reflect.deleteProperty(issue, "component")
+          const diagnostics = yield* makeDiagnosticsScope
+          const result = yield* getIssue({
+            project: projectIdentifier("TEST"),
+            identifier: issueIdentifier("TEST-1")
+          }).pipe(
+            Effect.provide(
+              createTestLayerWithMocks({
+                projects: [project],
+                issues: [issue],
+                components: state === "deleted" ? [] : [component]
+              })
+            ),
+            Effect.provideService(Diagnostics, diagnostics.service)
+          )
+          expect(result.component).toEqual(state === "assigned" ? { id: "component-1", label: "Backend" } : undefined)
+          expect(Object.hasOwn(result, "component")).toBe(state === "assigned")
+          const warnings = yield* diagnostics.drainWarnings
+          expect(warnings.filter((warning) => warning.code === "issue_component_metadata_degraded")).toHaveLength(
+            state === "deleted" || state === "malformed" ? 1 : 0
+          )
+        })
+      )
+    }
 
     it.effect("projects the assigned milestone on a full issue", () =>
       Effect.gen(function* () {

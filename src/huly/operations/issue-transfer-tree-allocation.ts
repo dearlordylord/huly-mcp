@@ -71,7 +71,7 @@ const failedAllocation = Effect.fn("transfer.failedAllocation")(function* (
     status: refused ? "refused" : "uncertain",
     numbers,
     reason: refused
-      ? "Sequence request was refused before send. Task batch was not sent; prior confirmed reservations may leave gaps."
+      ? "Sequence request was refused before send. Task batch was not sent."
       : "Sequence allocation response unavailable; reservation may have occurred. Task batch was not sent; gaps may remain."
   }
 })

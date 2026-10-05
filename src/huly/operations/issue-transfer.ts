@@ -18,7 +18,7 @@ export const transferIssue = Effect.fn("transferIssue")(function* (
   destination: MovementProject,
   params: MoveIssueParams
 ): Effect.fn.Return<MoveIssueResult, MovementError> {
-  const inspection = movementStableIdReadInstructions(destination, [root._id])
+  const inspection = movementStableIdReadInstructions(source, [root._id])
   const preparedResult = yield* Effect.result(
     inspectTransferPlan(client, root, parent, source, destination, params).pipe(
       Effect.timeout(TRANSFER_DISCOVERY_BUDGET)
@@ -42,11 +42,14 @@ export const transferIssue = Effect.fn("transferIssue")(function* (
       changed: false,
       reason: `${prepared.conflicts.map((entry) => entry.reason).join(" ")} ${prepared.limitation}`,
       discovery: prepared.discovery ?? "incomplete",
-      nextCall: transferRetryCall(params, root._id, prepared.conflicts, issueIds),
+      ...(prepared.destinationParentId === undefined
+        ? { nextCall: transferRetryCall(params, root._id, prepared.conflicts, issueIds) }
+        : {}),
       conflicts: prepared.conflicts,
       destinationId: destination._id,
+      ...(prepared.destinationParentId === undefined ? {} : { destinationParentId: prepared.destinationParentId }),
       issueIds,
-      inspection: movementStableIdReadInstructions(destination, issueIds)
+      inspection: movementStableIdReadInstructions(source, issueIds)
     }
   }
   return yield* executeTransferTree(client, prepared, destination, params)

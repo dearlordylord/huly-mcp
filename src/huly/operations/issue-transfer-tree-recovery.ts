@@ -103,8 +103,8 @@ export const failedCommit = Effect.fn("transfer.failedCommit")(function* (
   return yield* stoppedResult(
     noSend ? "incomplete" : "indeterminate",
     noSend
-      ? "Commit failed before send; task batch was not sent. Prior allocations may leave gaps."
-      : "Commit reply unavailable; effects may have occurred. No resend or rollback attempted; reserved numbers may leave gaps.",
+      ? "Commit failed before send; task batch was not sent."
+      : "Commit reply unavailable; effects may have occurred. No resend or rollback attempted.",
     prepared,
     destination,
     progress
