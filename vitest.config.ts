@@ -1,18 +1,42 @@
 import { defineConfig } from 'vitest/config'
 import { ORACLE_INFRASTRUCTURE_TAG } from './test/helpers/test-tags.js'
 
+const portTestFiles = [
+  'test/domain/**/*.test.ts',
+  'test/huly/**/*.test.ts',
+  'test/config/**/*.test.ts',
+  'test/utils/**/*.test.ts',
+]
+
 export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
     // Bundled CLI subprocesses compete with coverage workers for CPU and memory.
     maxWorkers: 4,
-    // Persist transforms locally; every isolated test still executes on each run.
+    // Persist transforms locally; every test still executes on each run.
     fsModuleCache: true,
     fsModuleCachePath: '.vitest-cache',
     // Keep real subprocesses and packed-artifact tests out of usage analytics.
     env: { HULY_MCP_TELEMETRY: '0', HULY_CLI_TELEMETRY: '0' },
-    include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
+    projects: [
+      {
+        test: {
+          name: 'ports',
+          include: portTestFiles,
+          // The oracle adapter registers its guard at import, so it needs a fresh module graph per file.
+          isolate: Boolean(process.env.QUINT_ORACLE_URL?.trim()),
+        },
+      },
+      {
+        test: {
+          name: 'boundaries',
+          include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
+          exclude: portTestFiles,
+          isolate: true,
+        },
+      },
+    ],
     setupFiles: ['./test/setup/quint-oracle.ts'],
     tags: [{ name: ORACLE_INFRASTRUCTURE_TAG, description: 'Tests the observation channel itself without model forwarding.' }],
     reporters: ['dot'],

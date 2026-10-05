@@ -25,6 +25,10 @@ const QuerySchema = Schema.Struct({
   srcDocId: Schema.optionalKey(OwnerQuerySchema)
 })
 const RootQuerySchema = Schema.Struct({ _id: IssueId })
+const parseRootQuery = Schema.decodeUnknownSync(RootQuerySchema)
+const parseOwnerQuery = Schema.decodeUnknownSync(QuerySchema)
+const parseObjectClass = Schema.decodeUnknownSync(ObjectClassName)
+const parseDocId = Schema.decodeUnknownSync(DocId)
 const policy = { records: 100, queries: 1000, depth: 32, result: 101 }
 const roots = [IssueId.make("root"), IssueId.make("second")]
 const forestFixture = (extraClasses: ReadonlyArray<ObjectClassName> = []) => {
@@ -67,7 +71,7 @@ const forestFixture = (extraClasses: ReadonlyArray<ObjectClassName> = []) => {
   const client = sdkFixture<TxOperations>({
     getHierarchy: () => hierarchy,
     findOne: async (_cls: unknown, query: unknown) => {
-      const id = Schema.decodeUnknownSync(RootQuerySchema)(query)._id
+      const id = parseRootQuery(query)._id
       rootReads.push(id)
       if (failedRoots.has(id)) throw new ForestFixtureFailure({ reason: "private-token" })
       if (state.wrongRoot) return sdkFixture<Doc>({ _id: "unexpected-root", _class: tracker.class.Issue })
@@ -75,30 +79,36 @@ const forestFixture = (extraClasses: ReadonlyArray<ObjectClassName> = []) => {
     },
     findAll: (cls: unknown, query: DocumentQuery<Doc>, _options?: FindOptions<Doc>) => {
       const rawQuery: unknown = query
-      const parsed = Schema.decodeUnknownSync(QuerySchema)(rawQuery)
+      const parsed = parseOwnerQuery(rawQuery)
       const selector = parsed.attachedTo ?? parsed.srcDocId
       const owners = selector === undefined ? [] : typeof selector === "string" ? [selector] : selector.$in
-      const objectClass = Schema.decodeUnknownSync(ObjectClassName)(cls)
+      const objectClass = parseObjectClass(cls)
       calls.push({ cls: objectClass, owners, outgoing: parsed.srcDocId !== undefined })
       const read = Promise.resolve().then(() => {
         if (state.failCollection) throw new ForestFixtureFailure({ reason: "private-token" })
+        const ownerIds = new Set(owners)
+        const ownerField = parsed.srcDocId === undefined ? "attachedTo" : "srcDocId"
+        const requestedClass = toClassRef<Doc>(objectClass)
+        // Metadata is stable for this read; later reads must observe model changes.
+        const derivedClasses = new Map<unknown, boolean>()
+        const matchesClass = (input: unknown): boolean => {
+          const cached = derivedClasses.get(input)
+          if (cached !== undefined) return cached
+          const rowClass = parseObjectClass(input)
+          const derived = hierarchy.isDerived(toClassRef<Doc>(rowClass), requestedClass)
+          derivedClasses.set(input, derived)
+          return derived
+        }
         const rows = f.docs.filter(
           (row) =>
-            hierarchy.isDerived(
-              toClassRef<Doc>(Schema.decodeUnknownSync(ObjectClassName)(row._class)),
-              toClassRef<Doc>(objectClass)
-            ) &&
-            typeof row[parsed.srcDocId === undefined ? "attachedTo" : "srcDocId"] === "string" &&
-            owners.includes(
-              Schema.decodeUnknownSync(DocId)(row[parsed.srcDocId === undefined ? "attachedTo" : "srcDocId"])
-            )
+            matchesClass(row._class) && typeof row[ownerField] === "string" && ownerIds.has(parseDocId(row[ownerField]))
         )
         const result = findResult(
           rows.map((row) =>
             sdkFixture<Doc>(
               state.malformed
                 ? { ...row, collection: 1 }
-                : malformedOwners.has(Schema.decodeUnknownSync(DocId)(row.attachedTo))
+                : malformedOwners.has(parseDocId(row.attachedTo))
                   ? { ...row, message: 1 }
                   : state.wrongOwner
                     ? { ...row, attachedTo: "foreign" }
