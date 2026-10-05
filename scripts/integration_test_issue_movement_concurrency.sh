@@ -80,7 +80,7 @@ for transport in mcp cli; do
     BEFORE=$("${BUNDLED[@]}" scripts/integration-issue-transfer-state.ts "$SNAPSHOT_ARGS")
     ARGS=$(jq -nc --argjson entry "$entry" --arg upstream "$HULY_URL" --arg transport "$transport" --arg root "$ROOT_ID" --arg source "$SOURCE" --arg destination "$DESTINATION" --arg sourceParent "$SOURCE_PARENT" --arg destinationParent "$DESTINATION_PARENT" --argjson mutation "$MUTATION" '$entry + {upstream:$upstream,transport:$transport,movement:{issue:$root,destination:{project:$destination}},timeoutMs:90000,mutationTarget:{project:$source,issueId:$root},mutationParents:{($source):$sourceParent,($destination):$destinationParent},mutationArgs:$mutation} | del(.name,.expectedLocation)')
     FIXTURE_PHASE="$transport:$NAME:movement"
-    RESULT=$("${BUNDLED[@]}" scripts/issue-movement-concurrency/scenario.ts "$ARGS")
+    RESULT=$(MOVEMENT_CONCURRENCY_CASE="$NAME" "${BUNDLED[@]}" scripts/issue-movement-concurrency/scenario.ts "$ARGS")
     FIXTURE_PHASE="$transport:$NAME:verification"
     jq -c --arg transport "$transport" --arg case "$NAME" '{transport:$transport,case:$case,observation:.observation.status,outcome:.observation.result.outcome,changed:.observation.result.changed,reason:.observation.result.reason,discovery:.observation.result.discovery,verificationStatus:.observation.result.verification.status,verificationConsistency:.observation.result.verification.consistency}' <<<"$RESULT" >&2
     jq -e '.observation.status == "result" and any(.gatewayEvents[]; .event == "barrier")' >/dev/null <<<"$RESULT"

@@ -4,6 +4,7 @@ import { Effect, Schema } from "effect"
 import { MoveIssueResultSchema } from "../../src/domain/schemas/issues-results.js"
 import { GatewayEvent, type GatewayEvent as Event } from "./protocol.js"
 
+import { retainConcurrencyEvidence } from "./retain-evidence.js"
 import { ScenarioArguments, ScenarioEvidence } from "./scenario-contract.js"
 import { runPublic } from "./public-process.js"
 import { readStableIssue, runMutation } from "./mutation.js"
@@ -142,6 +143,14 @@ const main = async (args: ScenarioArguments, signal: AbortSignal) => {
             },
       gatewayEvents: events
     })
+    const privateDirectory = process.env["MOVEMENT_PRIVATE_EVIDENCE_DIR"]
+    if (privateDirectory !== undefined && privateDirectory !== "")
+      await Effect.runPromise(
+        retainConcurrencyEvidence({
+          directory: privateDirectory,
+          receipt: { transport: args.transport, case: process.env["MOVEMENT_CONCURRENCY_CASE"], evidence }
+        })
+      )
     process.stdout.write(`${JSON.stringify(evidence)}\n`)
   } finally {
     lifetime.abort()
