@@ -606,7 +606,9 @@ Current qualification must run the fresh ordinary `pnpm check-all` successfully
 before any live fixture writes. The stock `pnpm integration:movement` preparation
 already enforces this order. For the authorized no-overall-deadline continuation,
 run the same-candidate gate first, then one read-only native prior preparation,
-then all five feature suites serially on that frozen candidate. Build and cheap
+then all five feature suites serially on that frozen candidate: concurrency,
+tree, movement, transfer and attributes. Concurrency is the currently reproduced
+failure frontier and runs first; this changes feedback order, not required scope. Build and cheap
 process checks may precede the gate; they do not replace it. A failed lint,
 typecheck or coverage stage stops before live setup and cannot be carried forward
 as a passing prerequisite.

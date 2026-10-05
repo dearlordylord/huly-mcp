@@ -235,3 +235,8 @@ test('compiler build-info cache mutations do not invalidate live runtime evidenc
     }
   } finally { await rm(f.root, {recursive: true}) }
 })
+
+test('qualification checks the concurrency frontier first while retaining every feature suite', () => {
+  assert.deepEqual(suites, ['issue_movement_concurrency', 'issue_tree', 'issue_movement', 'issue_transfer', 'issue_attributes'])
+  assert.equal(new Set(suites).size, suites.length)
+})

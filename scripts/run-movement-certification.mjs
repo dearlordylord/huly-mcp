@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { Clock, Effect, Redacted, Schema } from 'effect'
 
 // Front-load unresolved feature boundaries; retain every required suite.
-export const suites = ['issue_attributes', 'issue_tree', 'issue_movement_concurrency', 'issue_movement', 'issue_transfer']
+export const suites = ['issue_movement_concurrency', 'issue_tree', 'issue_movement', 'issue_transfer', 'issue_attributes']
 const ReceiptSchema = Schema.Struct({ suite: Schema.NonEmptyString, fingerprint: Schema.NonEmptyString,
   sourceCommit: Schema.NonEmptyString, commonFingerprint: Schema.NonEmptyString, suiteFingerprint: Schema.NonEmptyString, environmentFingerprint: Schema.NonEmptyString, log: Schema.NonEmptyString, logHash: Schema.NonEmptyString, started: Schema.Number, ended: Schema.Number,
   exit: Schema.Number, clean: Schema.Boolean, inputsStable: Schema.Boolean, diagnostic: Schema.optionalKey(Schema.NonEmptyString) })
