@@ -698,3 +698,13 @@ output rather than a changing input. Collect evidence only after verifying
 the suite process has terminated. Keep report validation finite and separate
 from the underlying suite outcome. Preserve this evidence before choosing a
 repair; do not infer a deadline's cause from a different read-only profile.
+
+
+Generated runtime fingerprints include every file under `dist` and the CLI's
+`dist`, except files ending in `.tsbuildinfo`. Those files are incremental compiler
+cache data, not runtime inputs, and native typechecking can update them without
+changing an executable bundle. Bundle changes and every other generated artifact
+still invalidate live evidence; source, configuration, lockfile and fixture/tool
+dependencies remain in scope. This distinction applies prospectively and does
+not establish the sole cause of any historical fingerprint drift whose original
+per-file hashes were not retained.

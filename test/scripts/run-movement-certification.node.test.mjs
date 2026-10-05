@@ -215,3 +215,23 @@ test('shared transport source and fixture dependency changes invalidate every su
     }
   } finally { await rm(f.root, { recursive: true }) }
 })
+
+test('compiler build-info cache mutations do not invalidate live runtime evidence', async () => {
+  const f = await fixture()
+  try {
+    for (const directory of ['dist', 'packages/huly-cli/dist']) await mkdir(path.join(f.root, directory), {recursive: true})
+    for (const file of ['dist/index.cjs', 'packages/huly-cli/dist/index.cjs', 'dist/runtime.json']) await writeFile(path.join(f.root, file), 'runtime original')
+    await writeFile(path.join(f.root, 'dist/tsconfig.tsbuildinfo'), 'cache original')
+    const original = await fingerprintSuite(f.root, 'issue_tree')
+    await writeFile(path.join(f.root, 'dist/tsconfig.tsbuildinfo'), 'cache changed')
+    await writeFile(path.join(f.root, 'packages/huly-cli/dist/other.tsbuildinfo'), 'new compiler cache')
+    assert.equal((await fingerprintSuite(f.root, 'issue_tree')).fingerprint, original.fingerprint)
+    let before = original
+    for (const file of ['dist/index.cjs', 'packages/huly-cli/dist/index.cjs', 'dist/runtime.json']) {
+      await writeFile(path.join(f.root, file), 'runtime changed')
+      const after = await fingerprintSuite(f.root, 'issue_tree')
+      assert.notEqual(after.fingerprint, before.fingerprint)
+      before = after
+    }
+  } finally { await rm(f.root, {recursive: true}) }
+})
