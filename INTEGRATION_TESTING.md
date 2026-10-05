@@ -611,6 +611,22 @@ process checks may precede the gate; they do not replace it. A failed lint,
 typecheck or coverage stage stops before live setup and cannot be carried forward
 as a passing prerequisite.
 
+Before the qualification owner launches a frozen candidate:
+
+1. Finish source, tests and the complete fingerprint dependency inventory.
+2. Every source producer explicitly acknowledges the exact candidate HEAD and
+   private helper manifest, then ceases all writes to executable inputs.
+3. The owner verifies producers are idle or interrupts them, hashes the final
+   manifest and launches the owned run. The owner monitors it without activating
+   producers, including an integration agent with queued editing tasks.
+4. Any needed edit waits until the owned run is terminal and process custody is
+   resolved. Apply the edit, review it and establish a new freeze before launch.
+
+A clean or unchanged HEAD alone does not establish input stability: uncommitted
+source and private helper edits can change execution under the same commit.
+Existing source/runtime fingerprint guards must reject that drift. Never upgrade
+such a run or describe an edit made after launch as a prelaunch change.
+
 The earlier authorized tree-first repair feedback order is historical. It helped
 establish that the rich MCP/CLI tree scenarios were reachable, but it also spent
 live setup time before discovering a gate failure. Do not use that order for the
