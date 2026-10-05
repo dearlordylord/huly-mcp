@@ -6,27 +6,27 @@
     "packageUnpackedBytes": 8382949
   },
   "current": {
-    "bundleGzipBytes": 1316778,
-    "bundleRawBytes": 7177250,
-    "packageBytes": 1372197,
-    "packageUnpackedBytes": 7536701
+    "bundleGzipBytes": 1358452,
+    "bundleRawBytes": 7366368,
+    "packageBytes": 1415286,
+    "packageUnpackedBytes": 7729834
   },
   "delta": {
     "bundleGzipBytes": {
-      "bytes": -189366,
-      "percent": -12.572901395882466
+      "bytes": -147692,
+      "percent": -9.805968088044702
     },
     "bundleRawBytes": {
-      "bytes": -946860,
-      "percent": -11.654938202461562
+      "bytes": -757742,
+      "percent": -9.327077058287001
     },
     "packageBytes": {
-      "bytes": -170448,
-      "percent": -11.049074803341014
+      "bytes": -127359,
+      "percent": -8.25588518421283
     },
     "packageUnpackedBytes": {
-      "bytes": -846248,
-      "percent": -10.094872341463606
+      "bytes": -653115,
+      "percent": -7.790993360451077
     }
   },
   "materialIncrease": false
