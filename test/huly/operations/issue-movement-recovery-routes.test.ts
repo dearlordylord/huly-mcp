@@ -59,6 +59,7 @@ it.effect(
       )
       expect(result).toMatchObject({ outcome: "incomplete", issueIds: prepared.plan.tree.map((issue) => issue._id) })
       if (result.outcome !== "incomplete" && result.outcome !== "indeterminate") return
+      expect(result.reason).toContain("Reserved numbers may leave gaps")
       const calls = [...result.inspection.matchAll(/MCP get_issue (\{[^}]+\})/g)]
       expect(calls).toHaveLength(prepared.plan.tree.length)
       for (const call of calls) {

@@ -36,13 +36,14 @@ export const movementFailureResult = (
         : [])
     ])
   ]
+  const reservationGuidance = evidence.execution.reservations.length === 0 ? "" : " Reserved numbers may leave gaps."
   return {
     outcome,
-    reason,
+    reason: `${reason}${reservationGuidance}`,
     issueIds,
     destination: { projectId: destination._id, parentId: plan.parent?._id ?? null },
     discovery: { status: "complete" },
     ...evidence,
-    inspection: `${movementRecoveryInstructions(plan, destination, issueIds)}${evidence.execution.reservations.length === 0 ? "" : " Reserved numbers may leave gaps."}`
+    inspection: `${movementRecoveryInstructions(plan, destination, issueIds)}${reservationGuidance}`
   }
 }
