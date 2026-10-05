@@ -7,17 +7,23 @@ import { test } from "node:test"
 
 import { inspectMovementFixture, verifyMovementFixtures } from "./verify-movement-fixtures.mjs"
 
-const jqCompileFailureExit = 3
 const missingAdapterAndDiscoveryFailures = 2
 
 for (const flag of ["--arg", "--argjson"]) {
-  test(`rejects reserved jq label with ${flag}`, (t) => {
+  test(`rejects nonportable jq label and verifies its portable replacement with ${flag}`, (t) => {
     const directory = mkdtempSync(join(tmpdir(), "movement-fixture-"))
     t.after(() => rmSync(directory, { recursive: true }))
     writeFileSync(join(directory, "bad.sh"), `value=$(jq -nc \\\n ${flag} label '1' '{value:$label}')\n`)
-    assert.equal(verifyMovementFixtures(["bad.sh"], directory).length, 1)
-    const jq = spawnSync("jq", ["-nc", flag, "label", "1", "{value:$label}"], { encoding: "utf8" })
-    assert.equal(jq.status, jqCompileFailureExit)
+    assert.deepEqual(verifyMovementFixtures(["bad.sh"], directory), [
+      "bad.sh: jq argument name label is reserved; use a descriptive alternative."
+    ])
+    // jq 1.8 accepts this keyword as a variable; fixtures must also run on jq 1.6.
+    const portable = `value=$(jq -nc ${flag} itemLabel '1' '{value:$itemLabel}')\nprintf '%s' "$value"\n`
+    writeFileSync(join(directory, "portable.sh"), portable)
+    assert.deepEqual(verifyMovementFixtures(["portable.sh"], directory), [])
+    const jq = spawnSync("bash", [join(directory, "portable.sh")], { encoding: "utf8" })
+    assert.equal(jq.status, 0)
+    assert.deepEqual(JSON.parse(jq.stdout), { value: flag === "--arg" ? "1" : 1 })
   })
 }
 

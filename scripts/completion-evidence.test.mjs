@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { execFileSync, spawnSync } from 'node:child_process'
 import os from 'node:os'
 import path from 'node:path'
@@ -81,9 +81,18 @@ test('actual hook rejects a staged rewrite hidden behind a restored working-tree
     await writeFile(path.join(root, reportPath), JSON.stringify(bad)); git(['add', reportPath])
     await writeFile(path.join(root, reportPath), valid)
     const hook = (await readFile(new URL('../.husky/pre-commit', import.meta.url), 'utf8')).split('echo "Updating README')[0]
-    const result = spawnSync('bash', ['-c', hook], { cwd: root, encoding: 'utf8', timeout: 5000 })
-    assert.equal(result.status, 1)
-    assert.match(result.stdout, /Stage the complete protected report/)
-    assert.equal(result.signal, null)
+    const gitExecutable = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim()
+    const bashExecutable = execFileSync('sh', ['-c', 'command -v bash'], { encoding: 'utf8' }).trim()
+    const gitOnlyPath = path.join(root, 'git-only-bin')
+    await mkdir(gitOnlyPath)
+    await symlink(gitExecutable, path.join(gitOnlyPath, 'git'))
+    for (const executablePath of [process.env.PATH, gitOnlyPath]) {
+      const result = spawnSync(bashExecutable, ['-c', hook], {
+        cwd: root, encoding: 'utf8', timeout: 5000, env: { ...process.env, PATH: executablePath }
+      })
+      assert.equal(result.status, 1)
+      assert.match(result.stdout, /Stage the complete protected report/)
+      assert.equal(result.signal, null)
+    }
   } finally { await rm(root, { recursive: true }) }
 })
