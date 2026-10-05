@@ -1,4 +1,4 @@
-import { Clock, Effect } from 'effect'
+import { Clock, Effect, Schema } from 'effect'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
@@ -13,6 +13,32 @@ const TEST_BUDGET_MS = 60_000
 const TIMEOUT_EXIT = 124
 const FAILURE_EXIT = 7
 const LAUNCH_POLL_MS = 10
+const DESCENDANT_STOP_BUDGET_MS = 5_000
+const DESCENDANT_READY_BUDGET_MS = 5_000
+const CLEANUP_CLOCK_ADVANCE_MS = 10_000
+const DescendantSchema = Schema.Struct({
+  pid: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)).pipe(Schema.brand('CustodyFixtureProcessId')),
+  ready: Schema.Boolean
+})
+const readDescendant = async file => {
+  try { return Schema.decodeUnknownSync(Schema.fromJsonString(DescendantSchema))(await readFile(file, 'utf8')) }
+  catch (error) { if (error.code === 'ENOENT') return undefined; throw error }
+}
+const descendantStopped = async pid => {
+  try {
+    const stat = await readFile(`/proc/${pid}/stat`, 'utf8')
+    // A killed orphan may remain unreaped under the container init; it cannot execute.
+    return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[0] === 'Z'
+  } catch (error) { if (error.code === 'ENOENT') return true; throw error }
+}
+const stopOwnedDescendant = async file => {
+  const owned = await readDescendant(file)
+  if (owned === undefined) return
+  try { process.kill(owned.pid, 'SIGKILL') } catch (error) { if (error.code !== 'ESRCH') throw error }
+  const deadline = realTime.now() + DESCENDANT_STOP_BUDGET_MS
+  while (!(await descendantStopped(owned.pid)) && realTime.now() < deadline) await realTime.pause(LAUNCH_POLL_MS)
+  assert.equal(await descendantStopped(owned.pid), true, 'Known owned descendant must stop')
+}
 
 const fixture = async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'movement-certification-'))
@@ -179,20 +205,35 @@ test('preparation cannot qualify a harness changed during its execution', async 
 
 test('real detached quality-stage custody survives a successful preparation leader and blocks live work', async () => {
   const f = await fixture()
+  const descendantFile = path.join(f.root, 'owned-descendant.json')
   try {
     const runner = new URL('../../scripts/run-bounded-command.ts', import.meta.url).href
     const loader = createRequire(import.meta.url).resolve('tsx')
     const parent = path.join(f.root, 'scripts/parent.mjs')
-    const leader = "const {spawn}=require('node:child_process'); const child=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});child.unref()"
+    const descendant = "process.on('SIGTERM',()=>{});setInterval(()=>{},1000);process.send('ready')"
+    const leader = `
+      const {spawn}=require('node:child_process');
+      const {writeFileSync}=require('node:fs');
+      const file=${JSON.stringify(descendantFile)};
+      const child=spawn(process.execPath,['-e',${JSON.stringify(descendant)}],{stdio:['ignore','ignore','ignore','ipc']});
+      writeFileSync(file,JSON.stringify({pid:child.pid,ready:false}),{mode:0o600});
+      const timer=setTimeout(()=>{child.kill('SIGKILL');process.exitCode=1},${DESCENDANT_READY_BUDGET_MS});
+      child.once('message',message=>{
+        if(message!=='ready'){child.kill('SIGKILL');process.exitCode=1;return}
+        writeFileSync(file,JSON.stringify({pid:child.pid,ready:true}),{mode:0o600});
+        clearTimeout(timer);child.disconnect();child.unref();
+      });
+    `
     await writeFile(parent, `
       import {runBoundedCommand, Milliseconds} from ${JSON.stringify(runner)};
       const clock={value:0};
-      try { await runBoundedCommand({ executable:process.execPath,args:['-e',${JSON.stringify(leader)}],name:'nested custody',timeoutMilliseconds:Milliseconds.make(30000),cleanup:{now:()=>clock.value,pause:async()=>{clock.value+=10000}} }); }
+      try { await runBoundedCommand({ executable:process.execPath,args:['-e',${JSON.stringify(leader)}],name:'nested custody',timeoutMilliseconds:Milliseconds.make(30000),cleanup:{now:()=>clock.value,pause:async()=>{clock.value+=${CLEANUP_CLOCK_ADVANCE_MS}}} }); }
       catch(error) { console.log(error.message); }
     `)
     const quote = value => "'" + value.replaceAll("'", "'\\''") + "'"
     await writeFile(path.join(f.root, 'scripts/prepare.sh'), `#!/bin/bash\n${quote(process.execPath)} --import ${quote(loader)} ${quote(parent)}\n`)
     const result = await runCertification({ ...f, prepare: 'scripts/prepare.sh' })
+    assert.equal((await readDescendant(descendantFile))?.ready, true)
     assert.equal(result.exit, 1)
     await assert.rejects(readFile(path.join(f.root, 'launches')), { code: 'ENOENT' })
     const custody = path.join(f.stateDir, 'prepare.log.custody')
@@ -200,7 +241,7 @@ test('real detached quality-stage custody survives a successful preparation lead
     assert.equal(entries.length, 1)
     assert.equal(JSON.parse(await readFile(path.join(custody, entries[0]), 'utf8')).state, 'unconfirmed')
     assert.equal((await runCertification({ ...f, mode: 'plan' })).locked, true)
-  } finally { await rm(f.root, { recursive: true }) }
+  } finally { await stopOwnedDescendant(descendantFile); await rm(f.root, { recursive: true }) }
 })
 
 test('shared transport source and fixture dependency changes invalidate every suite', async () => {
