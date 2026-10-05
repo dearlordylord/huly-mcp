@@ -1,0 +1,206 @@
+import { it } from "@effect/vitest"
+import { Effect, Schema } from "effect"
+import { expect } from "vitest"
+import { inspectTransferRecords, commitTransfer } from "../../src/huly/issue-transfer-adapter.js"
+import { TransferWriteSchema } from "../../src/domain/schemas/issue-transfer.js"
+import { IssueId } from "../../src/domain/schemas/shared.js"
+import { activity, attachment, tracker } from "../../src/huly/huly-plugins.js"
+import { sdkFixture } from "../helpers/huly-sdk.js"
+import { recordAdapterFixture as adapterFixture, attachmentPayload, ownedRecord } from "../helpers/transfer-records.js"
+
+const writeInput = {
+  issueId: "root",
+  sourceId: "source",
+  destinationId: "destination",
+  previousParent: "old",
+  parentId: "parent",
+  modifiedOn: 1,
+  number: 2,
+  identifier: "NEW-2",
+  rank: "0|hzzzzz:",
+  recordClasses: []
+}
+
+it.effect("guards outgoing reference source identity while preserving its independent target", () =>
+  Effect.gen(function* () {
+    const f = adapterFixture()
+    f.docs.push(
+      ownedRecord("outgoing", String(activity.class.ActivityReference), "independent-target", "references", {
+        attachedToClass: "document:class:Document",
+        srcDocId: "root",
+        srcDocClass: String(tracker.class.Issue),
+        message: "link"
+      })
+    )
+    const inspection = yield* inspectTransferRecords(f.client, IssueId.make("root"))
+    expect(inspection.blockers).toEqual([])
+    const input: unknown = { ...writeInput, records: inspection.records, recordClasses: inspection.classes }
+    const write = Schema.decodeUnknownSync(TransferWriteSchema)(input)
+    expect(yield* Effect.promise(() => commitTransfer(f.client, write))).toBe("applied")
+    expect(f.conditions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ _id: "outgoing", srcDocId: "root", srcDocClass: String(tracker.class.Issue) }),
+        expect.objectContaining({ _id: "outgoing", attachedTo: "independent-target" })
+      ])
+    )
+    expect(f.updates.find((update) => update[2] === "outgoing")?.[3]).toEqual({ space: "destination" })
+  })
+)
+
+it.effect(
+  "discovers inherited model-owned records, retains history creation data and queues migration with the SDK caller",
+  () =>
+    Effect.gen(function* () {
+      const f = adapterFixture()
+      const records = yield* inspectTransferRecords(f.client, IssueId.make("root"))
+      expect(records.blockers).toEqual([])
+      expect(records.records).toMatchObject([
+        { _id: "history", kind: "history", history: { action: "create", createdBy: "author" } }
+      ])
+      const write = Schema.decodeUnknownSync(TransferWriteSchema)({ ...writeInput, records: records.records })
+      expect(yield* Effect.promise(() => commitTransfer(f.client, write))).toBe("applied")
+      expect(f.scopes.every((scope) => typeof scope === "string" && scope.length > 0)).toBe(true)
+      expect(f.updates[0]?.[5]).toBe(1)
+      expect(f.updates[0]?.[6]).toBeUndefined()
+      expect(f.updates[1]?.[3]).toMatchObject({
+        space: "destination",
+        number: 2,
+        identifier: "NEW-2",
+        attachedTo: "parent"
+      })
+      expect(f.conditions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ _id: "root", space: "source", attachedTo: "old", modifiedOn: 1 }),
+          expect.objectContaining({ _id: "history", attachedTo: "root" })
+        ])
+      )
+      expect(f.updates).toHaveLength(4)
+      f.state.refused = true
+      expect(
+        yield* Effect.promise(() =>
+          commitTransfer(f.client, {
+            ...write,
+            previousParent: sdkFixture(tracker.ids.NoParent),
+            parentId: sdkFixture(tracker.ids.NoParent)
+          })
+        )
+      ).toBe("condition-not-met")
+      expect(f.updates).toHaveLength(6)
+      expect(new Set(f.scopes).size).toBe(1)
+    })
+)
+
+it.effect("discovers nested attachments and refuses incomplete model results before any writes", () =>
+  Effect.gen(function* () {
+    const f = adapterFixture()
+    f.docs.push(
+      ownedRecord("attachment", String(attachment.class.Attachment), "root", "attachments", attachmentPayload)
+    )
+    f.state.incomplete = true
+    const inspection = yield* inspectTransferRecords(f.client, IssueId.make("root"))
+    expect(inspection.discovery).toBe("incomplete")
+    expect(inspection.blockers.join(" ")).toContain("Incomplete")
+    expect(f.updates).toEqual([])
+  })
+)
+
+for (const mode of ["failRead", "invalidMetadata", "failModel"] as const) {
+  it.effect(`returns typed inspection failure for ${mode}`, () =>
+    Effect.gen(function* () {
+      const f = adapterFixture()
+      f.state[mode] = true
+      const result = yield* Effect.result(inspectTransferRecords(f.client, IssueId.make("root")))
+      expect(result._tag).toBe("Failure")
+      expect(f.updates).toEqual([])
+    })
+  )
+}
+
+it.effect("parses historical update payloads into immutable encoded snapshots and rejects non-JSON history", () =>
+  Effect.gen(function* () {
+    const f = adapterFixture()
+    const updates = { title: { set: "Original title" } }
+    Reflect.set(f.history, "attributeUpdates", updates)
+    const inspection = yield* inspectTransferRecords(f.client, IssueId.make("root"))
+    expect(inspection.records).toMatchObject([{ history: { attributeUpdates: JSON.stringify(updates) } }])
+    Reflect.set(f.history, "attributeUpdates", () => "invalid")
+    expect((yield* Effect.result(inspectTransferRecords(f.client, IssueId.make("root"))))._tag).toBe("Failure")
+    expect(f.updates).toEqual([])
+  })
+)
+
+it.effect(
+  "scoped closure conditions refuse concurrent owned-record additions without relying on issue modifiedOn",
+  () =>
+    Effect.gen(function* () {
+      const f = adapterFixture()
+      const inspection = yield* inspectTransferRecords(f.client, IssueId.make("root"))
+      const write = Schema.decodeUnknownSync(TransferWriteSchema)({
+        ...writeInput,
+        records: inspection.records,
+        recordClasses: inspection.classes
+      })
+      f.docs.push(
+        ownedRecord("new-comment", "chunter:class:ChatMessage", "root", "comments", { message: "Concurrent write" })
+      )
+      expect(yield* Effect.promise(() => commitTransfer(f.client, write))).toBe("condition-not-met")
+      expect(f.docs.find((row) => row._id === "new-comment")?.space).toBe("source")
+    })
+)
+
+it.effect("incoming independent references do not invalidate ownership closure; outgoing source additions do", () =>
+  Effect.gen(function* () {
+    const f = adapterFixture()
+    const inspection = yield* inspectTransferRecords(f.client, IssueId.make("root"))
+    const write = Schema.decodeUnknownSync(TransferWriteSchema)({
+      ...writeInput,
+      records: inspection.records,
+      recordClasses: inspection.classes
+    })
+    f.docs.push(
+      ownedRecord("incoming", "activity:class:ActivityReference", "root", "references", {
+        srcDocId: "independent",
+        srcDocClass: "document:class:Document",
+        message: "incoming"
+      })
+    )
+    expect(yield* Effect.promise(() => commitTransfer(f.client, write))).toBe("applied")
+    f.docs.push(
+      ownedRecord("outgoing", "activity:class:ActivityReference", "independent", "references", {
+        srcDocId: "root",
+        srcDocClass: "tracker:class:Issue",
+        message: "outgoing"
+      })
+    )
+    expect(yield* Effect.promise(() => commitTransfer(f.client, write))).toBe("condition-not-met")
+  })
+)
+
+it.effect("writes only planned attributes and conditions each replacement or clear on its expected reference", () =>
+  Effect.gen(function* () {
+    for (const field of ["component", "milestone"]) {
+      for (const to of ["replacement", null]) {
+        const f = adapterFixture()
+        const write = Schema.decodeUnknownSync(TransferWriteSchema)({
+          ...writeInput,
+          records: [],
+          attributeChanges: [
+            {
+              issueId: "root",
+              field,
+              from: "expected",
+              to,
+              reason: to === null ? "explicit-clear" : "explicit-replacement"
+            }
+          ]
+        })
+        expect(yield* Effect.promise(() => commitTransfer(f.client, write))).toBe("applied")
+        expect(f.conditions).toContainEqual({ _id: "root", [field]: "expected" })
+        if (to !== null) expect(f.conditions).toContainEqual({ _id: to, space: "destination" })
+        expect(f.updates[0]?.[3]).toMatchObject({ [field]: to })
+        const other = field === "component" ? "milestone" : "component"
+        expect(f.updates[0]?.[3]).not.toHaveProperty(other)
+      }
+    }
+  })
+)

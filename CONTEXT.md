@@ -1,6 +1,6 @@
 # Huly MCP
 
-Language for the local and hosted Huly MCP authentication model.
+Language for Huly MCP authentication and tracker issue operations.
 
 ## Language
 
@@ -48,3 +48,12 @@ The Huly instance and workspace for which a local credential was saved. Changing
 
 **Local logout**:
 Removal of the selected local profile's saved credential while retaining the profile. It does not revoke the credential at Huly, remove environment credentials, or disconnect already-running processes.
+
+**Issue transfer conflict**:
+An unresolved incompatibility between a task's project-scoped attributes and its destination project that prevents transfer until the caller chooses a resolution.
+
+**Project attribute reference**:
+A task's reference to a project-scoped value, such as a component or milestone, whose meaning must remain valid in the destination project.
+
+**Explicit attribute discard**:
+The caller's deliberate choice to remove a specific project attribute reference as part of a transfer.

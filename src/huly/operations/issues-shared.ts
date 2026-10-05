@@ -6,7 +6,7 @@ import { Effect, Result, Schema, SchemaGetter } from "effect"
 
 import type { IssuePriority as IssuePriorityStr } from "../../domain/schemas/issues.js"
 import type { NonNegativeNumber } from "../../domain/schemas/shared.js"
-import { Count, IssueStatusId, PositiveNumber, StatusName } from "../../domain/schemas/shared.js"
+import { Count, IssueIdentifier, IssueStatusId, PositiveNumber, StatusName } from "../../domain/schemas/shared.js"
 import {
   StatusCategoryEntries,
   type StatusCategoryValue,
@@ -345,10 +345,11 @@ export const parseIssueIdentifier = (
   return { fullIdentifier: idStr, number: null }
 }
 
-export const findIssueInProject = (
+export const findIssueBySelector = (
   client: HulyClient["Service"],
   project: HulyProject,
-  identifierStr: string
+  identifierStr: IssueIdentifier,
+  stableIdScope: "project" | "workspace"
 ): Effect.Effect<HulyIssue, IssueNotFoundError | HulyClientError> =>
   Effect.gen(function* () {
     const { fullIdentifier, number } = parseIssueIdentifier(identifierStr, project.identifier)
@@ -358,15 +359,32 @@ export const findIssueInProject = (
         tracker.class.Issue,
         hulyQuery<HulyIssue>({ space: project._id, identifier: fullIdentifier })
       )) ??
-      (number !== null
-        ? yield* client.findOne<HulyIssue>(tracker.class.Issue, hulyQuery<HulyIssue>({ space: project._id, number }))
-        : undefined)
+      (number === null
+        ? undefined
+        : yield* client.findOne<HulyIssue>(
+            tracker.class.Issue,
+            hulyQuery<HulyIssue>({ space: project._id, number })
+          )) ??
+      (yield* client.findOne<HulyIssue>(
+        tracker.class.Issue,
+        hulyQuery<HulyIssue>({
+          ...(stableIdScope === "project" ? { space: project._id } : {}),
+          _id: toRef<HulyIssue>(identifierStr)
+        })
+      ))
     if (issue === undefined) {
       return yield* new IssueNotFoundError({ identifier: identifierStr, project: project.identifier })
     }
 
     return issue
   })
+
+export const findIssueInProject = (
+  client: HulyClient["Service"],
+  project: HulyProject,
+  identifierStr: string
+): Effect.Effect<HulyIssue, IssueNotFoundError | HulyClientError> =>
+  findIssueBySelector(client, project, IssueIdentifier.make(identifierStr), "project")
 
 export const findProjectAndIssue = (params: {
   project: string

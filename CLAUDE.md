@@ -33,9 +33,13 @@ Use `pnpm`, not npm. Prefer package.json scripts over raw commands (e.g., `pnpm 
 
 ## Verification
 
+For movement qualification retries, follow [verified quality receipt reuse](INTEGRATION_TESTING.md#reusing-verified-movement-quality-evidence) before repeating preparation.
+
 Run before considering work complete:
 1. `pnpm check-all` (runs build, typecheck, circular, lint, test)
 2. Integration tests against local Huly (Docker) — **required** for any new feature, major change, or pre-release. Do not defer to the user; run them yourself. See `INTEGRATION_TESTING.md` for test patterns and `CLAUDE.local.md` for credentials/setup.
+
+For movement qualification and failure diagnosis, follow [bounded movement qualification](INTEGRATION_TESTING.md#bounded-movement-qualification).
 
 ### Local Huly from This Container
 
@@ -197,3 +201,13 @@ Versioning uses [Changesets](https://github.com/changesets/changesets):
 `prepublishOnly` runs `pnpm check-all` automatically before publish.
 
 Package: `@firfi/huly-mcp` on npm.
+
+## Current delivery ownership and validation cadence
+
+The user disabled Dalph and transferred306–311 delivery to the overseer and its implementer/reviewer agents. Do not invoke Dalph or follow its obsolete orchestration instructions. You are not alone in this codebase; do not revert other agents' work. Each implementer owns its assigned worktree. All six issues and all71 criteria remain required.
+
+306 is accepted at200075a4e86c21791130d57277bb252203b403a6.307 is unfinished; retained candidateac782a0c and corrections are in this worktree. Authoritative cached specifications are /tmp/hulymcp-dalph-306-311/issues/305.json through311.json.307 depends on306;308 and309 depend on307 and can run in parallel;310 depends on308/309;311 depends on310. Implement the complete assigned issue, persist through tests and review fixes, and do not return investigation-only work.
+
+Live Huly integration runs ONLY after all six slices are implemented and integrated, per explicit user instruction overriding earlier per-feature scheduling. Author executable MCP/CLI fixtures now, keep every behavioral criterion, and record live evidence as pending final certification. Use focused checks during implementation and fresh Standards/Spec reviews through $code-review; run pnpm check-all on the coherent final candidate. Never weaken coverage thresholds, timeouts, inventory or diagnostics. GOMAXPROCS=2 is a current compiler concurrency experiment; compare actual results and retain all diagnostic checks.
+
+Use Linux-local dependencies. Bootstrap with bash scripts/bootstrap-worktree.sh /tmp/hulymcp-dalph-306-311/retry-repository. Never reinstall dependencies in the canonical Darwin checkout. Consult pinned Effect references. Record candidate changes, full gate and reviews in docs/implementation/issue-NNN.md. The final combined candidate must pass check-all and the five relevant movement MCP/CLI fixtures under the bounded qualification workflow. All unique concurrency cases remain; unrelated whole-server MCP/full CLI regressions are separate from #305–311 feature completion under the user’s 2026-10-04 process correction. The overseer owns live suite execution.

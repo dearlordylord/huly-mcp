@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process"
-import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { promisify } from "node:util"
@@ -133,15 +133,17 @@ test.skipIf(process.platform === "win32")(
     `
 
     try {
-      await expect(
-        runBoundedCommand({
-          args: ["-e", leader],
-          executable: process.execPath,
-          name: "resistant descendant fixture",
-          terminationGraceMilliseconds: Milliseconds.make(100),
-          timeoutMilliseconds: COMMAND_TIMEOUT
-        })
-      ).rejects.toThrow("resistant descendant fixture exceeded 2 seconds")
+      const custodyDirectory = join(directory, "custody")
+      const program = `
+      const {runBoundedCommand,Milliseconds}=await import('./scripts/run-bounded-command.ts');
+      try { await runBoundedCommand({executable:process.execPath,args:['-e',${JSON.stringify(leader)}],name:'resistant descendant fixture',timeoutMilliseconds:Milliseconds.make(${COMMAND_TIMEOUT}),terminationGraceMilliseconds:Milliseconds.make(100)}); }
+      catch(error) { console.log(error.message); }
+    `
+      const { stdout } = await execFileAsync(process.execPath, ["--import", "tsx", "--eval", program], {
+        env: { ...process.env, MOVEMENT_CUSTODY_DIR: custodyDirectory }
+      })
+      expect(stdout).toContain("resistant descendant fixture exceeded 2 seconds")
+      expect(await readdir(custodyDirectory)).toEqual([])
 
       const descendantPid = Number(await readFile(pidFile, "utf8"))
       await expect.poll(() => processExists(descendantPid), { interval: 20, timeout: 2_000 }).toBe(false)
@@ -150,4 +152,102 @@ test.skipIf(process.platform === "win32")(
       await rm(directory, { force: true, recursive: true })
     }
   }
+)
+
+test.skipIf(process.platform === "win32")(
+  "relays parent termination to its detached stage and descendant",
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), "hulymcp-parent-term-"))
+    const pidFile = join(directory, "descendant.pid")
+    const leader = `
+    const { spawn } = require('node:child_process');
+    const { writeFileSync } = require('node:fs');
+    const descendant = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {stdio:'inherit'});
+    writeFileSync(${JSON.stringify(pidFile)}, String(descendant.pid));
+    process.kill(process.ppid, 'SIGTERM');
+    setInterval(() => {}, 1000);
+  `
+    const program = `
+    const {runBoundedCommand, Milliseconds} = await import('./scripts/run-bounded-command.ts');
+    try { await runBoundedCommand({executable:process.execPath,args:['-e',${JSON.stringify(leader)}],name:'parent relay',timeoutMilliseconds:Milliseconds.make(30000)}); }
+    catch (error) { console.log(error.message); }
+  `
+    try {
+      const { stdout } = await execFileAsync(process.execPath, ["--import", "tsx", "--eval", program])
+      expect(stdout).toContain("parent relay interrupted by SIGTERM")
+      expect(processExists(Number(await readFile(pidFile, "utf8")))).toBe(false)
+    } finally {
+      await terminateRecordedDescendant(pidFile)
+      await rm(directory, { recursive: true, force: true })
+    }
+  },
+  PROCESS_TEST_TIMEOUT_MS
+)
+
+test.skipIf(process.platform === "win32")(
+  "retains custody when a normal leader exits before group absence is proven",
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), "hulymcp-custody-"))
+    const pidFile = join(directory, "descendant.pid")
+    const custodyDirectory = join(directory, "custody")
+    const leader = `
+    const {spawn} = require('node:child_process');
+    const {writeFileSync} = require('node:fs');
+    const child = spawn(process.execPath,['-e',"process.on('SIGTERM',()=>{});setInterval(()=>{},1000)"],{stdio:'ignore'});
+    writeFileSync(${JSON.stringify(pidFile)},String(child.pid));
+    child.unref();
+  `
+    const program = `
+    const {runBoundedCommand,Milliseconds} = await import('./scripts/run-bounded-command.ts');
+    const clock = {value:0};
+    try { await runBoundedCommand({executable:process.execPath,args:['-e',${JSON.stringify(leader)}],name:'custody fixture',timeoutMilliseconds:Milliseconds.make(30000),cleanup:{now:()=>clock.value,pause:async()=>{clock.value+=10000}}}); }
+    catch(error) { console.log(error.message); }
+  `
+    try {
+      const { stdout } = await execFileAsync(process.execPath, ["--import", "tsx", "--eval", program], {
+        env: { ...process.env, MOVEMENT_CUSTODY_DIR: custodyDirectory }
+      })
+      expect(stdout).toContain("process-group cleanup is unconfirmed")
+      const files = await readdir(custodyDirectory)
+      expect(files).toHaveLength(1)
+      expect(JSON.parse(await readFile(join(custodyDirectory, files[0] ?? ""), "utf8"))).toMatchObject({
+        state: "unconfirmed"
+      })
+      const descendantPid = Number(await readFile(pidFile, "utf8"))
+      await expect.poll(() => processExists(descendantPid), { timeout: 2000 }).toBe(false)
+    } finally {
+      await terminateRecordedDescendant(pidFile)
+      await rm(directory, { recursive: true, force: true })
+    }
+  },
+  PROCESS_TEST_TIMEOUT_MS
+)
+
+test.skipIf(process.platform === "win32")(
+  "settles unconfirmed cleanup when an escaped descendant holds stage stdio",
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), "hulymcp-escaped-stdio-"))
+    const pidFile = join(directory, "descendant.pid")
+    const leader = `
+    const {spawn}=require('node:child_process');
+    const {writeFileSync}=require('node:fs');
+    const child=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{detached:true,stdio:'inherit'});
+    writeFileSync(${JSON.stringify(pidFile)},String(child.pid));child.unref();
+  `
+    try {
+      const program = `
+      const {runBoundedCommand,Milliseconds}=await import('./scripts/run-bounded-command.ts');
+      try { await runBoundedCommand({executable:process.execPath,args:['-e',${JSON.stringify(leader)}],name:'escaped stdio',timeoutMilliseconds:Milliseconds.make(${COMMAND_TIMEOUT}),terminationGraceMilliseconds:Milliseconds.make(100)}); }
+      catch(error) { console.log(error.message); }
+    `
+      const { stdout } = await execFileAsync(process.execPath, ["--import", "tsx", "--eval", program], {
+        env: { ...process.env, MOVEMENT_CUSTODY_DIR: join(directory, "custody") }
+      })
+      expect(stdout).toContain("process-group cleanup is unconfirmed")
+    } finally {
+      await terminateRecordedDescendant(pidFile)
+      await rm(directory, { recursive: true, force: true })
+    }
+  },
+  PROCESS_TEST_TIMEOUT_MS
 )

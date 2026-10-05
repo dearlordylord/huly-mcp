@@ -1,4 +1,5 @@
 import { Context, Layer } from "effect"
+import type { MovementHttpPort } from "./movement-transaction-transport.js"
 import { markdownToMarkup, markupToMarkdown } from "./huly-text-markdown.js"
 import { htmlToJSON, jsonToHTML, jsonToMarkup, markupToJSON } from "./huly-text.js"
 
@@ -20,6 +21,7 @@ const getWorkspaceToken = apiClient.getWorkspaceToken
 const loadServerConfig = apiClient.loadServerConfig
 
 export interface HulySdkDependencies {
+  readonly movementHttp?: MovementHttpPort
   readonly createRestClient: typeof createRestClient
   readonly createRestTxOperations: typeof createRestTxOperations
   readonly createStorageClient: typeof createStorageClient

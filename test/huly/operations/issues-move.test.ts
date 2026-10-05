@@ -1,293 +1,323 @@
-import { assertAt } from "../../../src/utils/assertions.js"
-/* eslint-disable no-restricted-syntax -- test fixtures build Huly SDK tracker docs whose nominal types are not structurally compatible with plain object literals, and branded refs have no runtime constructors */
 import { describe, it } from "@effect/vitest"
-import { type Ref, toFindResult } from "@hcengineering/core"
-import type { Issue as HulyIssue, IssueParentInfo, Project as HulyProject } from "@hcengineering/tracker"
-import { Effect } from "effect"
+import { Effect, Fiber, Schema } from "effect"
+import { TestClock } from "effect/testing"
 import { expect } from "vitest"
 
-import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
+import { parseMoveIssueParams } from "../../../src/domain/schemas/issue-movement.js"
+import { UNKNOWN_TOTAL } from "../../../src/domain/schemas/shared.js"
+import { MoveIssueResultSchema } from "../../../src/domain/schemas/issues-results.js"
 import { tracker } from "../../../src/huly/huly-plugins.js"
 import { moveIssue } from "../../../src/huly/operations/issues-move.js"
-import { issueIdentifier, projectIdentifier } from "../../helpers/brands.js"
+import { issueIdentifier } from "../../helpers/brands.js"
+import {
+  initializeHierarchy,
+  movementFixture,
+  movementIssue,
+  movementProject,
+  threeLevelMovementFixture
+} from "../../helpers/movement.js"
 
-const PROJECT_ID = "project-1" as Ref<HulyProject>
+const call = (input: unknown, fixture: ReturnType<typeof movementFixture>) =>
+  parseMoveIssueParams(input).pipe(Effect.flatMap(moveIssue), Effect.provide(fixture.layer))
 
-const makeProject = (): HulyProject =>
-  ({
-    _id: PROJECT_ID,
-    _class: tracker.class.Project,
-    identifier: "TEST",
-    name: "Test Project",
-    modifiedOn: 0,
-    createdOn: 0
-  }) as unknown as HulyProject
-
-const makeIssue = (id: string, identifier: string, overrides?: Partial<HulyIssue>): HulyIssue =>
-  ({
-    _id: id as Ref<HulyIssue>,
-    _class: tracker.class.Issue,
-    space: PROJECT_ID,
-    identifier,
-    number: Number(identifier.split("-")[1] ?? 0),
-    title: `Issue ${identifier}`,
-    attachedTo: tracker.ids.NoParent,
-    attachedToClass: tracker.class.Issue,
-    collection: "subIssues",
-    subIssues: 0,
-    parents: [] as Array<IssueParentInfo>,
-    modifiedOn: 0,
-    createdOn: 0,
-    ...overrides
-  }) as unknown as HulyIssue
-
-interface UpdateCall {
-  id: unknown
-  ops: Record<string, unknown>
+const expectBlocked = (
+  result: Effect.Success<ReturnType<typeof moveIssue>>,
+  fixture: ReturnType<typeof movementFixture>
+) => {
+  expect(result).toMatchObject({ outcome: "blocked", changed: false })
+  expect(fixture.writes).toEqual([])
+  expect(Schema.decodeUnknownSync(MoveIssueResultSchema)(result)).toEqual(result)
 }
 
-const buildLayer = (m: {
-  issues: ReadonlyArray<HulyIssue>
-  projects?: ReadonlyArray<HulyProject>
-  updates?: Array<UpdateCall>
-}) => {
-  const projects = m.projects ?? [makeProject()]
-  const issues = m.issues
+describe("destination movement", () => {
+  it.effect("public movement requests totals that the SDK otherwise leaves unknown", () =>
+    Effect.gen(function* () {
+      const tree = threeLevelMovementFixture()
+      const fixture = movementFixture(tree.issues)
+      const unknown = yield* fixture.operations.findAll(tracker.class.Issue, { attachedTo: tree.root._id })
+      expect(unknown.total).toBe(UNKNOWN_TOTAL)
+      const result = yield* call(
+        { issue: tree.root.identifier, destination: { parent: tree.destination.identifier } },
+        fixture
+      )
+      expect(result).toMatchObject({ outcome: "completed", changed: true })
+    })
+  )
 
-  const findOneImpl: HulyClientOperations["findOne"] = ((_class: unknown, query: unknown) => {
-    const q = query as Record<string, unknown>
-    if (_class === tracker.class.Project) {
-      return Effect.succeed(projects.find((p) => p.identifier === q.identifier))
-    }
-    if (_class === tracker.class.Issue) {
-      if (q.identifier !== undefined) {
-        return Effect.succeed(issues.find((i) => i.space === q.space && i.identifier === q.identifier))
+  it.effect("moves a three-level tree, preserves data and lets triggers maintain ancestry and aggregates", () =>
+    Effect.gen(function* () {
+      const tree = threeLevelMovementFixture()
+      const fixture = movementFixture(tree.issues)
+      const before = tree.issues.map((issue) => ({ ...issue }))
+      const result = yield* call(
+        { issue: tree.root.identifier, destination: { parent: tree.destination.identifier } },
+        fixture
+      )
+      expect(result).toMatchObject({
+        outcome: "completed",
+        changed: true,
+        issueId: tree.root._id,
+        parentId: tree.destination._id
+      })
+      expect(tree.root.parents.map((info) => info.parentId)).toEqual([
+        tree.destination._id,
+        tree.destinationAncestor._id
+      ])
+      expect(tree.leaf.parents.map((info) => info.parentId)).toEqual([
+        tree.child._id,
+        tree.root._id,
+        tree.destination._id,
+        tree.destinationAncestor._id
+      ])
+      expect(tree.old.subIssues).toBe(0)
+      expect(tree.old.childInfo).toEqual([])
+      expect(tree.destination.subIssues).toBe(1)
+      expect(tree.destination.childInfo.map((info) => info.childId)).toEqual([
+        tree.root._id,
+        tree.child._id,
+        tree.leaf._id
+      ])
+      for (const previous of before) {
+        const current = fixture.issues.find((issue) => issue._id === previous._id)
+        expect(current).toMatchObject({
+          identifier: previous.identifier,
+          kind: previous.kind,
+          status: previous.status,
+          description: previous.description,
+          component: previous.component,
+          milestone: previous.milestone,
+          space: previous.space
+        })
       }
-      if (q.number !== undefined) {
-        return Effect.succeed(issues.find((i) => i.space === q.space && i.number === q.number))
-      }
-    }
-    return Effect.succeed(undefined)
-  }) as HulyClientOperations["findOne"]
+      expect(Schema.decodeUnknownSync(MoveIssueResultSchema)(result)).toEqual(result)
+    })
+  )
 
-  const findAllImpl: HulyClientOperations["findAll"] = ((_class: unknown, query: unknown) => {
-    const q = query as Record<string, unknown>
-    if (_class === tracker.class.Issue) {
-      return Effect.succeed(toFindResult(issues.filter((i) => i.attachedTo === q.attachedTo && i.space === q.space)))
-    }
-    return Effect.succeed(toFindResult([]))
-  }) as HulyClientOperations["findAll"]
+  for (const destination of [{ parent: null }, { project: "TEST" }, { project: "project-1", parent: null }]) {
+    it.effect(`detaches with ${JSON.stringify(destination)} and verifies repeat no-op`, () =>
+      Effect.gen(function* () {
+        const tree = threeLevelMovementFixture()
+        const fixture = movementFixture(tree.issues)
+        const result = yield* call({ issue: tree.root._id, destination }, fixture)
+        expect(result.outcome).toBe("completed")
+        expect(tree.root.attachedTo).toBe(tracker.ids.NoParent)
+        expect(tree.leaf.parents.map((info) => info.parentId)).toEqual([tree.child._id, tree.root._id])
+        const written = fixture.writes.length
+        const repeat = yield* call({ issue: tree.root._id, destination }, fixture)
+        expect(repeat).toMatchObject({ outcome: "no-op", changed: false })
+        expect(fixture.writes).toHaveLength(written)
+      })
+    )
+  }
 
-  const updateDocImpl: HulyClientOperations["updateDoc"] = ((_c: unknown, _s: unknown, id: unknown, ops: unknown) => {
-    m.updates?.push({ id, ops: ops as Record<string, unknown> })
-    return Effect.succeed({} as never)
-  }) as HulyClientOperations["updateDoc"]
+  it.effect("accepts explicit agreeing stable project and parent IDs", () =>
+    Effect.gen(function* () {
+      const tree = threeLevelMovementFixture()
+      const result = yield* call(
+        { issue: tree.root._id, destination: { project: "project-1", parent: tree.destination._id } },
+        movementFixture(tree.issues)
+      )
+      expect(result.outcome).toBe("completed")
+    })
+  )
 
-  return HulyClient.testLayer({ findOne: findOneImpl, findAll: findAllImpl, updateDoc: updateDocImpl })
+  for (const target of ["root", "child", "leaf"]) {
+    it.effect(`refuses ${target} parenting before writes`, () =>
+      Effect.gen(function* () {
+        const tree = threeLevelMovementFixture()
+        const fixture = movementFixture(tree.issues)
+        expectBlocked(yield* call({ issue: tree.root._id, destination: { parent: target } }, fixture), fixture)
+      })
+    )
+  }
+
+  for (const destination of [
+    { project: "OTHER" },
+    { parent: "OTHER-foreign" },
+    { project: "TEST", parent: "OTHER-foreign" }
+  ]) {
+    it.effect(`refuses cross-project/disagreeing destination ${JSON.stringify(destination)}`, () =>
+      Effect.gen(function* () {
+        const foreignProject = movementProject("project-2", "OTHER")
+        const foreign = movementIssue("foreign", { space: foreignProject._id, identifier: "OTHER-foreign" })
+        const root = movementIssue("root")
+        const fixture = movementFixture([root, foreign], { projects: [movementProject(), foreignProject] })
+        expectBlocked(yield* call({ issue: root._id, destination }, fixture), fixture)
+      })
+    )
+  }
+
+  for (const input of [
+    { issue: "missing", destination: { parent: null } },
+    { issue: "root", destination: { parent: "missing" } },
+    { issue: "root", destination: { project: "missing" } }
+  ]) {
+    it.effect(`refuses invalid selector ${JSON.stringify(input)}`, () =>
+      Effect.gen(function* () {
+        const fixture = movementFixture([movementIssue("root")])
+        expectBlocked(yield* call(input, fixture), fixture)
+      })
+    )
+  }
+
+  it.effect("refuses missing source project", () =>
+    Effect.gen(function* () {
+      const fixture = movementFixture([movementIssue("root")], { projects: [] })
+      expectBlocked(yield* call({ issue: "root", destination: { parent: null } }, fixture), fixture)
+    })
+  )
+
+  it.effect("refuses ambiguous issue and project identifiers", () =>
+    Effect.gen(function* () {
+      const fixture = movementFixture([
+        movementIssue("root"),
+        movementIssue("other", { identifier: movementIssue("root").identifier })
+      ])
+      expectBlocked(
+        yield* call({ issue: movementIssue("root").identifier, destination: { parent: null } }, fixture),
+        fixture
+      )
+      const ambiguous = movementFixture([movementIssue("root")], {
+        projects: [movementProject(), movementProject("other")]
+      })
+      expectBlocked(yield* call({ issue: "root", destination: { project: "TEST" } }, ambiguous), ambiguous)
+    })
+  )
+
+  for (const input of [
+    { issue: "root", destination: {} },
+    { issue: "root", destination: { parent: 42 } },
+    { issue: "root", destination: { project: null } },
+    { issue: "root", destination: { parent: null, project: 42 } }
+  ]) {
+    it.effect(`rejects malformed input ${JSON.stringify(input)}`, () =>
+      Effect.gen(function* () {
+        const result = yield* Effect.result(parseMoveIssueParams(input))
+        expect(result._tag).toBe("Failure")
+      })
+    )
+  }
+
+  for (const resolutions of [[], [{ issueId: "root", field: "component", from: "component-1", to: null }]]) {
+    it.effect("refuses supplied same-project resolutions before no-op", () =>
+      Effect.gen(function* () {
+        const fixture = movementFixture([movementIssue("root")])
+        const result = yield* call({ issue: "root", destination: { parent: null }, resolutions }, fixture)
+        expectBlocked(result, fixture)
+        expect(result).toHaveProperty("reason", expect.stringContaining("Omit resolutions"))
+      })
+    )
+  }
+
+  it.effect("reports failure during writes without claiming unchanged state", () =>
+    Effect.gen(function* () {
+      const tree = threeLevelMovementFixture()
+      const fixture = movementFixture(tree.issues, { failWriteAt: 2 })
+      const result = yield* call({ issue: "root", destination: { parent: "destination" } }, fixture)
+      expect(result).toMatchObject({ outcome: "indeterminate", issueIds: ["root", "child", "leaf"] })
+      expect(result).not.toHaveProperty("changed", false)
+      expect(result).toHaveProperty("inspection", expect.stringContaining('"project":"TEST"'))
+    })
+  )
+
+  it.effect("reports verification outage after writes", () =>
+    Effect.gen(function* () {
+      const fixture = movementFixture([movementIssue("root"), movementIssue("destination")], { failVerification: true })
+      const result = yield* call({ issue: "root", destination: { parent: "destination" } }, fixture)
+      expect(result.outcome).toBe("indeterminate")
+      expect(result).not.toHaveProperty("changed", false)
+    })
+  )
+
+  it.effect("reports observed incomplete execution rather than success", () =>
+    Effect.gen(function* () {
+      const fixture = movementFixture([movementIssue("root"), movementIssue("destination")], { ignoreWrites: true })
+      const fiber = yield* Effect.forkChild(call({ issue: "root", destination: { parent: "destination" } }, fixture))
+      yield* TestClock.adjust("2 seconds")
+      const result = yield* Fiber.join(fiber)
+      expect(result.outcome).toBe("incomplete")
+    })
+  )
+
+  it.effect("continues to export moveIssue through the existing operation module", () =>
+    Effect.gen(function* () {
+      const fixture = movementFixture([movementIssue("root")])
+      const result = yield* moveIssue({ issue: issueIdentifier("root"), destination: { parent: null } }).pipe(
+        Effect.provide(fixture.layer)
+      )
+      expect(result.outcome).toBe("no-op")
+    })
+  )
+})
+
+for (const options of [
+  { discoveryTotal: 100 },
+  { closureTotal: 100 },
+  { changeRootDuringRead: true },
+  { invalidSelectorResult: true }
+]) {
+  it.effect(`refuses incomplete/changed/invalid discovery ${JSON.stringify(options)}`, () =>
+    Effect.gen(function* () {
+      const fixture = movementFixture([movementIssue("root")], options)
+      expectBlocked(
+        yield* call(
+          { issue: options.invalidSelectorResult ? "missing" : "root", destination: { parent: null } },
+          fixture
+        ),
+        fixture
+      )
+    })
+  )
 }
 
-const PROJECT = projectIdentifier("TEST")
-
-describe("moveIssue — to a new parent", () => {
-  it.effect("attaches a native top-level issue without decrementing the NoParent sentinel", () =>
+for (const corruption of [
+  "ancestry",
+  "count",
+  "aggregate",
+  "collection",
+  "missing-parent",
+  "cycle",
+  "duplicate",
+  "foreign-child"
+]) {
+  it.effect(`refuses inconsistent hierarchy ${corruption} including no-ops`, () =>
     Effect.gen(function* () {
-      const updates: Array<UpdateCall> = []
-      const issue = makeIssue("issue-1", "TEST-1")
-      const parent = makeIssue("issue-9", "TEST-9")
-
-      yield* moveIssue({
-        project: PROJECT,
-        identifier: issueIdentifier("TEST-1"),
-        newParent: issueIdentifier("TEST-9")
-      }).pipe(Effect.provide(buildLayer({ issues: [issue, parent], updates })))
-
-      expect(updates).toHaveLength(2)
-      expect(assertAt(updates, 0).ops).toMatchObject({
-        attachedTo: "issue-9",
-        attachedToClass: tracker.class.Issue,
-        collection: "subIssues"
-      })
-      expect(assertAt(updates, 1)).toEqual({ id: "issue-9", ops: { $inc: { subIssues: 1 } } })
-    })
-  )
-
-  it.effect("re-parents, adjusts both parents' counts, and re-threads one descendant", () =>
-    Effect.gen(function* () {
-      const updates: Array<UpdateCall> = []
-      const issue = makeIssue("issue-1", "TEST-1", {
-        attachedTo: "old-parent" as Ref<HulyIssue>,
-        attachedToClass: tracker.class.Issue,
-        subIssues: 1
-      })
-      const parent = makeIssue("issue-9", "TEST-9")
-      const child = makeIssue("issue-2", "TEST-2", { attachedTo: "issue-1" as Ref<HulyIssue> })
-
-      const result = yield* moveIssue({
-        project: PROJECT,
-        identifier: issueIdentifier("TEST-1"),
-        newParent: issueIdentifier("TEST-9")
-      }).pipe(Effect.provide(buildLayer({ issues: [issue, parent, child], updates })))
-
-      expect(result).toEqual({ identifier: "TEST-1", moved: true, newParent: "TEST-9" })
-
-      // main move
-      expect(assertAt(updates, 0).id).toBe("issue-1")
-      expect(assertAt(updates, 0).ops).toEqual({
-        attachedTo: "issue-9",
-        attachedToClass: tracker.class.Issue,
-        collection: "subIssues",
-        parents: [{ parentId: "issue-9", identifier: "TEST-9", parentTitle: "Issue TEST-9", space: PROJECT_ID }]
-      })
-      // increment new parent, decrement old parent
-      expect(assertAt(updates, 1)).toEqual({ id: "issue-9", ops: { $inc: { subIssues: 1 } } })
-      expect(assertAt(updates, 2)).toEqual({ id: "old-parent", ops: { $inc: { subIssues: -1 } } })
-      // descendant re-thread (no recursion since the child has no sub-issues)
-      expect(assertAt(updates, 3).id).toBe("issue-2")
-      expect(assertAt(updates, 3).ops).toEqual({
-        parents: [
-          { parentId: "issue-9", identifier: "TEST-9", parentTitle: "Issue TEST-9", space: PROJECT_ID },
-          { parentId: "issue-1", identifier: "TEST-1", parentTitle: "Issue TEST-1", space: PROJECT_ID }
-        ]
-      })
-      expect(updates).toHaveLength(4)
-    })
-  )
-
-  it.effect("recurses through grandchildren", () =>
-    Effect.gen(function* () {
-      const updates: Array<UpdateCall> = []
-      const issue = makeIssue("issue-1", "TEST-1", { attachedToClass: tracker.class.Project, subIssues: 1 })
-      const child = makeIssue("issue-2", "TEST-2", { attachedTo: "issue-1" as Ref<HulyIssue>, subIssues: 1 })
-      const grandchild = makeIssue("issue-3", "TEST-3", { attachedTo: "issue-2" as Ref<HulyIssue> })
-
-      yield* moveIssue({ project: PROJECT, identifier: issueIdentifier("TEST-1"), newParent: null }).pipe(
-        Effect.provide(buildLayer({ issues: [issue, child, grandchild], updates }))
-      )
-
-      const childUpdate = updates.find((u) => u.id === "issue-2")
-      const grandchildUpdate = updates.find((u) => u.id === "issue-3")
-      expect(childUpdate?.ops).toEqual({
-        parents: [{ parentId: "issue-1", identifier: "TEST-1", parentTitle: "Issue TEST-1", space: PROJECT_ID }]
-      })
-      expect(grandchildUpdate?.ops).toEqual({
-        parents: [
-          { parentId: "issue-1", identifier: "TEST-1", parentTitle: "Issue TEST-1", space: PROJECT_ID },
-          { parentId: "issue-2", identifier: "TEST-2", parentTitle: "Issue TEST-2", space: PROJECT_ID }
-        ]
-      })
-    })
-  )
-})
-
-describe("moveIssue — to top-level", () => {
-  it.effect("detaches a sub-issue to NoParent and decrements the old parent", () =>
-    Effect.gen(function* () {
-      const updates: Array<UpdateCall> = []
-      const issue = makeIssue("issue-1", "TEST-1", {
-        attachedTo: "old-parent" as Ref<HulyIssue>,
-        attachedToClass: tracker.class.Issue,
-        subIssues: 0,
-        parents: [
-          { parentId: "old-parent" as Ref<HulyIssue>, identifier: "TEST-7", parentTitle: "Old", space: PROJECT_ID }
-        ]
-      })
-
-      const result = yield* moveIssue({
-        project: PROJECT,
-        identifier: issueIdentifier("TEST-1"),
-        newParent: null
-      }).pipe(Effect.provide(buildLayer({ issues: [issue], updates })))
-
-      expect(result).toEqual({ identifier: "TEST-1", moved: true })
-      expect(result).not.toHaveProperty("newParent")
-      expect(assertAt(updates, 0).ops).toEqual({
-        attachedTo: tracker.ids.NoParent,
-        attachedToClass: tracker.class.Issue,
-        collection: "subIssues",
-        parents: []
-      })
-      // decrement the old issue parent; no increment because it is now top-level
-      expect(assertAt(updates, 1)).toEqual({ id: "old-parent", ops: { $inc: { subIssues: -1 } } })
-      expect(updates).toHaveLength(2)
-    })
-  )
-
-  it.effect("repairs a legacy project-attached top-level issue without changing child counts", () =>
-    Effect.gen(function* () {
-      const updates: Array<UpdateCall> = []
-      const issue = makeIssue("issue-1", "TEST-1", {
-        attachedTo: PROJECT_ID as unknown as Ref<HulyIssue>,
-        attachedToClass: tracker.class.Project,
-        subIssues: 0
-      })
-
-      yield* moveIssue({ project: PROJECT, identifier: issueIdentifier("TEST-1"), newParent: null }).pipe(
-        Effect.provide(buildLayer({ issues: [issue], updates }))
-      )
-
-      expect(updates).toHaveLength(1)
-      expect(assertAt(updates, 0).ops).toEqual({
-        attachedTo: tracker.ids.NoParent,
-        attachedToClass: tracker.class.Issue,
-        collection: "subIssues",
-        parents: []
-      })
-    })
-  )
-
-  it.effect("keeps an already-native top-level issue detached without changing child counts", () =>
-    Effect.gen(function* () {
-      const updates: Array<UpdateCall> = []
-      const issue = makeIssue("issue-1", "TEST-1")
-
-      yield* moveIssue({ project: PROJECT, identifier: issueIdentifier("TEST-1"), newParent: null }).pipe(
-        Effect.provide(buildLayer({ issues: [issue], updates }))
-      )
-
-      expect(updates).toHaveLength(1)
-      expect(assertAt(updates, 0).ops).toMatchObject({
-        attachedTo: tracker.ids.NoParent,
-        attachedToClass: tracker.class.Issue,
-        collection: "subIssues"
-      })
-    })
-  )
-})
-
-describe("moveIssue — error branches", () => {
-  it.effect("fails when the project is not found", () =>
-    Effect.gen(function* () {
-      const err = yield* Effect.flip(
-        moveIssue({ project: projectIdentifier("NOPE"), identifier: issueIdentifier("TEST-1"), newParent: null }).pipe(
-          Effect.provide(buildLayer({ issues: [], projects: [] }))
+      const tree = threeLevelMovementFixture()
+      if (corruption === "ancestry") tree.leaf.parents = []
+      if (corruption === "count") tree.root.subIssues = 0
+      if (corruption === "aggregate") tree.old.childInfo = []
+      if (corruption === "collection") tree.root.collection = "issues"
+      if (corruption === "missing-parent") tree.issues.splice(tree.issues.indexOf(tree.old), 1)
+      if (corruption === "cycle") tree.old.attachedTo = tree.leaf._id
+      if (corruption === "duplicate") tree.issues.push(tree.root)
+      if (corruption === "foreign-child")
+        tree.issues.push(
+          movementIssue("foreign", { space: movementProject("project-2")._id, attachedTo: tree.root._id })
         )
-      )
-      expect(err._tag).toBe("ProjectNotFoundError")
+      const fixture = movementFixture(tree.issues)
+      expectBlocked(yield* call({ issue: "root", destination: { parent: "old" } }, fixture), fixture)
     })
   )
+}
 
-  it.effect("fails when the issue is not found", () =>
+for (const change of ["detach-descendant", "add-child"]) {
+  it.effect(`does not complete an observed concurrently changed tree: ${change}`, () =>
     Effect.gen(function* () {
-      const err = yield* Effect.flip(
-        moveIssue({ project: PROJECT, identifier: issueIdentifier("TEST-404"), newParent: null }).pipe(
-          Effect.provide(buildLayer({ issues: [] }))
-        )
-      )
-      expect(err._tag).toBe("IssueNotFoundError")
+      const tree = threeLevelMovementFixture()
+      const fixture = movementFixture(tree.issues, {
+        onWrite: (issues) => {
+          if (fixture.writes.length !== 5) return
+          if (change === "detach-descendant") tree.leaf.attachedTo = tree.destination._id
+          else issues.push(movementIssue("concurrent", { attachedTo: tree.root._id }))
+          initializeHierarchy(issues)
+        }
+      })
+      const fiber = yield* Effect.forkChild(call({ issue: "root", destination: { parent: "destination" } }, fixture))
+      yield* TestClock.adjust("2 seconds")
+      const result = yield* Fiber.join(fiber)
+      expect(result.outcome).toBe("incomplete")
+      expect(result).not.toHaveProperty("changed", false)
+      expect(fixture.writes).toHaveLength(5)
     })
   )
-
-  it.effect("fails when the new parent issue is not found", () =>
-    Effect.gen(function* () {
-      const issue = makeIssue("issue-1", "TEST-1")
-      const err = yield* Effect.flip(
-        moveIssue({
-          project: PROJECT,
-          identifier: issueIdentifier("TEST-1"),
-          newParent: issueIdentifier("TEST-404")
-        }).pipe(Effect.provide(buildLayer({ issues: [issue] })))
-      )
-      expect(err._tag).toBe("IssueNotFoundError")
-    })
-  )
-})
+}

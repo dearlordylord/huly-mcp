@@ -1,13 +1,15 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process"
 import { once } from "node:events"
 import { createServer as createTcpServer, type Socket } from "node:net"
-import { resolve } from "node:path"
 import { createInterface } from "node:readline"
 
 import { Schema } from "effect"
-import { beforeAll, describe, expect, it } from "vitest"
+import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
-const builtServerPath = resolve(process.cwd(), "dist/index.cjs")
+import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
+
+let builtServerPath: string
+let cleanupBuild: (() => Promise<void>) | undefined
 const PROCESS_BOUND_MS = 30_000
 const SECRET = "subprocess-secret-token"
 const PAYLOAD_MARKER = "lifecycle-secret-payload"
@@ -65,7 +67,29 @@ const spawnServer = (environment: Readonly<NodeJS.ProcessEnv> = {}): SpawnedServ
     output.stderr += chunk
   })
   const lines = createInterface({ input: child.stdout })
-  const firstLine = once(lines, "line").then(([line]) => (typeof line === "string" ? line : ""))
+  const firstLine = new Promise<string>((resolveLine, rejectLine) => {
+    const detach = () => {
+      child.off("exit", exitedBeforeDiscovery)
+      child.off("error", failedBeforeDiscovery)
+      lines.off("line", discovered)
+    }
+    const discovered = (line: string) => {
+      detach()
+      resolveLine(line)
+    }
+    const diagnostic = () => output.stderr.replaceAll(SECRET, "[redacted]").replaceAll(PAYLOAD_MARKER, "[redacted]")
+    const exitedBeforeDiscovery = (code: number | null, signal: NodeJS.Signals | null) => {
+      detach()
+      rejectLine(new Error(`Stdio server exited before discovery (${signal ?? String(code)}): ${diagnostic()}`))
+    }
+    const failedBeforeDiscovery = () => {
+      detach()
+      rejectLine(new Error(`Stdio server failed before discovery: ${diagnostic()}`))
+    }
+    lines.once("line", discovered)
+    child.once("exit", exitedBeforeDiscovery)
+    child.once("error", failedBeforeDiscovery)
+  })
   const responseWaiters = new Map<number, (line: string) => void>()
   lines.on("line", (line) => {
     const envelope = parseJsonRpcLine(line)
@@ -130,14 +154,13 @@ const ensureStopped = (server: SpawnedServer): void => {
 }
 
 describe("built stdio process lifecycle", { timeout: PROCESS_BOUND_MS + 1_000 }, () => {
-  beforeAll(() => {
-    const child = spawn("pnpm", ["build:mcp"], { cwd: process.cwd(), stdio: "ignore" })
-    return withBound(
-      once(child, "exit").then(([code]) => {
-        if (code !== 0) throw new Error(`pnpm build:mcp exited with ${String(code)}`)
-      }),
-      "MCP build"
-    )
+  beforeAll(async () => {
+    const build = await buildIsolatedStdioServer(PROCESS_BOUND_MS)
+    builtServerPath = build.path
+    cleanupBuild = build.cleanup
+  })
+  afterAll(async () => {
+    await cleanupBuild?.()
   })
 
   it("exits successfully and removes its PID on stdin EOF without MCP_AUTO_EXIT", async () => {

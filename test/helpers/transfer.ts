@@ -1,0 +1,217 @@
+import { assertExists } from "../../src/utils/assertions.js"
+import { toRef } from "../../src/huly/operations/sdk-boundary.js"
+import type { Doc, DocumentQuery, FindOptions } from "@hcengineering/core"
+import { IssuePriority, type Issue } from "@hcengineering/tracker"
+import { Effect, Schema } from "effect"
+import { TransferInspectionSchema, type TransferWrite } from "../../src/domain/schemas/issue-transfer.js"
+import { DocId, IssueId, ObjectClassName, Timestamp, NonEmptyString } from "../../src/domain/schemas/shared.js"
+import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
+import { HulyAuthError } from "../../src/huly/errors-base.js"
+import { activity, core, task, tracker } from "../../src/huly/huly-plugins.js"
+import { sdkFixture, documentForTestClass, findResultForTestClass } from "./huly-sdk.js"
+import { initializeHierarchy, movementFixture, movementIssue, movementProject } from "./movement.js"
+
+const CORRUPTED_HISTORY_TIMESTAMP = 2
+
+export const transferFixture = () => {
+  const source = { ...movementProject(), type: "type-1", private: false, archived: false, members: [] }
+  const destination = {
+    ...movementProject("project-2", "OTHER"),
+    type: "type-1",
+    private: false,
+    archived: false,
+    members: [],
+    restricted: false
+  }
+  const workflow = { _id: "type-1", tasks: ["kind-1"], statuses: [{ _id: "status-1", taskType: "kind-1" }] }
+  const kind = { _id: "kind-1", parent: "type-1", statuses: ["status-1"], kind: "both", allowedAsChildOf: ["kind-1"] }
+  const old = movementIssue("old", { number: 1, rank: "0|hzzzzz:" })
+  const root = movementIssue("root", {
+    attachedTo: old._id,
+    component: null,
+    milestone: null,
+    number: 2,
+    rank: "0|hzzzzz:",
+    relations: [{ _id: old._id, _class: tracker.class.Issue }],
+    priority: IssuePriority.NoPriority,
+    assignee: null,
+    remainingTime: 0,
+    reports: 0,
+    createdOn: sdkFixture(0)
+  })
+  const parent = movementIssue("parent", {
+    space: destination._id,
+    identifier: "OTHER-parent",
+    component: null,
+    milestone: null,
+    number: 1,
+    rank: "0|hzzzzz:"
+  })
+  const existing = movementIssue("existing", {
+    space: destination._id,
+    identifier: "OTHER-existing",
+    attachedTo: parent._id,
+    number: 3,
+    rank: "0|hzzzzz:"
+  })
+  const issues = [old, root, parent, existing]
+  initializeHierarchy(issues)
+  const fixture = movementFixture(issues, { projects: [sdkFixture(source), sdkFixture(destination)] })
+  const records = [
+    {
+      _id: DocId.make("history-1"),
+      _class: ObjectClassName.make(String(activity.class.DocUpdateMessage)),
+      space: DocId.make(source._id),
+      attachedTo: DocId.make(root._id),
+      attachedToClass: ObjectClassName.make(String(tracker.class.Issue)),
+      collection: "docUpdateMessages",
+      snapshot: "original history payload",
+      modifiedOn: Timestamp.make(0),
+      modifiedBy: NonEmptyString.make("author"),
+      history: {
+        objectId: DocId.make(root._id),
+        objectClass: ObjectClassName.make(String(tracker.class.Issue)),
+        action: "create"
+      },
+      kind: "history"
+    }
+  ]
+  const state = {
+    sequence: 3,
+    allocated: 0,
+    sent: 0,
+    failAllocation: false,
+    invalidAllocation: false,
+    refuseCommit: false,
+    failCommit: false,
+    failPostRead: false,
+    ignoreCommit: false,
+    corruptHistory: false,
+    corruptHistoryPayload: false,
+    corruptHistoryAuthor: false,
+    corruptHistoryTime: false,
+    corruptNumber: false,
+    corruptContent: false,
+    failOrdering: false,
+    recordsBlockers: Array<string>(),
+    unfilteredAttributeRows: false,
+    attributeTotal: Number.NaN,
+    inspected: 0
+  }
+  const unavailable = () => Effect.fail(new HulyAuthError({ message: "Injected authorization refusal" }))
+  const findOne: HulyClientOperations["findOne"] = <T extends Doc>(cls: unknown, query: DocumentQuery<T>) => {
+    if (state.failPostRead && state.sent > 0) return unavailable()
+    const q = sdkFixture<Record<string, unknown>>(query)
+    if (q.space !== undefined && state.failOrdering) return unavailable()
+    const candidates: ReadonlyArray<Doc> =
+      cls === task.class.TaskType
+        ? [sdkFixture(kind)]
+        : cls === task.class.ProjectType
+          ? [sdkFixture(workflow)]
+          : cls === tracker.class.Project
+            ? [sdkFixture(source), sdkFixture(destination)]
+            : issues
+    const found = candidates.find((record) =>
+      Object.entries(q).every(([key, value]) => Reflect.get(record, key) === value)
+    )
+    return Effect.succeed(documentForTestClass<T>(found))
+  }
+  const attributeRows: Array<Doc> = []
+  const baseOperations: Partial<HulyClientOperations> = {
+    ...fixture.operations,
+    findOne,
+    findAll: <T extends Doc>(cls: unknown, query: DocumentQuery<T>, options?: FindOptions<T>) => {
+      if (cls !== tracker.class.Component && cls !== tracker.class.Milestone)
+        return fixture.operations.findAll<T>(sdkFixture(cls), query, options)
+      const result = findResultForTestClass<T>(
+        state.unfilteredAttributeRows
+          ? attributeRows
+          : attributeRows.filter((row) => row._class === cls && row.space === query.space)
+      )
+      if (Number.isFinite(state.attributeTotal) && options?.total === true) result.total = state.attributeTotal
+      return Effect.succeed(result)
+    },
+    inspectTransferRecords: (issueId) => {
+      state.inspected++
+      if (state.failPostRead && state.sent > 0) return unavailable()
+      return Effect.succeed(
+        Schema.decodeUnknownSync(TransferInspectionSchema)({
+          discovery: "complete",
+          classes: [...new Set(records.map((record) => record._class))],
+          records: issueId === IssueId.make(root._id) ? records.map((record) => ({ ...record })) : [],
+          blockers: issueId === IssueId.make(root._id) ? state.recordsBlockers : [],
+          limitation: "Fixture inspects model-owned records; unsupported structure is not a complete inventory."
+        })
+      )
+    },
+    updateDoc: (_class, _space, _id, _ops, _retrieve) => {
+      state.allocated++
+      state.sequence++
+      if (state.failAllocation) return unavailable()
+      return Effect.succeed(state.invalidAllocation ? {} : { object: { sequence: state.sequence } })
+    },
+    commitTransfer: (write: TransferWrite) => {
+      state.sent++
+      if (state.refuseCommit) return Effect.succeed("condition-not-met")
+      if (!state.ignoreCommit) {
+        Object.assign(root, {
+          space: write.destinationId,
+          attachedTo: write.parentId,
+          identifier: write.identifier,
+          rank: write.rank,
+          number: write.number
+        })
+        for (const change of write.attributeChanges ?? []) Reflect.set(root, change.field, change.to)
+        if (state.corruptNumber) root.number++
+        if (state.corruptContent) root.description = sdkFixture("Changed content")
+        if (!state.corruptHistory) for (const record of records) record.space = write.destinationId
+        if (state.corruptHistoryPayload) for (const record of records) record.history.action = "remove"
+        if (state.corruptHistoryAuthor)
+          for (const record of records) record.modifiedBy = NonEmptyString.make("changed author")
+        if (state.corruptHistoryTime)
+          for (const record of records) record.modifiedOn = Timestamp.make(CORRUPTED_HISTORY_TIMESTAMP)
+        initializeHierarchy(issues)
+      }
+      if (state.failCommit) return unavailable()
+      return Effect.succeed("applied")
+    }
+  }
+  const operations: Partial<HulyClientOperations> = {
+    ...baseOperations,
+    allocateMovementNumber: (destinationId) =>
+      assertExists(baseOperations.updateDoc)(
+        tracker.class.Project,
+        core.space.Space,
+        toRef(destinationId),
+        { $inc: { sequence: 1 } },
+        true
+      ),
+    commitTransferTree: (write) => {
+      const rootWrite = write.tasks.find((task) => task.issueId === write.rootId)
+      const commit = baseOperations.commitTransfer
+      return write.tasks.length !== 1 || rootWrite === undefined || commit === undefined
+        ? Effect.succeed("condition-not-met")
+        : commit(rootWrite)
+    }
+  }
+  return {
+    ...fixture,
+    attributeRows,
+    root,
+    old,
+    parent,
+    source,
+    destination,
+    workflow,
+    kind,
+    records,
+    state,
+    operations,
+    layer: HulyClient.testLayer(operations),
+    input: { issue: IssueId.make(root._id), destination: { project: "OTHER", parent: parent._id } }
+  }
+}
+export const appendTransferChild = (fixture: ReturnType<typeof transferFixture>, child: Issue) => {
+  fixture.issues.push(child)
+  initializeHierarchy(fixture.issues)
+}

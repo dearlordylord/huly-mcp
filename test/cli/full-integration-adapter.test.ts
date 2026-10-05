@@ -11,11 +11,14 @@ import {
   FullIntegrationAdapterResponseSchema
 } from "../../scripts/full-integration-adapter-contract.js"
 
+const adapterProcessTimeoutMs = 10_000
+const adapterTestTimeoutMs = 15_000
+
 const runAdapter = (executable: string, payload: string, imagePath: string) => {
   const stdout = execFileSync(
     "node",
     ["scripts/run-bundled.mjs", "scripts/cli-full-integration-adapter.ts", executable, payload, imagePath],
-    { encoding: "utf8" }
+    { encoding: "utf8", timeout: adapterProcessTimeoutMs, killSignal: "SIGKILL" }
   )
   const parsed: unknown = JSON.parse(stdout)
   return Schema.decodeUnknownSync(FullIntegrationAdapterResponseSchema)(parsed)
@@ -46,7 +49,7 @@ const withExecutableStub = async (
   }
 }
 
-describe("full CLI integration adapter", () => {
+describe("full CLI integration adapter", { timeout: adapterTestTimeoutMs }, () => {
   it("invokes the native route with positional input and returns an MCP-compatible success envelope", async () => {
     await withExecutableStub(
       '#!/usr/bin/env bash\nprintf \'{"id":"project-id","identifier":"HULY"}\\n\'\n',

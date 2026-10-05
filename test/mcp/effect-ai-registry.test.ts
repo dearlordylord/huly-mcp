@@ -205,4 +205,33 @@ describe("Effect AI MCP registry", () => {
       ])
     }).pipe(Effect.provide(McpServer.layer))
   )
+  it.effect("observes only the actual native movement request without changing its unavailable response", () =>
+    Effect.gen(function* () {
+      const observed = { calls: 0 }
+      const adapter = makeEffectMcpRegistry({
+        resolveClients: failedResolver,
+        discoverConcreteResources: false,
+        telemetry,
+        registry: toolRegistry,
+        getHulyContext: () => Effect.die("not used"),
+        fetchLatestVersion: async () => "9.9.9",
+        observeMovement: (operation) =>
+          Effect.sync(() => {
+            observed.calls++
+          }).pipe(Effect.andThen(operation))
+      })
+      yield* adapter.registration
+      const server = yield* McpServer
+      const version = yield* server
+        .callTool({ name: "get_version", arguments: {} })
+        .pipe(Effect.provideService(McpSchema.McpServerClient, clientService("claude-code")))
+      expect(version.isError).not.toBe(true)
+      expect(observed.calls).toBe(0)
+      const movement = yield* server
+        .callTool({ name: "move_issue", arguments: { issue: "root", destination: { parent: null } } })
+        .pipe(Effect.provideService(McpSchema.McpServerClient, clientService("claude-code")))
+      expect(movement.isError).toBe(true)
+      expect(observed.calls).toBe(1)
+    }).pipe(Effect.provide(McpServer.layer))
+  )
 })

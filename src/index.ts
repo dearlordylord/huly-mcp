@@ -6,6 +6,12 @@
  */
 
 import "./polyfills.js"
+import { MovementObserverError, type MovementStageObserver } from "./mcp/movement-stage-observer.js"
+import {
+  MovementReportDirectorySchema,
+  MovementObserverProcessSchema,
+  makeFileMovementStageObserver
+} from "./mcp/movement-stage-report.js"
 
 import { NodeRuntime } from "@effect/platform-node"
 import { Config, ConfigProvider, type Duration, Effect, Exit, Layer, Option, type Redacted, Schema } from "effect"
@@ -43,6 +49,7 @@ import { TelemetryService } from "./telemetry/telemetry.js"
 import { writeStderrLine } from "./utils/stderr.js"
 
 type AppError =
+  | MovementObserverError
   | CliProfileStoreError
   | ConfigValidationError
   | HulyClientError
@@ -129,7 +136,8 @@ export const buildAppLayer = (
   ) => Promise<RequestClientLease<Exit.Exit<ClientBundle, HulyClientBundleError>>>,
   httpServerFactoryLayer: Layer.Layer<HttpServerFactoryService> = HttpServerFactoryService.defaultLayer,
   closeClients?: () => Promise<void>,
-  runtimeConfigContext = () => sanitizeHulyRuntimeConfigFromEnv(process.env)
+  runtimeConfigContext = () => sanitizeHulyRuntimeConfigFromEnv(process.env),
+  observeMovement?: MovementStageObserver
 ): Layer.Layer<McpServerService | HttpServerFactoryService, McpServerError, never> => {
   const mcpServerConfig = {
     transport,
@@ -138,6 +146,7 @@ export const buildAppLayer = (
     ...(mcpAuthToken === undefined ? {} : { mcpAuthToken }),
     authMethod,
     resolveClients,
+    ...(observeMovement === undefined ? {} : { observeMovement }),
     ...(closeClients === undefined ? {} : { closeClients }),
     resolveClientLeaseForHttpRequest,
     getRuntimeConfigContext: runtimeConfigContext,
@@ -149,6 +158,23 @@ export const buildAppLayer = (
   return Layer.merge(mcpServerLayer, httpServerFactoryLayer)
 }
 
+const configureMovementObserver = Effect.fn("configureMovementObserver")(function* () {
+  const reportDirectory = yield* Config.schema(
+    MovementReportDirectorySchema,
+    "HULY_MOVEMENT_STAGE_REPORT_DIRECTORY"
+  ).pipe(Config.option)
+  return Option.isSome(reportDirectory)
+    ? yield* makeFileMovementStageObserver(
+        reportDirectory.value,
+        yield* Schema.decodeUnknownEffect(MovementObserverProcessSchema)({
+          processId: process.pid,
+          userId: process.getuid?.()
+        }).pipe(Effect.mapError(() => new MovementObserverError({ phase: "configuration" }))),
+        writeStderrLine
+      )
+    : undefined
+})
+
 const runConfiguredServer = (transport: McpTransportType): Effect.Effect<void, AppError> =>
   Effect.gen(function* () {
     const environment = { ...process.env }
@@ -156,6 +182,7 @@ const runConfiguredServer = (transport: McpTransportType): Effect.Effect<void, A
     const httpHost = yield* getHttpHost
     const mcpAuthToken = transport === "http" ? Option.getOrUndefined(yield* getMcpAuthToken) : undefined
     const lazyEnvs = yield* getLazyEnvs
+    const observeMovement = yield* configureMovementObserver()
     const profile =
       transport === "stdio" && environment["HULY_PROFILE"] !== undefined
         ? yield* resolveStdioProfile(environment, yield* defaultProfileStore(environment))
@@ -195,7 +222,8 @@ const runConfiguredServer = (transport: McpTransportType): Effect.Effect<void, A
             () =>
               profile === undefined
                 ? sanitizeHulyRuntimeConfigFromEnv(environment)
-                : profileRuntimeContext(profile, environment)
+                : profileRuntimeContext(profile, environment),
+            observeMovement
           )
 
           yield* Effect.gen(function* () {

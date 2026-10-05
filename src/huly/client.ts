@@ -45,6 +45,8 @@ import { type PersonAdministrationLocator, SocialIdentityId } from "../domain/sc
 import type { PersonMergeReferenceImpact } from "../domain/schemas/person-merge.js"
 import {
   AccountUuid as ParsedAccountUuid,
+  type IssueId,
+  type DocId,
   type HulyConditionalWriteResult,
   type HulyTransactionScope,
   type PersonId as DomainPersonId,
@@ -75,13 +77,34 @@ import {
   resolvePersonAdministrationTarget,
   type ResolvePersonAdministrationError
 } from "./operations/person-administration-shared.js"
-import { toAccountUuid, toCorePersonId } from "./operations/sdk-boundary.js"
+import { toAccountUuid, toCorePersonId, toRef } from "./operations/sdk-boundary.js"
 import { HulySdk, type HulySdkDependencies } from "./sdk-deps.js"
 import { parseCollaboratorEndpoint } from "./collaborator-endpoint.js"
 import { acquireClosableClient } from "./scoped-client.js"
 import { classifyHulyUnavailableFailure, normalizeHulyOrigin } from "./unavailable-diagnostics.js"
 import { testWorkbenchUrlConfig, type WorkbenchUrlConfig } from "./url-builders.js"
 import { inspectNativePersonReferences, migrateNativePersonReferences } from "./person-reference-migration.js"
+
+import { inspectTransferForest } from "./issue-transfer-forest.js"
+import { commitTransfer, inspectTransferRecords } from "./issue-transfer-adapter.js"
+import { inspectMovementTransactions } from "./issue-movement-transaction-inspection.js"
+import { commitTransferTree } from "./issue-transfer-tree-adapter.js"
+import type { TransferTreeWrite } from "../domain/schemas/issue-transfer-tree.js"
+import type { MovementIssue } from "../domain/schemas/issue-movement-state.js"
+import { core, tracker } from "./huly-plugins.js"
+import { MovementTransportMilliseconds, type MovementTransportConfig } from "./movement-transaction-transport.js"
+import {
+  parseMovementTransportConfig,
+  withMovementWriteClient,
+  type MovementWriteError
+} from "./movement-write-client.js"
+import type {
+  MovementTransactionInspection,
+  MovementTransactionProgress,
+  MovementTransactions
+} from "./issue-movement-transactions.js"
+import type { TransferForestInspection, TransferForestProgress } from "./issue-transfer-forest-state.js"
+import type { TransferInspection, TransferWrite } from "../domain/schemas/issue-transfer.js"
 
 // --- Connection helpers ---
 
@@ -211,6 +234,24 @@ interface HulyClientContext {
 }
 
 export interface HulyClientOperations extends HulyClientContext {
+  readonly inspectTransferForest?: (
+    roots: ReadonlyArray<IssueId>,
+    tree?: ReadonlyArray<MovementIssue>,
+    publish?: TransferForestProgress
+  ) => Effect.Effect<TransferForestInspection, HulyClientError | HulyDataInvalidError>
+  readonly inspectTransferRecords?: (
+    issueId: IssueId,
+    tree?: ReadonlyArray<MovementIssue>
+  ) => Effect.Effect<TransferInspection, HulyClientError | HulyDataInvalidError>
+  readonly inspectMovementTransactions?: (
+    queued: MovementTransactions
+  ) => Effect.Effect<MovementTransactionInspection, HulyClientError | HulyDataInvalidError>
+  readonly commitTransferTree?: (
+    write: TransferTreeWrite,
+    publishTransactions?: MovementTransactionProgress
+  ) => Effect.Effect<HulyConditionalWriteResult, MovementWriteError>
+  readonly commitTransfer?: (write: TransferWrite) => Effect.Effect<HulyConditionalWriteResult, MovementWriteError>
+  readonly allocateMovementNumber?: (destinationId: DocId) => Effect.Effect<TxResult, MovementWriteError>
   readonly getAccountUuid: () => AccountUuid
   readonly getPrimarySocialId: () => PersonId
   readonly getSocialIds?: () => ReadonlyArray<PersonId>
@@ -386,10 +427,23 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
         const config = yield* HulyConfigService
         const sdk = yield* HulySdk
 
-        const { accountUuid, client, imageUrl, markupOps, primarySocialId, refUrl, socialIds, workspaceUrlSlug } =
-          yield* acquireClosableClient(
-            connectRestWithRetry({ url: config.url, auth: config.auth, workspace: config.workspace }, sdk)
+        const {
+          accountUuid,
+          client,
+          imageUrl,
+          markupOps,
+          movementTransportConfig,
+          primarySocialId,
+          refUrl,
+          socialIds,
+          workspaceUrlSlug
+        } = yield* acquireClosableClient(
+          connectRestWithRetry(
+            { url: config.url, auth: config.auth, workspace: config.workspace },
+            sdk,
+            MovementTransportMilliseconds.make(config.connectionTimeout)
           )
+        )
 
         const markupUrlConfig: MarkupUrlConfig = { refUrl: UrlString.make(refUrl), imageUrl: UrlString.make(imageUrl) }
         const workbenchUrlConfig: WorkbenchUrlConfig = { baseUrl: UrlString.make(config.url), workspaceUrlSlug }
@@ -401,6 +455,47 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
           Effect.tryPromise({ try: () => op(client), catch: (error) => makeOperationConnectionError(operation, error) })
 
         const operations: HulyClientOperations = {
+          inspectMovementTransactions: (queued) => inspectMovementTransactions(client, queued),
+          inspectTransferRecords: (issueId, tree) => inspectTransferRecords(client, issueId, undefined, tree),
+          inspectTransferForest: (roots, tree, publish) => inspectTransferForest(client, roots, tree, publish),
+          commitTransferTree: (write, publishQueuedTransactions) =>
+            Effect.gen(function* () {
+              const context = yield* Effect.context<never>()
+              const result = yield* withMovementWriteClient(
+                client,
+                movementTransportConfig,
+                sdk.movementHttp,
+                "conditionalUpdateDoc",
+                (movement, signal) =>
+                  commitTransferTree(
+                    movement,
+                    write,
+                    publishQueuedTransactions === undefined
+                      ? undefined
+                      : (transactions, batch) =>
+                          Effect.runPromiseWith(context)(publishQueuedTransactions(transactions, batch), { signal })
+                  )
+              )
+              return yield* Effect.fromResult(result)
+            }),
+          commitTransfer: (write) =>
+            withMovementWriteClient(
+              client,
+              movementTransportConfig,
+              sdk.movementHttp,
+              "conditionalUpdateDoc",
+              (movement) => commitTransfer(movement, write)
+            ),
+          allocateMovementNumber: (destinationId) =>
+            withMovementWriteClient(client, movementTransportConfig, sdk.movementHttp, "updateDoc", (movement) =>
+              movement.updateDoc(
+                tracker.class.Project,
+                core.space.Space,
+                toRef(destinationId),
+                { $inc: { sequence: 1 } },
+                true
+              )
+            ),
           getAccountUuid: () => accountUuid,
           getPrimarySocialId: () => primarySocialId,
           getSocialIds: () => socialIds,
@@ -659,6 +754,7 @@ interface MarkupOperations {
 }
 
 interface RestConnection {
+  movementTransportConfig: MovementTransportConfig
   client: TxOperations
   accountUuid: AccountUuid
   primarySocialId: PersonId
@@ -713,7 +809,8 @@ function createMarkupOps(
 
 const connectRestWithRetry = (
   config: ConnectionConfig,
-  sdk: HulySdkDependencies
+  sdk: HulySdkDependencies,
+  timeoutMs: MovementTransportConfig["timeoutMs"]
 ): Effect.Effect<RestConnection, ConnectionError> =>
   Effect.gen(function* () {
     const discovery = yield* connectionAttempt(async () => {
@@ -726,6 +823,12 @@ const connectRestWithRetry = (
       return { serverConfig, ...selected }
     }, config.url)
     const { endpoint, info, token, workspaceId } = discovery
+    const movementTransportConfig = yield* parseMovementTransportConfig({
+      endpoint,
+      workspace: workspaceId,
+      token: Redacted.make(token),
+      timeoutMs
+    })
     const collaboratorEndpoint = yield* parseCollaboratorEndpoint(discovery.serverConfig, info)
 
     return yield* connectionAttempt(async () => {
@@ -748,6 +851,7 @@ const connectRestWithRetry = (
 
       return {
         client,
+        movementTransportConfig,
         accountUuid: account.uuid,
         primarySocialId: account.primarySocialId,
         socialIds: account.socialIds,

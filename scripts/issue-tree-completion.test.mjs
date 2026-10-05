@@ -1,0 +1,117 @@
+import assert from "node:assert/strict"
+import { spawnSync } from "node:child_process"
+import { readFileSync, mkdtempSync, mkdirSync, chmodSync, statSync, rmSync, symlinkSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { test } from "node:test"
+
+const source = readFileSync(new URL("./integration_test_issue_tree.sh", import.meta.url), "utf8")
+const helper = source.slice(source.indexOf("assert_tree_completion() {"), source.indexOf("assert_document_unchanged() {"))
+const run = (result) => spawnSync("bash", ["-c", `${helper}\nassert_tree_completion "$1" '.outcome=="completed" and (.tasks|length)==4'`, "fixture-test", result], { encoding: "utf8", timeout: 5000, killSignal: "SIGKILL" })
+test("completion assertion retains passing four-task predicate", () => {
+  const result = run(JSON.stringify({ outcome: "completed", tasks: [{}, {}, {}, {}] }))
+  assert.equal(result.status, 0)
+  assert.equal(result.stderr, "")
+})
+test("failure records safe outcome and count without payload or identifiers", () => {
+  const result = run(JSON.stringify({ outcome: "indeterminate", reason: "SECRET_MARKER", issueId: "SECRET_MARKER", tasks: [], execution: { phase: "verification", reservations: [{ issueId: "SECRET_MARKER" }] } }))
+  assert.equal(result.status, 1)
+  const summary = JSON.parse(result.stderr)
+  assert.equal(summary.outcome, "indeterminate")
+  assert.equal(summary.taskCount, 0)
+  assert.equal(summary.executionPhase, "verification")
+  assert.equal(summary.reservationCount, 1)
+  assert.ok(!result.stderr.includes("SECRET_MARKER"))
+})
+test("audited pre-allocation deadline is projected without exposing raw reason", () => {
+  const result = run(JSON.stringify({ outcome: "blocked", changed: false, reason: "Pre-allocation inspection exceeded its deadline; no allocation or task writes performed." }))
+  assert.equal(result.status, 1)
+  assert.equal(JSON.parse(result.stderr).reasonCategory, "pre-allocation-timeout")
+  assert.ok(!result.stderr.includes("no allocation or task writes performed"))
+})
+test("malformed result fails with fixed diagnostic only", () => {
+  const result = run("SECRET_MARKER")
+  assert.equal(result.status, 1)
+  assert.equal(result.stderr.trim(), "FAIL: tree completion result is not JSON")
+})
+for (const [status, consistency, reason, category] of [
+  ["observed", "inconsistent", "Protected payload of SECRET_MARKER differs from approved final values.", "protected-task-payload"],
+  ["unavailable", null, "Complete post-write project inventory is unavailable.", "project-inventory-unavailable"],
+  ["observed", "undetermined", "Movement deadline interrupted remaining verification reads.", "verification-deadline-interrupted"],
+  ["observed", "undetermined", "SECRET_MARKER arbitrary unknown cause", "unclassified"]
+]) {
+  test(`records safe verification category ${category}`, () => {
+    const result = run(JSON.stringify({ outcome: "incomplete", reason: "SECRET_MARKER", tasks: [], execution: { phase: "verification", commit: "acknowledged", reservations: [{ status: "confirmed", issueId: "SECRET_MARKER", number: 1 }, { status: "uncertain", issueId: "SECRET_MARKER" }] }, verification: status === "unavailable" ? { status, reason } : { status, consistency, completeness: "incomplete", reason, tasks: [{ issueId: "SECRET_MARKER" }], records: [{ recordId: "SECRET_MARKER" }], absentIssueIds: [] } }))
+    assert.equal(result.status, 1)
+    const summary = JSON.parse(result.stderr)
+    assert.equal(summary.commitConfirmation, "acknowledged")
+    assert.equal(summary.verificationStatus, status)
+    assert.equal(summary.verificationConsistency, consistency)
+    assert.equal(summary.verificationCompleteness, status === "unavailable" ? null : "incomplete")
+    assert.equal(summary.observedTaskCount, status === "unavailable" ? null : 1)
+    assert.equal(summary.observedRecordCount, status === "unavailable" ? null : 1)
+    assert.equal(summary.confirmedAbsentTaskCount, status === "unavailable" ? null : 0)
+    assert.equal(summary.confirmedReservationCount, 1)
+    assert.equal(summary.uncertainReservationCount, 1)
+    assert.equal(summary.verificationReasonCategory, category)
+    assert.equal(summary.reasonCategory, "unclassified")
+    assert.ok(!result.stderr.includes("SECRET_MARKER"))
+  })
+}
+test("unrecognized enum values cannot leak through the summary", () => {
+  const result = run(JSON.stringify({ outcome: "SECRET_MARKER", execution: { commit: "SECRET_MARKER", phase: "SECRET_MARKER" }, verification: { status: "SECRET_MARKER", consistency: "SECRET_MARKER", completeness: "SECRET_MARKER" } }))
+  assert.equal(result.status, 1)
+  const summary = JSON.parse(result.stderr)
+  assert.equal(summary.outcome, "invalid")
+  assert.equal(summary.commitConfirmation, null)
+  assert.equal(summary.verificationStatus, null)
+  assert.ok(!result.stderr.includes("SECRET_MARKER"))
+})
+
+const retention = source.slice(source.indexOf("retain_tree_result() {"), source.indexOf("assert_tree_completion() {"))
+const retain = (directory, result) => spawnSync("bash", ["-c", `${retention}\nretain_tree_result "$1" mcp`, "fixture-test", result], { env: { ...process.env, MOVEMENT_PRIVATE_EVIDENCE_DIR: directory }, encoding: "utf8", timeout: 5000, killSignal: "SIGKILL" })
+test("retains exact private reply once without printing its contents", () => {
+  const directory = mkdtempSync(join(tmpdir(), "tree-private-evidence-"))
+  try {
+    const result = '{"outcome":"incomplete","reason":"SECRET_MARKER"}'
+    const saved = retain(directory, result)
+    assert.equal(saved.status, 0)
+    assert.equal(saved.stdout, "")
+    assert.equal(saved.stderr, "")
+    const path = join(directory, "tree-final-mcp.json")
+    assert.equal(readFileSync(path, "utf8"), `${result}\n`)
+    assert.equal(statSync(path).mode & 0o777, 0o600)
+    assert.equal(retain(directory, "replacement").status, 1)
+    assert.equal(readFileSync(path, "utf8"), `${result}\n`)
+  } finally { rmSync(directory, { recursive: true }) }
+})
+test("rejects public or symlink evidence directories and preserves default behavior", () => {
+  const directory = mkdtempSync(join(tmpdir(), "tree-evidence-policy-"))
+  try {
+    const publicDirectory = join(directory, "public")
+    mkdirSync(publicDirectory, { mode: 0o755 })
+    chmodSync(publicDirectory, 0o755)
+    assert.equal(retain(publicDirectory, "SECRET_MARKER").status, 1)
+    const link = join(directory, "link")
+    symlinkSync(directory, link)
+    assert.equal(retain(link, "SECRET_MARKER").status, 1)
+    const disabled = retain("", "SECRET_MARKER")
+    assert.equal(disabled.status, 0)
+    assert.equal(disabled.stdout, "")
+    assert.equal(disabled.stderr, "")
+  } finally { rmSync(directory, { recursive: true }) }
+})
+
+test("ledger failure still attempts known-resource cleanup and preserves original failure", () => {
+  const cleanup = source.slice(source.indexOf("\ncleanup() {"), source.indexOf("FIXTURE_RECORD_IDS='[]'"))
+  for (const originalStatus of [0, 7]) {
+    const result = spawnSync("bash", ["-c", `${cleanup}
+ISSUES=(known-issue); PROJECT_IDS=(known-project); DOCUMENT=''; TEAMSPACE=''; FIXTURE_RECORD_IDS='[]'; UNRESOLVED_CREATION=false
+ledger_failure() { return 1; }
+cleanup_acknowledged() { jq -e '.input.issueIds==["known-issue"] and .input.projectIds==["known-project"]' >/dev/null <<<"$1" || return 1; printf 'known-cleanup-attempted\\n'; }
+(exit "$1")
+cleanup ledger_failure cleanup_acknowledged`, "cleanup-test", String(originalStatus)], { encoding: "utf8", timeout: 5000, killSignal: "SIGKILL" })
+    assert.equal(result.status, originalStatus === 0 ? 1 : originalStatus)
+    assert.equal(result.stdout.trim(), "known-cleanup-attempted")
+  }
+})

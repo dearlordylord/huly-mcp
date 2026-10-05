@@ -443,11 +443,15 @@ Key response fields used by the test script for entity IDs:
 
 ## Stdio EOF and In-Flight Request Draining
 
-The stdio server always exits when stdin closes; `MCP_AUTO_EXIT` is no longer needed and cannot disable connection ownership. The server **drains in-flight tool calls before shutting down**: if a tool handler is mid-execution when stdin closes, it gets up to five seconds to complete and write its response. Wire and resource cleanup share the remainder of one ten-second global deadline.
+The stdio server always exits when stdin closes; `MCP_AUTO_EXIT` is no longer needed and cannot disable connection ownership. EOF or stdin close starts a bounded shutdown: in-flight requests have up to 30 seconds to finish, followed by concurrent wire, telemetry and client cleanup, each capped at three seconds. An independent 35-second global watchdog forces process exit 1 if shutdown has not finished. SIGINT, SIGTERM and programmatic stop instead use a two-second request drain and a ten-second global watchdog.
 
 This matters for operations that make HTTP round-trips to Huly's collaborator service (e.g., `edit_document` with content changes calls `updateMarkup`). Without draining, the stdin-close event would race against the HTTP call, and the response would be lost even though the mutation succeeded on the server.
 
-**For script authors**: the standard `printf '%s\n%s\n' | node` pattern works correctly for all tools, including slow ones. No need for `sleep` workarounds.
+**For script authors**: closing stdin starts the EOF drain deadline. A `printf` pipeline is suitable only when the request finishes within that allowance. Keep stdin open until the matching response for longer workflows, then close it and verify process cleanup. Capture process status and stderr separately; a missing reply does not prove that a mutation was refused. Movement has separate initial-inspection and execution bounds, so its total request lifetime can exceed the EOF drain allowance.
+
+The tree fixture uses `scripts/integration-mcp-call-main.ts` through `scripts/run-bundled.mjs`. Its SDK client keeps stdin open until the matching reply and supplies the discovered tool definition to prevent automatic mutation retries. The helper sets the supported `LAZY_ENVS=true` mode so the SDK’s disposable discovery process does not authenticate Huly clients. The real session resolves the normal process-owned clients on its first tool call; configuration and authentication failures remain typed tool errors. Native tool registration is unchanged. Stdout contains the reply envelope; stderr contains schema-owned phase names and elapsed milliseconds only. Preserve both streams separately when diagnosing a failed call. The phase sequence distinguishes connection, tool discovery, invocation, reply and close; `bundle-ready` starts after bundling, so bundling time requires the outer process owner's timestamps.
+
+The tree command has an 80-second outer guard: ten seconds for bundling and setup, ten seconds for connection, ten seconds for tool discovery, 45 seconds for invocation, and up to four seconds for SDK transport close. Whole-phase connection, discovery and invocation deadlines abort their SDK requests; cleanup is still awaited. The server's ten-second inspection and 30-second execution bounds remain unchanged. These are transport envelope limits, not permission to repeat a mutation. On any missing reply, inspect phase events and reconcile server state read-only before rebuilding the call; the certification campaign's absolute deadline still limits the entire run.
 
 **Implementation**: `src/mcp/server.ts` routes stdin EOF/close, SIGINT/SIGTERM, and programmatic stop through one idempotent shutdown coordinator. New requests are rejected after quiescing, and request completion notifications release the drain without polling timers.
 
@@ -488,3 +492,274 @@ printf '%s\n' \
 ### Shared local profiles
 
 Run `pnpm build`, source `.env.local`, and run `HULY_URL="${HULY_URL/localhost/host.docker.internal}" pnpm integration:profiles` from a Linux-local checkout in this container. The focused harness packs/installs the CLI, logs into local Huly through its real prompts, removes environment credentials, reads projects through CLI and stdio with the same profile, and checks independent active selection, destination binding, and prompt-free missing credentials. It uses an isolated temporary configuration directory and deletes it afterward. Requires Python 3 and jq. Test telemetry is disabled by the shared harness helper.
+
+## Destination-based same-project movement
+
+After building, run the focused MCP/CLI tree and aggregate certification:
+
+```bash
+set -a
+source .env.local
+set +a
+HULY_URL="${HULY_URL/localhost/host.docker.internal}" bash scripts/integration_test_issue_movement.sh
+```
+
+This creates and cleans up a three-level tree with old/new ancestors, verifies
+preserved fields and relations, and checks actual `parents`, `subIssues` and
+`childInfo` data. See `docs/implementation/issue-306.md` for ordinary Huly 0.7.409
+trigger ownership and parent-array ordering. Movement refuses inconsistent trees;
+it does not repair or resume a partially moved tree automatically.
+
+The fixture waits 30 seconds between independent MCP and CLI scenario groups
+to respect the ordinary server's shared account RPC quota window. Each movement
+and its immediate no-op remain together; concurrent actors run without an
+intervening cooldown. These fixture waits do not change operation deadlines,
+fresh inspection guards, or assertions, and failed movements are not retried.
+They isolate independent certification cases from cumulative quota pressure;
+they are not evidence of improved product latency.
+
+
+## Bounded movement qualification
+
+Preparation tracks detached quality-stage groups in private `<log>.custody`
+directories. A successful leader exit alone never proves cleanup. Each stage
+writes a schema-owned starting record before launch, registers its group after
+installing cleanup handlers and removes the record only after proving group
+absence. The default termination grace is five seconds followed by at most two
+seconds of group-absence proof, within the outer ten-second cleanup allowance.
+TERM/KILL escalation and group-absence checks are finite; missing close
+or failed registration leaves custody unconfirmed. Any retained entry, including
+a malformed record, keeps the coordinator lock and prevents live-suite admission.
+Inspect the recorded owner/group and prove cleanup before removing custody;
+never delete a lock simply to restart. Physical nested-process regressions run
+through `check-all`/CI. See [the campaign retrospective](docs/postmortems/issue-305-integration-churn.md#bounded-campaign-outcome).
+
+For #305–311, use all five movement fixtures. The coordinator runs attributes,
+tree and concurrency before movement and rich transfer, putting unresolved
+feature boundaries ahead of previously passing checks. They own feature integration through MCP and CLI. The
+routine concurrency profile retains all fourteen unique cases through MCP and
+four representative CLI cases; `HULY_MOVEMENT_CONCURRENCY_PROFILE=expanded`
+selects the historical 28-case transport matrix. Whole-server unrelated-tool
+regressions remain separate checks, not a substitute for these feature cases.
+
+Run focused failure checks during repair. Run `pnpm check-all` once on a coherent,
+reviewed production candidate. A fixture-only correction uses shell/preflight
+and affected fixture checks; do not restart passed, unchanged feature cases just
+because the commit changed. Reused evidence must retain its original tested
+commit, environment, inputs and log. It is source-equivalent characterization,
+not an assertion that an earlier run executed the newer commit.
+
+For an authorized repair of a known failing feature boundary, run `pnpm build`,
+`pnpm verify-movement-fixtures`, `pnpm test:movement-process`, and the affected
+focused dependency tests before one bounded stock fixture run. This is repair
+feedback, not certification. The existing coordinator exports
+`boundedProcess(root, script, log, deadline)` for an overseer-owned private driver;
+it owns process groups and custody under the worktree lock. The CLI has
+`--plan`, `--run`, `--deadline`, `--state-dir`, `--diagnostic`, and `--prepare`;
+it has no single-suite selection flag. Do not invent one. The package `pnpm integration:movement` command verifies persistent quality evidence before its suite inventory; unchanged successful evidence avoids repeating preparation.
+
+For repeated fixture calls on the same immutable build and environment, prepare
+one read-only native discovery prior in an owned private directory:
+
+```bash
+prior_directory=$(mktemp -d)
+node scripts/run-bundled.mjs scripts/integration-mcp-call-main.ts --prepare-prior "$prior_directory"
+export HULY_INTEGRATION_MCP_PRIOR="$prior_directory/native-discovery.json"
+```
+
+Preparation captures ordinary native discovery once; each later helper call
+still owns a fresh stdio session and uses an explicit tool definition. The cache
+is schema-parsed, private, and bound to the exact executable, bundle and
+environment identity. An invalid or stale prior fails before invocation; it does
+not authorize replaying a mutation. Keep the prior private and include its hash
+in the coordinator's input audit.
+
+All five movement fixtures use the official SDK helper with the published
+`2026-07-28` protocol. The four fixtures other than tree use the shared Bash
+adapter `scripts/integration-mcp-adapter.sh`; tree retains its own strict reply
+and ownership-ledger wrapper. Tool calls retain
+stdin until their matching reply, supply the discovered tool definition, and do
+not resend mutations. Read-only inventory uses the helper's `--list-tools`
+mode. Telemetry opt-outs are normalized before prior identity construction.
+The concurrency gateway changes the endpoint, so its MCP movement child omits
+the upstream discovery prior and performs fresh discovery for that endpoint;
+upstream CLI reads and the independent writer retain their ordinary routes.
+Transport source, prior/helper modules and their regression fixtures are included
+in every stock suite fingerprint, not merely the private continuation audit.
+
+When the authorized coordinator provides `MOVEMENT_PRIVATE_EVIDENCE_DIR` (an
+owned, normalized 0700 directory), the tree fixture atomically retains a 0600
+`tree-ledger.json`. It records known project, issue, component, milestone,
+document, teamspace and reference IDs plus acknowledged comment, attachment and
+time-report IDs before subsequent effects. Stage/tool intent and conservative
+unresolved-creation flags remain evidence limitations. Label tools do not return
+tag-reference IDs, and a failing reference helper may have unobservable partial
+IDs. The ledger preserves those limitations without inventing IDs. Ledger failure
+keeps a failing exit status while existing known-ID cleanup is still attempted.
+The current cleanup receipt proves absence only for its explicitly inspected
+resource kinds; retaining nested IDs does not prove their absence or authorize
+broader deletion.
+
+Current qualification must run the fresh ordinary `pnpm check-all` successfully
+before any live fixture writes. The stock `pnpm integration:movement` preparation
+already enforces this order. For the authorized no-overall-deadline continuation,
+run the same-candidate gate first, then one read-only native prior preparation,
+then all five feature suites serially on that frozen candidate: concurrency,
+tree, movement, transfer and attributes. Concurrency is the currently reproduced
+failure frontier and runs first; this changes feedback order, not required scope. Build and cheap
+process checks may precede the gate; they do not replace it. A failed lint,
+typecheck or coverage stage stops before live setup and cannot be carried forward
+as a passing prerequisite.
+
+Before the qualification owner launches a frozen candidate:
+
+1. Finish source, tests and the complete fingerprint dependency inventory.
+2. Every source producer explicitly acknowledges the exact candidate HEAD and
+   private helper manifest, then ceases all writes to executable inputs.
+3. The owner verifies producers are idle or interrupts them, hashes the final
+   manifest and launches the owned run. The owner monitors it without activating
+   producers, including an integration agent with queued editing tasks.
+4. Any needed edit waits until the owned run is terminal and process custody is
+   resolved. Apply the edit, review it and establish a new freeze before launch.
+
+A clean or unchanged HEAD alone does not establish input stability: uncommitted
+source and private helper edits can change execution under the same commit.
+Existing source/runtime fingerprint guards must reject that drift. Never upgrade
+such a run or describe an edit made after launch as a prelaunch change.
+
+The earlier authorized tree-first repair feedback order is historical. It helped
+establish that the rich MCP/CLI tree scenarios were reachable, but it also spent
+live setup time before discovering a gate failure. Do not use that order for the
+next qualification. Retain its original receipts without retagging them. Only a
+successful current-candidate gate, all five successful suite receipts and final
+source, environment, runtime, log, file and directory artifact audits qualify the
+candidate. Stop on failure. This order does not authorize mutation retries,
+increase deadlines, reuse a predecessor gate or certify a subset of criteria.
+
+The movement coordinator uses one absolute deadline, a worktree lock, retained
+logs and input fingerprints. The package command includes final-gate preparation
+inside the same deadline. Preparation removes inherited `HULY_*` values from
+the unit-test subprocess; the parent retains them for live suites. Inspect `pnpm integration:movement --plan`
+before running. After process preparation, the user’s delivery budget is twenty
+minutes including the final gate, queueing, diagnosis and live work. Never reset
+that budget for a new commit or subtask. Expiry is an incomplete outcome, never
+qualification. Compute the stop time once before final preparation and retain the
+same state directory across repairs. In this Linux container:
+
+```bash
+set -a
+source .env.local
+set +a
+export HULY_URL="${HULY_URL/localhost/host.docker.internal}"
+MOVEMENT_STOP_UTC=$(date -u -d '+20 minutes' '+%Y-%m-%dT%H:%M:%SZ')
+pnpm integration:movement --run --deadline "$MOVEMENT_STOP_UTC" --state-dir .movement-certification
+```
+
+The twenty-minute delivery budget above records the original campaign constraint.
+The user subsequently removed that overall limit for completion of #306–311.
+Keep the expired campaign unchanged. For this authorized continuation, use a
+separate evidence directory and serial suite execution with finite per-suite
+hang guards, worktree ownership, input fingerprints, retained logs and verified
+process custody. A per-suite timeout diagnoses a stalled run; it does not
+reinstate the removed overall delivery budget or authorize mutation retries.
+All five feature suites and the quality gate remain required.
+
+Do not recompute `MOVEMENT_STOP_UTC` for a retry. The persisted campaign rejects
+extension and expiry. A retained custody lock means cleanup is unconfirmed:
+inspect its owner and descendants before removing it; never delete it merely to
+force another launch. CI runs the fixture and process checks through `check-all`.
+
+Do not relaunch an unchanged failed case without a named,
+distinguishing diagnostic; after two non-advancing attempts, change the method.
+
+Before each expensive run, record expected duration, UTC stop time, failed
+boundary and unexecuted suffix in the existing handoff. Preserve safe phase and
+line diagnostics before assertions, with private result/log files where needed.
+A lost response permits bounded read-only reconciliation, never another write.
+Use retained evidence to separate fixture, startup, transport and product faults.
+
+This workflow adopts the finite-work controls in sibling Dalph’s
+`docs/development/workflow.md` and Hapsland’s `docs/testing-matrix.md`. It changes
+qualification selection, not the movement API, coverage thresholds, permissions,
+or truthfulness requirements.
+
+Cross-project pre-send inspection consumes the remaining shared 30-second execution budget after fresh admission and sequence allocation; it does not start a separate ten-second allowance. Initial discovery and pre-allocation inspection retain their ten-second bounds. The full fresh pre-send guard must succeed before a task batch is sent. Expiry preserves confirmed reservations and a not-sent task batch; no mutation is replayed.
+
+### Native movement stage evidence
+
+When a movement deadline fails without identifying its slow stage, enable the
+native observer for the next distinguishing run. Before preparing native
+discovery, create a private report directory and export
+`HULY_MOVEMENT_STAGE_REPORT_DIRECTORY` with its canonical absolute path. The
+directory must already exist, belong to the current user, have mode `0700`, and
+contain no symlink in its canonical path. Keep that same environment value for
+discovery preparation and every suite, including proxy subprocesses: changing
+it invalidates the prepared discovery identity. The observer is disabled when
+the variable is absent.
+
+Each native `move_issue` request writes an exclusive mode `0600` file named
+`movement-<process-id>-<request-ordinal>.json`. Reports contain only allowlisted
+stage names, Effect outcomes and clock-derived elapsed milliseconds; they
+contain no issue identifiers, span attributes, raw errors or credentials.
+Decode report content with `MovementStageReportSchema` from
+`src/mcp/movement-stage-observer.ts`. A successful Effect span can return a
+blocked domain result: establish movement completion from the actual tool
+reply and preservation assertions, independently of stage outcomes.
+
+Reporting has a one-second write budget and preserves the original operation
+result when reporting fails. Its schema-owned status is `recorded` or
+`unavailable`. A timed-out filesystem promise may finish later, so a later
+report file does not overturn an unavailable status or establish completed
+filesystem cleanup. Empty, malformed or unavailable reports provide no
+diagnostic coverage and cannot turn a failed movement into a passing one.
+
+Before and after each suite, capture report filenames and retain hashes for
+new files. Recheck every attempted suite's report hashes in the final audit,
+including failed suites. Fingerprint the observer, report parser and collector
+sources with the qualification inputs; treat the growing report directory as
+output rather than a changing input. Collect evidence only after verifying
+the suite process has terminated. Keep report validation finite and separate
+from the underlying suite outcome. Preserve this evidence before choosing a
+repair; do not infer a deadline's cause from a different read-only profile.
+
+
+Generated runtime fingerprints include every file under `dist` and the CLI's
+`dist`, except files ending in `.tsbuildinfo`. Those files are incremental compiler
+cache data, not runtime inputs, and native typechecking can update them without
+changing an executable bundle. Bundle changes and every other generated artifact
+still invalidate live evidence; source, configuration, lockfile and fixture/tool
+dependencies remain in scope. This distinction applies prospectively and does
+not establish the sole cause of any historical fingerprint drift whose original
+per-file hashes were not retained.
+
+
+### Reusing verified movement quality evidence
+
+Movement qualification checks the native-prior environment before expensive preparation.
+Run with an explicitly empty `NODE_OPTIONS` and `HULY_PROFILE`; the prior identity
+cannot bind mutable preload/profile context. This applies to preparation and every
+fixture child, rather than clearing flags only after a gate has passed.
+
+The coordinator retains `quality-receipts.jsonl` separately from live-suite receipts.
+Quality reuse requires the last matching preparation command and input fingerprint,
+actual exit zero, confirmed custody, stable inputs, an intact hashed log, and unchanged
+built artifacts. Inputs cover source, tests, gate tooling, configuration, patches,
+installed dependency signatures and Node/platform identity. `.tsbuildinfo` is derived
+compiler metadata. Only stock `integration_test_*.sh` fixture shells are excluded from
+the quality identity; other helper/source/test changes invalidate it.
+
+When quality and all five live receipts remain valid, preparation is skipped. A changed
+live environment or fixture shell runs the stock fixture preflight and movement process
+checks before fresh affected live evidence. The scoped preparation grant independently
+revalidates the quality receipt; there is no unconditional skip-gate flag. Missing or
+edited logs and failed matching quality receipts block automatic reuse. A named
+`quality:` diagnostic admits a measured repair attempt while preserving the original
+failed receipt. Source/dependency changes require fresh quality evidence. Existing
+suite deadlines, custody and coverage thresholds remain unchanged.
+
+This repair follows the `77f66` receipt: all401 files/5348 tests and all global99%
+coverage thresholds passed, then prior preparation failed at its identity boundary
+because ambient `NODE_OPTIONS` contained only a heap flag. Repeating the same quality
+gate could not repair that environment mismatch. Earlier lost concurrency replies
+and fixture SIGTERM cleanup races likewise require retained stage evidence and
+bounded process custody, rather than another undifferentiated full campaign.

@@ -1,0 +1,224 @@
+import { TxOperations, type Client, type Tx } from "@hcengineering/core"
+import { Cause, Effect, Redacted, Schema } from "effect"
+import { DocId, NonEmptyString, ObjectClassName, PositiveInteger, Timestamp } from "../domain/schemas/shared.js"
+import { TransferSequenceSchema } from "../domain/schemas/issue-transfer.js"
+
+export const MovementTransportMilliseconds = PositiveInteger.pipe(Schema.brand("MovementTransportMilliseconds"))
+const endpointProtocols = new Set(["http:", "https:", "ws:", "wss:"])
+export const MovementEndpointSchema = Schema.URLFromString.check(
+  Schema.makeFilter(
+    (url) =>
+      endpointProtocols.has(url.protocol) &&
+      url.username === "" &&
+      url.password === "" &&
+      url.search === "" &&
+      url.hash === "",
+    { message: "Expected an absolute http, https, ws or wss endpoint without credentials, query or fragment" }
+  )
+)
+export const MovementTransportConfigSchema = Schema.Struct({
+  endpoint: MovementEndpointSchema,
+  workspace: NonEmptyString,
+  token: Schema.Redacted(NonEmptyString),
+  timeoutMs: MovementTransportMilliseconds
+})
+export type MovementTransportConfig = Schema.Schema.Type<typeof MovementTransportConfigSchema>
+export class MovementTransportError extends Schema.TaggedError<MovementTransportError>()("MovementTransportError", {
+  phase: Schema.Literals(["before-send", "after-send"]),
+  reason: NonEmptyString
+}) {}
+
+// Installed core 0.7.26 class names; plain boundary literals avoid SDK Ref type graphs in codecs.
+const MovementTransactionClasses = {
+  update: Schema.Literal("core:class:TxUpdateDoc"),
+  project: Schema.Literal("tracker:class:Project"),
+  conditional: Schema.Literal("core:class:TxApplyIf"),
+  issue: Schema.Literal("tracker:class:Issue")
+}
+const TransactionFields = {
+  _id: DocId,
+  _class: ObjectClassName,
+  space: DocId,
+  objectSpace: DocId,
+  modifiedOn: Timestamp,
+  modifiedBy: NonEmptyString
+}
+const SequenceTransactionSchema = Schema.Struct({
+  ...TransactionFields,
+  _class: MovementTransactionClasses.update,
+  objectClass: MovementTransactionClasses.project,
+  objectId: DocId,
+  operations: Schema.Struct({ $inc: Schema.Struct({ sequence: PositiveInteger }) }),
+  retrieve: Schema.Literal(true)
+})
+const ConditionalMovementSchema = Schema.Struct({
+  ...TransactionFields,
+  _class: MovementTransactionClasses.conditional,
+  scope: NonEmptyString,
+  match: Schema.Array(Schema.Struct({ _class: ObjectClassName, query: Schema.JsonObject })),
+  notMatch: Schema.Array(Schema.Struct({ _class: ObjectClassName, query: Schema.JsonObject })),
+  txes: Schema.Array(Schema.Struct({ ...TransactionFields, objectId: DocId, objectClass: ObjectClassName }))
+})
+const SameProjectUpdateSchema = Schema.Struct({
+  ...TransactionFields,
+  _class: MovementTransactionClasses.update,
+  objectClass: MovementTransactionClasses.issue,
+  objectId: DocId,
+  operations: Schema.JsonObject
+})
+const supportsSameProjectUpdate = Schema.decodeUnknownOption(SameProjectUpdateSchema)
+const supportsSequence = Schema.decodeUnknownOption(SequenceTransactionSchema)
+const supportsConditional = Schema.decodeUnknownOption(ConditionalMovementSchema)
+const MovementTransactionSchema = Schema.JsonObject.check(
+  Schema.makeFilter(
+    (value) =>
+      supportsSequence(value)._tag === "Some" ||
+      supportsConditional(value)._tag === "Some" ||
+      supportsSameProjectUpdate(value)._tag === "Some"
+  )
+)
+const ConditionalReplySchema = Schema.Union([
+  Schema.Struct({ success: Schema.Literal(false) }),
+  Schema.Struct({ success: Schema.Literal(true), serverTime: Schema.Number })
+])
+const TransportReplySchema = Schema.Struct({ status: PositiveInteger, body: Schema.String })
+const HTTP_STATUS_OK_MIN = 200
+const HTTP_STATUS_REDIRECT_MIN = 300
+const TransportRequestSchema = Schema.Struct({ ...MovementTransportConfigSchema.fields, body: Schema.String })
+type TransportRequest = Schema.Schema.Type<typeof TransportRequestSchema>
+type TransportReply = Schema.Schema.Type<typeof TransportReplySchema>
+
+// Internal I/O port: payloads are schema-owned; its effect implementation is not serialized.
+export interface MovementHttpPort {
+  readonly send: (request: TransportRequest) => Effect.Effect<TransportReply, MovementTransportError>
+}
+export const makeMovementRequestUrl = (endpoint: URL, workspace: NonEmptyString) =>
+  Effect.try({
+    try: () => {
+      const url = Schema.decodeUnknownSync(MovementEndpointSchema)(endpoint.href)
+      url.protocol = url.protocol === "ws:" ? "http:" : url.protocol === "wss:" ? "https:" : url.protocol
+      url.pathname = `${url.pathname.replace(/\/+$/, "")}/api/v1/tx/${encodeURIComponent(workspace)}`
+      return url
+    },
+    catch: () =>
+      new MovementTransportError({
+        phase: "before-send",
+        reason: NonEmptyString.make("Movement HTTP endpoint is invalid; no request sent.")
+      })
+  })
+export const movementHttpPort: MovementHttpPort = {
+  send: Effect.fn("movement.singleSendHttp")(function* (request) {
+    const url = yield* makeMovementRequestUrl(request.endpoint, request.workspace)
+    return yield* Effect.tryPromise({
+      try: async (signal) => {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${Redacted.value(request.token)}` },
+          body: request.body,
+          signal,
+          redirect: "error"
+        })
+        return Schema.decodeUnknownSync(TransportReplySchema)({ status: response.status, body: await response.text() })
+      },
+      catch: () =>
+        new MovementTransportError({
+          phase: "after-send",
+          reason: NonEmptyString.make("Movement write response unavailable; no transport retry was attempted.")
+        })
+    })
+  })
+}
+
+// Tx is generated by the installed SDK. The serialized request and response belong to the schemas here.
+export const sendMovementTransaction = Effect.fn("movement.sendTransaction")(function* (
+  transaction: Tx,
+  config: MovementTransportConfig,
+  http: MovementHttpPort
+) {
+  const json = yield* Effect.try({
+    try: () => JSON.stringify(transaction),
+    catch: () =>
+      new MovementTransportError({
+        phase: "before-send",
+        reason: NonEmptyString.make("Movement transaction could not be encoded; no request sent.")
+      })
+  })
+  const parsed = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(MovementTransactionSchema))(json).pipe(
+    Effect.mapError(
+      () =>
+        new MovementTransportError({
+          phase: "before-send",
+          reason: NonEmptyString.make("Unsupported or malformed movement transaction; no request sent.")
+        })
+    )
+  )
+  const reply = yield* http.send({ ...config, body: JSON.stringify(parsed) }).pipe(
+    Effect.timeout(config.timeoutMs),
+    Effect.mapError((cause) =>
+      cause instanceof MovementTransportError
+        ? cause
+        : new MovementTransportError({
+            phase: "after-send",
+            reason: NonEmptyString.make(
+              "Movement write response timed out; effects require inspection. No retry attempted."
+            )
+          })
+    )
+  )
+  if (reply.status < HTTP_STATUS_OK_MIN || reply.status >= HTTP_STATUS_REDIRECT_MIN)
+    return yield* new MovementTransportError({
+      phase: "after-send",
+      reason: NonEmptyString.make(
+        "Movement write returned a non-success HTTP response; effects require inspection. No retry attempted."
+      )
+    })
+  const response = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.JsonObject))(reply.body).pipe(
+    Effect.mapError(
+      () =>
+        new MovementTransportError({
+          phase: "after-send",
+          reason: NonEmptyString.make(
+            "Movement write response was malformed; effects require inspection. No retry attempted."
+          )
+        })
+    )
+  )
+  const invalidResponse = () =>
+    new MovementTransportError({
+      phase: "after-send",
+      reason: NonEmptyString.make(
+        "Movement write result did not match its contract; effects require inspection. No retry attempted."
+      )
+    })
+  if (supportsSequence(parsed)._tag === "Some")
+    return yield* Schema.decodeUnknownEffect(TransferSequenceSchema)(response).pipe(Effect.mapError(invalidResponse))
+  if (supportsConditional(parsed)._tag === "Some")
+    return yield* Schema.decodeUnknownEffect(ConditionalReplySchema)(response).pipe(Effect.mapError(invalidResponse))
+  return response
+})
+
+export const makeMovementTxOperations = (
+  ordinary: TxOperations,
+  config: MovementTransportConfig,
+  http: MovementHttpPort = movementHttpPort,
+  signal?: AbortSignal
+) => {
+  const client: Client = {
+    getHierarchy: () => ordinary.getHierarchy(),
+    getModel: () => ordinary.getModel(),
+    findAll: (cls, query, options) => ordinary.findAll(cls, query, options),
+    findOne: (cls, query, options) => ordinary.findOne(cls, query, options),
+    searchFulltext: (query, options) => ordinary.searchFulltext(query, options),
+    domainRequest: (domain, params, options) => ordinary.client.domainRequest(domain, params, options),
+    close: () => Promise.resolve(),
+    tx: async (transaction) => {
+      const exit = await Effect.runPromiseExit(sendMovementTransaction(transaction, config, http), { signal })
+      if (exit._tag === "Success") return exit.value
+      const error = Cause.findErrorOption(exit.cause)
+      // Client.tx requires a rejected Promise; preserve the typed expected error for the Effect adapter.
+      if (error._tag === "Some") throw error.value
+      throw Cause.squash(exit.cause)
+    }
+  }
+  return new TxOperations(client, ordinary.user, ordinary.isDerived)
+}

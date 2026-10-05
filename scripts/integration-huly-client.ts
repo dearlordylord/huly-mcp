@@ -9,7 +9,8 @@ const decodeHulyConfig = Schema.decodeUnknownSync(HulyConfigSchema)
 const decodeAccountUuid = Schema.decodeUnknownSync(AccountUuid)
 const decodePersonId = Schema.decodeUnknownSync(PersonId)
 
-const require = createRequire(import.meta.url)
+// Fixture commands run from the repository; this anchor survives both ESM and CJS bundling.
+const require = createRequire(`${process.cwd()}/package.json`)
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports, no-restricted-syntax -- CJS interop boundary: api-client does not expose these helpers as ESM runtime named exports under tsx.
 const apiClient = require("@hcengineering/api-client") as typeof import("@hcengineering/api-client")
 
