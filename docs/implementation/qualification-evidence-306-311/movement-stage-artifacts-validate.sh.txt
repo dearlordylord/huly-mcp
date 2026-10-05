@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+: "${MOVEMENT_STAGE_VALIDATION_INPUT:?Stage validation input required}"
+env NODE_PATH="$PWD/node_modules" node scripts/run-bundled.mjs /tmp/hulymcp-dalph-306-311/takeover/movement-stage-artifacts-validate.mts "$MOVEMENT_STAGE_VALIDATION_INPUT"

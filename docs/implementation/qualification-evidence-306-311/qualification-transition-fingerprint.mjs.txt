@@ -1,0 +1,9 @@
+import {readFile} from 'node:fs/promises'
+import {createHash} from 'node:crypto'
+import {fingerprintSuite as original} from './qualification-fingerprint.mjs'
+export {boundedProcess,realTime} from './qualification-fingerprint.mjs'
+export const fingerprintSuite=async(...args)=>{
+ const base=await original(...args),files=['qualification-transition.mjs','qualification-transition-live-driver.mjs','qualification-transition-binding.mjs','qualification-transition-fingerprint.mjs','qualification-transition-proof.mjs']
+ const extra=await Promise.all(files.map(async name=>[name,createHash('sha256').update(await readFile(new URL(name,import.meta.url))).digest('hex')]))
+ return {...base,fingerprint:createHash('sha256').update(JSON.stringify({base:base.fingerprint,extra})).digest('hex')}
+}

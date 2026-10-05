@@ -1,0 +1,18 @@
+import {createHash} from "node:crypto"
+import {readFile} from "node:fs/promises"
+import {Schema} from "./integration/node_modules/effect/dist/index.js"
+import {makeValidationOutputSchema} from "./movement-stage-validation-schema.mjs"
+import {MovementStageReportSchema} from "./integration/src/mcp/movement-stage-observer.js"
+const Arguments = Schema.Struct({directory:Schema.NonEmptyString,names:Schema.Array(Schema.String.check(Schema.isPattern(/^movement-[0-9]+-[0-9]+\.json$/)))})
+const Output=makeValidationOutputSchema(MovementStageReportSchema)
+const main=async()=>{
+ const args=Schema.decodeUnknownSync(Schema.fromJsonString(Arguments))(process.argv[2])
+ const reports=[]
+ for(const name of args.names){
+  const raw:unknown=await readFile(`${args.directory}/${name}`,"utf8")
+  const report=Schema.decodeUnknownSync(Schema.fromJsonString(MovementStageReportSchema))(raw)
+  reports.push({name,hash:createHash("sha256").update(String(raw)).digest("hex"),report})
+ }
+ process.stdout.write(Schema.encodeSync(Schema.fromJsonString(Output))({status:"observed",reports})+"\n")
+}
+void main().catch(()=>{process.stderr.write('{"observerStatus":"unavailable"}\n');process.exitCode=1})

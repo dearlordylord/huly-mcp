@@ -1,0 +1,52 @@
+import {lstat,realpath,readdir,readFile} from 'node:fs/promises'
+import {createHash} from 'node:crypto'
+import {Schema} from './integration/node_modules/effect/dist/index.js'
+const PERMISSION_BITS=0o777,PRIVATE_DIRECTORY_MODE=0o700,PRIVATE_FILE_MODE=0o600
+export const ReportFilenameSchema=Schema.String.check(Schema.isPattern(/^movement-[0-9]+-[0-9]+\.json$/))
+const privateDirectory=async directory=>{
+ try{
+  const stat=await lstat(directory)
+  return stat.isDirectory()&&!stat.isSymbolicLink()&&stat.uid===process.getuid?.()&&(stat.mode&PERMISSION_BITS)===PRIVATE_DIRECTORY_MODE&&await realpath(directory)===directory
+ }catch{return false}
+}
+export const snapshotReportNames=async directory=>{
+ if(!await privateDirectory(directory))return {status:'unavailable',reason:'directory'}
+ try{
+  const names=(await readdir(directory)).sort()
+  if(names.some(name=>Schema.decodeUnknownOption(ReportFilenameSchema)(name)._tag==='None'))return {status:'unavailable',reason:'filename'}
+  return {status:'observed',names}
+ }catch{return {status:'unavailable',reason:'directory'}}
+}
+const readReport=async(directory,name)=>{
+ if(Schema.decodeUnknownOption(ReportFilenameSchema)(name)._tag==='None')return undefined
+ try{
+  const file=`${directory}/${name}`,stat=await lstat(file)
+  if(!stat.isFile()||stat.isSymbolicLink()||stat.uid!==process.getuid?.()||(stat.mode&PERMISSION_BITS)!==PRIVATE_FILE_MODE)return undefined
+  const bytes=await readFile(file)
+  return {bytes,hash:createHash('sha256').update(bytes).digest('hex')}
+ }catch{return undefined}
+}
+// Internal parser port: the typed entry supplies the production report codec.
+// No report bytes can become evidence without its successful parsed projection.
+export const collectReportDelta=async(directory,before,parseReport)=>{
+ const after=await snapshotReportNames(directory)
+ if(after.status!=='observed')return after
+ if(before.some(name=>!after.names.includes(name)))return {status:'unavailable',reason:'removed-report'}
+ const artifacts=[]
+ let codecUnavailable=false
+ for(const name of after.names.filter(name=>!before.includes(name))){
+  const file=await readReport(directory,name)
+  if(file===undefined)return {status:'unavailable',reason:'file'}
+  const parsed=parseReport(file.bytes.toString('utf8'))
+  if(parsed.status!=='valid'){codecUnavailable=true;artifacts.push({name,hash:file.hash});continue}
+  artifacts.push({name,hash:file.hash,report:parsed.report})
+ }
+ if(codecUnavailable)return {status:'unavailable',reason:'codec',artifacts,diagnosticCoverage:'unavailable'}
+ return {status:'observed',artifacts,reportCount:artifacts.length,diagnosticCoverage:artifacts.length>0?'available':'no-reports'}
+}
+export const auditReportArtifacts=async(directory,artifacts)=>{
+ if(!await privateDirectory(directory))return false
+ for(const artifact of artifacts){const file=await readReport(directory,artifact.name);if(file===undefined||file.hash!==artifact.hash)return false}
+ return true
+}
+export {snapshotEvidenceArtifacts} from './integration/scripts/movement-artifact-hashes.mjs'

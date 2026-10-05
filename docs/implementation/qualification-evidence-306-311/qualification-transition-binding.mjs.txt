@@ -1,0 +1,12 @@
+import {Schema} from './integration/node_modules/effect/dist/index.js'
+import {GateBindingSchema} from './gate-first-binding.mjs'
+export const oldCommit='77f66d096fa472958648894232de51138301a287'
+export const successor='96204ed887b5ef087d5215e348ca070233bc7d84'
+export const pending=['mcp:successful-batch-reply-lost','mcp:verification-outage','cli:refuse-stale-attribute','cli:allocated-reply-lost','cli:successful-batch-reply-lost','cli:verification-outage']
+export const historical=['refuse-stale-child','preserve-later-child','refuse-stale-comment','preserve-later-comment','refuse-stale-time','preserve-later-time','refuse-stale-attribute','preserve-later-attribute','refuse-stale-ancestry','preserve-later-ancestry','before-allocation-send','allocated-reply-lost'].map(name=>`mcp:${name}`)
+export const Digest=Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/))
+export const CaseKey=Schema.Literals([...historical,...pending])
+export const CaseName=Schema.Literals([...new Set([...historical,...pending].map(key=>key.split(':')[1]))])
+export const AssertedRowSchema=Schema.Struct({transport:Schema.Literals(['mcp','cli']),case:CaseName,evidence:Schema.JsonObject})
+export const CasesPassedSchema=Schema.Struct({phase:Schema.Literal('concurrency-cases-passed'),scope:Schema.Literal('selected'),cases:Schema.Array(CaseKey),caseCount:Schema.Literal(6)})
+export const TransitionSchema=Schema.Struct({event:Schema.Literal('qualification-source-transition'),sourceCommit:Schema.Literal(successor),originalSourceCommit:Schema.Literal(oldCommit),originalGateReceiptHash:Digest,originalBinding:GateBindingSchema,liveBinding:GateBindingSchema,historicalSummaryHash:Digest,reviewedDiffHash:Digest,reconstructedGateBinding:GateBindingSchema,historicalCases:Schema.Array(CaseKey),pendingCases:Schema.Array(CaseKey),environmentChange:Schema.Literal('heap-only-NODE_OPTIONS-removed; HULY_PROFILE-absent; new-owned-observer-directory')})

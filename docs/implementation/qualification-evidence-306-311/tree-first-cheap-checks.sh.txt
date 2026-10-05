@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+while IFS= read -r movement_config_key; do unset "$movement_config_key"; done < <(compgen -A variable HULY_)
+pnpm verify-movement-fixtures
+pnpm test:movement-process
+pnpm test test/scripts/issue-tree-cleanup.test.ts test/scripts/integration-mcp-call.test.ts test/scripts/integration-mcp-prior.test.ts test/integration-fixtures/movement-public-process.test.ts
+pnpm build

@@ -1,0 +1,53 @@
+import {readFile,mkdtemp,writeFile,symlink,rm} from 'node:fs/promises'
+import {execFileSync} from 'node:child_process'
+import {createHash} from 'node:crypto'
+import {pathToFileURL} from 'node:url'
+import {Schema} from './integration/node_modules/effect/dist/index.js'
+import {captureGateBinding,gateBindingsEqual} from './gate-first-binding.mjs'
+import {MovementArtifactSnapshotSchema,auditEvidenceArtifacts} from './integration/scripts/movement-artifact-hashes.mjs'
+import {ReportFilenameSchema,auditReportArtifacts} from './movement-stage-artifacts.mjs'
+import {oldCommit,successor,historical,Digest,AssertedRowSchema} from './qualification-transition-binding.mjs'
+export const root='/tmp/hulymcp-dalph-306-311/takeover/integration'
+export const hash=value=>createHash('sha256').update(value).digest('hex')
+const git=(...args)=>execFileSync('git',args,{cwd:root,encoding:'utf8'}).trim()
+export const summaryPath='/tmp/hulymcp-dalph-306-311/takeover/qualification-77f66d09-resume-terminal-summary.json'
+const allow=['CLAUDE.md','INTEGRATION_TESTING.md','docs/implementation/issue-311.md','docs/postmortems/issue-305-integration-churn.md','package.json','scripts/integration_test_issue_movement_concurrency.sh','scripts/issue-movement-concurrency/assert-outcome-smoke.sh','scripts/issue-movement-concurrency/assert-outcome.jq','scripts/issue-movement-concurrency/retain-verification-main.ts','scripts/issue-movement-concurrency/select-cases.mjs','scripts/issue-movement-concurrency/select-cases.test.mjs','scripts/movement-quality-receipt.mjs','scripts/prepare-movement-certification.sh','scripts/run-movement-certification.mjs','test/scripts/run-movement-certification.node.test.mjs']
+export const verifySource=()=>{
+ if(git('rev-parse','HEAD')!==successor||git('status','--porcelain'))throw Error('Clean successor required')
+ const changed=git('diff','--name-only',oldCommit,successor).split('\n')
+ if(changed.some(file=>!allow.includes(file)))throw Error('Unreviewed source transition')
+ if(git('diff',oldCommit,successor,'--','src','packages/huly-cli/src'))throw Error('Production source changed')
+ return hash(execFileSync('git',['diff','--binary',oldCommit,successor],{cwd:root}))
+}
+const StageArtifact=Schema.Struct({name:ReportFilenameSchema,hash:Digest,report:Schema.Struct({validatedProjectionArtifact:Schema.Literal('stage-validation.json'),name:ReportFilenameSchema})})
+const TerminalSchema=Schema.Struct({sourceCommit:Schema.Literal(oldCommit),log:Schema.NonEmptyString,logHash:Digest,exit:Schema.Literal(1),clean:Schema.Literal(true),inputsStable:Schema.Literal(true),evidenceDirectory:Schema.NonEmptyString,artifactHashes:MovementArtifactSnapshotSchema.fields.files,artifactDirectories:MovementArtifactSnapshotSchema.fields.directories,movementStageEvidence:Schema.Struct({status:Schema.Literal('observed'),artifacts:Schema.Array(StageArtifact),reportCount:Schema.Literal(13),diagnosticCoverage:Schema.Literal(true),directory:Schema.NonEmptyString})})
+export const SummarySchema=Schema.Struct({terminal:TerminalSchema,assertedCasePasses:Schema.Literal(12),failedCase:Schema.Literal('mcp:successful-batch-reply-lost'),complete:Schema.Literal(false),remainingSuites:Schema.Literal('not-started'),audit:Schema.Struct({gateBindingStable:Schema.Literal(true),priorCacheStable:Schema.Literal(true),originalGateReused:Schema.Literal(true),combinedPassed:Schema.Literal(false),audits:Schema.Array(Schema.Struct({suite:Schema.Literal('issue_movement_concurrency'),fingerprintStable:Schema.Literal(true),artifactHashesStable:Schema.Literal(true),artifactDirectoriesStable:Schema.Literal(true),logHashStable:Schema.Literal(true),sourceCommitStable:Schema.Literal(true),movementStageArtifactsStable:Schema.Literal(true)}))})})
+export const verifyHistorical=async()=>{
+ const bytes=await readFile(summaryPath)
+ if(hash(bytes)!=='f1f0d2dd5841bbddf53d32727660e1a12dda2e85e237f8648e8292797272f15d')throw Error('Historical summary changed')
+ const summary=Schema.decodeUnknownSync(Schema.fromJsonString(SummarySchema))(bytes.toString('utf8')),parsed=summary.terminal
+ const log=await readFile(parsed.log,'utf8')
+ if(hash(log)!==parsed.logHash)throw Error('Historical log changed')
+ const keys=log.split('\n').flatMap(line=>{const row=Schema.decodeUnknownOption(Schema.fromJsonString(AssertedRowSchema))(line);return row._tag==='Some'?[`${row.value.transport}:${row.value.case}`]:[]})
+ if(JSON.stringify(keys)!==JSON.stringify(historical))throw Error('Historical asserted markers mismatch')
+ const audit=await auditEvidenceArtifacts(parsed.evidenceDirectory,{files:parsed.artifactHashes,directories:parsed.artifactDirectories})
+ const stage=parsed.movementStageEvidence
+ if(!audit.filesStable||!audit.directoriesStable||!await auditReportArtifacts(stage.directory,stage.artifacts))throw Error('Historical artifacts changed')
+ return hash(bytes)
+}
+export const reconstructGate=async gate=>{
+ const projection=await mkdtemp('/tmp/hulymcp-dalph-306-311/takeover/transition-old-source-')
+ try{
+  const archive=execFileSync('git',['archive',oldCommit],{cwd:root,maxBuffer:64*1024*1024});execFileSync('tar',['-xf','-','-C',projection],{input:archive})
+  await symlink(`${root}/node_modules`,`${projection}/node_modules`)
+  await symlink(`${root}/dist`,`${projection}/dist`)
+  await symlink(`${root}/packages/huly-cli/dist`,`${projection}/packages/huly-cli/dist`)
+  const source=await readFile('/tmp/hulymcp-dalph-306-311/takeover/qualification-fingerprint.mjs','utf8')
+  const helper=`${projection}/historical-fingerprint.mjs`
+  await writeFile(helper,source.replaceAll("'./integration/scripts/run-movement-certification.mjs'","'./scripts/run-movement-certification.mjs'"))
+  const original=await import(pathToFileURL(helper).href)
+  const binding=await captureGateBinding(projection,original.fingerprintSuite)
+  if(!gateBindingsEqual(binding,gate.binding))throw Error('Historical aggregate runtime binding not reproduced')
+  return binding
+ }finally{await rm(projection,{recursive:true,force:true})}
+}

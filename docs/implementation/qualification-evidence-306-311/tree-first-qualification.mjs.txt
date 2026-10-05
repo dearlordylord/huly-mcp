@@ -1,0 +1,36 @@
+import {mkdir,writeFile,readFile,rm,mkdtemp,chmod} from 'node:fs/promises'
+import {execFileSync} from 'node:child_process'
+import {createHash} from 'node:crypto'
+import {boundedProcess,realTime,fingerprintSuite} from './qualification-fingerprint.mjs'
+const root='/tmp/hulymcp-dalph-306-311/takeover/integration',lock=`${root}/.movement-certification.lock`,sourceCommit=execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim()
+if(sourceCommit!=='6689ff3c38b4a0afb346e684c63003d8ad1c319d')throw Error('Candidate mismatch')
+process.umask(0o077)
+delete process.env.HULY_INTEGRATION_MCP_PRIOR
+await mkdir(lock);let clean=false,passed=false
+const started=realTime.now(),log=`/tmp/hulymcp-dalph-306-311/takeover/qualification-cheap-${started}.log`
+try{await writeFile(`${lock}/owner.json`,JSON.stringify({pid:process.pid,mode:'cheap-required-checks',sourceCommit,log}));const before=await fingerprintSuite(root,'issue_tree','scripts/prepare-movement-certification.sh',false);process.stdout.write(JSON.stringify({event:'cheap-start',sourceCommit,started,log})+'\n');const result=await boundedProcess(root,'/tmp/hulymcp-dalph-306-311/takeover/tree-first-cheap-checks.sh',log,started+300000);clean=result.clean;const after=await fingerprintSuite(root,'issue_tree','scripts/prepare-movement-certification.sh',false);const inputsStable=before.fingerprint===after.fingerprint&&execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim()===sourceCommit;const receipt={event:'cheap-terminal',sourceCommit,started,ended:realTime.now(),log,logHash:createHash('sha256').update(await readFile(log)).digest('hex'),...result,inputsStable};await writeFile(`${log}.receipt.json`,JSON.stringify(receipt));process.stdout.write(JSON.stringify(receipt)+'\n');passed=result.exit===0&&clean&&inputsStable;if(!passed)process.exitCode=result.exit||1
+if(passed){
+ const stageDirectory=await mkdtemp('/tmp/hulymcp-dalph-306-311/takeover/movement-stage-reports-');await chmod(stageDirectory,0o700)
+ process.env.HULY_MOVEMENT_STAGE_REPORT_DIRECTORY=stageDirectory
+ const directory=await mkdtemp('/tmp/hulymcp-dalph-306-311/takeover/native-prior-');await chmod(directory,0o700)
+ process.env.MOVEMENT_PRIOR_DIRECTORY=directory
+ const priorStarted=realTime.now(),priorLog=`${directory}/prepare.log`
+ const priorBefore=await fingerprintSuite(root,'issue_tree','scripts/prepare-movement-certification.sh',false)
+ process.stdout.write(JSON.stringify({event:'prior-start',sourceCommit,started:priorStarted,log:priorLog})+'\n')
+ clean=false
+ const priorResult=await boundedProcess(root,'/tmp/hulymcp-dalph-306-311/takeover/native-prior-prepare.sh',priorLog,priorStarted+80000)
+ clean=priorResult.clean;delete process.env.MOVEMENT_PRIOR_DIRECTORY
+ await chmod(priorLog,0o600)
+ const priorAfter=await fingerprintSuite(root,'issue_tree','scripts/prepare-movement-certification.sh',false)
+ const stable=priorBefore.fingerprint===priorAfter.fingerprint&&execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim()===sourceCommit
+ passed=priorResult.exit===0&&clean&&stable
+ const cachePath=`${directory}/native-discovery.json`
+ const cacheHash=passed?createHash('sha256').update(await readFile(cachePath)).digest('hex'):undefined
+ const priorReceipt={event:'prior-terminal',sourceCommit,started:priorStarted,ended:realTime.now(),log:priorLog,logHash:createHash('sha256').update(await readFile(priorLog)).digest('hex'),...priorResult,inputsStable:stable,cachePath,cacheHash,diagnosticOnly:false}
+ await writeFile(`${priorLog}.receipt.json`,JSON.stringify(priorReceipt),{mode:0o600})
+ process.stdout.write(JSON.stringify(priorReceipt)+'\n')
+ if(passed)process.env.HULY_INTEGRATION_MCP_PRIOR=cachePath
+ else process.exitCode=priorResult.exit||1
+}
+}finally{if(clean)await rm(lock,{recursive:true})}
+if(passed)await import('./tree-first-live-driver.mjs')

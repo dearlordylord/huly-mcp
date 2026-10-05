@@ -1,0 +1,110 @@
+import {ResumeSchema} from './qualification-resume-binding.mjs'
+import { mkdir, writeFile, appendFile, readFile, rm, readdir } from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import {auditEvidenceArtifacts} from './integration/scripts/movement-artifact-hashes.mjs'
+import {GateReceiptSchema,PriorReceiptSchema,captureGateBinding,gateBindingsEqual} from './gate-first-binding.mjs'
+import {Schema} from './integration/node_modules/effect/dist/index.js'
+import {ValidationManifestSchema} from './movement-stage-validation-schema.mjs'
+import {snapshotReportNames,collectReportDelta,auditReportArtifacts,snapshotEvidenceArtifacts} from './movement-stage-artifacts.mjs'
+import {suites} from './integration/scripts/run-movement-certification.mjs'
+import { boundedProcess, fingerprintSuite, realTime } from './qualification-resume-fingerprint.mjs'
+const root = '/tmp/hulymcp-dalph-306-311/takeover/integration'
+const stateDir = '/tmp/hulymcp-dalph-306-311/takeover/unlimited-delivery-qualification'
+const lock = `${root}/.movement-certification.lock`
+const prepare = 'scripts/prepare-movement-certification.sh'
+const diagnostic = 'SDK stdin held until matching reply; verified CommonJS entry; 80-second whole-helper bound; strict derived-tree aggregate oracle; current-candidate qualification'
+const hash = value => createHash('sha256').update(value).digest('hex')
+const currentCommit = () => execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim()
+const receiptPath=Schema.decodeUnknownSync(Schema.NonEmptyString)(process.env.MOVEMENT_VERIFIED_GATE_RECEIPT)
+const gateReceiptBytes=await readFile(receiptPath,'utf8'),gateReceiptHash=hash(gateReceiptBytes)
+const gateReceipt=Schema.decodeUnknownSync(Schema.fromJsonString(GateReceiptSchema))(gateReceiptBytes)
+if(gateReceipt.sourceCommit!==currentCommit()||gateReceipt.logHash!==hash(await readFile(gateReceipt.log)))throw Error('Verified gate evidence mismatch')
+const resumePath=Schema.decodeUnknownSync(Schema.NonEmptyString)(process.env.MOVEMENT_QUALIFICATION_RESUME_RECEIPT)
+const resumeBytes=await readFile(resumePath,'utf8'),resumeHash=hash(resumeBytes)
+const resume=Schema.decodeUnknownSync(Schema.fromJsonString(ResumeSchema))(resumeBytes)
+if(resume.sourceCommit!==currentCommit()||resume.originalGateReceiptHash!==gateReceiptHash||!gateBindingsEqual(resume.originalBinding,gateReceipt.binding))throw Error('Resume provenance mismatch')
+const priorReceiptPath=Schema.decodeUnknownSync(Schema.NonEmptyString)(process.env.MOVEMENT_VERIFIED_PRIOR_RECEIPT)
+const priorReceiptBytes=await readFile(priorReceiptPath,'utf8'),priorReceiptHash=hash(priorReceiptBytes)
+const priorReceipt=Schema.decodeUnknownSync(Schema.fromJsonString(PriorReceiptSchema))(priorReceiptBytes)
+const priorStable=async()=>priorReceipt.sourceCommit===currentCommit()&&priorReceipt.cachePath===process.env.HULY_INTEGRATION_MCP_PRIOR&&priorReceipt.cacheHash===hash(await readFile(priorReceipt.cachePath))&&priorReceiptHash===hash(await readFile(priorReceiptPath))
+if(!await priorStable()||!gateBindingsEqual(resume.liveBinding,await captureGateBinding(root,fingerprintSuite)))throw Error('Gate to live binding mismatch')
+
+let clean = true
+await mkdir(stateDir, {recursive:true,mode:0o700})
+await mkdir(lock)
+try {
+  const runStarted = realTime.now()
+  await writeFile(`${lock}/owner.json`, JSON.stringify({pid:process.pid,stateDir,mode:'no-overall-deadline',perSuiteMinutes:20,runStarted}))
+  const sourceCommit = currentCommit()
+  const sourceBaseline = await fingerprintSuite(root,suites[0],prepare,false)
+  await writeFile(`${stateDir}/campaign-${runStarted}.json`,JSON.stringify({sourceCommit,overallDeadline:null,perSuiteMinutes:20,started:runStarted,diagnostic,historicalCampaignPreserved:true}))
+  const successful = [],attempted=[]
+  const gatePassed=true
+  for (const suite of suites) {
+    const fingerprints = await fingerprintSuite(root,suite,prepare)
+    const stageDirectory=process.env.HULY_MOVEMENT_STAGE_REPORT_DIRECTORY
+    const stageBefore=await snapshotReportNames(stageDirectory)
+    const started = realTime.now(), log = `${stateDir}/${suite}-${started}.log`
+    process.stdout.write(JSON.stringify({event:'suite-start',suite,started,log,diagnostic})+'\n')
+    const evidenceDirectory=`${log}.evidence`
+    await mkdir(evidenceDirectory,{mode:0o700})
+    process.env.MOVEMENT_PRIVATE_EVIDENCE_DIR=evidenceDirectory
+    clean = false
+    const result = await boundedProcess(root,`scripts/integration_test_${suite}.sh`,log,started+20*60*1000)
+    delete process.env.MOVEMENT_PRIVATE_EVIDENCE_DIR
+    clean = result.clean
+    let movementStageEvidence={status:'unavailable',reason:'snapshot',diagnosticCoverage:false}
+    if(clean&&stageBefore.status==='observed'){
+      const stageAfter=await snapshotReportNames(stageDirectory)
+      if(stageAfter.status==='observed'){
+        const names=stageAfter.names.filter(name=>!stageBefore.names.includes(name))
+        process.env.MOVEMENT_STAGE_VALIDATION_INPUT=JSON.stringify({directory:stageDirectory,names})
+        const validationLog=`${evidenceDirectory}/stage-validation.json`
+        const validation=await boundedProcess(root,'/tmp/hulymcp-dalph-306-311/takeover/movement-stage-artifacts-validate.sh',validationLog,realTime.now()+30000)
+        delete process.env.MOVEMENT_STAGE_VALIDATION_INPUT
+        clean=clean&&validation.clean
+        if(validation.exit===0&&validation.clean){
+          try {
+          const decoded=Schema.decodeUnknownSync(Schema.fromJsonString(ValidationManifestSchema))(await readFile(validationLog,'utf8'))
+          movementStageEvidence=await collectReportDelta(stageDirectory,stageBefore.names,raw=>{
+            const item=decoded.reports.find(report=>report.hash===hash(raw))
+            return item===undefined?{status:'invalid'}:{status:'valid',report:{validatedProjectionArtifact:'stage-validation.json',name:item.name}}
+          })
+          movementStageEvidence={...movementStageEvidence,directory:stageDirectory,
+            diagnosticCoverage:movementStageEvidence.status==='observed'&&movementStageEvidence.reportCount>0&&!/"observerStatus"\s*:\s*"unavailable"/.test(await readFile(log,'utf8'))}
+          } catch { movementStageEvidence={...await collectReportDelta(stageDirectory,stageBefore.names,()=>({status:'invalid'})),directory:stageDirectory,diagnosticCoverage:false,reason:'validation-output'} }
+        }else movementStageEvidence={...await collectReportDelta(stageDirectory,stageBefore.names,()=>({status:'invalid'})),directory:stageDirectory,diagnosticCoverage:false,validation}
+      }
+    }
+    const artifactSnapshot=await snapshotEvidenceArtifacts(evidenceDirectory)
+    const artifactHashes=artifactSnapshot.files
+    const after = await fingerprintSuite(root,suite,prepare)
+    const sourceAfter = await fingerprintSuite(root,suites[0],prepare,false)
+    const inputsStable = currentCommit()===sourceCommit && after.fingerprint===fingerprints.fingerprint && sourceAfter.fingerprint===sourceBaseline.fingerprint
+    const evidence = {suite,evidenceDirectory,artifactHashes,artifactDirectories:artifactSnapshot.directories,movementStageEvidence,...fingerprints,sourceCommit,log,logHash:hash(await readFile(log)),started,ended:realTime.now(),exit:result.exit,clean,inputsStable,diagnostic,...(result.custodyDirectory?{custodyDirectory:result.custodyDirectory}:{})}
+    attempted.push(evidence)
+    await appendFile(`${stateDir}/receipts.jsonl`,JSON.stringify(evidence)+'\n')
+    process.stdout.write(JSON.stringify({event:'suite-terminal',...evidence})+'\n')
+    if(result.exit!==0||!clean||!inputsStable){process.exitCode=result.exit||1;break}
+    successful.push(evidence)
+
+  }
+  const audits = []
+  for (const receipt of attempted) {
+    const fingerprints = await fingerprintSuite(root,receipt.suite,prepare)
+    const artifactAudit=await auditEvidenceArtifacts(receipt.evidenceDirectory,{files:receipt.artifactHashes,directories:receipt.artifactDirectories})
+    audits.push({suite:receipt.suite,fingerprintStable:fingerprints.fingerprint===receipt.fingerprint,
+      artifactHashesStable:artifactAudit.filesStable,artifactDirectoriesStable:artifactAudit.directoriesStable,
+      logHashStable:hash(await readFile(receipt.log))===receipt.logHash,sourceCommitStable:currentCommit()===sourceCommit,
+      movementStageArtifactsStable:receipt.movementStageEvidence.artifacts===undefined||await auditReportArtifacts(receipt.movementStageEvidence.directory,receipt.movementStageEvidence.artifacts)})
+  }
+  const gateBindingStable=gateBindingsEqual(resume.liveBinding,await captureGateBinding(root,fingerprintSuite)),priorCacheStable=await priorStable()
+  const auditPassed = gateBindingStable&&priorCacheStable&&audits.every(audit=>audit.fingerprintStable&&audit.logHashStable&&audit.sourceCommitStable&&audit.artifactHashesStable&&audit.artifactDirectoriesStable&&audit.movementStageArtifactsStable)
+  if(!auditPassed)process.exitCode=1
+  const final = {event:'final-audit',runStarted,sourceCommit,ended:realTime.now(),audits,gateBindingStable,priorCacheStable,gateReceiptPath:receiptPath,gateReceiptHash,
+    qualificationResumeReceiptHash:resumeHash,originalGateReused:true,
+    combinedPassed:resumeHash===hash(await readFile(resumePath))&&gatePassed&&successful.length===suites.length&&auditPassed&&clean&&gateReceipt.logHash===hash(await readFile(gateReceipt.log))&&gateReceiptHash===hash(await readFile(receiptPath))&&currentCommit()===sourceCommit}
+  await writeFile(`${stateDir}/final-audit-${runStarted}.json`,JSON.stringify(final)+'\n')
+  process.stdout.write(JSON.stringify(final)+'\n')
+} finally { if(clean) await rm(lock,{recursive:true}) }

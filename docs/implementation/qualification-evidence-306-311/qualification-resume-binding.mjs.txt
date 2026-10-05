@@ -1,0 +1,3 @@
+import {Schema} from './integration/node_modules/effect/dist/index.js'
+import {GateBindingSchema} from './gate-first-binding.mjs'
+export const ResumeSchema=Schema.Struct({event:Schema.Literal('qualification-resume'),sourceCommit:Schema.NonEmptyString,originalGateReceiptHash:Schema.String,originalBinding:GateBindingSchema,liveBinding:GateBindingSchema,environmentChange:Schema.Literal('heap-only-NODE_OPTIONS-removed; HULY_PROFILE-absent; new-owned-observer-directory')})

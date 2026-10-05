@@ -1,0 +1,39 @@
+import {mkdir,writeFile,readFile,rm,mkdtemp,chmod} from 'node:fs/promises'
+import {execFileSync} from 'node:child_process'
+import {createHash} from 'node:crypto'
+import {Schema} from './integration/node_modules/effect/dist/index.js'
+import {GateReceiptSchema,captureGateBinding,gateBindingsEqual} from './gate-first-binding.mjs'
+import {ResumeSchema} from './qualification-resume-binding.mjs'
+import {fingerprintSuite,boundedProcess,realTime} from './qualification-resume-fingerprint.mjs'
+const root='/tmp/hulymcp-dalph-306-311/takeover/integration',lock=`${root}/.movement-certification.lock`,hash=value=>createHash('sha256').update(value).digest('hex')
+const head=()=>execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim()
+if(head()!=='77f66d096fa472958648894232de51138301a287'||execFileSync('git',['status','--porcelain'],{cwd:root,encoding:'utf8'}).trim())throw Error('Resume requires unchanged clean candidate')
+if(process.env.HULY_PROFILE!==undefined||!/^(?:--max-old-space-size=\d+)(?:\s+--max-semi-space-size=\d+)?$/.test(process.env.NODE_OPTIONS??''))throw Error('Resume requires original heap-only environment')
+process.env.HULY_MOVEMENT_STAGE_REPORT_DIRECTORY='/tmp/hulymcp-dalph-306-311/takeover/movement-stage-reports-PUeebl'
+const receiptPath='/tmp/hulymcp-dalph-306-311/takeover/gate-first-quality-1791166192099.log.receipt.json',bytes=await readFile(receiptPath,'utf8'),gate=Schema.decodeUnknownSync(Schema.fromJsonString(GateReceiptSchema))(bytes)
+if(gate.sourceCommit!==head()||gate.logHash!==hash(await readFile(gate.log))||!gateBindingsEqual(gate.binding,await captureGateBinding(root)))throw Error('Original gate binding not reproduced')
+process.umask(0o077)
+delete process.env.NODE_OPTIONS
+const stageDirectory=await mkdtemp('/tmp/hulymcp-dalph-306-311/takeover/movement-stage-resume-');await chmod(stageDirectory,0o700)
+process.env.HULY_MOVEMENT_STAGE_REPORT_DIRECTORY=stageDirectory
+delete process.env.HULY_INTEGRATION_MCP_PRIOR
+const liveBinding=await captureGateBinding(root,fingerprintSuite),resume=Schema.decodeUnknownSync(ResumeSchema)({event:'qualification-resume',sourceCommit:head(),originalGateReceiptHash:hash(bytes),originalBinding:gate.binding,liveBinding,environmentChange:'heap-only-NODE_OPTIONS-removed; HULY_PROFILE-absent; new-owned-observer-directory'})
+const resumeDirectory=await mkdtemp('/tmp/hulymcp-dalph-306-311/takeover/qualification-resume-evidence-');await chmod(resumeDirectory,0o700)
+const resumePath=`${resumeDirectory}/qualification-resume.json`;await writeFile(resumePath,JSON.stringify(resume),{mode:0o600,flag:'wx'})
+process.stdout.write(JSON.stringify(resume)+'\n')
+await mkdir(lock);let clean=false,passed=false
+try{
+ const directory=await mkdtemp('/tmp/hulymcp-dalph-306-311/takeover/native-prior-resume-');await chmod(directory,0o700)
+ process.env.MOVEMENT_PRIOR_DIRECTORY=directory
+ const started=realTime.now(),log=`${directory}/prepare.log`
+ await writeFile(`${lock}/owner.json`,JSON.stringify({pid:process.pid,mode:'qualification-resume-prior',sourceCommit:head(),log}))
+ const result=await boundedProcess(root,'/tmp/hulymcp-dalph-306-311/takeover/native-prior-prepare.sh',log,started+80000)
+ clean=result.clean;delete process.env.MOVEMENT_PRIOR_DIRECTORY
+ const inputsStable=gateBindingsEqual(liveBinding,await captureGateBinding(root,fingerprintSuite))&&head()===gate.sourceCommit
+ passed=result.exit===0&&clean&&inputsStable
+ const cachePath=`${directory}/native-discovery.json`,prior={event:'prior-terminal',sourceCommit:head(),started,ended:realTime.now(),log,logHash:hash(await readFile(log)),...result,inputsStable,cachePath,...(passed?{cacheHash:hash(await readFile(cachePath))}:{})}
+ const priorPath=`${log}.receipt.json`;await writeFile(priorPath,JSON.stringify(prior),{mode:0o600})
+ process.stdout.write(JSON.stringify(prior)+'\n')
+ if(passed){process.env.HULY_INTEGRATION_MCP_PRIOR=cachePath;process.env.MOVEMENT_VERIFIED_PRIOR_RECEIPT=priorPath;process.env.MOVEMENT_VERIFIED_GATE_RECEIPT=receiptPath;process.env.MOVEMENT_QUALIFICATION_RESUME_RECEIPT=resumePath}else process.exitCode=result.exit||1
+}finally{if(clean)await rm(lock,{recursive:true})}
+if(passed)await import('./qualification-resume-live-driver.mjs')

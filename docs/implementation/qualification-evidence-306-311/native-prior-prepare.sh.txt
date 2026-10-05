@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+: "${MOVEMENT_PRIOR_DIRECTORY:?Private prior directory required}"
+node scripts/run-bundled.mjs scripts/integration-mcp-call-main.ts --prepare-prior "$MOVEMENT_PRIOR_DIRECTORY"

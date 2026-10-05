@@ -1,0 +1,21 @@
+import {Schema} from './integration/node_modules/effect/dist/index.js'
+import {fingerprintSuite} from './qualification-fingerprint.mjs'
+const Digest=Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/))
+export const GateBindingSchema=Schema.Struct({sourceFingerprint:Digest,runtimeFingerprint:Digest})
+export const GateReceiptSchema=Schema.Struct({event:Schema.Literal('gate-terminal'),sourceCommit:Schema.NonEmptyString,log:Schema.NonEmptyString,logHash:Digest,exit:Schema.Literal(0),clean:Schema.Literal(true),inputsStable:Schema.Literal(true),binding:GateBindingSchema})
+export const PriorReceiptSchema=Schema.Struct({sourceCommit:Schema.NonEmptyString,cachePath:Schema.NonEmptyString,cacheHash:Digest,exit:Schema.Literal(0),clean:Schema.Literal(true),inputsStable:Schema.Literal(true)})
+// Only the intended newly prepared cache key is normalized here. Its exact path,
+// receipt and bytes are separately bound before live admission and final audit.
+export const captureGateBinding=async(root,fingerprint=fingerprintSuite)=>{
+ const cache=process.env.HULY_INTEGRATION_MCP_PRIOR
+ delete process.env.HULY_INTEGRATION_MCP_PRIOR
+ try{
+  const source=await fingerprint(root,'issue_tree','scripts/prepare-movement-certification.sh',false)
+  const runtime=await fingerprint(root,'issue_tree','scripts/prepare-movement-certification.sh',true)
+  return Schema.decodeUnknownSync(GateBindingSchema)({sourceFingerprint:source.fingerprint,runtimeFingerprint:runtime.fingerprint})
+ }finally{if(cache!==undefined)process.env.HULY_INTEGRATION_MCP_PRIOR=cache}
+}
+export const gateBindingsEqual=(left,right)=>{
+ const expected=Schema.decodeUnknownSync(GateBindingSchema)(left),actual=Schema.decodeUnknownSync(GateBindingSchema)(right)
+ return expected.sourceFingerprint===actual.sourceFingerprint&&expected.runtimeFingerprint===actual.runtimeFingerprint
+}

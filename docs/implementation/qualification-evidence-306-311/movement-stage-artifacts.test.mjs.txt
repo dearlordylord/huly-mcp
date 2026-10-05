@@ -1,0 +1,42 @@
+import {test} from 'node:test'
+import assert from 'node:assert/strict'
+import {mkdtemp,writeFile,chmod,rm,mkdir,symlink} from 'node:fs/promises'
+import {tmpdir} from 'node:os'
+import {Schema} from './integration/node_modules/effect/dist/index.js'
+import {snapshotReportNames,collectReportDelta,auditReportArtifacts,snapshotEvidenceArtifacts} from './movement-stage-artifacts.mjs'
+const TestReport=Schema.Struct({stage:Schema.Literal('fixed-stage')})
+const parse=raw=>{const result=Schema.decodeUnknownOption(Schema.fromJsonString(TestReport))(raw);return result._tag==='Some'?{status:'valid',report:result.value}:{status:'invalid'}}
+const fixture=async check=>{const directory=await mkdtemp(`${tmpdir()}/stage-artifacts-`);await chmod(directory,0o700);try{await check(directory)}finally{await rm(directory,{recursive:true})}}
+test('empty directory does not imply observer diagnostic coverage',()=>fixture(async directory=>{
+ const snapshot=await snapshotReportNames(directory);assert.equal(snapshot.status,'observed')
+ const delta=await collectReportDelta(directory,snapshot.names,parse)
+ assert.equal(delta.status,'observed');assert.equal(delta.reportCount,0);assert.equal(delta.diagnosticCoverage,'no-reports')
+}))
+test('new exact filenames are parsed and hashed; final audit detects tampering',()=>fixture(async directory=>{
+ const before=await snapshotReportNames(directory)
+ await writeFile(`${directory}/movement-42-1.json`,'{"stage":"fixed-stage"}',{mode:0o600})
+ const delta=await collectReportDelta(directory,before.names,parse)
+ assert.equal(delta.status,'observed');assert.equal(delta.reportCount,1);assert.deepEqual(delta.artifacts[0].report,{stage:'fixed-stage'})
+ assert.equal(await auditReportArtifacts(directory,delta.artifacts),true)
+ await writeFile(`${directory}/movement-42-1.json`,'{"stage":"changed"}')
+ assert.equal(await auditReportArtifacts(directory,delta.artifacts),false)
+}))
+test('invalid payload, public permissions and unexpected filenames remain unavailable',()=>fixture(async directory=>{
+ await writeFile(`${directory}/movement-42-1.json`,'{"stage":"private-unapproved"}',{mode:0o600})
+ assert.equal((await collectReportDelta(directory,[],parse)).reason,'codec')
+ await chmod(`${directory}/movement-42-1.json`,0o644)
+ assert.equal((await collectReportDelta(directory,[],parse)).reason,'file')
+ await writeFile(`${directory}/unexpected.json`,'{}',{mode:0o600})
+ assert.equal((await snapshotReportNames(directory)).status,'unavailable')
+}))
+
+test('nested custody directories retain lifecycle metadata and private file hashes',()=>fixture(async directory=>{
+ await mkdir(directory+'/validation.custody',{mode:0o700})
+ await writeFile(directory+'/report.json','report',{mode:0o600})
+ const snapshot=await snapshotEvidenceArtifacts(directory)
+ assert.deepEqual(snapshot.directories,[{path:'validation.custody',mode:0o700}])
+ assert.equal(Object.keys(snapshot.files).length,1)
+ assert.match(snapshot.files['report.json'],/^[a-f0-9]{64}$/)
+ await symlink(directory+'/report.json',directory+'/linked.json')
+ await assert.rejects(snapshotEvidenceArtifacts(directory),/ownership unavailable/)
+}))

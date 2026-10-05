@@ -1,0 +1,31 @@
+import {test} from 'node:test'
+import assert from 'node:assert/strict'
+import {mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises'
+import {tmpdir} from 'node:os'
+import path from 'node:path'
+import {execFileSync} from 'node:child_process'
+import {fingerprintSuite,movementTransportInputs} from './integration/scripts/run-movement-certification.mjs'
+import {captureGateBinding,gateBindingsEqual} from './gate-first-binding.mjs'
+test('same HEAD source and bundle mutation fail gate admission; prior key addition is explicit',async()=>{
+ const root=await mkdtemp(path.join(tmpdir(),'gate-binding-')),prior=process.env.HULY_INTEGRATION_MCP_PRIOR
+ try{
+  for(const file of [...movementTransportInputs,'package.json','pnpm-lock.yaml','tsconfig.json','packages/huly-cli/package.json','scripts/integration_test_issue_tree.sh','scripts/prepare-movement-certification.sh','src/main.ts','dist/index.cjs']){
+   await mkdir(path.dirname(path.join(root,file)),{recursive:true})
+   await writeFile(path.join(root,file),file.endsWith('.json')?'{}':'original')
+  }
+  execFileSync('git',['init','-q',root])
+  execFileSync('git',['-C',root,'-c','user.name=Test','-c','user.email=test@example.invalid','commit','--allow-empty','-qm','Fixture'])
+  const head=()=>execFileSync('git',['-C',root,'rev-parse','HEAD'],{encoding:'utf8'}).trim(),originalHead=head()
+  const original=await captureGateBinding(root,fingerprintSuite)
+  process.env.HULY_INTEGRATION_MCP_PRIOR=path.join(root,'new-private-cache.json')
+  assert.equal(gateBindingsEqual(original,await captureGateBinding(root,fingerprintSuite)),true)
+  assert.equal(process.env.HULY_INTEGRATION_MCP_PRIOR,path.join(root,'new-private-cache.json'))
+  await writeFile(path.join(root,'src/main.ts'),'changed source')
+  assert.equal(head(),originalHead)
+  assert.equal(gateBindingsEqual(original,await captureGateBinding(root,fingerprintSuite)),false)
+  await writeFile(path.join(root,'src/main.ts'),'original')
+  await writeFile(path.join(root,'dist/index.cjs'),'changed runtime')
+  assert.equal(head(),originalHead)
+  assert.equal(gateBindingsEqual(original,await captureGateBinding(root,fingerprintSuite)),false)
+ }finally{if(prior===undefined)delete process.env.HULY_INTEGRATION_MCP_PRIOR;else process.env.HULY_INTEGRATION_MCP_PRIOR=prior;await rm(root,{recursive:true})}
+})
