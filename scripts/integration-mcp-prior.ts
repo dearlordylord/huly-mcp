@@ -5,6 +5,10 @@ import { execFileSync } from "node:child_process"
 import { lstat, readFile, writeFile } from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
 
+const PERMISSION_MODE_MASK = 0o777
+const PRIVATE_DIRECTORY_MODE = 0o700
+const PRIVATE_FILE_MODE = 0o600
+
 // The SDK Standard Schema owns the MCP DTO. The Effect codec returns its parsed value,
 // rather than validating and forwarding the unknown file payload.
 export const NativeDiscoverySchema = Schema.declareConstructor<DiscoverResult>()([], () => (input) => {
@@ -95,7 +99,7 @@ const privatePath = (path: string) =>
         owner === undefined ||
         !directory.isDirectory() ||
         directory.uid !== owner ||
-        (directory.mode & 0o777) !== 0o700
+        (directory.mode & PERMISSION_MODE_MASK) !== PRIVATE_DIRECTORY_MODE
       )
         throw new Error("Invalid prior directory")
     },
@@ -112,7 +116,7 @@ export const writePriorCache = (
     yield* Effect.tryPromise({
       try: async () => {
         await writeFile(path, Schema.encodeSync(Schema.fromJsonString(PriorCacheSchema))({ identity, discover }), {
-          mode: 0o600,
+          mode: PRIVATE_FILE_MODE,
           flag: "wx"
         })
       },
@@ -126,7 +130,11 @@ export const readPriorCache = (path: string, identity: PriorIdentity) =>
     const cache = yield* Effect.tryPromise({
       try: async () => {
         const file = await lstat(path)
-        if (!file.isFile() || file.uid !== process.getuid?.() || (file.mode & 0o777) !== 0o600)
+        if (
+          !file.isFile() ||
+          file.uid !== process.getuid?.() ||
+          (file.mode & PERMISSION_MODE_MASK) !== PRIVATE_FILE_MODE
+        )
           throw new Error("Invalid prior file")
         const raw: unknown = await readFile(path, "utf8")
         return Schema.decodeUnknownSync(Schema.fromJsonString(PriorCacheSchema))(raw)

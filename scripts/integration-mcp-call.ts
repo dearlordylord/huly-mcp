@@ -224,7 +224,7 @@ const withNativeClient = async <A>(
         elapsedMilliseconds: IntegrationElapsedMilliseconds.make(telemetry.now() - started)
       })
     )
-  const { client, transport, closeDiagnostics } = makeIntegrationMcpSession(options)
+  const { client, closeDiagnostics, transport } = makeIntegrationMcpSession(options)
   let phase: "connect" | "list" | "call" | "reply" | "close" = "connect"
   let connecting: Promise<void> | undefined
   const exchange = async () => {

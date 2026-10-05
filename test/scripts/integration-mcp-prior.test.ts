@@ -6,7 +6,12 @@ import { Effect, Schema } from "effect"
 import { expect, test } from "vitest"
 import { integrationMcpCall } from "../../scripts/integration-mcp-call.js"
 import { prepareIntegrationMcpPrior } from "../../scripts/integration-mcp-prior-prepare.js"
-import { makePriorIdentity, readPriorCache, PriorCacheSchema, NativeToolListSchema } from "../../scripts/integration-mcp-prior.js"
+import {
+  makePriorIdentity,
+  readPriorCache,
+  PriorCacheSchema,
+  NativeToolListSchema
+} from "../../scripts/integration-mcp-prior.js"
 
 const fixture = async () => {
   const directory = await mkdtemp(join(tmpdir(), "hulymcp-native-prior-"))
