@@ -556,9 +556,7 @@ feedback, not certification. The existing coordinator exports
 `boundedProcess(root, script, log, deadline)` for an overseer-owned private driver;
 it owns process groups and custody under the worktree lock. The CLI has
 `--plan`, `--run`, `--deadline`, `--state-dir`, `--diagnostic`, and `--prepare`;
-it has no single-suite selection flag. Do not invent one. The package
-`pnpm integration:movement` command still performs its full preparation before
-its suite inventory.
+it has no single-suite selection flag. Do not invent one. The package `pnpm integration:movement` command verifies persistent quality evidence before its suite inventory; unchanged successful evidence avoids repeating preparation.
 
 For repeated fixture calls on the same immutable build and environment, prepare
 one read-only native discovery prior in an owned private directory:
@@ -733,3 +731,35 @@ still invalidate live evidence; source, configuration, lockfile and fixture/tool
 dependencies remain in scope. This distinction applies prospectively and does
 not establish the sole cause of any historical fingerprint drift whose original
 per-file hashes were not retained.
+
+
+### Reusing verified movement quality evidence
+
+Movement qualification checks the native-prior environment before expensive preparation.
+Run with an explicitly empty `NODE_OPTIONS` and `HULY_PROFILE`; the prior identity
+cannot bind mutable preload/profile context. This applies to preparation and every
+fixture child, rather than clearing flags only after a gate has passed.
+
+The coordinator retains `quality-receipts.jsonl` separately from live-suite receipts.
+Quality reuse requires the last matching preparation command and input fingerprint,
+actual exit zero, confirmed custody, stable inputs, an intact hashed log, and unchanged
+built artifacts. Inputs cover source, tests, gate tooling, configuration, patches,
+installed dependency signatures and Node/platform identity. `.tsbuildinfo` is derived
+compiler metadata. Only stock `integration_test_*.sh` fixture shells are excluded from
+the quality identity; other helper/source/test changes invalidate it.
+
+When quality and all five live receipts remain valid, preparation is skipped. A changed
+live environment or fixture shell runs the stock fixture preflight and movement process
+checks before fresh affected live evidence. The scoped preparation grant independently
+revalidates the quality receipt; there is no unconditional skip-gate flag. Missing or
+edited logs and failed matching quality receipts block automatic reuse. A named
+`quality:` diagnostic admits a measured repair attempt while preserving the original
+failed receipt. Source/dependency changes require fresh quality evidence. Existing
+suite deadlines, custody and coverage thresholds remain unchanged.
+
+This repair follows the `77f66` receipt: all401 files/5348 tests and all global99%
+coverage thresholds passed, then prior preparation failed at its identity boundary
+because ambient `NODE_OPTIONS` contained only a heap flag. Repeating the same quality
+gate could not repair that environment mismatch. Earlier lost concurrency replies
+and fixture SIGTERM cleanup races likewise require retained stage evidence and
+bounded process custody, rather than another undifferentiated full campaign.

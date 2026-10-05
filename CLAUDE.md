@@ -33,6 +33,8 @@ Use `pnpm`, not npm. Prefer package.json scripts over raw commands (e.g., `pnpm 
 
 ## Verification
 
+For movement qualification retries, follow [verified quality receipt reuse](INTEGRATION_TESTING.md#reusing-verified-movement-quality-evidence) before repeating preparation.
+
 Run before considering work complete:
 1. `pnpm check-all` (runs build, typecheck, circular, lint, test)
 2. Integration tests against local Huly (Docker) — **required** for any new feature, major change, or pre-release. Do not defer to the user; run them yourself. See `INTEGRATION_TESTING.md` for test patterns and `CLAUDE.local.md` for credentials/setup.

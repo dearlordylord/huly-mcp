@@ -1,3 +1,4 @@
+import { inspectPriorEnvironment, parseQualityReceipt, qualityFingerprint, qualityArtifactFingerprint, reusableQualityReceipt } from './movement-quality-receipt.mjs'
 import { createHash } from 'node:crypto'
 import { spawn, execFileSync } from 'node:child_process'
 import { appendFile, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
@@ -25,7 +26,7 @@ const now = () => Effect.runSync(Clock.currentTimeMillis)
 const CLEANUP_MS = 10_000
 export const realTime = { now, schedule: (callback, milliseconds) => setTimeout(() => callback(), milliseconds), cancel: timer => clearTimeout(timer), pause: milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)) }
 const EnvironmentSchema = Schema.Record(Schema.String, Schema.RedactedFromValue(Schema.String))
-const parseEnvironment = () => Schema.decodeUnknownSync(EnvironmentSchema)(Object.fromEntries(Object.entries(process.env).filter(([key]) => key.startsWith('HULY_') || ['NODE_OPTIONS', 'MCP_AUTO_EXIT', 'HULY_TOOL_MODE'].includes(key))))
+const parseEnvironment = (environment = process.env) => Schema.decodeUnknownSync(EnvironmentSchema)(Object.fromEntries(Object.entries(environment).filter(([key]) => key.startsWith('HULY_') || ['NODE_OPTIONS', 'MCP_AUTO_EXIT', 'HULY_TOOL_MODE'].includes(key))))
 const atomicState = async (file, state) => {
   const temporary = `${file}.${process.pid}.tmp`
   await writeFile(temporary, JSON.stringify(state))
@@ -70,7 +71,7 @@ const preparationFingerprint = async root => {
   return byteFingerprint(root, files.sort((a, b) => a.localeCompare(b)))
 }
 export const movementTransportInputs = ['scripts/integration-mcp-adapter.sh', 'scripts/integration-mcp-adapter.test.mjs', 'scripts/integration-mcp-call.ts', 'scripts/integration-mcp-observer-status.ts', 'scripts/integration-mcp-call-main.ts', 'scripts/integration-mcp-prior.ts', 'scripts/integration-mcp-prior-prepare.ts', 'test/scripts/integration-mcp-call.test.ts', 'test/scripts/integration-mcp-observer-status.test.ts', 'test/mcp/movement-stage-observer.test.ts', 'test/mcp/movement-stage-report.test.ts', 'test/scripts/integration-mcp-prior.test.ts', 'test/integration-fixtures/movement-public-process.test.ts', 'test/integration-fixtures/movement-public-process-fixture.ts']
-export const fingerprintSuite = async (root, suite, prepare, includeGenerated = true) => {
+export const fingerprintSuite = async (root, suite, prepare, includeGenerated = true, environmentInput = process.env) => {
   const generatedFiles = includeGenerated
     ? [...await walk(path.join(root, 'dist')), ...await walk(path.join(root, 'packages/huly-cli/dist'))].filter(file => !file.endsWith('.tsbuildinfo')).map(file => path.relative(root, file))
     : []
@@ -78,7 +79,7 @@ export const fingerprintSuite = async (root, suite, prepare, includeGenerated = 
     ...(await walk(path.join(root, 'packages/huly-cli/src'))).map(file => path.relative(root, file)),
     ...generatedFiles]
   if (prepare !== undefined) commonFiles.push(...await dependencies(root, prepare))
-  const environment = parseEnvironment()
+  const environment = parseEnvironment(environmentInput)
   const packageData = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.JsonObject))(await readFile(path.join(root, 'package.json'), 'utf8'))
   const scripts = packageData['scripts']
   const buildScripts = typeof scripts === 'object' && scripts !== null && !Array.isArray(scripts)
@@ -97,7 +98,7 @@ const reusableLog = async (receipt, time) => {
 }
 const groupAlive = pid => { try { process.kill(-pid, 0); return true } catch (error) { if (error.code === 'ESRCH') return false; throw error } }
 const signalGroup = (pid, signal) => { try { process.kill(-pid, signal) } catch (error) { if (error.code !== 'ESRCH') throw error } }
-export const boundedProcess = async (root, script, log, deadline, time = realTime) => {
+export const boundedProcess = async (root, script, log, deadline, time = realTime, preparationEnvironment = {}) => {
   if (time.now() >= deadline) return { exit: TIMEOUT_EXIT, clean: true, launched: false }
   const custodyDirectory = `${log}.custody`
   await mkdir(custodyDirectory, { recursive: true, mode: 0o700 })
@@ -105,7 +106,7 @@ export const boundedProcess = async (root, script, log, deadline, time = realTim
     return { exit: 1, clean: false, launched: false, custodyDirectory }
   const output = await import('node:fs').then(fs => fs.openSync(log, 'a'))
   const child = spawn('bash', [script], { cwd: root, detached: true, stdio: ['ignore', output, output],
-    env: { ...process.env, MOVEMENT_CUSTODY_DIR: custodyDirectory } })
+    env: { ...process.env, MOVEMENT_VERIFIED_QUALITY_RECEIPT: '', MOVEMENT_QUALITY_CHECK_TIME: '', ...preparationEnvironment, MOVEMENT_CUSTODY_DIR: custodyDirectory } })
   let timedOut = false
   let interrupted = false
   let interruptionKill
@@ -137,7 +138,7 @@ export const runCertification = async (options) => {
   try { return await ownedCertification({ ...options, root, time: options.time ?? realTime }, ownership) }
   finally { if (ownership.clean) await rm(lock, { recursive: true }) }
 }
-const ownedCertification = async ({ deadline, diagnostic, mode, prepare, root, stateDir, time }, ownership) => {
+const ownedCertification = async ({ deadline, diagnostic, mode, prepare, root, stateDir, time, environment = process.env }, ownership) => {
   stateDir = path.resolve(stateDir)
   const stateFile = path.join(stateDir, 'campaign.json'), receiptFile = path.join(stateDir, 'receipts.jsonl')
   const prior = await optionalFile(stateFile)
@@ -147,7 +148,7 @@ const ownedCertification = async ({ deadline, diagnostic, mode, prepare, root, s
   if (mode === 'plan') {
     const plan = []
     for (const suite of suites) {
-      const fingerprints = await fingerprintSuite(root, suite, prepare)
+      const fingerprints = await fingerprintSuite(root, suite, prepare, true, environment)
       const { fingerprint } = fingerprints
       const receipt = receipts.findLast(value => value.suite === suite && value.fingerprint === fingerprint)
       const reusable = receipt?.exit === 0 && receipt.clean && receipt.inputsStable && await reusableLog(receipt, time)
@@ -165,24 +166,47 @@ const ownedCertification = async ({ deadline, diagnostic, mode, prepare, root, s
   let clean = true
   try {
     await writeFile(path.join(root, '.movement-certification.lock/owner.json'), JSON.stringify({ pid: process.pid, deadline: effectiveDeadline, stateDir }))
-    const sourceBaseline = await fingerprintSuite(root, suites[0], prepare, false)
+    if (!inspectPriorEnvironment(environment).supported) return { exit: 1, expired: false, plan: [], preflight: 'unsupported-prior-environment' }
+    const sourceBaseline = await fingerprintSuite(root, suites[0], prepare, false, environment)
     if (prepare !== undefined) {
       await dependencies(root, prepare)
-      const preparationBaseline = await preparationFingerprint(root)
-      ownership.clean = false
-      const result = await boundedProcess(root, prepare, path.join(stateDir, 'prepare.log'), effectiveDeadline, time)
-      clean = result.clean
-      ownership.clean = clean
-      if (result.exit !== 0 || !result.clean) return { exit: result.exit || 1, expired: result.exit === TIMEOUT_EXIT, plan: [] }
-      if (await preparationFingerprint(root) !== preparationBaseline) return { exit: 1, expired: false, plan: [], drift: true }
+      const qualityFile = path.join(stateDir, 'quality-receipts.jsonl')
+      const qualityText = await optionalFile(qualityFile)
+      const qualities = qualityText === undefined ? [] : qualityText.trim().split('\n').filter(Boolean).map(parseQualityReceipt)
+      const qualityInput = await qualityFingerprint(root, prepare)
+      const previousQuality = qualities.findLast(receipt => receipt.fingerprint === qualityInput)
+      const qualityReusable = await reusableQualityReceipt(root, previousQuality, time.now())
+      if (previousQuality !== undefined && !qualityReusable && !diagnostic?.startsWith('quality:'))
+        return { exit: 1, expired: false, plan: [], quality: 'blocked' }
+      const allReusable = qualityReusable && (await Promise.all(suites.map(async suite => {
+        const { fingerprint } = await fingerprintSuite(root, suite, prepare, true, environment)
+        const receipt = receipts.findLast(value => value.suite === suite && value.fingerprint === fingerprint)
+        return receipt?.exit === 0 && receipt.clean && receipt.inputsStable && await reusableLog(receipt, time)
+      }))).every(Boolean)
+      if (!allReusable) {
+        const preparationBaseline = await preparationFingerprint(root)
+        const started = time.now(), log = path.join(stateDir, `prepare-${started}.log`)
+        const grantFile = path.join(stateDir, 'verified-quality.json')
+        if (qualityReusable) await atomicState(grantFile, previousQuality)
+        ownership.clean = false
+        const result = await boundedProcess(root, prepare, log, effectiveDeadline, time,
+          { ...environment, ...(qualityReusable ? { MOVEMENT_VERIFIED_QUALITY_RECEIPT: grantFile, MOVEMENT_QUALITY_CHECK_TIME: String(time.now()) } : {}) })
+        clean = result.clean; ownership.clean = clean
+        const stable = await qualityFingerprint(root, prepare) === qualityInput && await preparationFingerprint(root) === preparationBaseline
+        if (!qualityReusable) await appendFile(qualityFile, JSON.stringify(parseQualityReceipt(JSON.stringify({ prepare, fingerprint: qualityInput,
+          artifactFingerprint: await qualityArtifactFingerprint(root), sourceCommit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
+          log, logHash: hash(await readFile(log)), started, ended: time.now(), exit: result.exit, clean: result.clean, inputsStable: stable }))) + '\n')
+        if (result.exit !== 0 || !result.clean) return { exit: result.exit || 1, expired: result.exit === TIMEOUT_EXIT, plan: [] }
+        if (!stable) return { exit: 1, expired: false, plan: [], drift: true }
+      }
     }
-    if ((await fingerprintSuite(root, suites[0], prepare, false)).fingerprint !== sourceBaseline.fingerprint) return { exit: 1, expired: false, plan: [], drift: true }
+    if ((await fingerprintSuite(root, suites[0], prepare, false, environment)).fingerprint !== sourceBaseline.fingerprint) return { exit: 1, expired: false, plan: [], drift: true }
     const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
     const plan = []
     const accepted = new Map()
     for (const suite of suites) {
       if (time.now() >= effectiveDeadline) { state.expired = true; return { exit: TIMEOUT_EXIT, expired: true, plan } }
-      const fingerprints = await fingerprintSuite(root, suite, prepare)
+      const fingerprints = await fingerprintSuite(root, suite, prepare, true, environment)
       const { fingerprint } = fingerprints
       const receipt = receipts.findLast(value => value.suite === suite && value.fingerprint === fingerprint)
       if (receipt?.exit === 0 && receipt.clean && receipt.inputsStable && await reusableLog(receipt, time)) { accepted.set(suite, fingerprint); plan.push({ suite, status: 'reuse', log: receipt.log, sourceCommit: receipt.sourceCommit }); continue }
@@ -190,11 +214,11 @@ const ownedCertification = async ({ deadline, diagnostic, mode, prepare, root, s
       if (receipt !== undefined && !admission) return { exit: 1, expired: false, plan: [...plan, { suite, status: 'blocked', log: receipt.log }] }
       ownership.clean = false
       const started = time.now(), log = path.join(stateDir, `${suite}-${started}.log`)
-      const result = await boundedProcess(root, `scripts/integration_test_${suite}.sh`, log, effectiveDeadline, time)
+      const result = await boundedProcess(root, `scripts/integration_test_${suite}.sh`, log, effectiveDeadline, time, environment)
       clean = result.clean
       ownership.clean = clean
-      const sourceStable = (await fingerprintSuite(root, suites[0], prepare, false)).fingerprint === sourceBaseline.fingerprint
-      const inputsStable = sourceStable && (await fingerprintSuite(root, suite, prepare)).fingerprint === fingerprint
+      const sourceStable = (await fingerprintSuite(root, suites[0], prepare, false, environment)).fingerprint === sourceBaseline.fingerprint
+      const inputsStable = sourceStable && (await fingerprintSuite(root, suite, prepare, true, environment)).fingerprint === fingerprint
       const evidence = parseReceipt(JSON.stringify({ suite, ...fingerprints, sourceCommit, log, logHash: hash(await readFile(log)), started, ended: time.now(), exit: result.exit, clean, inputsStable,
         ...(admission ? { diagnostic: admission } : {}) }))
       await appendFile(receiptFile, JSON.stringify(evidence) + '\n'); receipts.push(evidence)
@@ -202,9 +226,9 @@ const ownedCertification = async ({ deadline, diagnostic, mode, prepare, root, s
       if (result.exit !== 0 || !clean || !inputsStable) { state.expired ||= result.exit === TIMEOUT_EXIT; return { exit: result.exit || 1, expired: state.expired, plan } }
       accepted.set(suite, fingerprint)
     }
-    if ((await fingerprintSuite(root, suites[0], prepare, false)).fingerprint !== sourceBaseline.fingerprint) return { exit: 1, expired: false, plan, drift: true }
+    if ((await fingerprintSuite(root, suites[0], prepare, false, environment)).fingerprint !== sourceBaseline.fingerprint) return { exit: 1, expired: false, plan, drift: true }
     for (const [suite, fingerprint] of accepted) {
-      if ((await fingerprintSuite(root, suite, prepare)).fingerprint !== fingerprint) return { exit: 1, expired: false, plan, drift: true }
+      if ((await fingerprintSuite(root, suite, prepare, true, environment)).fingerprint !== fingerprint) return { exit: 1, expired: false, plan, drift: true }
     }
     return { exit: time.now() >= effectiveDeadline ? TIMEOUT_EXIT : 0, expired: time.now() >= effectiveDeadline, plan }
   } finally {

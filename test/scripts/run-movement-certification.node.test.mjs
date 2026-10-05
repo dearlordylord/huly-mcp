@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import os from 'node:os'
 import { createRequire } from 'node:module'
+import { parseQualityReceipt } from '../../scripts/movement-quality-receipt.mjs'
 import { realTime, runCertification, suites, movementTransportInputs, fingerprintSuite } from '../../scripts/run-movement-certification.mjs'
 
 const now = () => Effect.runSync(Clock.currentTimeMillis)
@@ -53,7 +54,7 @@ const fixture = async () => {
   }
   execFileSync('git', ['init', '-q', root])
   execFileSync('git', ['-C', root, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '--allow-empty', '-qm', 'Fixture'])
-  return { root, stateDir: path.join(root, 'evidence'), mode: 'run', deadline: now() + TEST_BUDGET_MS }
+  return { environment: { NODE_OPTIONS: '', HULY_PROFILE: '' }, root, stateDir: path.join(root, 'evidence'), mode: 'run', deadline: now() + TEST_BUDGET_MS }
 }
 
 test('expired campaign never launches and cannot be extended', async () => {
@@ -185,7 +186,7 @@ test('successful preparation with retained detached-stage custody cannot launch 
     const result = await runCertification({ ...f, prepare: 'scripts/prepare.sh' })
     assert.equal(result.exit, 1)
     await assert.rejects(readFile(path.join(f.root, 'launches')), { code: 'ENOENT' })
-    assert.match(await readFile(path.join(f.stateDir, 'prepare.log.custody/stage.json'), 'utf8'), /unconfirmed/)
+    assert.match(await readFile(path.join(parseQualityReceipt((await readFile(path.join(f.stateDir, 'quality-receipts.jsonl'), 'utf8')).trim()).log + '.custody', 'stage.json'), 'utf8'), /unconfirmed/)
     assert.equal((await runCertification({ ...f, mode: 'plan' })).locked, true)
   } finally { await rm(f.root, { recursive: true }) }
 })
@@ -236,7 +237,7 @@ test('real detached quality-stage custody survives a successful preparation lead
     assert.equal((await readDescendant(descendantFile))?.ready, true)
     assert.equal(result.exit, 1)
     await assert.rejects(readFile(path.join(f.root, 'launches')), { code: 'ENOENT' })
-    const custody = path.join(f.stateDir, 'prepare.log.custody')
+    const custody = parseQualityReceipt((await readFile(path.join(f.stateDir, 'quality-receipts.jsonl'), 'utf8')).trim()).log + '.custody'
     const entries = await (await import('node:fs/promises')).readdir(custody)
     assert.equal(entries.length, 1)
     assert.equal(JSON.parse(await readFile(path.join(custody, entries[0]), 'utf8')).state, 'unconfirmed')
@@ -280,4 +281,63 @@ test('compiler build-info cache mutations do not invalidate live runtime evidenc
 test('qualification checks the concurrency frontier first while retaining every feature suite', () => {
   assert.deepEqual(suites, ['issue_movement_concurrency', 'issue_tree', 'issue_movement', 'issue_transfer', 'issue_attributes'])
   assert.equal(new Set(suites).size, suites.length)
+})
+
+test('quality receipt skips unchanged preparation and uses scoped checks after only a live fixture change', async () => {
+  const f = await fixture()
+  try {
+    await writeFile(path.join(f.root, 'scripts/prepare.sh'), '#!/bin/bash\nif [[ -n "${MOVEMENT_VERIFIED_QUALITY_RECEIPT:-}" ]]; then echo scoped >> checks; else echo quality >> checks; fi\n')
+    const options = { ...f, prepare: 'scripts/prepare.sh' }
+    assert.equal((await runCertification(options)).exit, 0)
+    assert.equal((await runCertification(options)).exit, 0)
+    assert.equal(await readFile(path.join(f.root, 'checks'), 'utf8'), 'quality\n')
+    await writeFile(path.join(f.root, 'scripts/integration_test_issue_tree.sh'), '#!/bin/bash\necho changed >> launches\n')
+    assert.equal((await runCertification(options)).exit, 0)
+    assert.equal(await readFile(path.join(f.root, 'checks'), 'utf8'), 'quality\nscoped\n')
+  } finally { await rm(f.root, { recursive: true }) }
+})
+test('changed production input requires fresh quality while failed quality stays blocked', async () => {
+  const f = await fixture()
+  try {
+    await mkdir(path.join(f.root, 'src'))
+    await writeFile(path.join(f.root, 'src/main.ts'), '// first')
+    await writeFile(path.join(f.root, 'scripts/prepare.sh'), '#!/bin/bash\necho quality >> checks\n')
+    const options = { ...f, prepare: 'scripts/prepare.sh' }
+    assert.equal((await runCertification(options)).exit, 0)
+    await writeFile(path.join(f.root, 'src/main.ts'), '// changed')
+    assert.equal((await runCertification(options)).exit, 0)
+    assert.equal(await readFile(path.join(f.root, 'checks'), 'utf8'), 'quality\nquality\n')
+    await writeFile(path.join(f.root, 'scripts/prepare.sh'), '#!/bin/bash\necho failed >> checks\nexit 7\n')
+    assert.equal((await runCertification(options)).exit, FAILURE_EXIT)
+    assert.equal((await runCertification(options)).quality, 'blocked')
+    assert.equal(await readFile(path.join(f.root, 'checks'), 'utf8'), 'quality\nquality\nfailed\n')
+  } finally { await rm(f.root, { recursive: true }) }
+})
+for (const damaged of ['missing', 'edited']) test(`quality ${damaged} log blocks reuse without launching preparation`, async () => {
+  const f = await fixture()
+  try {
+    await writeFile(path.join(f.root, 'scripts/prepare.sh'), '#!/bin/bash\necho quality >> checks\n')
+    const options = { ...f, prepare: 'scripts/prepare.sh' }
+    assert.equal((await runCertification(options)).exit, 0)
+    const receipt = JSON.parse((await readFile(path.join(f.stateDir, 'quality-receipts.jsonl'), 'utf8')).trim())
+    if (damaged === 'missing') await rm(receipt.log)
+    else await writeFile(receipt.log, 'edited')
+    assert.equal((await runCertification(options)).quality, 'blocked')
+    assert.equal(await readFile(path.join(f.root, 'checks'), 'utf8'), 'quality\n')
+  } finally { await rm(f.root, { recursive: true }) }
+})
+test('unsupported prior environment fails before any preparation side effect', async () => {
+  const { inspectPriorEnvironment } = await import('../../scripts/movement-quality-receipt.mjs')
+  assert.equal(inspectPriorEnvironment({ NODE_OPTIONS: '--max-old-space-size=8192' }).supported, false)
+  assert.equal(inspectPriorEnvironment({ HULY_PROFILE: 'private' }).supported, false)
+  const f = await fixture()
+  try {
+    await writeFile(path.join(f.root, 'scripts/prepare.sh'), '#!/bin/bash\necho quality >> checks\n')
+    // A real child owns the environment; the test never mutates global process.env.
+    const driver = `import {runCertification} from ${JSON.stringify(new URL('../../scripts/run-movement-certification.mjs', import.meta.url).href)};\nconst result=await runCertification(${JSON.stringify({ ...f, environment: undefined, prepare: 'scripts/prepare.sh' })});console.log(JSON.stringify(result));`
+    const output = execFileSync(process.execPath, ['--input-type=module', '-e', driver], { env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=8192' }, encoding: 'utf8', timeout: TEST_BUDGET_MS, killSignal: 'SIGKILL' })
+    assert.equal(JSON.parse(output).preflight, 'unsupported-prior-environment')
+    await assert.rejects(readFile(path.join(f.root, 'checks')), { code: 'ENOENT' })
+    await assert.rejects(readFile(path.join(f.root, 'launches')), { code: 'ENOENT' })
+  } finally { await rm(f.root, { recursive: true }) }
 })
