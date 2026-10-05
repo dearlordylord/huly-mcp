@@ -664,6 +664,64 @@ process custody. A per-suite timeout diagnoses a stalled run; it does not
 reinstate the removed overall delivery budget or authorize mutation retries.
 All five feature suites and the quality gate remain required.
 
+### Campaign policy and evidence publication
+
+Use the stock coordinator for new campaigns. Choose one immutable policy:
+
+- `--deadline <UTC>` retains an absolute delivery deadline, capped at twenty
+  minutes from first admission. Reusing its state directory cannot extend an
+  expired campaign.
+- `--per-suite-timeout-ms 1200000` bounds preparation and each individual suite
+  at twenty minutes, without a total campaign deadline. It represents the user's
+  removal of the overall delivery limit, not permission to retry failed mutations.
+  Values must be positive safe integers no greater than 1200000.
+
+For an authorized continuation without a total limit, use a new state directory:
+
+```bash
+set -a
+source .env.local
+set +a
+export HULY_URL="${HULY_URL/localhost/host.docker.internal}"
+export NODE_OPTIONS='' HULY_PROFILE=''
+pnpm integration:movement --plan --state-dir .movement-certification-continuation
+pnpm integration:movement --run --per-suite-timeout-ms 1200000 --state-dir .movement-certification-continuation
+```
+
+Keep that directory across repairs. Valid receipts are reused; failed matching
+receipts still need the existing named diagnostic. Changing modes or the
+per-suite bound requires a new campaign and preserves the original evidence.
+Full certification rejects `HULY_MOVEMENT_CONCURRENCY_CASES` before preparation:
+selected cases are characterization, and require an independently verified case
+union to qualify a complete matrix. The stock coordinator runs the full matrix.
+
+Before another costly repair attempt, record the first causal failure, failed
+command, unexecuted suffix and the next distinguishing experiment in the existing
+handoff. After two attempts without new distinguishing evidence, or thirty
+minutes of active repair, change the diagnostic method before another broad run.
+Waiting on a confirmed live handle is separate from active repair. Reuse the
+existing runner and evidence format before adding a private coordinator.
+
+Publish a report from its frozen draft by changing only top-level adjudication,
+per-criterion certification and the precise pending-adjudication annotation.
+Preserve nested historical statuses, source excerpts, original requirements,
+test declarations and receipt identities. Run:
+
+```bash
+pnpm verify-completion-evidence --compare /path/to/frozen-draft.json docs/implementation/completion-306-311.json
+pnpm verify-completion-evidence
+```
+
+The integrity manifest stores the reviewed frozen draft's hash and its immutable
+evidence projection. The normal process tests, quality gate and CI verify this
+projection; report edits also invoke the check before commit. Path sanitization
+applies only to declared artifact locators. This detects publication drift; it
+does not independently certify the truth of tests or deployed observations.
+Future reports use `pnpm verify-completion-evidence --manifest <manifest.json>`
+with their reviewed baseline, and register their manifest/report in the process
+tests, quality input identity and hook. Updating a digest requires independent
+review of the evidence change.
+
 Do not recompute `MOVEMENT_STOP_UTC` for a retry. The persisted campaign rejects
 extension and expiry. A retained custody lock means cleanup is unconfirmed:
 inspect its owner and descendants before removing it; never delete it merely to

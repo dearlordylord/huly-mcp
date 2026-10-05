@@ -34,6 +34,7 @@ Use `pnpm`, not npm. Prefer package.json scripts over raw commands (e.g., `pnpm 
 ## Verification
 
 For movement qualification retries, follow [verified quality receipt reuse](INTEGRATION_TESTING.md#reusing-verified-movement-quality-evidence) before repeating preparation.
+For a multi-suite campaign or a completion report, use [campaign policy and evidence publication](INTEGRATION_TESTING.md#campaign-policy-and-evidence-publication).
 
 Run before considering work complete:
 1. `pnpm check-all` (runs build, typecheck, circular, lint, test)

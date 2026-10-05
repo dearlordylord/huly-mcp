@@ -1,5 +1,13 @@
 set -e
 
+if git diff --cached --name-only -- 'docs/implementation/completion-*.json' | rg -q .; then
+  if ! git diff --quiet -- docs/implementation/completion-306-311.json docs/implementation/completion-306-311.integrity.json; then
+    echo "Stage the complete protected report and integrity manifest before verification."
+    exit 1
+  fi
+  pnpm verify-completion-evidence
+fi
+
 echo "Updating README with tools documentation..."
 pnpm run update-readme
 git add README.md

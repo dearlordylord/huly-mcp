@@ -7,7 +7,7 @@ import path from 'node:path'
 import os from 'node:os'
 import { createRequire } from 'node:module'
 import { parseQualityReceipt } from '../../scripts/movement-quality-receipt.mjs'
-import { realTime, runCertification, suites, movementTransportInputs, fingerprintSuite } from '../../scripts/run-movement-certification.mjs'
+import { realTime, runCertification, parseArguments, suites, movementTransportInputs, fingerprintSuite } from '../../scripts/run-movement-certification.mjs'
 
 const now = () => Effect.runSync(Clock.currentTimeMillis)
 const TEST_BUDGET_MS = 60_000
@@ -342,7 +342,7 @@ test('unsupported prior environment fails before any preparation side effect', a
   } finally { await rm(f.root, { recursive: true }) }
 })
 
-for (const file of ['README.md', 'packages/huly-cli/README.md', 'packages/huly-cli/skills/huly-cli/references/automation.md']) test(`gate-read document ${file} invalidates quality reuse`, async () => {
+for (const file of ['README.md', 'packages/huly-cli/README.md', 'packages/huly-cli/skills/huly-cli/references/automation.md', 'docs/implementation/completion-306-311.json', 'docs/implementation/completion-306-311.integrity.json', '.husky/pre-commit']) test(`gate-read document ${file} invalidates quality reuse`, async () => {
   const f = await fixture()
   try {
     await mkdir(path.dirname(path.join(f.root, file)), { recursive: true })
@@ -353,5 +353,96 @@ for (const file of ['README.md', 'packages/huly-cli/README.md', 'packages/huly-c
     await writeFile(path.join(f.root, file), 'stale documentation')
     assert.equal((await runCertification(options)).exit, 0)
     assert.equal(await readFile(path.join(f.root, 'checks'), 'utf8'), 'quality\nquality\n')
+  } finally { await rm(f.root, { recursive: true }) }
+})
+
+
+test('per-process policy completes all five suites beyond twenty minutes and persists for read-only plan', async () => {
+  const f = await fixture()
+  try {
+    let clock = now()
+    const started = clock
+    const time = { ...realTime, now: () => clock,
+      schedule: (callback, milliseconds) => ({ timer: realTime.schedule(callback, milliseconds), milliseconds }),
+      cancel: handle => { if (handle === undefined) return; realTime.cancel(handle.timer); if (handle.milliseconds === 600_000) clock += 300_000 }
+    }
+    const options = { ...f, deadline: undefined, perSuiteTimeoutMs: 600_000, time }
+    const result = await runCertification(options)
+    assert.equal(result.exit, 0)
+    assert.equal(result.plan.length, 5)
+    assert.ok(clock - started > 1_200_000)
+    assert.deepEqual(JSON.parse(await readFile(path.join(f.stateDir, 'campaign.json'), 'utf8')), { perSuiteTimeoutMs: 600_000, expired: false })
+    const plan = await runCertification({ ...f, deadline: undefined, mode: 'plan', time })
+    assert.deepEqual(plan.policy, { perSuiteTimeoutMs: 600_000, expired: false })
+    assert.equal(plan.plan.every(entry => entry.status === 'reuse'), true)
+    await assert.rejects(runCertification({ ...options, perSuiteTimeoutMs: 600_001 }), /immutable/)
+    await assert.rejects(runCertification(f), /immutable/)
+    assert.equal((await readFile(path.join(f.root, 'launches'), 'utf8')).trim().split('\n').length, 5)
+  } finally { await rm(f.root, { recursive: true }) }
+})
+
+test('legacy expired campaign cannot switch to per-process policy', async () => {
+  const f = await fixture()
+  try {
+    await mkdir(f.stateDir)
+    const state = { deadline: now() - 1, expired: true }
+    await writeFile(path.join(f.stateDir, 'campaign.json'), JSON.stringify(state))
+    await assert.rejects(runCertification({ ...f, deadline: undefined, perSuiteTimeoutMs: 1000 }), /immutable/)
+    assert.equal((await runCertification(f)).exit, TIMEOUT_EXIT)
+    assert.deepEqual(JSON.parse(await readFile(path.join(f.stateDir, 'campaign.json'), 'utf8')), state)
+    await assert.rejects(readFile(path.join(f.root, 'launches')), { code: 'ENOENT' })
+  } finally { await rm(f.root, { recursive: true }) }
+})
+
+test('full certification rejects a partial concurrency matrix before preparation', async () => {
+  const f = await fixture()
+  try {
+    await writeFile(path.join(f.root, 'scripts/prepare.sh'), '#!/bin/bash\necho quality >> checks\n')
+    const result = await runCertification({ ...f, prepare: 'scripts/prepare.sh', environment: { ...f.environment, HULY_MOVEMENT_CONCURRENCY_CASES: 'one-case' } })
+    assert.equal(result.preflight, 'full-matrix-required')
+    await assert.rejects(readFile(path.join(f.root, 'checks')), { code: 'ENOENT' })
+    await assert.rejects(readFile(path.join(f.root, 'launches')), { code: 'ENOENT' })
+  } finally { await rm(f.root, { recursive: true }) }
+})
+
+test('CLI timeout modes reject missing, invalid, duplicate and colliding options', () => {
+  for (const args of [ ['--run'], ['--run', '--plan'], ['--run', '--per-suite-timeout-ms'],
+    ...['0', '-1', 'Infinity', 'NaN', '1.5', '1200001', '9007199254740992'].map(value => ['--run', '--per-suite-timeout-ms', value]),
+    ['--run', '--deadline', 'bad'], ['--run', '--per-suite-timeout-ms', '1000', '--deadline', '2026-10-05'],
+    ['--run', '--per-suite-timeout-ms', '1000', '--per-suite-timeout-ms', '1000'], ['--plan', '--unknown'] ])
+    assert.throws(() => parseArguments(args))
+  assert.equal(parseArguments(['--run', '--per-suite-timeout-ms', '1000']).perSuiteTimeoutMs, 1000)
+  assert.equal(parseArguments(['--plan']).mode, 'plan')
+})
+
+test('per-process timeout records bounded failure and retained custody blocks retries', async () => {
+  const f = await fixture()
+  try {
+    await writeFile(path.join(f.root, `scripts/integration_test_${suites[0]}.sh`), '#!/bin/bash\ntrap \'exit 0\' TERM\necho retained > "$MOVEMENT_CUSTODY_DIR/retained"\necho running >> launches\nsleep 30\n')
+    let clock = now()
+    let scheduled = 0
+    const time = { ...realTime, now: () => clock,
+      pause: async milliseconds => { clock += milliseconds; await realTime.pause(milliseconds) },
+      schedule: (callback, milliseconds) => {
+        if (++scheduled !== 1) return realTime.schedule(callback, TEST_BUDGET_MS)
+        const waitForLaunch = async () => {
+          try { await readFile(path.join(f.root, 'launches')); clock += milliseconds; callback() }
+          catch (error) { if (error.code !== 'ENOENT') throw error; await realTime.pause(LAUNCH_POLL_MS); await waitForLaunch() }
+        }
+        void waitForLaunch()
+        return undefined
+      }
+    }
+    const options = { ...f, deadline: undefined, perSuiteTimeoutMs: 1000, time }
+    const result = await runCertification(options)
+    assert.equal(result.exit, TIMEOUT_EXIT)
+    assert.equal(result.expired, false)
+    const receipt = JSON.parse((await readFile(path.join(f.stateDir, 'receipts.jsonl'), 'utf8')).trim())
+    assert.equal(receipt.exit, TIMEOUT_EXIT)
+    assert.equal(receipt.clean, false)
+    assert.ok(receipt.ended - receipt.started <= 1000 + CLEANUP_CLOCK_ADVANCE_MS)
+    assert.equal((await runCertification(options)).locked, true)
+    assert.equal((await readFile(path.join(f.root, 'launches'), 'utf8')).trim(), 'running')
+    assert.deepEqual(JSON.parse(await readFile(path.join(f.stateDir, 'campaign.json'), 'utf8')), { perSuiteTimeoutMs: 1000, expired: false })
   } finally { await rm(f.root, { recursive: true }) }
 })

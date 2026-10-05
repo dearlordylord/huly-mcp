@@ -11,11 +11,14 @@ export const suites = ['issue_movement_concurrency', 'issue_tree', 'issue_moveme
 const ReceiptSchema = Schema.Struct({ suite: Schema.NonEmptyString, fingerprint: Schema.NonEmptyString,
   sourceCommit: Schema.NonEmptyString, commonFingerprint: Schema.NonEmptyString, suiteFingerprint: Schema.NonEmptyString, environmentFingerprint: Schema.NonEmptyString, log: Schema.NonEmptyString, logHash: Schema.NonEmptyString, started: Schema.Number, ended: Schema.Number,
   exit: Schema.Number, clean: Schema.Boolean, inputsStable: Schema.Boolean, diagnostic: Schema.optionalKey(Schema.NonEmptyString) })
-const CampaignSchema = Schema.Struct({ deadline: Schema.Number, expired: Schema.Boolean })
+const MAX_CAMPAIGN_MS = 1_200_000
+const CampaignSchema = Schema.Union([
+  Schema.Struct({ deadline: Schema.Number.check(Schema.isFinite()), expired: Schema.Boolean }),
+  Schema.Struct({ perSuiteTimeoutMs: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(MAX_CAMPAIGN_MS)), expired: Schema.Boolean })
+])
 const parseReceipt = Schema.decodeUnknownSync(Schema.fromJsonString(ReceiptSchema))
 const parseCampaign = Schema.decodeUnknownSync(Schema.fromJsonString(CampaignSchema))
 const hash = value => createHash('sha256').update(value).digest('hex')
-const MAX_CAMPAIGN_MS = 1_200_000
 const TIMEOUT_EXIT = 124
 const INTERRUPTED_EXIT = 130
 const SIGNAL_EXIT = 128
@@ -138,7 +141,38 @@ export const runCertification = async (options) => {
   try { return await ownedCertification({ ...options, root, time: options.time ?? realTime }, ownership) }
   finally { if (ownership.clean) await rm(lock, { recursive: true }) }
 }
-const ownedCertification = async ({ deadline, diagnostic, mode, prepare, root, stateDir, time, environment = process.env }, ownership) => {
+export const selectedPolicy = (deadline, perSuiteTimeoutMs, time = realTime) => {
+  const hasDeadline = deadline !== undefined && !Number.isNaN(deadline)
+  if (hasDeadline === (perSuiteTimeoutMs !== undefined)) throw new Error('Choose exactly one of --deadline or --per-suite-timeout-ms')
+  if (perSuiteTimeoutMs !== undefined) {
+    if (!Number.isSafeInteger(perSuiteTimeoutMs) || perSuiteTimeoutMs <= 0 || perSuiteTimeoutMs > MAX_CAMPAIGN_MS) throw new Error('--per-suite-timeout-ms requires a positive finite safe integer no greater than 1200000 (20 minutes)')
+    return { perSuiteTimeoutMs, expired: false }
+  }
+  if (!Number.isFinite(deadline)) throw new Error('--deadline requires a finite absolute deadline')
+  return { deadline: Math.min(deadline, time.now() + MAX_CAMPAIGN_MS), expired: false }
+}
+export const parseArguments = args => {
+  const flags = new Set(['--run', '--plan'])
+  const values = new Set(['--state-dir', '--deadline', '--per-suite-timeout-ms', '--diagnostic', '--prepare'])
+  const parsed = new Map()
+  for (let index = 0; index < args.length; index++) {
+    const key = args[index]
+    if (parsed.has(key) || (!flags.has(key) && !values.has(key))) throw new Error(`Invalid or duplicate option: ${key}`)
+    if (flags.has(key)) parsed.set(key, true)
+    else {
+      const value = args[++index]
+      if (value === undefined || value.startsWith('--')) throw new Error(`Missing value: ${key}`)
+      parsed.set(key, value)
+    }
+  }
+  if (parsed.has('--run') === parsed.has('--plan')) throw new Error('Choose exactly one of --plan or --run')
+  const deadline = parsed.has('--deadline') ? Date.parse(parsed.get('--deadline')) : undefined
+  const perSuiteTimeoutMs = parsed.has('--per-suite-timeout-ms') ? Number(parsed.get('--per-suite-timeout-ms')) : undefined
+  if (parsed.has('--deadline') && !Number.isFinite(deadline)) throw new Error('Invalid --deadline')
+  if (parsed.has('--deadline') || parsed.has('--per-suite-timeout-ms') || parsed.has('--run')) selectedPolicy(deadline, perSuiteTimeoutMs)
+  return { mode: parsed.has('--run') ? 'run' : 'plan', stateDir: parsed.get('--state-dir'), deadline, perSuiteTimeoutMs, diagnostic: parsed.get('--diagnostic'), prepare: parsed.get('--prepare') }
+}
+const ownedCertification = async ({ deadline, perSuiteTimeoutMs, diagnostic, mode, prepare, root, stateDir, time, environment = process.env }, ownership) => {
   stateDir = path.resolve(stateDir)
   const stateFile = path.join(stateDir, 'campaign.json'), receiptFile = path.join(stateDir, 'receipts.jsonl')
   const prior = await optionalFile(stateFile)
@@ -155,17 +189,26 @@ const ownedCertification = async ({ deadline, diagnostic, mode, prepare, root, s
       plan.push({ suite, status: reusable ? 'reuse' : receipt !== undefined ? 'blocked' : 'pending',
         ...(receipt === undefined ? {} : { sourceCommit: receipt.sourceCommit, log: receipt.log }) })
     }
-    return { exit: 0, expired: campaign?.expired ?? false, plan }
+    return { exit: 0, expired: campaign?.expired ?? false, policy: campaign ?? (deadline === undefined && perSuiteTimeoutMs === undefined ? undefined : selectedPolicy(deadline, perSuiteTimeoutMs, time)), plan }
   }
-  if (!Number.isFinite(deadline)) throw new Error('Run requires an absolute deadline')
-  const effectiveDeadline = Math.min(deadline, campaign?.deadline ?? time.now() + MAX_CAMPAIGN_MS)
+  const requested = selectedPolicy(deadline, perSuiteTimeoutMs, time)
+  if (campaign !== undefined && (('perSuiteTimeoutMs' in campaign) !== ('perSuiteTimeoutMs' in requested) ||
+    ('perSuiteTimeoutMs' in campaign && campaign.perSuiteTimeoutMs !== requested.perSuiteTimeoutMs)))
+    throw new Error('Campaign timeout policy is immutable; use a new evidence directory')
+  const state = campaign === undefined ? requested : 'deadline' in campaign
+    ? { deadline: Math.min(requested.deadline, campaign.deadline), expired: campaign.expired }
+    : campaign
+  const campaignExpired = () => state.expired || ('deadline' in state && time.now() >= state.deadline)
+  const processDeadline = () => 'deadline' in state ? state.deadline : time.now() + state.perSuiteTimeoutMs
+  state.expired = campaignExpired()
   await mkdir(stateDir, { recursive: true })
-  const state = { deadline: effectiveDeadline, expired: campaign?.expired === true || time.now() >= effectiveDeadline }
   await atomicState(stateFile, parseCampaign(JSON.stringify(state)))
   if (state.expired) return { exit: TIMEOUT_EXIT, expired: true, plan: [] }
   let clean = true
   try {
-    await writeFile(path.join(root, '.movement-certification.lock/owner.json'), JSON.stringify({ pid: process.pid, deadline: effectiveDeadline, stateDir }))
+    await writeFile(path.join(root, '.movement-certification.lock/owner.json'), JSON.stringify({ pid: process.pid, policy: state, stateDir }))
+    if ((environment.HULY_MOVEMENT_CONCURRENCY_CASES ?? process.env.HULY_MOVEMENT_CONCURRENCY_CASES ?? '').trim() !== '')
+      return { exit: 1, expired: false, plan: [], preflight: 'full-matrix-required' }
     if (!inspectPriorEnvironment(environment).supported) return { exit: 1, expired: false, plan: [], preflight: 'unsupported-prior-environment' }
     const sourceBaseline = await fingerprintSuite(root, suites[0], prepare, false, environment)
     if (prepare !== undefined) {
@@ -189,14 +232,14 @@ const ownedCertification = async ({ deadline, diagnostic, mode, prepare, root, s
         const grantFile = path.join(stateDir, 'verified-quality.json')
         if (qualityReusable) await atomicState(grantFile, previousQuality)
         ownership.clean = false
-        const result = await boundedProcess(root, prepare, log, effectiveDeadline, time,
+        const result = await boundedProcess(root, prepare, log, processDeadline(), time,
           { ...environment, ...(qualityReusable ? { MOVEMENT_VERIFIED_QUALITY_RECEIPT: grantFile, MOVEMENT_QUALITY_CHECK_TIME: String(time.now()) } : {}) })
         clean = result.clean; ownership.clean = clean
         const stable = await qualityFingerprint(root, prepare) === qualityInput && await preparationFingerprint(root) === preparationBaseline
         if (!qualityReusable) await appendFile(qualityFile, JSON.stringify(parseQualityReceipt(JSON.stringify({ prepare, fingerprint: qualityInput,
           artifactFingerprint: await qualityArtifactFingerprint(root), sourceCommit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
           log, logHash: hash(await readFile(log)), started, ended: time.now(), exit: result.exit, clean: result.clean, inputsStable: stable }))) + '\n')
-        if (result.exit !== 0 || !result.clean) return { exit: result.exit || 1, expired: result.exit === TIMEOUT_EXIT, plan: [] }
+        if (result.exit !== 0 || !result.clean) return { exit: result.exit || 1, expired: campaignExpired(), plan: [] }
         if (!stable) return { exit: 1, expired: false, plan: [], drift: true }
       }
     }
@@ -205,7 +248,7 @@ const ownedCertification = async ({ deadline, diagnostic, mode, prepare, root, s
     const plan = []
     const accepted = new Map()
     for (const suite of suites) {
-      if (time.now() >= effectiveDeadline) { state.expired = true; return { exit: TIMEOUT_EXIT, expired: true, plan } }
+      if (campaignExpired()) { state.expired = true; return { exit: TIMEOUT_EXIT, expired: true, plan } }
       const fingerprints = await fingerprintSuite(root, suite, prepare, true, environment)
       const { fingerprint } = fingerprints
       const receipt = receipts.findLast(value => value.suite === suite && value.fingerprint === fingerprint)
@@ -214,7 +257,7 @@ const ownedCertification = async ({ deadline, diagnostic, mode, prepare, root, s
       if (receipt !== undefined && !admission) return { exit: 1, expired: false, plan: [...plan, { suite, status: 'blocked', log: receipt.log }] }
       ownership.clean = false
       const started = time.now(), log = path.join(stateDir, `${suite}-${started}.log`)
-      const result = await boundedProcess(root, `scripts/integration_test_${suite}.sh`, log, effectiveDeadline, time, environment)
+      const result = await boundedProcess(root, `scripts/integration_test_${suite}.sh`, log, processDeadline(), time, environment)
       clean = result.clean
       ownership.clean = clean
       const sourceStable = (await fingerprintSuite(root, suites[0], prepare, false, environment)).fingerprint === sourceBaseline.fingerprint
@@ -223,26 +266,23 @@ const ownedCertification = async ({ deadline, diagnostic, mode, prepare, root, s
         ...(admission ? { diagnostic: admission } : {}) }))
       await appendFile(receiptFile, JSON.stringify(evidence) + '\n'); receipts.push(evidence)
       plan.push({ suite, status: result.exit === 0 && inputsStable ? 'passed' : 'failed', log })
-      if (result.exit !== 0 || !clean || !inputsStable) { state.expired ||= result.exit === TIMEOUT_EXIT; return { exit: result.exit || 1, expired: state.expired, plan } }
+      if (result.exit !== 0 || !clean || !inputsStable) { state.expired ||= 'deadline' in state && result.exit === TIMEOUT_EXIT; return { exit: result.exit || 1, expired: state.expired, plan } }
       accepted.set(suite, fingerprint)
     }
     if ((await fingerprintSuite(root, suites[0], prepare, false, environment)).fingerprint !== sourceBaseline.fingerprint) return { exit: 1, expired: false, plan, drift: true }
     for (const [suite, fingerprint] of accepted) {
       if ((await fingerprintSuite(root, suite, prepare, true, environment)).fingerprint !== fingerprint) return { exit: 1, expired: false, plan, drift: true }
     }
-    return { exit: time.now() >= effectiveDeadline ? TIMEOUT_EXIT : 0, expired: time.now() >= effectiveDeadline, plan }
+    return { exit: campaignExpired() ? TIMEOUT_EXIT : 0, expired: campaignExpired(), plan }
   } finally {
     ownership.clean = ownership.clean && clean
-    state.expired ||= time.now() >= effectiveDeadline
+    state.expired ||= campaignExpired()
     await atomicState(stateFile, state)
   }
 }
 if (process.argv[1] !== undefined && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const args = process.argv.slice(ARGV_START), value = key => { const index = args.indexOf(key); return index < 0 ? undefined : args[index + 1] }
   const root = process.cwd()
-  const mode = args.includes('--run') ? 'run' : args.includes('--plan') ? 'plan' : undefined
-  if (mode === undefined) throw new Error('Choose --plan or --run')
-  const result = await runCertification({ root, mode, stateDir: value('--state-dir') ?? path.join(root, '.movement-certification'),
-    deadline: Date.parse(value('--deadline') ?? ''), diagnostic: value('--diagnostic'), prepare: value('--prepare') })
+  const options = parseArguments(process.argv.slice(ARGV_START))
+  const result = await runCertification({ ...options, root, stateDir: options.stateDir ?? path.join(root, '.movement-certification') })
   process.stdout.write(JSON.stringify(result) + '\n'); process.exitCode = result.exit
 }

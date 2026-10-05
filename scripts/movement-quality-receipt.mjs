@@ -20,9 +20,9 @@ export const qualityFingerprint = async (root, prepare) => {
   const directories = ['src', 'test', 'scripts', 'packages', 'patches', 'quint-specs']
   const files = (await Promise.all(directories.map(directory => walk(path.join(root, directory))))).flat()
     .map(file => path.relative(root, file)).filter(file => !file.includes('/dist/') && !file.includes('/node_modules/') && !file.endsWith('.tsbuildinfo') && !/^scripts\/integration_test_[^/]+\.sh$/.test(file))
-  // Root README synchronization and registry metadata checks read these files directly.
+  // Documentation consumed by registered checks belongs to the gate input identity.
   // Package README and packaged skill documents are already included by the packages walk.
-  for (const file of ['README.md', 'server.json', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.json', 'vitest.config.ts', '.oxlintrc.json', 'oxlint.complexity.json', '.jscpd.json', 'dprint.json',
+  for (const file of ['README.md', 'server.json', '.husky/pre-commit', 'docs/implementation/completion-306-311.json', 'docs/implementation/completion-306-311.integrity.json', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.json', 'vitest.config.ts', '.oxlintrc.json', 'oxlint.complexity.json', '.jscpd.json', 'dprint.json',
     'node_modules/.modules.yaml', 'node_modules/.pnpm/lock.yaml', 'node_modules/effect/package.json', 'node_modules/@effect/tsgo/package.json', 'node_modules/@typescript/native/package.json', 'node_modules/@hcengineering/api-client/package.json'])
     if (await optional(path.join(root, file)) !== undefined) files.push(file)
   return hash(JSON.stringify({ prepare, bytes: await bytes(root, files), runtime: [process.version, process.platform, process.arch] }))
