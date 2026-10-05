@@ -43,3 +43,16 @@ test("diagnostic callback defects become unavailable without escaping the listen
   expect(() => reader.accept(Buffer.from('{"observerStatus":"recorded"}\n'))).not.toThrow()
   expect(unavailable).toBe(1)
 })
+
+test("discarding an oversized line across chunks recovers only after its newline", () => {
+  const statuses: Array<MovementObserverStatus> = []
+  const reader = makeMovementStatusReader(
+    (status) => statuses.push(status),
+    () => {}
+  )
+  reader.accept(Buffer.from("x".repeat(MAX_OBSERVER_STATUS_LINE_BYTES + 1)))
+  reader.accept(Buffer.from('{"observerStatus":"recorded"}'))
+  expect(statuses).toEqual([])
+  reader.accept(Buffer.from('\n{"observerStatus":"unavailable"}\n'))
+  expect(statuses).toEqual([{ observerStatus: "unavailable" }])
+})

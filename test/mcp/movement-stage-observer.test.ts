@@ -182,3 +182,63 @@ it.effect("distinguishes completed frontier reads from the one interrupted read"
     expect(report.stages.find((stage) => stage.stage === "transfer.inspectForestFrontier")?.outcome).toBe("interrupted")
   })
 )
+
+it.effect("an unfinished producer span is reported without inventing elapsed time or changing success", () =>
+  Effect.gen(function* () {
+    const reports: Array<MovementStageReport> = []
+    const observe = makeMovementStageObserver({
+      write: (report) =>
+        Effect.sync(() => {
+          reports.push(report)
+        }),
+      publishStatus: () => Effect.void
+    })
+    const result = yield* observe(Effect.makeSpan("transfer.inspectForest").pipe(Effect.as("unchanged")))
+    expect(result).toBe("unchanged")
+    expect(reports[0]?.stages).toEqual([
+      { stage: "transfer.inspectForest", outcome: "unfinished", timing: { status: "unavailable" } }
+    ])
+  })
+)
+
+it.effect("invalid producer span timing is unavailable while its successful result remains unchanged", () =>
+  Effect.gen(function* () {
+    const reports: Array<MovementStageReport> = []
+    const observe = makeMovementStageObserver({
+      write: (report) =>
+        Effect.sync(() => {
+          reports.push(report)
+        }),
+      publishStatus: () => Effect.void
+    })
+    const result = yield* observe(
+      Effect.gen(function* () {
+        const span = yield* Effect.makeSpan("transfer.inspectForest")
+        span.end(-1n, Exit.succeed(undefined))
+        return "unchanged"
+      })
+    )
+    expect(result).toBe("unchanged")
+    expect(reports[0]?.stages).toEqual([
+      { stage: "transfer.inspectForest", outcome: "success", timing: { status: "unavailable" } }
+    ])
+  })
+)
+
+it.effect("a recorded typed operation failure remains the original failure and has a failure outcome", () =>
+  Effect.gen(function* () {
+    const failure = new MovementObserverError({ phase: "configuration" })
+    const reports: Array<MovementStageReport> = []
+    const observe = makeMovementStageObserver({
+      write: (report) =>
+        Effect.sync(() => {
+          reports.push(report)
+        }),
+      publishStatus: () => Effect.void
+    })
+    const result = yield* Effect.result(observe(Effect.fail(failure).pipe(Effect.withSpan("moveIssue"))))
+    expect(result._tag).toBe("Failure")
+    if (result._tag === "Failure") expect(result.failure).toBe(failure)
+    expect(reports[0]?.stages[0]?.outcome).toBe("failure")
+  })
+)

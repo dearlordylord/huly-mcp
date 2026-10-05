@@ -1,4 +1,4 @@
-import { chmod, lstat, mkdtemp, readdir, readFile, rm, symlink } from "node:fs/promises"
+import { chmod, lstat, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Effect, Schema } from "effect"
@@ -58,6 +58,52 @@ for (const mode of ["owned", "public", "symlink", "wrong-owner"]) {
       expect(statuses.at(-1)).toBe('{"observerStatus":"unavailable"}')
     } finally {
       await rm(link, { force: true })
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+}
+
+test("configuration codecs refuse relative report paths and invalid process identities", () => {
+  expect(Schema.decodeUnknownOption(MovementReportDirectorySchema)("relative/private")._tag).toBe("None")
+  for (const input of [
+    { processId: -1, userId: 0 },
+    { processId: 0, userId: -1 },
+    { processId: 0.5, userId: 0 }
+  ])
+    expect(Schema.decodeUnknownOption(MovementObserverProcessSchema)(input)._tag).toBe("None")
+})
+
+for (const kind of ["missing", "broken-link", "noncanonical", "file"]) {
+  test(`report configuration refuses ${kind} before observing an operation`, async () => {
+    const directory = await mkdtemp(join(tmpdir(), "movement-report-invalid-"))
+    const entry = join(directory, "entry")
+    try {
+      await chmod(directory, privateDirectoryMode)
+      if (kind === "broken-link") await symlink(join(directory, "absent"), entry)
+      if (kind === "file") {
+        await writeFile(entry, "private", { mode: privateDirectoryMode })
+      }
+      const owner = (await lstat(directory)).uid
+      const identity = Schema.decodeUnknownSync(MovementObserverProcessSchema)({
+        processId: process.pid,
+        userId: owner
+      })
+      const path = Schema.decodeUnknownSync(MovementReportDirectorySchema)(
+        kind === "noncanonical" ? `${directory}/.` : entry
+      )
+      const statuses: Array<string> = []
+      const result = await Effect.runPromise(
+        Effect.result(
+          makeFileMovementStageObserver(path, identity, (line) => {
+            statuses.push(line)
+          })
+        )
+      )
+      expect(result._tag).toBe("Failure")
+      if (result._tag === "Failure") expect(result.failure.phase).toBe("configuration")
+      expect(statuses).toEqual([])
+      expect((await readdir(directory)).filter((name) => name.startsWith("movement-"))).toEqual([])
+    } finally {
       await rm(directory, { recursive: true, force: true })
     }
   })
