@@ -19,7 +19,7 @@ export default defineConfig({
     silent: 'passed-only',
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      reporter: ['text-summary', 'json', 'html'],
       skipFull: true,
       exclude: [
         'node_modules/**',
