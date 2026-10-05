@@ -1,6 +1,7 @@
 import { Context, Effect, Exit } from "effect"
 import { HttpServerRequest, HttpServerResponse } from "effect/http"
 import { describe, expect, it } from "vitest"
+import { EventEmitter } from "node:events"
 
 import { ConfigValidationError, sanitizeHulyRuntimeConfigFromEnv } from "../../src/config/config.js"
 import { requestContextMiddleware } from "../../src/mcp/http-request-context.js"
@@ -15,7 +16,56 @@ const runRequest = (
     requestContextMiddleware(options)(Effect.as(inspect, HttpServerResponse.empty()))
   )
 
+class AbortableWebRequest extends Request {
+  readonly events = new EventEmitter()
+
+  constructor(readonly socket: object | null | undefined) {
+    super("http://localhost/request-context")
+  }
+
+  once(event: string, listener: () => void): unknown {
+    return this.events.once(event, listener)
+  }
+
+  removeListener(event: string, listener: () => void): unknown {
+    return this.events.removeListener(event, listener)
+  }
+}
+
 describe("HTTP MCP request context", () => {
+  it.each([
+    { socket: undefined, response: undefined },
+    { socket: null, response: null },
+    { socket: {}, response: {} }
+  ])(
+    "releases the request lease when optional disconnect sources are unavailable: %j",
+    async ({ response, socket }) => {
+      const source = new AbortableWebRequest(socket)
+      const request = Object.assign(HttpServerRequest.fromWeb(source), { resolvedResponse: response })
+      const unavailable = new ConfigValidationError({ message: "request-local client unavailable" })
+      let closes = 0
+      await runRequest(
+        request,
+        {
+          resolveClients: async () => Exit.fail(unavailable),
+          resolveClientLeaseForHttpRequest: async () => ({
+            bundle: Exit.fail(unavailable),
+            close: () => {
+              closes++
+            }
+          })
+        },
+        Effect.gen(function* () {
+          const context = yield* McpRequestContextService
+          expect(yield* Effect.promise(context.resolveClients)).toEqual(Exit.fail(unavailable))
+          expect(source.events.listenerCount("aborted")).toBe(1)
+        })
+      )
+      expect(closes).toBe(1)
+      expect(source.events.listenerCount("aborted")).toBe(0)
+    }
+  )
+
   it("preserves absolute adapter URLs and closes the acquired request lease", async () => {
     const runtimeConfig = sanitizeHulyRuntimeConfigFromEnv({})
     const seenUrls: Array<string> = []
