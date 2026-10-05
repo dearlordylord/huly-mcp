@@ -1840,7 +1840,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -6635,7 +6635,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -7772,7 +7772,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -8333,7 +8333,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -8843,7 +8843,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -11432,7 +11432,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -12052,7 +12052,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -12372,7 +12372,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -12692,7 +12692,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -13198,7 +13198,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -13939,7 +13939,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -13974,7 +13974,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -14379,7 +14379,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -14647,7 +14647,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -14682,7 +14682,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -14950,7 +14950,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -15480,7 +15480,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -15790,7 +15790,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -15825,7 +15825,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -16135,7 +16135,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -16170,7 +16170,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -16462,7 +16462,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -16717,7 +16717,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -16752,7 +16752,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -17370,7 +17370,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -17639,7 +17639,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -17674,7 +17674,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -17709,7 +17709,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -17971,7 +17971,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
@@ -22258,7 +22258,7 @@
               "terminalExit": 0,
               "clean": true,
               "inputsStableAtTerminal": true,
-              "finalInputAudit": "passed",
+              "finalInputAudit": "pending",
               "transport": [
                 "MCP native SDK",
                 "published CLI"
