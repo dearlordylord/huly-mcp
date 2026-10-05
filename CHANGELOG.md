@@ -1,5 +1,17 @@
 # @firfi/huly-mcp
 
+## 0.53.0
+
+### Minor Changes
+
+- 66a726e: Share saved local profiles between CLI and explicitly configured stdio MCP. Add CLI `--profile` / `HULY_PROFILE` selection, bind saved tokens to their login destination, and reject incomplete or conflicting credential overrides before forwarding secrets. Existing unbound tokens require another login; file defaults and environment-only/HTTP configuration remain supported.
+
+### Patch Changes
+
+- 2778036: Honor `DO_NOT_TRACK` to disable MCP and CLI usage analytics.
+- ddb706f: Upgrade the Effect runtime, Node platform, and test integration to stable 4.0.0, migrate module imports, and preserve the MCP transport extension on the stable release.
+- 890c41c: Explain cyclic issue-movement destinations before allocating numbers or sending writes, return the offending stable parent ID, and provide truthful source-project inspection hints for blocked moves. Include assigned component IDs and labels in issue details.
+
 ## 0.52.6
 
 ### Patch Changes

@@ -43,6 +43,7 @@ const JSON_INDENT_SPACES = 2
 
 const HarnessEnvironmentSchema = Schema.Struct({
   ...CertificationConnectionConfigSchema.fields,
+  token: Schema.RedactedFromValue(CertificationConnectionConfigSchema.fields.token.value),
   project: ProjectIdentifier,
   httpPort: CertificationHttpPort,
   attachmentId: Schema.optionalKey(AttachmentId),
