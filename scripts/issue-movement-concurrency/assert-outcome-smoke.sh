@@ -11,10 +11,10 @@ BASE=$(jq -nc --argjson ids "$IDS" '{
 }')
 COMPLETED=$(jq -nc --argjson ids "$IDS" '{outcome:"completed",changed:true,issueId:"root",projectId:"destination",parentId:null,tasks:[$ids | to_entries[] | {issueId:.value,previousIdentifier:("SOURCE-"+((.key+1)|tostring)),identifier:("DEST-"+((.key+21)|tostring)),parentId:null,url:("http://localhost/"+.value)}]}')
 check() {
-  jq -e --arg name "$1" --arg destinationId destination --argjson ids "$IDS" --argjson previousSequence 20 --argjson after "$AFTER" -f "$PREDICATE" >/dev/null <<<"$2"
+  jq -e --arg name "$1" --arg destinationId destination --argjson ids "$IDS" --argjson previousSequence 20 --argjson after "${3:-$AFTER}" -f "$PREDICATE" >/dev/null <<<"$2"
 }
 reject() {
-  if check "$1" "$2"; then echo "Predicate falsely accepted $1" >&2; exit 1; fi
+  if check "$1" "$2" "${3:-$AFTER}"; then echo "Predicate falsely accepted $1" >&2; exit 1; fi
 }
 for kind in child comment time attribute ancestry; do
   check "refuse-stale-$kind" "$BASE"
@@ -39,3 +39,37 @@ for name in before-allocation-send allocated-reply-lost; do
 done
 reject refuse-stale-child "$(jq -c '.observation.result.execution.reservations[0].number=999' <<<"$BASE")"
 echo 'PASS: fourteen case predicates; completed/no-op, unavailable-proof and reservation counterexamples rejected'
+
+# Partial is accepted only for independently preserved later ancestry with a
+# known contradiction, one acknowledged send, and an explicit deadline limitation.
+PARTIAL_AFTER='{"issues":[{"issue":{"_id":"root","space":"destination","attachedTo":"later-parent","identifier":"DEST-21","title":"Fixture","modifiedOn":2}}]}'
+PARTIAL=$(jq -c --argjson ids "$IDS" '
+  .observation.result.execution.phase="verification" |
+  .observation.result.execution.commit="acknowledged" |
+  .observation.result.verification.completeness="incomplete" |
+  .observation.result.verification.reason="Task root differs from its planned destination or ancestry. Movement deadline interrupted remaining verification reads." |
+  .observation.result.verification.tasks=[$ids | to_entries[] | {issueId:.value,projectId:"destination",parentId:(if .key==0 then "later-parent" elif .key==1 then "root" else "child" end),identifier:("DEST-"+((21+.key)|tostring)),number:(21+.key)}] |
+  .mutation={before:{issueId:"root",parentIssue:null},after:{issueId:"root",parentIssue:"DEST-1",identifier:"DEST-21",title:"Fixture",modifiedOn:2},action:{kind:"ancestry",result:{outcome:"completed",changed:true,issueId:"root",projectId:"destination",parentId:"later-parent"}}} |
+  .gatewayEvents=[{event:"forwarded",point:"commit-after",attempt:1,status:200},{event:"barrier",point:"commit-after",action:"pause"}]
+' <<<"$BASE")
+check preserve-later-ancestry "$PARTIAL" "$PARTIAL_AFTER"
+for filter in \
+  '.observation.result.verification.consistency="undetermined"' \
+  '.observation.result.verification.reason="Remaining reads unavailable."' \
+  '.observation.result.verification.reason="Unsupported contradiction. Movement deadline interrupted remaining verification reads."' \
+  '.observation.result.verification.tasks[0].parentId=null' \
+  '.observation.result.verification.tasks|=map(select(.issueId!="child"))' \
+  '.observation.result.execution.commit="reply-lost"' \
+  '.observation.result.execution.reservations[0].status="uncertain"' \
+  '.mutation.action.result.outcome="indeterminate"' \
+  '.mutation.action.result.parentId=null' \
+  '.mutation.after.parentIssue=null' \
+  '.gatewayEvents += [{event:"retry-suppressed",point:"commit-after",attempt:2}]' \
+  '.gatewayEvents += [{event:"forwarded",point:"commit-after",attempt:2,status:200}]'; do
+  reject preserve-later-ancestry "$(jq -c "$filter" <<<"$PARTIAL")" "$PARTIAL_AFTER"
+done
+for filter in '.issues[0].issue.attachedTo="different-parent"' '.issues[0].issue.modifiedOn=3' '.issues[0].issue.title="later edit"'; do
+  reject preserve-later-ancestry "$PARTIAL" "$(jq -c "$filter" <<<"$PARTIAL_AFTER")"
+done
+reject preserve-later-comment "$PARTIAL" "$PARTIAL_AFTER"
+echo 'PASS: partial later-ancestry proof and single-send/actor-state/deadline counterexamples'

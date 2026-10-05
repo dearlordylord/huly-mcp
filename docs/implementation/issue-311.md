@@ -70,3 +70,16 @@ Version evidence correction removes the invented mandatory HULY_SERVER_BUILD inp
 Actual core successor `6a3285f11266cd1d760df88310a8e25c7c50c98a` passed TypeScript and strict Effect diagnostics across 1117 files with zero errors/warnings/messages (`/tmp/issue311-core-typecheck6.log`). Its 262-test focused run passed 261 and exposed the union parser stripping forbidden absence fields (`/tmp/issue311-core-focused3.log`). The owned `4972d76b` fix uses explicit optionalKey(Schema.Never) fields instead of an ineffective excess-field annotation. Core merged that fix as coherent `97ecbb5c34420b2d57723c8f753c3947c6a1ed9a`; the specifically authorized codec retry actually passed all 11 tests in 304ms (`/tmp/issue311-core-codec1.log`). This is not a new full gate or coverage/live acceptance claim.
 
 The final combined source's first ordinary cold quality gate on `eede7046682bcc64002b86c2318ee0e28e699770` passed build, diagnostics (1120 files, zero findings), schema/circular/complexity and all metadata/parity/documentation/package stages, then failed lint with exit 123. Coverage did not run (`/tmp/integration-306-311-check-all-eede7046-cold.log`). The owned lint findings are corrected by merged imports, explicit type-only imports and named HTTP status/range and MCP request-ID constants. The specifically authorized seven-file type-aware Oxlint check passed with exit zero (`/tmp/issue311-owned-lint-eede-findings.log`); formatting and diff checks passed. Core-owned findings are handled separately; the merged full lint/gate remain required. No live write or suite was run.
+
+
+The later-ancestry concurrency oracle accepts a final observed incomplete/inconsistent
+proof only when the acknowledged single movement send, all confirmed reservations
+and stable task IDs remain present, the independently completed actor reparent is
+observed in both verification and the subsequent fresh snapshot, and the result
+explicitly reports the deadline interruption. The fresh actor state includes its
+parent, identifier, title and modification timestamp. Undetermined evidence,
+unacknowledged sends, missing task IDs, different later state and retry evidence
+still fail. This narrow branch preserves the existing complete-proof branch and
+does not apply to other race cases. It reflects retained known inconsistency plus
+unavailable later reads; it does not relabel partial observations complete or
+change product retries, guards or deadlines.
