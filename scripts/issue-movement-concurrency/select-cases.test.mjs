@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process'
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
 import {selectCases} from './select-cases.mjs'
@@ -10,9 +11,15 @@ test('default routine retains all fourteen MCP and four CLI cases',() => {
  })
 test('explicit continuation retains only the six requested transport cases',() => {
  const cases=['mcp:successful-batch-reply-lost', 'mcp:verification-outage', 'cli:refuse-stale-attribute', 'cli:allocated-reply-lost', 'cli:successful-batch-reply-lost', 'cli:verification-outage']
- assert.deepEqual(selectCases({ profile: 'routine', selection: cases.join(', ') }),{scope: 'selected',cases  })
+ assert.deepEqual(selectCases({ profile: 'routine', selection: cases.join(',') }),{scope: 'selected',cases  })
  })
 test('unknown, duplicate, empty and historical prefix selections refuse',() => {
  for (const selection of ['', 'mcp:unknown', 'cli:verification-outage,cli:verification-outage', 'mcp:refuse-stale-child'])assert.throws(() => selectCases({ profile: 'routine',selection }))
  })
 test('expanded default retains both complete transports',() => assert.equal(selectCases({ profile: 'expanded' }).cases.length,28))
+test('CLI invalid selection returns a fixed error without private input', () => {
+  const result = spawnSync(process.execPath, ['scripts/issue-movement-concurrency/select-cases.mjs'], { encoding: 'utf8', timeout: 5000, killSignal: 'SIGKILL', env: { ...process.env, HULY_MOVEMENT_CONCURRENCY_CASES: 'secret-like-invalid-selection' } })
+  assert.equal(result.status, 1)
+  assert.equal(result.stdout, '')
+  assert.equal(result.stderr, 'Invalid concurrency case selection.\n')
+})
