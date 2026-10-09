@@ -1,5 +1,11 @@
 # @firfi/huly-cli
 
+## 0.51.1
+
+### Patch Changes
+
+- e5ac6ab: Keep Drive listing, item retrieval, and version history usable when Huly stores an empty file-version MIME type. Preserve file size and download URLs with an application/octet-stream fallback, and record the substitution in operator diagnostics without adding agent-facing warnings.
+
 ## 0.51.0
 
 ### Minor Changes
