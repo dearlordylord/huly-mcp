@@ -53,7 +53,9 @@ export const toDriveItemSummary = (
         ? {}
         : {
             size: Count.make(currentVersion.size),
-            contentType: MimeType.make(currentVersion.type),
+            // Huly-native docs (.gdoc, .gsheet) store an empty MIME type, and
+            // MimeType.make("") throws, which fails the whole folder listing.
+            contentType: MimeType.make(currentVersion.type || "application/octet-stream"),
             downloadUrl: UrlString.make(storage.getFileUrl(currentVersion.file))
           })
     }
@@ -72,7 +74,7 @@ export const toFileVersionSummary = (
   title: driveTextOrUntitled(version.title),
   blobId: BlobId.make(version.file),
   size: Count.make(version.size),
-  contentType: MimeType.make(version.type),
+  contentType: MimeType.make(version.type || "application/octet-stream"),
   lastModified: Timestamp.make(version.lastModified),
   current,
   downloadUrl: UrlString.make(storage.getFileUrl(version.file))
