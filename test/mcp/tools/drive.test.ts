@@ -6,6 +6,7 @@ import type { ChatMessage } from "@hcengineering/chunter"
 import type {
   AttachedData,
   AttachedDoc,
+  Blob,
   Class,
   Data,
   Doc,
@@ -19,6 +20,7 @@ import { toFindResult } from "@hcengineering/core"
 import { Effect } from "effect"
 import { expect } from "vitest"
 
+import { BlobId } from "../../../src/domain/schemas/shared.js"
 import type { HulyClientOperations } from "../../../src/huly/client.js"
 import { drive, type DriveSpace, type File, type FileVersion, type Folder } from "../../../src/huly/drive-sdk.js"
 import { activity, chunter, core } from "../../../src/huly/huly-plugins.js"
@@ -35,6 +37,7 @@ interface DriveToolState {
   readonly drives: Array<DriveSpace>
   readonly folders: Array<Folder>
   readonly files: Array<File>
+  readonly versions?: ReadonlyArray<FileVersion>
   readonly messages?: Array<ChatMessage>
   readonly activityMessages?: Array<HulyActivityMessage>
   nextId: number
@@ -133,11 +136,13 @@ const documentsForClass = (state: DriveToolState, classRef: Ref<Class<Doc>>): Re
       ? state.folders
       : classRef === drive.class.File
         ? state.files
-        : classRef === chunter.class.ChatMessage
-          ? (state.messages ?? [])
-          : classRef === activity.class.ActivityMessage
-            ? (state.activityMessages ?? [])
-            : []
+        : classRef === drive.class.FileVersion
+          ? (state.versions ?? [])
+          : classRef === chunter.class.ChatMessage
+            ? (state.messages ?? [])
+            : classRef === activity.class.ActivityMessage
+              ? (state.activityMessages ?? [])
+              : []
 
 const makeHulyClient = (state: DriveToolState): HulyClientOperations => ({
   getAccountUuid: () => accountA,
@@ -345,6 +350,69 @@ describe("driveTools", () => {
       expect(deleted.structuredContent?.result).toMatchObject({ deleted: true, drive: { name: "Team Drive" } })
     })
   )
+
+  for (const type of ["", "text/markdown"]) {
+    it.effect(`surfaces MIME fallback diagnostics in Drive tool responses for ${JSON.stringify(type)}`, () =>
+      Effect.gen(function* () {
+        const item = file("file-api", "API.md")
+        const storedVersion: FileVersion = {
+          _id: item.file,
+          _class: drive.class.FileVersion,
+          space: item.space,
+          attachedTo: item._id,
+          attachedToClass: drive.class.File,
+          collection: "versions",
+          title: item.title,
+          file: toRef<Blob>(BlobId.make("blob-api")),
+          size: 12,
+          type,
+          lastModified: 100,
+          version: 1,
+          modifiedBy: personId,
+          modifiedOn: 0,
+          createdBy: personId,
+          createdOn: 0
+        }
+        const client = makeHulyClient({
+          drives: [driveSpace()],
+          folders: [],
+          files: [item],
+          versions: [storedVersion],
+          nextId: 1
+        })
+        for (const name of ["list_drive_items", "get_drive_item", "list_drive_file_versions"]) {
+          const result = yield* Effect.promise(() =>
+            findTool(name).handler(
+              name === "list_drive_items"
+                ? { drive: "Docs" }
+                : name === "get_drive_item"
+                  ? { drive: "Docs", itemId: "file-api" }
+                  : { drive: "Docs", file: "file-api" },
+              client,
+              storageClient
+            )
+          )
+          expect(result.isError).toBeUndefined()
+          if (type === "") {
+            expect(result.structuredContent?.warnings).toEqual(
+              expect.arrayContaining([
+                {
+                  code: "drive_mime_type_metadata_degraded",
+                  message: `Drive file version ${item.file} has no MIME type; contentType defaults to application/octet-stream.`
+                }
+              ])
+            )
+            expect(JSON.parse(assertAt(result.content, 1).text)).toEqual({
+              warnings: result.structuredContent?.warnings
+            })
+          } else {
+            expect(result.structuredContent?.warnings).toBeUndefined()
+            expect(result.content).toHaveLength(1)
+          }
+        }
+      })
+    )
+  }
 
   it.effect("Drive file comment and activity handlers encode successful structured output", () =>
     Effect.gen(function* () {

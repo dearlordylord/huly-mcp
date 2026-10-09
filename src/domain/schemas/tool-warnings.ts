@@ -14,6 +14,8 @@ export const CustomFieldMetadataDegradedWarningCode = "custom_field_metadata_deg
 export const ExternalPublicationTargetMetadataDegradedWarningCode =
   "external_publication_target_metadata_degraded" as const
 
+export const DriveMimeTypeMetadataDegradedWarningCode = "drive_mime_type_metadata_degraded" as const
+
 export const IssueComponentMetadataDegradedWarningCode = "issue_component_metadata_degraded" as const
 
 export const IssueDescendantAncestryStaleWarningCode = "issue_descendant_ancestry_stale" as const
@@ -47,7 +49,8 @@ export const ToolWarningCodeSchema = Schema.Literals([
   CalendarMeetingRoomMetadataDegradedWarningCode,
   RecruitingCandidateCustomFieldMetadataDegradedWarningCode,
   CustomFieldMetadataDegradedWarningCode,
-  ExternalPublicationTargetMetadataDegradedWarningCode
+  ExternalPublicationTargetMetadataDegradedWarningCode,
+  DriveMimeTypeMetadataDegradedWarningCode
 ]).pipe(
   Schema.annotate({
     identifier: "ToolWarningCode",
