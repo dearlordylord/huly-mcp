@@ -352,7 +352,7 @@ describe("driveTools", () => {
   )
 
   for (const type of ["", "text/markdown"]) {
-    it.effect(`surfaces MIME fallback diagnostics in Drive tool responses for ${JSON.stringify(type)}`, () =>
+    it.effect(`returns usable MIME metadata without agent warnings for ${JSON.stringify(type)}`, () =>
       Effect.gen(function* () {
         const item = file("file-api", "API.md")
         const storedVersion: FileVersion = {
@@ -393,22 +393,20 @@ describe("driveTools", () => {
             )
           )
           expect(result.isError).toBeUndefined()
-          if (type === "") {
-            expect(result.structuredContent?.warnings).toEqual(
-              expect.arrayContaining([
-                {
-                  code: "drive_mime_type_metadata_degraded",
-                  message: `Drive file version ${item.file} has no MIME type; contentType defaults to application/octet-stream.`
-                }
-              ])
-            )
-            expect(JSON.parse(assertAt(result.content, 1).text)).toEqual({
-              warnings: result.structuredContent?.warnings
-            })
-          } else {
-            expect(result.structuredContent?.warnings).toBeUndefined()
-            expect(result.content).toHaveLength(1)
+          const metadata = {
+            contentType: type || "application/octet-stream",
+            size: storedVersion.size,
+            downloadUrl: storageClient.getFileUrl(storedVersion.file)
           }
+          expect(result.structuredContent?.result).toMatchObject(
+            name === "list_drive_items"
+              ? { items: [metadata] }
+              : name === "get_drive_item"
+                ? metadata
+                : { file: metadata, versions: [metadata] }
+          )
+          expect(result.structuredContent?.warnings).toBeUndefined()
+          expect(result.content).toHaveLength(1)
         }
       })
     )

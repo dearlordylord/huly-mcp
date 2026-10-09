@@ -13,7 +13,7 @@ import type {
   Ref,
   Space
 } from "@hcengineering/core"
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Ref as EffectRef } from "effect"
 import { TestClock } from "effect/testing"
 import { expect } from "vitest"
 
@@ -636,7 +636,7 @@ describe("drive operations", () => {
   )
 
   for (const type of ["", "text/markdown", "application/octet-stream"]) {
-    it.effect(`preserves file metadata and reports MIME fallback for ${JSON.stringify(type)}`, () =>
+    it.effect(`preserves file metadata and logs MIME fallback only for ${JSON.stringify(type)}`, () =>
       Effect.gen(function* () {
         const sheet = file("file-sheet", "Parts.gsheet", drive.ids.Root, [])
         const state: DriveState = {
@@ -646,22 +646,21 @@ describe("drive operations", () => {
           versions: [{ ...version("version-1", sheet._id, 1), type }],
           nextId: 1
         }
-        const listDiagnostics = yield* makeDiagnosticsScope
-        const getDiagnostics = yield* makeDiagnosticsScope
-        const versionsDiagnostics = yield* makeDiagnosticsScope
-        const layer = makeLayer(state)
+        const diagnostics = yield* makeDiagnosticsScope
+        const trails = yield* EffectRef.make<ReadonlyArray<string>>([])
+        const layer = Layer.merge(
+          makeLayer(state),
+          Layer.succeed(Diagnostics, {
+            ...diagnostics.service,
+            trail: (message) => EffectRef.update(trails, (messages) => [...messages, message])
+          })
+        )
         const listParams = yield* parseListDriveItemsParams({ drive: "Docs" })
-        const listed = yield* listDriveItems(listParams).pipe(
-          Effect.provide(Layer.merge(layer, Layer.succeed(Diagnostics, listDiagnostics.service)))
-        )
+        const listed = yield* listDriveItems(listParams).pipe(Effect.provide(layer))
         const getParams = yield* parseGetDriveItemParams({ drive: "Docs", path: "/Parts.gsheet" })
-        const item = yield* getDriveItem(getParams).pipe(
-          Effect.provide(Layer.merge(layer, Layer.succeed(Diagnostics, getDiagnostics.service)))
-        )
+        const item = yield* getDriveItem(getParams).pipe(Effect.provide(layer))
         const versionsParams = yield* parseListDriveFileVersionsParams({ drive: "Docs", file: "/Parts.gsheet" })
-        const versions = yield* listDriveFileVersions(versionsParams).pipe(
-          Effect.provide(Layer.merge(layer, Layer.succeed(Diagnostics, versionsDiagnostics.service)))
-        )
+        const versions = yield* listDriveFileVersions(versionsParams).pipe(Effect.provide(layer))
         const metadata = {
           contentType: type || "application/octet-stream",
           size: 12,
@@ -671,19 +670,9 @@ describe("drive operations", () => {
         expect(item).toMatchObject(metadata)
         expect(versions.file).toMatchObject(metadata)
         expect(versions.versions).toMatchObject([{ ...metadata, blobId: "blob-1", current: true }])
-        const warnings =
-          type === ""
-            ? [
-                {
-                  code: "drive_mime_type_metadata_degraded",
-                  message:
-                    "Drive file version version-1 has no MIME type; contentType defaults to application/octet-stream."
-                }
-              ]
-            : []
-        expect(yield* listDiagnostics.drainWarnings).toEqual(warnings)
-        expect(yield* getDiagnostics.drainWarnings).toEqual(warnings)
-        expect(yield* versionsDiagnostics.drainWarnings).toEqual([...warnings, ...warnings])
+        expect(yield* diagnostics.drainWarnings).toEqual([])
+        const trail = "Drive file version version-1 has no MIME type; contentType defaults to application/octet-stream."
+        expect(yield* EffectRef.get(trails)).toEqual(type === "" ? [trail, trail, trail, trail] : [])
       })
     )
   }

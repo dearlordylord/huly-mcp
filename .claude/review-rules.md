@@ -127,3 +127,5 @@ Any fallback that changes returned payload fidelity must emit `Diagnostics.warnA
 Operator-only facts use `Diagnostics.trail` inside request scope, or bare `Effect.log*` outside request scope. `warnAgent` is reserved for payload-fidelity degradation, not routine anomalies.
 
 Tests for fallback paths must assert the warning is present, or assert it is absent when the fallback fully repairs the payload.
+
+An empty Drive file-version MIME type mapped to `application/octet-stream` fully repairs the payload: download URLs, accepted upload types, and version restoration remain usable. Use `Diagnostics.trail` for this substitution and assert that no agent warning is emitted.

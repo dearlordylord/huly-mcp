@@ -4,7 +4,6 @@ import { Effect } from "effect"
 import type { DriveFileVersionSummary, DriveItemSummary, DriveSummary } from "../../domain/schemas/drive.js"
 import { DriveFileVersionId, DriveId, DriveItemId, DrivePath } from "../../domain/schemas/drive.js"
 import { BlobId, Count, MimeType, Timestamp, UrlString } from "../../domain/schemas/shared.js"
-import { DriveMimeTypeMetadataDegradedWarningCode } from "../../domain/schemas/tool-warnings.js"
 import type { HulyClientError, HulyClientOperations } from "../client.js"
 import { Diagnostics } from "../diagnostics.js"
 import { drive, type DriveSpace, type File, type FileVersion } from "../drive-sdk.js"
@@ -21,10 +20,9 @@ const resolveVersionMimeType = Effect.fnUntraced(function* (
 ): Effect.fn.Return<MimeType, never, Diagnostics> {
   if (type !== "") return MimeType.make(type)
   const diagnostics = yield* Diagnostics
-  yield* diagnostics.warnAgent({
-    code: DriveMimeTypeMetadataDegradedWarningCode,
-    message: `Drive file version ${versionId} has no MIME type; contentType defaults to ${FALLBACK_MIME_TYPE}.`
-  })
+  yield* diagnostics.trail(
+    `Drive file version ${versionId} has no MIME type; contentType defaults to ${FALLBACK_MIME_TYPE}.`
+  )
   return FALLBACK_MIME_TYPE
 })
 
