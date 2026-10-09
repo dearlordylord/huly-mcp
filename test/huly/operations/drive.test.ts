@@ -630,6 +630,30 @@ describe("drive operations", () => {
     })
   )
 
+  it.effect("lists and gets files whose version has an empty MIME type", () =>
+    Effect.gen(function* () {
+      const sheet = file("file-sheet", "Parts.gsheet", drive.ids.Root, [])
+      const state: DriveState = {
+        drives: [driveSpace()],
+        folders: [],
+        files: [sheet],
+        versions: [{ ...version("version-1", sheet._id, 1), type: "" }],
+        nextId: 1
+      }
+
+      const listParams = yield* parseListDriveItemsParams({ drive: "Docs" })
+      const listed = yield* listDriveItems(listParams).pipe(Effect.provide(makeLayer(state)))
+      const getParams = yield* parseGetDriveItemParams({ drive: "Docs", path: "/Parts.gsheet" })
+      const item = yield* getDriveItem(getParams).pipe(Effect.provide(makeLayer(state)))
+      const versionsParams = yield* parseListDriveFileVersionsParams({ drive: "Docs", file: "/Parts.gsheet" })
+      const versions = yield* listDriveFileVersions(versionsParams).pipe(Effect.provide(makeLayer(state)))
+
+      expect(listed.items).toMatchObject([{ title: "Parts.gsheet", contentType: "application/octet-stream" }])
+      expect(item).toMatchObject({ contentType: "application/octet-stream" })
+      expect(versions.versions).toMatchObject([{ contentType: "application/octet-stream" }])
+    })
+  )
+
   it.effect("gets items by id and reports missing or non-folder path parents", () =>
     Effect.gen(function* () {
       const specs = folder("folder-specs", "Specs", drive.ids.Root)
