@@ -15,6 +15,7 @@ import type {
 import { DEFAULT_DRIVE_PATH, DriveItemId, DrivePath } from "../../domain/schemas/drive.js"
 import { Count } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../client.js"
+import type { Diagnostics } from "../diagnostics.js"
 import { computeChildPath, drive, type DriveSpace, type File, type FileVersion, type Folder } from "../drive-sdk.js"
 import {
   DriveFolderNotEmptyError,
@@ -54,7 +55,7 @@ const isInvalidFolderMoveTarget = (item: DriveItem, targetFolder: Folder | undef
 
 export const uploadDriveFileVersion = (
   params: UploadDriveFileVersionParams
-): Effect.Effect<UploadDriveFileVersionResult, DriveOperationError, HulyClient | HulyStorageClient> =>
+): Effect.Effect<UploadDriveFileVersionResult, DriveOperationError, HulyClient | HulyStorageClient | Diagnostics> =>
   Effect.gen(function* () {
     const client = yield* HulyClient
     const storage = yield* HulyStorageClient
@@ -92,13 +93,13 @@ export const uploadDriveFileVersion = (
     const updatedFile: File = { ...file, file: versionId, version: nextVersion }
     return {
       file: yield* toDriveItemSummary(updatedFile, driveSpace, yield* displayPathForItem(client, updatedFile), client),
-      currentVersion: toFileVersionSummary(storage, versionId, file._id, version, true)
+      currentVersion: yield* toFileVersionSummary(storage, versionId, file._id, version, true)
     }
   })
 
 export const moveDriveItem = (
   params: MoveDriveItemParams
-): Effect.Effect<MoveDriveItemResult, DriveOperationError, HulyClient | HulyStorageClient> =>
+): Effect.Effect<MoveDriveItemResult, DriveOperationError, HulyClient | HulyStorageClient | Diagnostics> =>
   Effect.gen(function* () {
     const client = yield* HulyClient
     const driveSpace = yield* resolveDrive(client, params.drive)
@@ -155,7 +156,7 @@ export const moveDriveItem = (
 
 export const renameDriveItem = (
   params: RenameDriveItemParams
-): Effect.Effect<RenameDriveItemResult, DriveOperationError, HulyClient | HulyStorageClient> =>
+): Effect.Effect<RenameDriveItemResult, DriveOperationError, HulyClient | HulyStorageClient | Diagnostics> =>
   Effect.gen(function* () {
     const client = yield* HulyClient
     const driveSpace = yield* resolveDrive(client, params.drive)
@@ -194,7 +195,7 @@ export const renameDriveItem = (
 
 export const deleteDriveItem = (
   params: DeleteDriveItemParams
-): Effect.Effect<DeleteDriveItemResult, DriveOperationError, HulyClient | HulyStorageClient> =>
+): Effect.Effect<DeleteDriveItemResult, DriveOperationError, HulyClient | HulyStorageClient | Diagnostics> =>
   Effect.gen(function* () {
     const client = yield* HulyClient
     const driveSpace = yield* resolveDrive(client, params.drive)

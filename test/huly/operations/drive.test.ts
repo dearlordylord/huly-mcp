@@ -13,7 +13,7 @@ import type {
   Ref,
   Space
 } from "@hcengineering/core"
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Ref as EffectRef } from "effect"
 import { TestClock } from "effect/testing"
 import { expect } from "vitest"
 
@@ -38,6 +38,7 @@ import {
 } from "../../../src/domain/schemas.js"
 import { AccountUuid, BlobId } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
+import { Diagnostics, makeDiagnosticsScope } from "../../../src/huly/diagnostics.js"
 import { drive, type DriveSpace, type File, type FileVersion, type Folder } from "../../../src/huly/drive-sdk.js"
 import {
   DriveFileNotFoundError,
@@ -174,7 +175,7 @@ const matchesQuery = (doc: Doc, query: DocumentQuery<Doc>): boolean =>
     return actual === value
   })
 
-const makeLayer = (state: DriveState): Layer.Layer<HulyClient | HulyStorageClient> => {
+const makeLayer = (state: DriveState): Layer.Layer<HulyClient | HulyStorageClient | Diagnostics> => {
   const findAll: HulyClientOperations["findAll"] = <T extends Doc>(
     classRef: Ref<Class<T>>,
     query: DocumentQuery<T>
@@ -350,7 +351,11 @@ const makeLayer = (state: DriveState): Layer.Layer<HulyClient | HulyStorageClien
     workbenchUrlConfig: testWorkbenchUrlConfig
   }
 
-  return Layer.merge(HulyClient.testLayer(clientOperations), HulyStorageClient.testLayer(storage))
+  return Layer.mergeAll(
+    HulyClient.testLayer(clientOperations),
+    HulyStorageClient.testLayer(storage),
+    Layer.effect(Diagnostics, makeDiagnosticsScope.pipe(Effect.map((scope) => scope.service)))
+  )
 }
 
 describe("drive operations", () => {
@@ -630,29 +635,47 @@ describe("drive operations", () => {
     })
   )
 
-  it.effect("lists and gets files whose version has an empty MIME type", () =>
-    Effect.gen(function* () {
-      const sheet = file("file-sheet", "Parts.gsheet", drive.ids.Root, [])
-      const state: DriveState = {
-        drives: [driveSpace()],
-        folders: [],
-        files: [sheet],
-        versions: [{ ...version("version-1", sheet._id, 1), type: "" }],
-        nextId: 1
-      }
-
-      const listParams = yield* parseListDriveItemsParams({ drive: "Docs" })
-      const listed = yield* listDriveItems(listParams).pipe(Effect.provide(makeLayer(state)))
-      const getParams = yield* parseGetDriveItemParams({ drive: "Docs", path: "/Parts.gsheet" })
-      const item = yield* getDriveItem(getParams).pipe(Effect.provide(makeLayer(state)))
-      const versionsParams = yield* parseListDriveFileVersionsParams({ drive: "Docs", file: "/Parts.gsheet" })
-      const versions = yield* listDriveFileVersions(versionsParams).pipe(Effect.provide(makeLayer(state)))
-
-      expect(listed.items).toMatchObject([{ title: "Parts.gsheet", contentType: "application/octet-stream" }])
-      expect(item).toMatchObject({ contentType: "application/octet-stream" })
-      expect(versions.versions).toMatchObject([{ contentType: "application/octet-stream" }])
-    })
-  )
+  for (const type of ["", "text/markdown", "application/octet-stream"]) {
+    it.effect(`preserves file metadata and logs MIME fallback only for ${JSON.stringify(type)}`, () =>
+      Effect.gen(function* () {
+        const sheet = file("file-sheet", "Parts.gsheet", drive.ids.Root, [])
+        const state: DriveState = {
+          drives: [driveSpace()],
+          folders: [],
+          files: [sheet],
+          versions: [{ ...version("version-1", sheet._id, 1), type }],
+          nextId: 1
+        }
+        const diagnostics = yield* makeDiagnosticsScope
+        const trails = yield* EffectRef.make<ReadonlyArray<string>>([])
+        const layer = Layer.merge(
+          makeLayer(state),
+          Layer.succeed(Diagnostics, {
+            ...diagnostics.service,
+            trail: (message) => EffectRef.update(trails, (messages) => [...messages, message])
+          })
+        )
+        const listParams = yield* parseListDriveItemsParams({ drive: "Docs" })
+        const listed = yield* listDriveItems(listParams).pipe(Effect.provide(layer))
+        const getParams = yield* parseGetDriveItemParams({ drive: "Docs", path: "/Parts.gsheet" })
+        const item = yield* getDriveItem(getParams).pipe(Effect.provide(layer))
+        const versionsParams = yield* parseListDriveFileVersionsParams({ drive: "Docs", file: "/Parts.gsheet" })
+        const versions = yield* listDriveFileVersions(versionsParams).pipe(Effect.provide(layer))
+        const metadata = {
+          contentType: type || "application/octet-stream",
+          size: 12,
+          downloadUrl: "https://files.test/blob-1"
+        }
+        expect(listed.items).toMatchObject([{ title: "Parts.gsheet", ...metadata }])
+        expect(item).toMatchObject(metadata)
+        expect(versions.file).toMatchObject(metadata)
+        expect(versions.versions).toMatchObject([{ ...metadata, blobId: "blob-1", current: true }])
+        expect(yield* diagnostics.drainWarnings).toEqual([])
+        const trail = "Drive file version version-1 has no MIME type; contentType defaults to application/octet-stream."
+        expect(yield* EffectRef.get(trails)).toEqual(type === "" ? [trail, trail, trail, trail] : [])
+      })
+    )
+  }
 
   it.effect("gets items by id and reports missing or non-folder path parents", () =>
     Effect.gen(function* () {

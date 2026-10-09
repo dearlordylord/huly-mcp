@@ -26,6 +26,7 @@ import type {
 } from "../../domain/schemas/drive-comments.js"
 import { CommentId, Count } from "../../domain/schemas/shared.js"
 import { HulyClient } from "../client.js"
+import type { Diagnostics } from "../diagnostics.js"
 import { drive, type DriveSpace, type File } from "../drive-sdk.js"
 import { DriveFileCommentNotFoundError } from "../errors-drive.js"
 import { HulyDataInvalidError } from "../errors.js"
@@ -101,7 +102,7 @@ const decodeComments = (comments: ReadonlyArray<unknown>) =>
 
 export const listDriveFileComments = (
   params: ListDriveFileCommentsParams
-): Effect.Effect<ListDriveFileCommentsResult, DriveOperationError, HulyClient | HulyStorageClient> =>
+): Effect.Effect<ListDriveFileCommentsResult, DriveOperationError, HulyClient | HulyStorageClient | Diagnostics> =>
   Effect.gen(function* () {
     const target = yield* resolveDriveFileTarget(params)
     const messages = yield* target.client.findAll<ChatMessage>(
@@ -138,7 +139,7 @@ export const listDriveFileComments = (
 
 export const addDriveFileComment = (
   params: AddDriveFileCommentParams
-): Effect.Effect<AddDriveFileCommentResult, DriveOperationError, HulyClient | HulyStorageClient> =>
+): Effect.Effect<AddDriveFileCommentResult, DriveOperationError, HulyClient | HulyStorageClient | Diagnostics> =>
   Effect.gen(function* () {
     const target = yield* resolveDriveFileTarget(params)
     const commentId: Ref<ChatMessage> = generateId()
@@ -164,7 +165,7 @@ export const addDriveFileComment = (
 
 export const updateDriveFileComment = (
   params: UpdateDriveFileCommentParams
-): Effect.Effect<UpdateDriveFileCommentResult, DriveOperationError, HulyClient | HulyStorageClient> =>
+): Effect.Effect<UpdateDriveFileCommentResult, DriveOperationError, HulyClient | HulyStorageClient | Diagnostics> =>
   Effect.gen(function* () {
     const target = yield* resolveDriveFileTarget(params)
     const comment = yield* findDriveFileComment(target, params.commentId)
@@ -191,7 +192,7 @@ export const updateDriveFileComment = (
 
 export const deleteDriveFileComment = (
   params: DeleteDriveFileCommentParams
-): Effect.Effect<DeleteDriveFileCommentResult, DriveOperationError, HulyClient | HulyStorageClient> =>
+): Effect.Effect<DeleteDriveFileCommentResult, DriveOperationError, HulyClient | HulyStorageClient | Diagnostics> =>
   Effect.gen(function* () {
     const target = yield* resolveDriveFileTarget(params)
     const comment = yield* findDriveFileComment(target, params.commentId)
@@ -206,7 +207,7 @@ export const deleteDriveFileComment = (
 
 export const listDriveFileActivity = (
   params: ListDriveFileActivityParams
-): Effect.Effect<ListDriveFileActivityResult, DriveOperationError, HulyClient | HulyStorageClient> =>
+): Effect.Effect<ListDriveFileActivityResult, DriveOperationError, HulyClient | HulyStorageClient | Diagnostics> =>
   Effect.gen(function* () {
     const target = yield* resolveDriveFileTarget(params)
     const messages = yield* target.client.findAll<HulyActivityMessage>(

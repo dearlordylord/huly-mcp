@@ -25,6 +25,7 @@ import {
   parseUpdateDriveFileCommentParams
 } from "../../../src/domain/schemas.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
+import { Diagnostics, makeDiagnosticsScope } from "../../../src/huly/diagnostics.js"
 import { drive, type DriveSpace, type File, type FileVersion, type Folder } from "../../../src/huly/drive-sdk.js"
 import { DriveFileCommentNotFoundError, DriveFileNotFoundError } from "../../../src/huly/errors-drive.js"
 import { activity, chunter, core } from "../../../src/huly/huly-plugins.js"
@@ -151,7 +152,7 @@ const docsForClass = (state: DriveCommentState, classRef: Ref<Class<Doc>>): Read
             ? state.activityMessages
             : []
 
-const makeLayer = (state: DriveCommentState): Layer.Layer<HulyClient | HulyStorageClient> => {
+const makeLayer = (state: DriveCommentState): Layer.Layer<HulyClient | HulyStorageClient | Diagnostics> => {
   const findAll: HulyClientOperations["findAll"] = <T extends Doc>(
     classRef: Ref<Class<T>>,
     query: DocumentQuery<T>
@@ -230,7 +231,8 @@ const makeLayer = (state: DriveCommentState): Layer.Layer<HulyClient | HulyStora
     getFileUrl: (blobId) => `https://files.test/${blobId}`
   }
 
-  return Layer.merge(
+  return Layer.mergeAll(
+    Layer.effect(Diagnostics, makeDiagnosticsScope.pipe(Effect.map((scope) => scope.service))),
     HulyClient.testLayer({
       findAll,
       findOne,

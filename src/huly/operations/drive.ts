@@ -28,6 +28,7 @@ import {
 import { Count, DEFAULT_INCLUDE_ARCHIVED } from "../../domain/schemas/shared.js"
 import { isNonEmpty } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientOperations } from "../client.js"
+import type { Diagnostics } from "../diagnostics.js"
 import { drive, type DriveSpace, type File, type FileVersion, type Folder } from "../drive-sdk.js"
 import { DrivePathConflictError, DrivePathNotFoundError } from "../errors-drive.js"
 import { getBufferFromParams, HulyStorageClient, validateContentType, validateFileSize } from "../storage.js"
@@ -100,7 +101,7 @@ export const getDrive = (params: GetDriveParams): Effect.Effect<DriveSummary, Dr
 
 export const listDriveItems = (
   params: ListDriveItemsParams
-): Effect.Effect<ListDriveItemsResult, DriveOperationError, HulyClient | HulyStorageClient> =>
+): Effect.Effect<ListDriveItemsResult, DriveOperationError, HulyClient | HulyStorageClient | Diagnostics> =>
   Effect.gen(function* () {
     const client = yield* HulyClient
     const driveSpace = yield* resolveDrive(client, params.drive)
@@ -127,7 +128,7 @@ export const listDriveItems = (
 
 export const getDriveItem = (
   params: GetDriveItemParams
-): Effect.Effect<DriveItemSummary, DriveOperationError, HulyClient | HulyStorageClient> =>
+): Effect.Effect<DriveItemSummary, DriveOperationError, HulyClient | HulyStorageClient | Diagnostics> =>
   Effect.gen(function* () {
     const client = yield* HulyClient
     const driveSpace = yield* resolveDrive(client, params.drive)
@@ -147,7 +148,7 @@ export const getDriveItem = (
 
 export const createDriveFolder = (
   params: CreateDriveFolderParams
-): Effect.Effect<CreateDriveFolderResult, DriveOperationError, HulyClient | HulyStorageClient> =>
+): Effect.Effect<CreateDriveFolderResult, DriveOperationError, HulyClient | HulyStorageClient | Diagnostics> =>
   Effect.gen(function* () {
     const client = yield* HulyClient
     const driveSpace = yield* resolveDrive(client, params.drive)
@@ -201,7 +202,7 @@ const resolveUploadParentFolder = (
 
 export const uploadDriveFile = (
   params: UploadDriveFileParams
-): Effect.Effect<UploadDriveFileResult, DriveOperationError, HulyClient | HulyStorageClient> =>
+): Effect.Effect<UploadDriveFileResult, DriveOperationError, HulyClient | HulyStorageClient | Diagnostics> =>
   Effect.gen(function* () {
     const client = yield* HulyClient
     const storage = yield* HulyStorageClient
@@ -248,7 +249,7 @@ export const uploadDriveFile = (
     )
 
     const file = yield* makeCreatedFile(drive.class.File, driveSpace, client, fileId, title, parent.folder, versionId)
-    const versionSummary = toFileVersionSummary(storage, versionId, fileId, version, true)
+    const versionSummary = yield* toFileVersionSummary(storage, versionId, fileId, version, true)
     return {
       file: yield* toDriveItemSummary(file, driveSpace, normalized.path, client),
       createdParents: yield* Effect.forEach(parent.createdFolders, (created) =>
@@ -260,7 +261,7 @@ export const uploadDriveFile = (
 
 export const listDriveFileVersions = (
   params: ListDriveFileVersionsParams
-): Effect.Effect<ListDriveFileVersionsResult, DriveOperationError, HulyClient | HulyStorageClient> =>
+): Effect.Effect<ListDriveFileVersionsResult, DriveOperationError, HulyClient | HulyStorageClient | Diagnostics> =>
   Effect.gen(function* () {
     const client = yield* HulyClient
     const driveSpace = yield* resolveDrive(client, params.drive)
@@ -273,7 +274,7 @@ export const listDriveFileVersions = (
     const storage = yield* HulyStorageClient
     return {
       file: yield* toDriveItemSummary(file, driveSpace, pathForItem(file), client),
-      versions: versions.map((version) =>
+      versions: yield* Effect.forEach(versions, (version) =>
         toFileVersionSummary(storage, version._id, file._id, version, version._id === file.file)
       ),
       total: Count.make(versions.length)
@@ -282,7 +283,7 @@ export const listDriveFileVersions = (
 
 export const restoreDriveFileVersion = (
   params: RestoreDriveFileVersionParams
-): Effect.Effect<RestoreDriveFileVersionResult, DriveOperationError, HulyClient | HulyStorageClient> =>
+): Effect.Effect<RestoreDriveFileVersionResult, DriveOperationError, HulyClient | HulyStorageClient | Diagnostics> =>
   Effect.gen(function* () {
     const client = yield* HulyClient
     const driveSpace = yield* resolveDrive(client, params.drive)
@@ -296,7 +297,7 @@ export const restoreDriveFileVersion = (
     const storage = yield* HulyStorageClient
     return {
       file: yield* toDriveItemSummary(updatedFile, driveSpace, pathForItem(updatedFile), client),
-      restoredVersion: toFileVersionSummary(storage, version._id, file._id, version, true),
+      restoredVersion: yield* toFileVersionSummary(storage, version._id, file._id, version, true),
       restored
     }
   })
