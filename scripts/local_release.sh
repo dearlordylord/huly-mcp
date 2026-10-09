@@ -10,6 +10,8 @@ ESBUILD_VERSION="0.27.2"
 EVIDENCE_WORKFLOW="prepare-release-evidence.yml"
 PACKAGE_SMOKE_WORKFLOW="package-smoke.yml"
 
+source "$(dirname "${BASH_SOURCE[0]}")/release-verification.sh"
+
 show_dist_tags() {
   local package_name="$1"
   local allow_missing="$2"
@@ -174,6 +176,17 @@ prepare_release_candidate() {
   local cli_version="$2"
   local release_commit
   local release_candidate_branch
+  local verified_run verification_status
+  if verified_run="$(find_verified_package_smoke "$PACKAGE_SMOKE_WORKFLOW")"; then
+    echo "Reusing successful Package Smoke for unchanged release contents: $verified_run"
+    git push origin "$RELEASE_BRANCH"
+    return 0
+  else
+    verification_status=$?
+    if [[ "$verification_status" != 1 ]]; then
+      return "$verification_status"
+    fi
+  fi
   release_commit="$(git rev-parse --short=12 HEAD)"
   release_candidate_branch="release-candidate/mcp-${mcp_version}-cli-${cli_version}-${release_commit}"
 

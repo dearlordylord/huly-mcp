@@ -72,6 +72,25 @@ The certified release command is intended to be rerunnable. If it created the ch
 mise exec node@24.15.0 -- pnpm local-release
 ```
 
+Before preparing another release candidate, the rerun looks for a completed,
+successful Package Smoke run on a push or release workflow dispatch. It reuses
+that verification only when the checked commit has identical tracked content to
+the current release, excluding `scripts/local_release.sh`,
+`scripts/release-verification.sh`, and this guide. Those files orchestrate
+publication and are not inputs to Package Smoke. Package versions, source,
+dependencies, build scripts, workflows, package documentation, and artifact
+evidence must all match. Pull-request runs are not accepted.
+
+An expired npm browser approval therefore does not rerun evidence preparation or
+Package Smoke for unchanged release contents. Rerun the same command and approve
+the new npm prompt. No manual skip flag or local receipt is required; successful
+GitHub workflow evidence is the authority. Package bundles are still rebuilt and
+version-checked locally before publication.
+
+If release contents changed or no matching successful run exists, the normal
+candidate preparation and Package Smoke gates run. A GitHub evidence lookup
+failure stops the release rather than silently bypassing verification.
+
 The rerun recomputes local package versions against npm:
 
 - Packages whose local version is already published are skipped.
