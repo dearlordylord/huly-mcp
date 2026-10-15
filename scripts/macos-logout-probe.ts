@@ -55,6 +55,9 @@ const run = async () => {
     const profiles = await fs.readFile(store.paths.profiles, "utf8")
     const credentials = await fs.readFile(store.paths.credentials, "utf8")
     phase = "search-list configuration"
+    await command("/usr/bin/security", ["default-keychain", "-d", "user", "-s", fixture.HULY_TEST_ORIGINAL_KEYCHAIN], {
+      timeout: commandTimeout
+    })
     const listing = await command("/usr/bin/security", ["list-keychains", "-d", "user"], { timeout: commandTimeout })
     const parseKeychain = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.NonEmptyString))
     const keychains = listing.stdout
@@ -69,13 +72,11 @@ const run = async () => {
         { timeout: commandTimeout }
       )
     }
-    await command("/usr/bin/security", ["default-keychain", "-d", "user", "-s", fixture.HULY_TEST_ORIGINAL_KEYCHAIN], {
-      timeout: commandTimeout
-    })
     phase = "unlocked nondefault metadata lookup"
     const reference = (await Effect.runPromise(store.readCredentials())).native?.[name]
     assert(reference !== undefined)
     const located = await Effect.runPromise(runMacosSecurity({ _tag: "Locate", key: reference.key }))
+    process.stdout.write(`Nondefault metadata lookup status: ${located.status}.\n`)
     assert.equal(located.status, 0)
     phase = "unlocked nondefault native secret read"
     const nondefaultToken = await Effect.runPromise(native.read(reference.key))
