@@ -324,7 +324,12 @@ their temporary roots without relaxing production custody checks. The first fres
 branches at 98.99% (functions 99.00%). Meaningful subprocess receipt, schema
 failure, TestClock cleanup, pre-aborted read, and legacy-reference logout tests
 address uncovered native boundaries without exclusions or threshold changes.
-The next complete Linux and macOS gates remain pending.
+The third gate passed 5,461 tests (functions 99.03%) but still failed branches
+at 98.99%. Coverage identified an unreachable empty-map fallback after a native
+reference was already proven present. Logout now captures and narrows that map,
+then carries it through deletion; missing-map/ref cases and repeated logout stay
+idempotent. Standards review found no behavior change or gate weakening.
+The fourth complete Linux gate and final macOS gate remain pending.
 
 The fix prevents new reference loss. It does not reconstruct a reference that an
 earlier successful-looking logout already discarded; restore its metadata

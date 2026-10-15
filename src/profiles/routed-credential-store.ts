@@ -64,7 +64,9 @@ export const selectCredentialStore: CredentialStoreSelector = (store) => {
         const backend = yield* backendFor(name)
         if (backend === "file") return yield* file.remove(name)
         const metadata = yield* store.readCredentials()
-        const reference = metadata.native?.[name]
+        const savedNative = metadata.native
+        if (savedNative === undefined) return
+        const reference = savedNative[name]
         if (reference === undefined) return
         if (reference.backend !== backend)
           return yield* failure(
@@ -73,7 +75,7 @@ export const selectCredentialStore: CredentialStoreSelector = (store) => {
         const port = yield* nativePort(backend)
         yield* port.remove(reference.key)
         yield* Effect.forEach(reference.retiredKeys ?? [], (retired) => port.remove(retired), { discard: true })
-        const { [name]: _removed, ...native } = metadata.native ?? {}
+        const { [name]: _removed, ...native } = savedNative
         yield* store.writeCredentials({ ...metadata, native })
       })
   }

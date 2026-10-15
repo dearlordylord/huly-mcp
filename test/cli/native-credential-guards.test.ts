@@ -149,6 +149,8 @@ it("logs out a legacy native reference without retired-key metadata", async () =
   await Effect.runPromise(selectCredentialStore(f.store).remove(f.name))
   expect(f.removed).toEqual(["entry"])
   expect(f.credentials.native).toEqual({})
+  await Effect.runPromise(selectCredentialStore(f.store).remove(f.name))
+  expect(f.removed).toEqual(["entry"])
 })
 
 it("preserves selection when metadata publication fails or a replacement changes backend", async () => {
