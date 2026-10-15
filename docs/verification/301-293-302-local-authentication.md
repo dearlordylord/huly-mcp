@@ -208,3 +208,22 @@ after the SDK-port refactor (`/tmp/hulymcp-local-auth-repaired-native-probe.log`
 
 Actual macOS execution and desktop/MCP-host authorization observations remain
 unverified. The three issues are not collectively claimed complete.
+
+## GitHub platform evidence
+
+Draft PR [#318](https://github.com/dearlordylord/huly-mcp/pull/318) contains the
+candidate. The [native macOS run](https://github.com/dearlordylord/huly-mcp/actions/runs/38810408590)
+passed on macOS 26.6.2 (25G83), arm64, Node 24.15.0: isolated real Keychain CRUD
+and CLI dependency closure. This establishes native adapter execution, not live
+packaged CLI/MCP-host access or desktop authorization/update prompt behavior.
+Those manual checklist items remain unverified.
+
+Package Smoke exposed stale byte certificates. The verifier now inventories
+both static requires and lazy imports while retaining exact closure equality.
+This includes the new native libraries and a preexisting optional Redis digest
+helper's lazy `@node-rs/xxhash` import in the MCP bundle. Actual MCP/CLI packed
+certification and CLI size reporting pass with refreshed evidence. Three focused
+artifact test files / 14 tests and TypeScript/Effect diagnostics pass. Separate
+Standards and Spec delta reviews found no new issues or weakened checks. App
+runtime is unchanged by this verification-only repair; the prior full gate and
+native receipts are retained separately.
