@@ -4,6 +4,39 @@ Scope: GitHub #301 (private local token management), #293 (macOS Keychain), and
 #302 (Linux Secret Service), based on `1e74e625`. Worktree:
 `/tmp/hulymcp-local-auth`, branch `implement/local-auth-301-293-302`.
 
+## Current completion audit
+
+The combined objective is **incomplete**. Candidate `745cb7aa` has passing
+[CI on Node 22 and 24](https://github.com/dearlordylord/huly-mcp/actions/runs/38811706460),
+[Package Smoke](https://github.com/dearlordylord/huly-mcp/actions/runs/38811706409),
+and [real macOS Keychain CRUD](https://github.com/dearlordylord/huly-mcp/actions/runs/38811706396).
+PR [#318](https://github.com/dearlordylord/huly-mcp/pull/318) remains a draft.
+The sections below retain earlier checkpoints and failed receipts as history.
+
+The audit uses acceptance bullets in their order on each issue; research checks
+are listed separately. A passing shared-port test proves application behavior,
+but does not prove a native OS/process-context requirement.
+
+| Issue / criteria | Evidence and result |
+| --- | --- |
+| #301 acceptance 1–5 | Passing private-input/process tests and packaged file/Linux workflows establish hidden/stdin import, verification before persistence, failed replacement preservation, configured versus verified status, metadata-preserving logout, and CLI/stdio access. |
+| #301 acceptance 6–8 | Shared configuration/HTTP/parity checks and Standards/Spec reviews pass. Full CI and focused live auth workflows pass. The broad predecessor regression's one relation failure and passing scoped diagnosis remain separate receipts below. |
+| #301 research checks | Hidden prompt and sentinel/file inspection pass in the packaged workflows. Environment-only status and shared-store serialization guards pass without compulsory persistence. |
+| #293 acceptance 1, 5–7 | Explicit selection, schema-owned metadata, shared routing, documentation and configuration preservation have passing shared-seam tests/reviews. This is implementation evidence, not a full native macOS workflow receipt. |
+| #293 acceptance 2–4, 8 | **Partial / untested:** real native CRUD passes on macOS 26.6.2 arm64. Native denial/locked/unavailable behavior and the complete packaged CLI/live-Huly/stdio flow have no macOS execution receipt. Required native-platform live qualification is incomplete. |
+| #293 update/headless research checks | **Untested on macOS:** file/environment behavior across an actual binary update, denied access, actual packaged CLI and MCP-host retrieval, and observed system prompts. Shared-seam tests and operator guidance exist. |
+| #293 session and file-artifact research checks | OS-user/session and explicit environment alternatives are documented. **Untested on macOS:** sentinel inspection after the actual native packaged save/read/replace/status/failure flows. |
+| #302 acceptance 1–5 | Real Linux Secret Service probes and installed packaged CLI/stdio workflows pass: explicit backend, CRUD/replacement/logout, locked collection, missing session/service, no plaintext fallback, and accurate offline backend/status. |
+| #302 acceptance 6–8 | Configuration/HTTP/parity checks, schema/redaction/port reviews, full CI and focused local-Huly auth qualification pass. Platform-local dependencies and versions are recorded below. |
+| #302 research checks | Same-session CLI/stdio, locked/missing-session failures and file inspection pass in the private D-Bus fixture. Typed prompt-return refusal and connection cleanup pass through the injected transport; no Prompt/Unlock operation exists in the supported protocol. Environment alternatives are documented. |
+
+The remaining gate is the real macOS host qualification in
+[the checklist](macos-local-authentication.md), using the actual packaged CLI and
+MCP host against Huly. A hosted CRUD job cannot supply those observations. No
+macOS host/SSH target or host results have been supplied; the user offered manual
+checks later. No token, password, host credential, or tunnel is required merely
+to record this limitation, and none has been requested or published.
+
 ## Delivered candidate
 
 - `auth import-token` accepts hidden terminal input or explicit stdin, rejects
