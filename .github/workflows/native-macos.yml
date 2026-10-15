@@ -7,6 +7,7 @@ on:
       - src/profiles/**
       - packages/huly-cli/**
       - scripts/native-credentials-probe.ts
+      - scripts/macos-logout-probe.ts
       - pnpm-lock.yaml
       - .github/workflows/native-macos.yml
 
@@ -28,6 +29,13 @@ jobs:
           node-version: 24.15.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Install the packed CLI for the logout regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          source scripts/packed-cli-test-helpers.sh
+          prepare_packed_cli "$RUNNER_TEMP/huly-logout-package"
+          printf 'HULY_TEST_PACKED_CLI=%s\n' "$HULY_PREPARED_CLI" >> "$GITHUB_ENV"
       - name: Verify real Keychain CRUD in an isolated runner keychain
         shell: bash
         run: |
@@ -44,8 +52,14 @@ jobs:
           security unlock-keychain -p "$qualification_password" "$qualification_keychain"
           security default-keychain -d user -s "$qualification_keychain"
           pnpm exec tsx scripts/native-credentials-probe.ts
+          export HULY_TEST_KEYCHAIN_PATH="$qualification_keychain"
+          export HULY_TEST_ORIGINAL_KEYCHAIN="$previous_keychain"
+          export HULY_TEST_KEYCHAIN_PASSWORD="$qualification_password"
+          pnpm exec tsx scripts/macos-logout-probe.ts "$HULY_TEST_PACKED_CLI"
       - name: Build and verify packaged CLI dependency closure
         run: |
           pnpm build:cli
           pnpm verify-cli-package-closure
+      - name: Run the complete quality gate on macOS
+        run: pnpm check-all
 

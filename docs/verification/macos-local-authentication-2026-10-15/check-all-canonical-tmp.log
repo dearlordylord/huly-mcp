@@ -1,0 +1,268 @@
+
+> @firfi/huly-mcp@0.53.1 check-all /private/tmp/hulymcp-macos-auth
+> tsx scripts/run-quality-gate.ts
+
+
+> @firfi/huly-mcp@0.53.1 verify-movement-fixtures /private/tmp/hulymcp-macos-auth
+> node scripts/verify-movement-fixtures.mjs
+
+Verified 5 movement fixture scripts.
+
+> @firfi/huly-mcp@0.53.1 test:movement-process /private/tmp/hulymcp-macos-auth
+> node --test --test-reporter=dot scripts/completion-evidence.test.mjs scripts/verify-movement-fixtures.test.mjs scripts/movement-artifact-hashes.test.mjs scripts/issue-tree-aggregates.test.mjs scripts/issue-tree-completion.test.mjs scripts/issue-tree-ledger.test.mjs scripts/integration-mcp-adapter.test.mjs scripts/issue-movement-concurrency/select-cases.test.mjs test/scripts/run-movement-certification.node.test.mjs
+
+....................
+....................
+....................
+....................
+....................
+....
+
+> @firfi/huly-mcp@0.53.1 verify:effect-cohort /private/tmp/hulymcp-macos-auth
+> node scripts/verify-effect-cohort.mjs
+
+Verified exact Effect 4.0.0 dependency cohort and native tsgo 0.36.4 startup.
+
+> @firfi/huly-mcp@0.53.1 build /private/tmp/hulymcp-macos-auth
+> pnpm build:mcp && pnpm build:cli
+
+
+> @firfi/huly-mcp@0.53.1 build:mcp /private/tmp/hulymcp-macos-auth
+> PKG_VERSION=$(node -p "require('./package.json').version") NODE_ENGINE_REQUIREMENT=$(node -p "require('./package.json').engines.node") && esbuild src/launcher.ts --bundle --platform=node --format=cjs --log-level=warning --outfile=dist/index.cjs --external:ws --external:@napi-rs/keyring --external:dbus-next "--define:PKG_VERSION=\"$PKG_VERSION\"" "--define:NODE_ENGINE_REQUIREMENT=\"$NODE_ENGINE_REQUIREMENT\""
+
+
+> @firfi/huly-mcp@0.53.1 build:cli /private/tmp/hulymcp-macos-auth
+> pnpm --filter @firfi/huly-cli build
+
+
+> @firfi/huly-cli@0.51.1 build /private/tmp/hulymcp-macos-auth/packages/huly-cli
+> PKG_VERSION=$(node -p "require('./package.json').version") && esbuild src/index.ts --bundle --platform=node --format=cjs --log-level=warning --outfile=dist/index.cjs --external:ws --external:@napi-rs/keyring --external:dbus-next "--define:PKG_VERSION=\"$PKG_VERSION\""
+
+
+> @firfi/huly-mcp@0.53.1 typecheck /private/tmp/hulymcp-macos-auth
+> pnpm typecheck:tsc && pnpm typecheck:effect
+
+
+> @firfi/huly-mcp@0.53.1 typecheck:tsc /private/tmp/hulymcp-macos-auth
+> node node_modules/@typescript/native/bin/tsc -p tsconfig.json --noEmit 2>&1 | grep -v ": suggestion TS" | { grep -E '^(src/|packages/|scripts/|test/|tsconfig\.json)' && exit 1 || exit 0; }
+
+
+> @firfi/huly-mcp@0.53.1 typecheck:effect /private/tmp/hulymcp-macos-auth
+> effect-tsgo diagnostics --project tsconfig.json --strict --severity error,warning
+
+Checked 1215 files out of 1215 files. 
+0 errors, 0 warnings and 0 messages.
+
+> @firfi/huly-mcp@0.53.1 verify-schema-boundaries /private/tmp/hulymcp-macos-auth
+> node scripts/verify-schema-boundaries.mjs
+
+
+> @firfi/huly-mcp@0.53.1 circular /private/tmp/hulymcp-macos-auth
+> dpdm --no-warning --no-tree --no-progress --exit-code circular:1 --transform 'src/**/*.ts' 'packages/huly-cli/src/**/*.ts'
+
+- Start analyzing dependencies...
+✔ [709/709] Analyze done!
+• Circular Dependencies
+  ✅ Congratulations, no circular dependency was found in your project.
+
+
+> @firfi/huly-mcp@0.53.1 complexity /private/tmp/hulymcp-macos-auth
+> oxlint -c oxlint.complexity.json src packages/huly-cli/src
+
+
+> @firfi/huly-mcp@0.53.1 verify-registry-metadata /private/tmp/hulymcp-macos-auth
+> node scripts/sync-registry-metadata.mjs --check
+
+server.json is in sync with package.json
+
+> @firfi/huly-mcp@0.53.1 verify-registry-schema /private/tmp/hulymcp-macos-auth
+> node scripts/verify-registry-schema.mjs
+
+server.json validates against https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json
+
+> @firfi/huly-mcp@0.53.1 verify-cli-integration-coverage /private/tmp/hulymcp-macos-auth
+> node scripts/run-bundled.mjs scripts/verify-cli-integration-coverage.ts
+
+CLI live coverage is in sync: 19 behavior/risk cases, 121 directly exercised commands, 542 routes covered by shared operations plus adapter-class cases, 604 catalog routes, zero deferrals.
+
+> @firfi/huly-mcp@0.53.1 verify-sdk-parity /private/tmp/hulymcp-macos-auth
+> node scripts/audit-sdk-parity.mjs
+
+PARTIAL: .reference/platform/models not found — skipping optional reference model area parity. Clone the Huly platform repo there to enable this check.
+SDK parity ledger covers 316 SDK model exports (covered: 137, gap: 55, ignored: 1, not-mcp-facing: 123) and 55 reference model areas
+
+> @firfi/huly-mcp@0.53.1 verify-readme /private/tmp/hulymcp-macos-auth
+> tsx scripts/update-readme-tools.mjs --check
+
+✅ README.md is up to date with 604 native tools, 4 proxy tools, 47 categories, and 3 resource templates
+
+> @firfi/huly-mcp@0.53.1 verify-cli-readme /private/tmp/hulymcp-macos-auth
+> node scripts/run-bundled.mjs scripts/update-cli-readme.ts --check
+
+
+> @firfi/huly-mcp@0.53.1 verify-cli-skill /private/tmp/hulymcp-macos-auth
+> node scripts/run-bundled.mjs scripts/update-cli-skill.ts --check
+
+Huly CLI Agent Skill matches command and failure contracts.
+
+> @firfi/huly-mcp@0.53.1 verify-cli-skill-package /private/tmp/hulymcp-macos-auth
+> node scripts/run-bundled.mjs scripts/verify-cli-skill-package.ts
+
+CLI tarball contains byte-identical generated Huly CLI Agent Skill files.
+
+> @firfi/huly-mcp@0.53.1 verify-cli-package-closure /private/tmp/hulymcp-macos-auth
+> node scripts/run-bundled.mjs scripts/verify-cli-package-closure.ts
+
+CLI package closure verified: bundled shared registry plus the exact declared external runtime dependencies (@napi-rs/keyring, dbus-next, ws).
+
+> @firfi/huly-mcp@0.53.1 lint /private/tmp/hulymcp-macos-auth
+> find src packages scripts test -name '*.ts' -print0 | xargs -0 oxlint --deny-warnings && dprint check && jscpd --silent src packages/huly-cli/src
+
+Duplications detection: Found [1m122[22m exact clones with [1m1116[22m(0.93%) duplicated lines in [1m698[22m (1 formats) files.
+
+> @firfi/huly-mcp@0.53.1 test:coverage /private/tmp/hulymcp-macos-auth
+> vitest run --coverage
+
+
+ RUN  v5.0.1 /private/tmp/hulymcp-macos-auth
+      Coverage enabled with v8
+
+····························································································································································································································MCP HTTP server listening on http://127.0.0.1:59638/mcp
+·········MCP HTTP server listening on http://127.0.0.1:59641/mcp
+··MCP HTTP server listening on http://127.0.0.1:59644/mcp
+···························MCP HTTP server listening on http://127.0.0.1:59647/mcp
+·MCP HTTP server listening on http://127.0.0.1:59650/mcp
+········································MCP HTTP server listening on http://127.0.0.1:59652/mcp
+·MCP HTTP server listening on http://127.0.0.1:59655/mcp
+························································MCP HTTP server listening on http://127.0.0.1:59661/mcp
+·MCP HTTP server listening on http://127.0.0.1:59663/mcp
+·MCP HTTP server listening on http://127.0.0.1:59666/mcp
+·MCP HTTP server listening on http://127.0.0.1:59669/mcp
+·MCP HTTP server listening on http://127.0.0.1:59672/mcp
+·MCP HTTP server listening on http://127.0.0.1:59675/mcp
+··········MCP HTTP server listening on http://127.0.0.1:59678/mcp
+··MCP HTTP server listening on http://127.0.0.1:59680/mcp
+···············MCP HTTP server listening on http://127.0.0.1:59682/mcp
+······································MCP HTTP server listening on http://127.0.0.1:59684/mcp
+·MCP HTTP server listening on http://127.0.0.1:59686/mcp
+·MCP HTTP server listening on http://127.0.0.1:59689/mcp
+···MCP HTTP server listening on http://127.0.0.1:59694/mcp
+··························MCP HTTP server listening on http://127.0.0.1:59695/mcp
+········································MCP HTTP server listening on http://127.0.0.1:59698/mcp
+································{"phase":"bundle-ready","elapsedMilliseconds":0}
+{"phase":"connect-start","elapsedMilliseconds":1.7202500104904175}
+{"phase":"connect-ready","elapsedMilliseconds":114.95612502098083}
+{"phase":"list-start","elapsedMilliseconds":115.2302919626236}
+{"phase":"list-ready","elapsedMilliseconds":199.119500041008}
+{"phase":"close-start","elapsedMilliseconds":199.29908406734467}
+{"phase":"closed","elapsedMilliseconds":203.69175004959106}
+···············································MCP HTTP server listening on http://127.0.0.1:59704/mcp
+MCP HTTP server listening on http://127.0.0.1:59707/mcp
+MCP HTTP server listening on http://127.0.0.1:59711/mcp
+MCP HTTP server listening on http://0.0.0.0:59714/mcp
+{"observerStatus":"recorded"}
+{"observerStatus":"unavailable"}
+MCP HTTP server listening on http://127.0.0.1:59716/mcp
+MCP HTTP server listening on http://127.0.0.1:59717/mcp
+·············{"observerStatus":"unavailable"}
+{"observerStatus":"unavailable"}
+·············································································································································································································x····················Warning: unknown toolset category "nonexistent_category_default_writer", ignoring. Valid categories: projects, issues, labels, tags, tag-categories, templates, comments, collaborators, milestones, documents, planner, drive, associations, hr, inventory, spaces, sdk-discovery, model-administration, security-administration, sequence-administration, storage, support, attachments, contacts, channels, mail, boards, views, cards, leads, recruiting, custom-fields, calendar, time tracking, preferences, approvals, search, activity, notifications, user-statuses, virtual-office, processes, workspace, workflow-statuses, workbench, task-management, test-management
+································································································································································································································································································································································································································x·····x············································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |boundaries| test/cli/private-token-input.test.ts > rejects private token input safely: 64 KiB
+AssertionError: expected 'Create and select a profile before im…' to contain '64 KiB'
+
+- Expected
++ Received
+
+- 64 KiB
++ Create and select a profile before importing a token.
++
+
+ ❯ test/cli/private-token-input.test.ts:39:27
+     37|     )
+     38|     expect(result.exitCode).not.toBe(0)
+     39|     expect(result.stderr).toContain(error)
+       |                           ^
+     40|     expect(result.stdout + result.stderr).not.toContain(sentinel)
+     41|     await expect(fs.access(store.paths.credentials)).rejects.toMatchOb…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  |boundaries| test/cli/private-token-input.test.ts > rejects private token input safely: privately from a terminal
+AssertionError: expected 'Create and select a profile before im…' to contain 'privately from a terminal'
+
+- Expected
++ Received
+
+- privately from a terminal
++ Create and select a profile before importing a token.
++
+
+ ❯ test/cli/private-token-input.test.ts:39:27
+     37|     )
+     38|     expect(result.exitCode).not.toBe(0)
+     39|     expect(result.stderr).toContain(error)
+       |                           ^
+     40|     expect(result.stdout + result.stderr).not.toContain(sentinel)
+     41|     await expect(fs.access(store.paths.credentials)).rejects.toMatchOb…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  |boundaries| test/scripts/run-bounded-command.test.ts > retains custody when a normal leader exits before group absence is proven
+AssertionError: expected 'kill EPERM\n' to contain 'process-group cleanup is unconfirmed'
+
+- Expected
++ Received
+
+- process-group cleanup is unconfirmed
++ kill EPERM
++
+
+ ❯ test/scripts/run-bounded-command.test.ts:210:22
+    208|         env: { ...process.env, MOVEMENT_CUSTODY_DIR: custodyDirectory }
+    209|       })
+    210|       expect(stdout).toContain("process-group cleanup is unconfirmed")
+       |                      ^
+    211|       const files = await readdir(custodyDirectory)
+    212|       expect(files).toHaveLength(1)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: write EPIPE
+ ❯ WriteWrap.onWriteComplete [as oncomplete] node:internal/stream_base_commons:87:19
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { errno: -32, code: 'EPIPE', syscall: 'write' }
+This error originated in "test/cli/private-token-input.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The last test to run before this error was "rejects private token input safely: 64 KiB". This means either:
+- the error was thrown while Vitest was running this test, or
+- the error was thrown after the test completed, and this was the most recent test at that point.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+ Test Files  2 failed | 415 passed (417)
+      Tests  3 failed | 5439 passed (5442)
+     Errors  1 error
+   Start at  18:31:17
+   Duration  64.60s (import 46%, tests 43%, transform 9%, worker 1%, setup 1%)
+
+ ELIFECYCLE  Command failed with exit code 1.
+/private/tmp/hulymcp-macos-auth/scripts/run-bounded-command.ts:269
+        reject(new Error(`${name} failed with ${signal ?? `exit ${code}`}`))
+               ^
+
+Error: Quality gate 'tests and coverage' failed with exit 1
+    at ChildProcess.<anonymous> (/private/tmp/hulymcp-macos-auth/scripts/run-bounded-command.ts:269:16)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+Node.js v25.6.1
+ ELIFECYCLE  Command failed with exit code 1.

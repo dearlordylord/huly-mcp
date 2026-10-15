@@ -278,3 +278,40 @@ IDs. A deterministic transport-port test emits a notification and unrelated
 response before the matching response. All five spawned stdio tests pass after
 this fixture-only correction; timeouts and server behavior are unchanged.
 The failed CI receipt remains distinct from passing scoped repair evidence.
+
+## Locked Keychain logout regression
+
+The host report `macos-local-authentication-2026-10-15.md` records successful
+packed CLI authentication and real Codex MCP-host reads on macOS 27, followed by
+a blocking logout failure. Its decisive sequence changes the default Keychain
+while retaining the credential's Keychain in the search list, then locks that
+Keychain. The predecessor reports successful logout and discards the reference;
+unlocking cannot recover access through the profile.
+
+The replacement adapter locates metadata across the search list and retrieves
+secrets through the native SDK in a disposable process using the same Node
+executable. A located entry without an accessible secret is an access failure,
+not an absent credential. Deletion requires an accessible credential and a
+confirmed absence afterward. Commands contain no token arguments; captured
+secret payloads are schema-parsed and redacted. Native reads and metadata
+commands are bounded. Failed logout preserves the credential reference.
+
+Focused regressions exercise ineffective deletion acknowledgements, locked
+reads, malformed/ambiguous records, and real-file metadata preservation through
+lock/failure/unlock/success. The native macOS workflow installs the packed CLI
+and reproduces the report's default-change sequence against a disposable
+Keychain. Actual execution of this revised native fixture remains pending.
+Standards and Spec reviews found no new demonstrated issues in the revision.
+
+The host report also identified portable harness defects. CLI input fixtures
+now use the actual OS profile paths; early stdin closure retains the child's
+exit receipt without an unhandled EPIPE; permission-denied process-group probes
+remain explicitly unconfirmed cleanup. Movement custody fixtures canonicalize
+their temporary roots without relaxing production custody checks. A fresh
+complete gate and macOS gate are required for this candidate.
+
+The fix prevents new reference loss. It does not reconstruct a reference that an
+earlier successful-looking logout already discarded; restore its metadata
+backup or authenticate explicitly again. The host's access-denial,
+unavailable-session, actual upgrade, and complete visual prompt audit remain
+unqualified. The earlier passing native CRUD checks did not cover this blocker.

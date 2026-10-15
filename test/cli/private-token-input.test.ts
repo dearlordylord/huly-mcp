@@ -19,7 +19,14 @@ const cases = [
 
 it.each(cases)("rejects private token input safely: $error", async ({ args, error, input }) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "huly-private-input-"))
-  const store = makeCliProfileStore(cliProfilePaths("linux", { XDG_CONFIG_HOME: directory }, directory))
+  const environment = {
+    XDG_CONFIG_HOME: directory,
+    HOME: directory,
+    APPDATA: directory,
+    USERPROFILE: directory,
+    HULY_CLI_TELEMETRY: "0"
+  }
+  const store = makeCliProfileStore(cliProfilePaths(process.platform, environment, directory))
   try {
     const name = await Effect.runPromise(parseProfileName("work"))
     await Effect.runPromise(
@@ -32,7 +39,7 @@ it.each(cases)("rejects private token input safely: $error", async ({ args, erro
     const result = await runCapturedProcess(
       process.execPath,
       ["packages/huly-cli/dist/index.cjs", "auth", "import-token", ...args],
-      { XDG_CONFIG_HOME: directory, HOME: directory, HULY_CLI_TELEMETRY: "0" },
+      environment,
       input
     )
     expect(result.exitCode).not.toBe(0)

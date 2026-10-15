@@ -6,11 +6,20 @@ import { promisify } from "node:util"
 
 import { expect, test } from "vitest"
 
-import { Milliseconds, runBoundedCommand } from "../../scripts/run-bounded-command.js"
+import { Milliseconds, runBoundedCommand, processGroupCleanupFailure } from "../../scripts/run-bounded-command.js"
 
 const execFileAsync = promisify(execFile)
 const COMMAND_TIMEOUT = Milliseconds.make(2_000)
 const PROCESS_TEST_TIMEOUT_MS = 30_000
+
+test("keeps permission-denied cleanup unconfirmed without hiding other failures", () => {
+  const permission = Object.assign(new Error("kill EPERM"), { code: "EPERM" })
+  expect(processGroupCleanupFailure("fixture", permission)).toEqual(
+    new Error("fixture process-group cleanup is unconfirmed: permission denied")
+  )
+  const other = new Error("unexpected process failure")
+  expect(processGroupCleanupFailure("fixture", other)).toBe(other)
+})
 
 const processExists = (pid: number) => {
   try {

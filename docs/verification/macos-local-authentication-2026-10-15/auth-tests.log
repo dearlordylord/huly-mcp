@@ -1,0 +1,14 @@
+
+> @firfi/huly-mcp@0.53.1 test /private/tmp/hulymcp-macos-auth
+> vitest run test/cli/credential-storage-policy.test.ts test/cli/native-credential-guards.test.ts test/cli/profile-store.test.ts test/cli/credential-replacement.test.ts test/cli/native-credential-store.test.ts test/cli/profile-context.test.ts
+
+
+ RUN  v5.0.1 /private/tmp/hulymcp-macos-auth
+
+···················································
+
+ Test Files  6 passed (6)
+      Tests  51 passed (51)
+   Start at  18:30:07
+   Duration  900ms (import 53%, transform 27%, tests 15%, setup 3%, worker 1%)
+

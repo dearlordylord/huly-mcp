@@ -61,6 +61,11 @@ interface RunBoundedCommandResult {
 /* v8 ignore next -- This guard is reached only when POSIX process-group termination races with exit. */
 const isErrnoException = (error: unknown): error is NodeJS.ErrnoException => error instanceof Error && "code" in error
 
+export const processGroupCleanupFailure = (name: string, error: unknown): unknown =>
+  isErrnoException(error) && error.code === "EPERM"
+    ? new Error(`${name} process-group cleanup is unconfirmed: permission denied`)
+    : error
+
 const terminate = (child: ReturnType<typeof spawn>, signal: NodeJS.Signals): void => {
   /* v8 ignore next -- A successfully spawned child has a PID; immediate spawn errors use the error event. */
   if (child.pid === undefined) return
@@ -250,7 +255,7 @@ export const runBoundedCommand = ({
         if (custody !== undefined) unlinkSync(custody)
       } catch (error) {
         retainUnconfirmed()
-        reject(error)
+        reject(processGroupCleanupFailure(name, error))
         return
       }
       removeHandlers()

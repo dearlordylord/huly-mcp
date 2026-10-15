@@ -1,51 +1,34 @@
-import { Effect, Redacted } from "effect"
+import { Effect } from "effect"
 
-import { CliProfileStoreError } from "./model.js"
+import { MACOS_KEYCHAIN_ITEM_NOT_FOUND, macosKeychainUnavailable } from "./macos-keychain-protocol.js"
+import { makeMacosPasswords, type MacosPasswords } from "./macos-passwords.js"
+import { runMacosSecurity, type MacosSecurityCommand } from "./macos-security.js"
 import type { NativeCredentialPort } from "./native-credential-port.js"
 
-const unavailable = () =>
-  new CliProfileStoreError({
-    kind: "integration",
-    message:
-      "macOS Keychain access failed. Check Keychain access and the current OS user/session, or explicitly inject complete environment credentials. macOS controls access prompts, including after updates. No file fallback was used."
-  })
-
-// Internal SDK port; native payloads are encoded by the shared credential store.
-export interface MacosCredentialEntry {
-  readonly getPassword: () => Promise<string | null>
-  readonly setPassword: (value: string) => Promise<void>
-  readonly deleteCredential: () => Promise<unknown>
-}
-export type OpenMacosCredentialEntry = (key: string) => Promise<MacosCredentialEntry>
-
-// Loaded only after explicit Keychain selection. The addon is an external runtime dependency.
-const openEntry: OpenMacosCredentialEntry = async (key) => {
-  const { AsyncEntry } = await import("@napi-rs/keyring")
-  return new AsyncEntry("io.github.dearlordylord.huly-mcp", key)
-}
-
-export const makeMacosKeychain = (open: OpenMacosCredentialEntry = openEntry): NativeCredentialPort => ({
-  backend: "macos-keychain",
-  read: (key) =>
-    Effect.tryPromise({
-      try: async () => {
-        const value = await (await open(key)).getPassword()
-        return value === null ? undefined : Redacted.make(value)
-      },
-      catch: unavailable
-    }),
-  save: (key, value) =>
-    Effect.tryPromise({
-      try: async () => {
-        await (await open(key)).setPassword(Redacted.value(value))
-      },
-      catch: unavailable
-    }),
-  remove: (key) =>
-    Effect.tryPromise({
-      try: async () => {
-        await (await open(key)).deleteCredential()
-      },
-      catch: unavailable
+export const makeMacosKeychain = (
+  passwords: MacosPasswords = makeMacosPasswords(),
+  security: MacosSecurityCommand = runMacosSecurity
+): NativeCredentialPort => {
+  // Both metadata lookup and secret retrieval cover the OS search list.
+  const read = (key: string) =>
+    Effect.gen(function* () {
+      const reply = yield* security({ _tag: "Locate", key })
+      if (reply.status === MACOS_KEYCHAIN_ITEM_NOT_FOUND) return undefined
+      if (reply.status !== 0) return yield* macosKeychainUnavailable()
+      return yield* passwords.read(key)
     })
-})
+  return {
+    backend: "macos-keychain",
+    read,
+    save: passwords.save,
+    remove: (key) =>
+      Effect.gen(function* () {
+        // Establish access before deletion; locked/denied reads must retain the reference.
+        if ((yield* read(key)) === undefined) return
+        const reply = yield* security({ _tag: "Remove", key })
+        if (reply.status !== 0 && reply.status !== MACOS_KEYCHAIN_ITEM_NOT_FOUND)
+          return yield* macosKeychainUnavailable()
+        if ((yield* read(key)) !== undefined) return yield* macosKeychainUnavailable()
+      })
+  }
+}
