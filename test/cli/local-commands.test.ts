@@ -58,6 +58,26 @@ afterEach(async () => {
 })
 
 describe("Effect CLI local commands", () => {
+  it("refuses import without an existing selected profile", async () => {
+    const ports = await makePorts()
+    await expect(run(ports, ["auth", "import-token", "--stdin"])).rejects.toThrow("Create and select")
+    await expect(run(ports, ["auth", "import-token", "--profile", "missing", "--stdin"])).rejects.toThrow(
+      "does not exist"
+    )
+  })
+
+  it("checks complete environment credentials without creating a saved profile", async () => {
+    const ports = await makePorts()
+    const output = await run(
+      {
+        ...ports,
+        environment: { HULY_URL: "https://huly.example", HULY_WORKSPACE: "work", HULY_TOKEN: "environment-sentinel" }
+      },
+      ["auth", "check", "--json"]
+    )
+    expect(JSON.parse(output.join("\n"))).toEqual({ verified: true })
+  })
+
   it("creates, updates, selects, and lists named profiles", async () => {
     const ports = await makePorts()
 

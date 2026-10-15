@@ -1,3 +1,4 @@
+import type * as Dbus from "dbus-next"
 import { Effect, Redacted, Schema } from "effect"
 
 import { CliProfileStoreError } from "./model.js"
@@ -40,33 +41,46 @@ export interface SecretServiceConnection {
 }
 export type SecretServiceConnect = (address: string) => Effect.Effect<SecretServiceConnection, CliProfileStoreError>
 
-const connectSecretService: SecretServiceConnect = (address) =>
-  Effect.tryPromise({
-    try: async () => {
-      const sdk = await import("dbus-next")
-      const bus = sdk.sessionBus({ busAddress: address })
-      // Transport errors become bounded request failures, never payload-bearing logs.
-      bus.on("error", () => {})
-      return {
-        call: (request: SecretServiceRequest) =>
-          Schema.encodeEffect(SecretServiceRequestSchema)(request).pipe(
-            Effect.mapError(unavailable),
-            Effect.flatMap((encoded) =>
-              Effect.tryPromise({
-                try: async () => (await bus.call(encodeSecretServiceMessage(encoded, sdk)))?.body,
-                catch: unavailable
-              })
-            )
-          ),
-        close: Effect.sync(() => bus.disconnect())
-      }
-    },
-    catch: unavailable
-  })
+// Internal SDK lifetime port. Schema-owned requests/replies remain at call sites.
+interface SecretBus {
+  readonly on: (event: "error", listener: () => void) => unknown
+  readonly call: (message: Dbus.Message) => Promise<Pick<Dbus.Message, "body"> | null>
+  readonly disconnect: () => void
+}
+interface SecretServiceSdk extends Pick<typeof Dbus, "Message" | "Variant"> {
+  readonly sessionBus: (options: { readonly busAddress: string }) => SecretBus
+}
+type LoadSecretServiceSdk = () => Promise<SecretServiceSdk>
+
+export const makeSecretServiceConnect =
+  (load: LoadSecretServiceSdk = () => import("dbus-next")): SecretServiceConnect =>
+  (address) =>
+    Effect.tryPromise({
+      try: async () => {
+        const sdk = await load()
+        const bus = sdk.sessionBus({ busAddress: address })
+        // Transport errors become bounded request failures, never payload-bearing logs.
+        bus.on("error", () => {})
+        return {
+          call: (request: SecretServiceRequest) =>
+            Schema.encodeEffect(SecretServiceRequestSchema)(request).pipe(
+              Effect.mapError(unavailable),
+              Effect.flatMap((encoded) =>
+                Effect.tryPromise({
+                  try: async () => (await bus.call(encodeSecretServiceMessage(encoded, sdk)))?.body,
+                  catch: unavailable
+                })
+              )
+            ),
+          close: Effect.sync(() => bus.disconnect())
+        }
+      },
+      catch: unavailable
+    })
 
 export const makeLinuxSecretService = (
   busAddress: string | undefined,
-  connect: SecretServiceConnect = connectSecretService
+  connect: SecretServiceConnect = makeSecretServiceConnect()
 ): NativeCredentialPort => {
   const use = <A>(operation: (call: SecretCall) => Effect.Effect<A, CliProfileStoreError>) =>
     Effect.gen(function* () {

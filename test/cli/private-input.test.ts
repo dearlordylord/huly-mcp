@@ -4,6 +4,13 @@ import { expect, it } from "vitest"
 
 import { readPrivateTokenInput } from "../../packages/huly-cli/src/private-input.js"
 
+it("returns a typed failure when stdin was already closed", async () => {
+  const input = new Readable({ read() {} })
+  input.destroy()
+  expect(Result.isFailure(await Effect.runPromise(readPrivateTokenInput(input).pipe(Effect.result)))).toBe(true)
+  expect(input.listenerCount("data")).toBe(0)
+})
+
 it("parses and redacts token bytes at the input boundary", async () => {
   const input = Readable.from([Buffer.from("  private-"), Buffer.from("input-sentinel\n")])
   const token = await Effect.runPromise(readPrivateTokenInput(input))

@@ -20,6 +20,71 @@ const connection =
       })
     })
 
+it("reads a parsed secret and supports missing items, creation and idempotent deletion", async () => {
+  const events: Array<string> = []
+  let present = false
+  const native = makeLinuxSecretService(
+    "unix:path=/fixture",
+    connection((request) => {
+      switch (request._tag) {
+        case "SearchItems":
+          return [present ? ["/item"] : [], []]
+        case "OpenSession":
+          return [{}, "/session"]
+        case "GetSecret":
+          return [["/session", [], Buffer.from("stored-sentinel"), "text/plain"]]
+        case "ReadDefaultCollection":
+          return ["/collection"]
+        case "CollectionLocked":
+          return [{ value: false }]
+        case "CreateItem":
+          present = true
+          return ["/item", "/"]
+        case "DeleteItem":
+          present = false
+          return ["/"]
+      }
+    }, events)
+  )
+  expect(await Effect.runPromise(native.read("key"))).toBeUndefined()
+  await Effect.runPromise(native.remove("key"))
+  await Effect.runPromise(native.save("key", Redacted.make("stored-sentinel")))
+  const read = await Effect.runPromise(native.read("key"))
+  expect(read === undefined ? undefined : Redacted.value(read)).toBe("stored-sentinel")
+  await Effect.runPromise(native.remove("key"))
+  expect(present).toBe(false)
+  expect(events.filter((event) => event === "closed")).toHaveLength(5)
+})
+
+it("refuses missing sessions, ambiguous items and unusable default collections", async () => {
+  expect(
+    Result.isFailure(await Effect.runPromise(makeLinuxSecretService(undefined).read("key").pipe(Effect.result)))
+  ).toBe(true)
+  for (const response of [
+    [["/one", "/two"], []],
+    [[], ["/locked"]]
+  ]) {
+    const native = makeLinuxSecretService(
+      "unix:path=/fixture",
+      connection(() => response, [])
+    )
+    expect(Result.isFailure(await Effect.runPromise(native.read("key").pipe(Effect.result)))).toBe(true)
+    expect(Result.isFailure(await Effect.runPromise(native.remove("key").pipe(Effect.result)))).toBe(true)
+  }
+  for (const collection of ["/", "/collection"]) {
+    const events: Array<string> = []
+    const native = makeLinuxSecretService(
+      "unix:path=/fixture",
+      connection((request) => (request._tag === "ReadDefaultCollection" ? [collection] : [{ value: true }]), events)
+    )
+    expect(
+      Result.isFailure(await Effect.runPromise(native.save("key", Redacted.make("secret")).pipe(Effect.result)))
+    ).toBe(true)
+    expect(events).not.toContain("OpenSession")
+    expect(events.at(-1)).toBe("closed")
+  }
+})
+
 it("refuses a returned prompt without attempting interactive behavior and releases the connection", async () => {
   const events: Array<string> = []
   const native = makeLinuxSecretService(

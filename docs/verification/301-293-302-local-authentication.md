@@ -155,3 +155,56 @@ pass, and three private-input/process files / 22 tests pass. GitHub Actions is
 enabled; `.github/workflows/native-macos.yml` prepares an isolated real Keychain
 CRUD job. It has not executed and does not certify desktop prompts or live Huly.
 The host checklist is [macOS qualification](macos-local-authentication.md).
+
+## Frozen successor qualification (`fc93683f`)
+
+A detached Linux qualification worktree preserves the broader predecessor MCP
+run's original bundle. Both final installed packaged CLI workflows pass against
+matching successor MCP output: file storage
+(`/tmp/hulymcp-local-auth-fc93683f-file-live.log`) and real Secret Service
+(`/tmp/hulymcp-local-auth-fc93683f-native-live.log`), including locked and missing
+session errors, immutable replacement, offline status/check, CLI/stdio sharing,
+secret inspection, and logout.
+
+The fresh full gate passed every stage before tests/coverage, then failed five
+process tests across three files: adapter subprocess timeout, two private-input
+process timeouts, resistant-descendant timeout, and a missing process-cleanup
+message. It passed 5,411 tests; this is a failed full receipt, not coverage
+certification (`/tmp/hulymcp-local-auth-final-check-all.log`). All three unchanged
+affected files pass together, 21 tests
+(`/tmp/hulymcp-local-auth-final-failures-focused.log`). No timeout or threshold
+changed. A fresh full gate remains required and is being retried after the
+packaged live runs completed. macOS execution remains pending.
+
+The first full retry passed all 5,416 tests but failed function (98.70%) and
+branch (98.67%) coverage. A second candidate added SDK injection ports and tests
+for native encoding/error/lifetime behavior, Keychain redaction/error translation,
+native selection/publication guards, private argv parsing, and non-TTY input.
+Standards and Spec delta reviews against `fc93683f` found no new issues. The next
+full run passed 5,434 tests and function coverage (99.02%), but branches remained
+98.94%. No threshold, exclusion, or timeout changed. Additional tests cover
+missing-profile import, environment-only check, closed stdin, native-preserving
+profile updates, and unselected offline status; the subsequent gate is pending.
+
+The broader predecessor-bundle MCP regression finished with 1,443 passed, one
+failed, and 31 skipped. Its failure was a missing reverse issue-relation
+identifier after adding a relation. It is not a passing broad receipt. A scoped
+fresh-pair probe against the current bundle returned both the expected forward
+`blockedBy` and reverse `blocks` identifiers, then deleted its fixtures
+(`/tmp/hulymcp-local-auth-relation-diagnosis-final.log`). An earlier diagnostic
+parser expected an unwrapped response; its created fixture was recovered and
+deleted before the successful scoped probe. No relation production code changed.
+
+## Passing full gate after coverage repair
+
+`pnpm check-all` passed on the final coverage-repaired source, including all
+5,440 tests across 417 files. V8 coverage: statements 99.47%, branches 99.00%,
+functions 99.04%, lines 99.56%. Every original threshold and timeout is unchanged;
+no coverage exclusions were added. Receipt:
+`/tmp/hulymcp-local-auth-final-certified-gate.log`. The installed D-Bus SDK also
+has an actual connection/disconnect test; injected SDK tests exercise wire
+requests, cleanup, and safe failure mapping. Real Linux native CRUD passes again
+after the SDK-port refactor (`/tmp/hulymcp-local-auth-repaired-native-probe.log`).
+
+Actual macOS execution and desktop/MCP-host authorization observations remain
+unverified. The three issues are not collectively claimed complete.
