@@ -6,10 +6,15 @@ Scope: GitHub #301 (private local token management), #293 (macOS Keychain), and
 
 ## Current completion audit
 
-The combined objective is **incomplete**. Candidate `745cb7aa` has passing
-[CI on Node 22 and 24](https://github.com/dearlordylord/huly-mcp/actions/runs/38811706460),
-[Package Smoke](https://github.com/dearlordylord/huly-mcp/actions/runs/38811706409),
-and [real macOS Keychain CRUD](https://github.com/dearlordylord/huly-mcp/actions/runs/38811706396).
+The combined objective is **incomplete**. Current runtime candidate `6bdaf85f`
+fixes the locked-Keychain logout blocker and passes fresh local `pnpm check-all`:
+5,461 tests; statements 99.47%, branches 99.00%, functions 99.03%, lines 99.57%.
+Its final macOS and Node 22/24 CI gates remain pending.
+The [macOS 27 host report](macos-local-authentication-2026-10-15.md) establishes
+packed CLI and actual Codex MCP-host happy paths, and records the predecessor's
+blocking logout failure. The corrected installed-CLI regression passes on a real
+macOS runner in [run 38823671921](https://github.com/dearlordylord/huly-mcp/actions/runs/38823671921).
+Its later harness failure and repairs remain separate receipts below.
 PR [#318](https://github.com/dearlordylord/huly-mcp/pull/318) remains a draft.
 The sections below retain earlier checkpoints and failed receipts as history.
 
@@ -23,19 +28,19 @@ but does not prove a native OS/process-context requirement.
 | #301 acceptance 6–8 | Shared configuration/HTTP/parity checks and Standards/Spec reviews pass. Full CI and focused live auth workflows pass. The broad predecessor regression's one relation failure and passing scoped diagnosis remain separate receipts below. |
 | #301 research checks | Hidden prompt and sentinel/file inspection pass in the packaged workflows. Environment-only status and shared-store serialization guards pass without compulsory persistence. |
 | #293 acceptance 1, 5–7 | Explicit selection, schema-owned metadata, shared routing, documentation and configuration preservation have passing shared-seam tests/reviews. This is implementation evidence, not a full native macOS workflow receipt. |
-| #293 acceptance 2–4, 8 | **Partial / untested:** real native CRUD passes on macOS 26.6.2 arm64. Native denial/locked/unavailable behavior and the complete packaged CLI/live-Huly/stdio flow have no macOS execution receipt. Required native-platform live qualification is incomplete. |
-| #293 update/headless research checks | **Untested on macOS:** file/environment behavior across an actual binary update, denied access, actual packaged CLI and MCP-host retrieval, and observed system prompts. Shared-seam tests and operator guidance exist. |
-| #293 session and file-artifact research checks | OS-user/session and explicit environment alternatives are documented. **Untested on macOS:** sentinel inspection after the actual native packaged save/read/replace/status/failure flows. |
+| #293 acceptance 2–4, 8 | **Partial:** macOS 27 host evidence passes packed CLI login/check/import/rejected replacement and actual Codex MCP reads against local Huly. It demonstrates the predecessor locked-logout blocker. The corrected packed-CLI default-change/lock/failure/unlock/recovery/logout fixture passes on macOS 26 arm64; actual-host correction, access-denial and unavailable-session qualification remain open. |
+| #293 update/headless research checks | Same-version reinstall and actual packed CLI/Codex MCP retrieval pass on the host. Actual binary upgrade, denied-access behavior and complete visual system-prompt observations remain untested. |
+| #293 session and file-artifact research checks | Host inspection passes normal-access no-secret application JSON checks, native metadata shape, explicit file login/check, and complete environment-backed reads. Denied-state fallback isolation and a complete decryption-key audit remain unqualified. |
 | #302 acceptance 1–5 | Real Linux Secret Service probes and installed packaged CLI/stdio workflows pass: explicit backend, CRUD/replacement/logout, locked collection, missing session/service, no plaintext fallback, and accurate offline backend/status. |
 | #302 acceptance 6–8 | Configuration/HTTP/parity checks, schema/redaction/port reviews, full CI and focused local-Huly auth qualification pass. Platform-local dependencies and versions are recorded below. |
 | #302 research checks | Same-session CLI/stdio, locked/missing-session failures and file inspection pass in the private D-Bus fixture. Typed prompt-return refusal and connection cleanup pass through the injected transport; no Prompt/Unlock operation exists in the supported protocol. Environment alternatives are documented. |
 
-The remaining gate is the real macOS host qualification in
-[the checklist](macos-local-authentication.md), using the actual packaged CLI and
-MCP host against Huly. A hosted CRUD job cannot supply those observations. No
-macOS host/SSH target or host results have been supplied; the user offered manual
-checks later. No token, password, host credential, or tunnel is required merely
-to record this limitation, and none has been requested or published.
+The remaining macOS qualification follows
+[the checklist](macos-local-authentication.md). The supplied host report records
+macOS 27 arm64, Node 25.6.1, packed CLI 0.51.1/MCP 0.53.1 and the actual Codex
+app-server. A hosted regression job cannot substitute for its remaining actual
+upgrade, denied/unavailable-session, and visual prompt observations. No secrets
+or SecurityAgent UI automation are required or requested for this implementation.
 
 ## Delivered candidate
 
@@ -329,10 +334,26 @@ at 98.99%. Coverage identified an unreachable empty-map fallback after a native
 reference was already proven present. Logout now captures and narrows that map,
 then carries it through deletion; missing-map/ref cases and repeated logout stay
 idempotent. Standards review found no behavior change or gate weakening.
-The fourth complete Linux gate and final macOS gate remain pending.
+The fourth complete Linux gate passes on runtime `6bdaf85f`: 420 files / 5,461
+tests; statements 99.47%, branches 99.00%, functions 99.03%, lines 99.57%.
+All build, TypeScript/Effect diagnostics, movement process checks, architecture,
+complexity, formatting, duplication and artifact closure gates pass. The final
+macOS, Node 22/24 CI and Package Smoke results remain pending.
 
 The fix prevents new reference loss. It does not reconstruct a reference that an
 earlier successful-looking logout already discarded; restore its metadata
 backup or authenticate explicitly again. The host's access-denial,
 unavailable-session, actual upgrade, and complete visual prompt audit remain
 unqualified. The earlier passing native CRUD checks did not cover this blocker.
+
+
+macOS full-gate follow-up: [run 38824004057](https://github.com/dearlordylord/huly-mcp/actions/runs/38824004057)
+on `f8408abe` again passes real CRUD and the installed CLI locked-logout
+regression. With Bash/GNU timeout prerequisites installed, movement process
+checks pass. The suite reaches 5,459 passing tests and two fixture failures:
+`movement-stage-report` and `issue-movement-concurrency-evidence` used aliased
+`/var` temporary roots. Those fixtures now canonicalize their owned roots before
+constructing explicit negative symlink, permission, owner, noncanonical-path and
+overwrite cases. Both files / 13 tests pass locally; fresh Standards and Spec
+reviews report no findings. This fixture-only repair follows the successful
+runtime `6bdaf85f` Linux gate; it does not relax production custody checks.

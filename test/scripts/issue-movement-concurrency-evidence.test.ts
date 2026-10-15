@@ -1,4 +1,4 @@
-import { chmod, mkdtemp, readFile, rm, stat, symlink } from "node:fs/promises"
+import { chmod, mkdtemp, readFile, realpath, rm, stat, symlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Effect, Schema } from "effect"
@@ -34,7 +34,7 @@ const receipt = {
   }
 }
 const withDirectory = async (use: (directory: string) => Promise<void>) => {
-  const directory = await mkdtemp(join(tmpdir(), "concurrency-evidence-"))
+  const directory = await realpath(await mkdtemp(join(tmpdir(), "concurrency-evidence-")))
   await chmod(directory, 0o700)
   try {
     await use(directory)
