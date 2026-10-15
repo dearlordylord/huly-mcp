@@ -9,6 +9,7 @@ import { Effect, Redacted, Schema } from "effect"
 import { saveLogin } from "../packages/huly-cli/src/profile-operations.js"
 import { cliProfilePaths, makeCliProfileStore } from "../src/profiles/file-store.js"
 import { makeMacosKeychain } from "../src/profiles/macos-keychain.js"
+import { runMacosSecurity } from "../src/profiles/macos-security.js"
 import { parseProfileName } from "../src/profiles/model.js"
 import { resolveCliConfiguration } from "../src/profiles/resolve.js"
 
@@ -71,7 +72,15 @@ const run = async () => {
     await command("/usr/bin/security", ["default-keychain", "-d", "user", "-s", fixture.HULY_TEST_ORIGINAL_KEYCHAIN], {
       timeout: commandTimeout
     })
-    phase = "unlocked nondefault credential read"
+    phase = "unlocked nondefault metadata lookup"
+    const reference = (await Effect.runPromise(store.readCredentials())).native?.[name]
+    assert(reference !== undefined)
+    const located = await Effect.runPromise(runMacosSecurity({ _tag: "Locate", key: reference.key }))
+    assert.equal(located.status, 0)
+    phase = "unlocked nondefault native secret read"
+    const nondefaultToken = await Effect.runPromise(native.read(reference.key))
+    assert(nondefaultToken !== undefined)
+    phase = "unlocked nondefault profile resolution"
     const beforeLock = await Effect.runPromise(resolveCliConfiguration(store, {}, name))
     assert.equal(beforeLock.auth.method, "token", "Changing the default Keychain must retain search-list access.")
     process.stdout.write("Checking packaged logout against a locked Keychain.\n")

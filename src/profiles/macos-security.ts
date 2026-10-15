@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process"
+import { execFile, type ChildProcess } from "node:child_process"
 import { Effect, Result, Schema } from "effect"
 
 import {
@@ -15,10 +15,17 @@ export type MacosSecurityCommand = (
   request: MacosSecurityRequest
 ) => Effect.Effect<MacosSecurityReply, CliProfileStoreError>
 const ExitFailureSchema = Schema.Struct({ code: Schema.Int })
+// Internal process port; the schema owns the callback's untrusted reply.
+export type StartMacosSecurity = (
+  args: ReadonlyArray<string>,
+  complete: (error: unknown, output: unknown) => void
+) => Pick<ChildProcess, "exitCode" | "signalCode" | "kill">
+const startSecurity: StartMacosSecurity = (args, complete) =>
+  execFile("/usr/bin/security", args, { encoding: "utf8" }, complete)
 
-const execute = (args: ReadonlyArray<string>) =>
+const execute = (start: StartMacosSecurity, args: ReadonlyArray<string>) =>
   Effect.callback<MacosSecurityReply, CliProfileStoreError>((resume) => {
-    const child = execFile("/usr/bin/security", args, { encoding: "utf8" }, (error, output) => {
+    const child = start(args, (error, output) => {
       const failure = error === null ? undefined : Schema.decodeUnknownResult(ExitFailureSchema)(error)
       if (failure !== undefined && Result.isFailure(failure)) {
         resume(Effect.fail(macosKeychainUnavailable()))
@@ -36,10 +43,14 @@ const execute = (args: ReadonlyArray<string>) =>
     })
   })
 
-export const runMacosSecurity: MacosSecurityCommand = (request) =>
-  Schema.encodeEffect(MacosSecurityRequestSchema)(request).pipe(
-    Effect.mapError(macosKeychainUnavailable),
-    Effect.flatMap((parsed) => execute(macosSecurityArguments(parsed))),
-    Effect.timeout("10 seconds"),
-    Effect.mapError(macosKeychainUnavailable)
-  )
+export const makeMacosSecurity =
+  (start: StartMacosSecurity = startSecurity): MacosSecurityCommand =>
+  (request) =>
+    Schema.encodeEffect(MacosSecurityRequestSchema)(request).pipe(
+      Effect.mapError(macosKeychainUnavailable),
+      Effect.flatMap((parsed) => execute(start, macosSecurityArguments(parsed))),
+      Effect.timeout("10 seconds"),
+      Effect.mapError(macosKeychainUnavailable)
+    )
+
+export const runMacosSecurity = makeMacosSecurity()
