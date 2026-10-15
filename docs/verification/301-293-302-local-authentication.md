@@ -227,3 +227,21 @@ artifact test files / 14 tests and TypeScript/Effect diagnostics pass. Separate
 Standards and Spec delta reviews found no new issues or weakened checks. App
 runtime is unchanged by this verification-only repair; the prior full gate and
 native receipts are retained separately.
+
+The next Package Smoke run passed artifact certification but exposed an old
+seven-local-command inventory. The inventory now counts nine (five auth and four
+profile leaves); the 604 registry routes and 55 root commands remain unchanged.
+Smoke coverage includes both new auth helps using their existing Effect CLI
+renderer. An installed `--no-optional` packed CLI smoke passes locally, including
+all representative help, structured input, and exact failure-stream/exit checks.
+Six focused contract tests, inventory verification, lint and formatting pass;
+Standards and Spec reviews found no inventory weakening.
+
+CI passed on both Node versions for `ad0b52fb`. On `50e35680`, Node 22 passed;
+Node 24 failed the existing legacy handshake fixture with a missing response ID.
+The fixture assumed the next message was a response and could receive a
+notification. It now schema-parses notifications/responses and matches request
+IDs. A deterministic transport-port test emits a notification and unrelated
+response before the matching response. All five spawned stdio tests pass after
+this fixture-only correction; timeouts and server behavior are unchanged.
+The failed CI receipt remains distinct from passing scoped repair evidence.
