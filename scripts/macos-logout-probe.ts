@@ -20,6 +20,7 @@ const FixtureSchema = Schema.Struct({
 const command = promisify(execFile)
 const commandTimeout = 15000
 const processArgumentOffset = 2
+let phase = "fixture configuration"
 
 const run = async () => {
   assert.equal(process.platform, "darwin", "This probe requires real macOS Keychain.")
@@ -32,6 +33,7 @@ const run = async () => {
   await fs.mkdir(path.dirname(store.paths.directory), { recursive: true })
   // Refuse an existing configuration; the fixture owns only a new runner directory.
   await fs.mkdir(store.paths.directory)
+  phase = "initial credential publication"
   const name = await Effect.runPromise(parseProfileName("locked-logout"))
   const token = Redacted.make("huly-native-locked-logout-sentinel")
   const unlock = () =>
@@ -51,6 +53,7 @@ const run = async () => {
     )
     const profiles = await fs.readFile(store.paths.profiles, "utf8")
     const credentials = await fs.readFile(store.paths.credentials, "utf8")
+    phase = "search-list configuration"
     const listing = await command("/usr/bin/security", ["list-keychains", "-d", "user"], { timeout: commandTimeout })
     const parseKeychain = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.NonEmptyString))
     const keychains = listing.stdout
@@ -68,9 +71,11 @@ const run = async () => {
     await command("/usr/bin/security", ["default-keychain", "-d", "user", "-s", fixture.HULY_TEST_ORIGINAL_KEYCHAIN], {
       timeout: commandTimeout
     })
+    phase = "unlocked nondefault credential read"
     const beforeLock = await Effect.runPromise(resolveCliConfiguration(store, {}, name))
     assert.equal(beforeLock.auth.method, "token", "Changing the default Keychain must retain search-list access.")
     process.stdout.write("Checking packaged logout against a locked Keychain.\n")
+    phase = "locked packaged logout"
     await command("/usr/bin/security", ["lock-keychain", fixture.HULY_TEST_KEYCHAIN_PATH], { timeout: commandTimeout })
     const environment = { ...process.env, HULY_PROFILE: name, HULY_CLI_TELEMETRY: "0" }
     let failed = false
@@ -93,10 +98,12 @@ const run = async () => {
     assert.equal(await fs.readFile(store.paths.credentials, "utf8"), credentials)
     process.stdout.write("Locked logout failed and preserved profile/credential files.\n")
     await unlock()
+    phase = "unlocked credential recovery"
     const resolved = await Effect.runPromise(resolveCliConfiguration(store, {}, name))
     assert.equal(resolved.auth.method, "token")
     if (resolved.auth.method === "token") assert.equal(Redacted.value(resolved.auth.token), Redacted.value(token))
     process.stdout.write("Unlock restored access to the previous credential.\n")
+    phase = "unlocked packaged logout"
     await command(executable, ["auth", "logout", "--profile", name, "--json"], {
       env: environment,
       timeout: commandTimeout
@@ -116,6 +123,8 @@ const run = async () => {
 }
 
 run().catch(() => {
-  process.stderr.write("FAIL: real macOS packaged logout preservation probe; credential material suppressed.\n")
+  process.stderr.write(
+    `FAIL: real macOS packaged logout preservation probe at ${phase}; credential material suppressed.\n`
+  )
   process.exitCode = 1
 })
