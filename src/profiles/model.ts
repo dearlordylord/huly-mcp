@@ -24,7 +24,11 @@ export const ProfileUrlSchema = Schema.String.pipe(
   )
 )
 
+export const CredentialStorageSchema = Schema.Literals(["file", "macos-keychain", "linux-secret-service"])
+export type CredentialStorage = Schema.Schema.Type<typeof CredentialStorageSchema>
+
 export const CliProfileSchema = Schema.Struct({
+  credentialStorage: Schema.optionalKey(CredentialStorageSchema),
   url: ProfileUrlSchema,
   workspace: NonEmptyTrimmedString,
   defaultProject: Schema.optionalKey(NonEmptyTrimmedString)
@@ -44,7 +48,13 @@ export type CredentialDestination = Schema.Schema.Type<typeof CredentialDestinat
 export const CliCredentialsFileSchema = Schema.Struct({
   version: Schema.Literal(1),
   tokens: Schema.Record(ProfileNameSchema, Schema.RedactedFromValue(NonEmptyTrimmedString)),
-  destinations: Schema.optionalKey(Schema.Record(ProfileNameSchema, CredentialDestinationSchema))
+  destinations: Schema.optionalKey(Schema.Record(ProfileNameSchema, CredentialDestinationSchema)),
+  native: Schema.optionalKey(
+    Schema.Record(
+      ProfileNameSchema,
+      Schema.Struct({ backend: CredentialStorageSchema, destination: CredentialDestinationSchema })
+    )
+  )
 })
 export type CliCredentialsFile = Schema.Schema.Type<typeof CliCredentialsFileSchema>
 

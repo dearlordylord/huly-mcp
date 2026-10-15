@@ -2,6 +2,7 @@ import * as fs from "node:fs/promises"
 import * as path from "node:path"
 
 import { Effect, Result, Schema } from "effect"
+import type { NativeCredentialPort } from "./native-credential-port.js"
 
 import {
   type CliCredentialsFile,
@@ -137,6 +138,7 @@ const writeFile = <A, I>(
   })
 
 export interface CliProfileStore {
+  readonly nativeCredentials?: NativeCredentialPort
   readonly paths: CliProfilePaths
   readonly readCredentials: () => Effect.Effect<CliCredentialsFile, CliProfileStoreError>
   readonly readProfiles: () => Effect.Effect<CliProfilesFile, CliProfileStoreError>
@@ -144,7 +146,11 @@ export interface CliProfileStore {
   readonly writeProfiles: (profiles: CliProfilesFile) => Effect.Effect<void, CliProfileStoreError>
 }
 
-export const makeCliProfileStore = (paths: CliProfilePaths): CliProfileStore => ({
+export const makeCliProfileStore = (
+  paths: CliProfilePaths,
+  nativeCredentials?: NativeCredentialPort
+): CliProfileStore => ({
+  ...(nativeCredentials === undefined ? {} : { nativeCredentials }),
   paths,
   readCredentials: () => readFile(paths.credentials, CliCredentialsFileSchema, emptyCredentials),
   readProfiles: () => readFile(paths.profiles, CliProfilesFileSchema, emptyProfiles),

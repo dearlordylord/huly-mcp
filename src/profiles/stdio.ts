@@ -1,3 +1,4 @@
+import { makeNativeCredentials } from "./native-credentials.js"
 import * as os from "node:os"
 import { Effect } from "effect"
 import { cliProfilePaths, makeCliProfileStore, type CliProfileStore } from "./file-store.js"
@@ -12,4 +13,9 @@ export const resolveStdioProfile = (
 ) => resolveCliConfiguration(store, environment, undefined, false, credentialStore)
 
 export const defaultProfileStore = (environment: NodeJS.ProcessEnv) =>
-  Effect.sync(() => makeCliProfileStore(cliProfilePaths(process.platform, environment, os.homedir())))
+  Effect.sync(() =>
+    makeCliProfileStore(
+      cliProfilePaths(process.platform, environment, os.homedir()),
+      makeNativeCredentials(process.platform, environment)
+    )
+  )

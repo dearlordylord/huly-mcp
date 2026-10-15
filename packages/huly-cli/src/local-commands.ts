@@ -1,11 +1,7 @@
-import * as os from "node:os"
-import * as readline from "node:readline/promises"
-import { Writable } from "node:stream"
-
-import { Console, Context, Effect, Layer, Option, Redacted, Schema } from "effect"
+import { Console, Effect, Option, Schema } from "effect"
 import { Argument, Command, Flag } from "effect/cli"
 
-import { HulySdk } from "../../../src/huly/sdk-deps.js"
+import { LoginRequestSchema, LocalCliService, type LocalCliPorts } from "./local-cli-ports.js"
 import {
   CliProfilePatchSchema,
   createProfile,
@@ -18,96 +14,19 @@ import {
 } from "./profile-operations.js"
 import {
   type CliProfile,
+  type CredentialStorage,
   CliProfileSchema,
-  type CliProfileStore,
-  type CliProfileStoreError,
-  cliProfilePaths,
-  makeCliProfileStore,
+  CliProfileStoreError,
   parseProfileName,
-  type ProfileName
+  type ProfileName,
+  resolveCliConfiguration
 } from "./profile-store.js"
+import { TokenImportSchema, importLocalToken } from "../../../src/profiles/token-management.js"
 import { CliRuntimeError } from "./render.js"
 
+export { LocalCliService, type LocalCliPorts } from "./local-cli-ports.js"
+
 const JSON_INDENT_SPACES = 2
-
-const LoginRequestSchema = Schema.Struct({
-  url: CliProfileSchema.fields.url,
-  workspace: CliProfileSchema.fields.workspace,
-  email: Schema.Trimmed.pipe(Schema.check(Schema.isNonEmpty())),
-  password: Schema.RedactedFromValue(Schema.NonEmptyString)
-})
-type LoginRequest = Schema.Schema.Type<typeof LoginRequestSchema>
-
-export interface LocalCliPorts {
-  readonly authenticate: (request: LoginRequest) => Effect.Effect<Redacted.Redacted<string>, CliRuntimeError>
-  readonly environment: NodeJS.ProcessEnv
-  readonly prompt: (label: string, hidden: boolean) => Effect.Effect<string, CliRuntimeError>
-  readonly store: CliProfileStore
-}
-
-export class LocalCliService extends Context.Service<LocalCliService, LocalCliPorts>()("@huly-cli/LocalCliService") {
-  static readonly defaultLayer = Layer.sync(LocalCliService, defaultLocalCliPorts)
-}
-
-/* c8 ignore start -- production TTY and Huly SDK adapters are exercised by the final live integration; command behavior uses LocalCliPorts in unit tests. */
-class PromptOutput extends Writable {
-  muted = false
-
-  override _write(chunk: Buffer | string, encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
-    if (!this.muted) process.stdout.write(chunk, encoding)
-    callback()
-  }
-}
-
-const promptValue = (label: string, hidden: boolean): Effect.Effect<string, CliRuntimeError> =>
-  Effect.tryPromise({
-    try: async () => {
-      const output = new PromptOutput()
-      const terminal = readline.createInterface({ input: process.stdin, output, terminal: true })
-      process.stdout.write(`${label}: `)
-      output.muted = hidden
-      const value = await terminal.question("")
-      output.muted = false
-      process.stdout.write("\n")
-      terminal.close()
-      return value
-    },
-    catch: () => new CliRuntimeError({ kind: "input", message: `Unable to read ${label}.`, retryable: false })
-  })
-
-const authenticate = (request: LoginRequest): Effect.Effect<Redacted.Redacted<string>, CliRuntimeError> =>
-  Effect.gen(function* () {
-    const sdk = yield* HulySdk
-    return yield* Effect.tryPromise({
-      try: async () => {
-        const server = await sdk.loadServerConfig(request.url)
-        const login = await sdk
-          .getAccountClient(server.ACCOUNTS_URL)
-          .login(request.email, Redacted.value(request.password))
-        if (login.token === undefined) throw new Error("Huly login returned no token")
-        const workspace = await sdk
-          .getAccountClient(server.ACCOUNTS_URL, login.token)
-          .selectWorkspace(request.workspace)
-        return Redacted.make(workspace.token)
-      },
-      catch: () =>
-        new CliRuntimeError({
-          kind: "authentication",
-          message: "Huly login failed. Check the URL, workspace, email, and password.",
-          retryable: false
-        })
-    })
-  }).pipe(Effect.provide(HulySdk.defaultLayer))
-/* c8 ignore stop */
-
-function defaultLocalCliPorts(): LocalCliPorts {
-  return {
-    authenticate,
-    environment: process.env,
-    prompt: promptValue,
-    store: makeCliProfileStore(cliProfilePaths(process.platform, process.env, os.homedir()))
-  }
-}
 
 const storeError = (error: CliProfileStoreError): CliRuntimeError =>
   new CliRuntimeError({ kind: error.kind, message: error.message, retryable: false })
@@ -152,6 +71,7 @@ const profileForLogin = (
     const url = yield* valueOrPrompt(existing?.url, ports, "Huly URL")
     const workspace = yield* valueOrPrompt(existing?.workspace, ports, "Huly workspace")
     const profile = yield* Schema.decodeUnknownEffect(CliProfileSchema)({
+      ...existing,
       url,
       workspace,
       ...(existing?.defaultProject === undefined ? {} : { defaultProject: existing.defaultProject })
@@ -190,8 +110,20 @@ const optionalWorkspaceFlag = optionalTextFlag("workspace")
 const defaultProjectFlag = optionalTextFlag("default-project", "project")
 const clearDefaultProjectFlag = optionalBooleanFlag("clear-default-project")
 
+const storageFlag = {
+  param: Flag.Literals("storage", ["file", "os"]).pipe(Flag.optional),
+  syntax: "[--storage file|os]"
+}
+
 const localCommandConfigs = {
-  authLogin: { profile: profileFlag.param, json: jsonFlag.param },
+  authImport: {
+    storage: storageFlag.param,
+    profile: profileFlag.param,
+    json: jsonFlag.param,
+    stdin: Flag.Boolean("stdin").pipe(Flag.withDefault(false))
+  },
+  authCheck: { profile: profileFlag.param, json: jsonFlag.param },
+  authLogin: { profile: profileFlag.param, json: jsonFlag.param, storage: storageFlag.param },
   authStatus: { profile: profileFlag.param, json: jsonOption },
   authLogout: { profile: profileFlag.param, json: jsonFlag.param },
   profileCreate: {
@@ -216,7 +148,9 @@ const localCommandConfigs = {
 const stripOuterBrackets = (syntax: string): string => syntax.slice("[".length, syntax.length - "]".length)
 
 export const localCommandSkillSurfaces = {
-  authLogin: `huly auth login ${profileFlag.syntax} ${jsonFlag.syntax}`,
+  authImport: `huly auth import-token ${storageFlag.syntax} ${profileFlag.syntax} [--stdin] ${jsonFlag.syntax}`,
+  authCheck: `huly auth check ${profileFlag.syntax} ${jsonFlag.syntax}`,
+  authLogin: `huly auth login ${storageFlag.syntax} ${profileFlag.syntax} ${jsonFlag.syntax}`,
   authStatus: `huly auth status ${profileFlag.syntax} ${jsonFlag.syntax}`,
   authLogout: `huly auth logout ${profileFlag.syntax} ${jsonFlag.syntax}`,
   profileCreate: `huly profile create ${nameArgument.syntax} ${urlFlag.syntax} ${workspaceFlag.syntax} ${defaultProjectFlag.syntax} ${jsonFlag.syntax}`,
@@ -253,10 +187,44 @@ const profilePatch = (
     )
   )
 
-const authLogin = Command.make("login", localCommandConfigs.authLogin, ({ json, profile }) =>
+const nativeStorageFor = (platform: NodeJS.Platform): Effect.Effect<CredentialStorage, CliRuntimeError> => {
+  if (platform === "darwin") return Effect.succeed("macos-keychain")
+  if (platform === "linux") return Effect.succeed("linux-secret-service")
+  return Effect.fail(
+    new CliRuntimeError({
+      kind: "input",
+      message:
+        "OS credential storage is supported on macOS and Linux. Use file storage or environment injection on this platform.",
+      retryable: false
+    })
+  )
+}
+
+const profileWithStorage = Effect.fn("Cli.profileWithStorage")(function* (
+  ports: LocalCliPorts,
+  name: ProfileName,
+  profile: CliProfile,
+  requested: "file" | "os" | undefined
+) {
+  if (requested === undefined) return profile
+  const backend = requested === "file" ? "file" : yield* nativeStorageFor(ports.platform)
+  const credentials = yield* ports.store.readCredentials().pipe(Effect.mapError(storeError))
+  const saved = credentials.tokens[name] !== undefined || credentials.native?.[name] !== undefined
+  if (saved && backend !== (profile.credentialStorage ?? "file"))
+    return yield* new CliRuntimeError({
+      kind: "input",
+      message:
+        "Replacement retains the selected credential backend. Use a new profile for a different backend; no credential migration is performed.",
+      retryable: false
+    })
+  return { ...profile, credentialStorage: backend }
+})
+
+const authLogin = Command.make("login", localCommandConfigs.authLogin, ({ json, profile, storage }) =>
   Effect.gen(function* () {
     const ports = yield* LocalCliService
     const target = yield* profileForLogin(ports, optionValue(profile))
+    const destination = yield* profileWithStorage(ports, target.name, target.profile, optionValue(storage))
     const email = yield* ports.prompt("Huly email", false)
     const password = yield* ports.prompt("Huly password", true)
     const request = yield* Schema.decodeUnknownEffect(LoginRequestSchema)({ ...target.profile, email, password }).pipe(
@@ -265,7 +233,7 @@ const authLogin = Command.make("login", localCommandConfigs.authLogin, ({ json, 
       )
     )
     const token = yield* ports.authenticate(request)
-    yield* saveLogin(ports.store, target.name, target.profile, token).pipe(Effect.mapError(storeError))
+    yield* saveLogin(ports.store, target.name, destination, token).pipe(Effect.mapError(storeError))
     yield* print(`Logged in to Huly profile '${target.name}'.`, json)
   })
 ).pipe(Command.withDescription("Log in interactively and store only the resulting token."))
@@ -290,9 +258,71 @@ const authLogout = Command.make("logout", localCommandConfigs.authLogout, ({ jso
   })
 ).pipe(Command.withDescription("Remove the stored token for a profile."))
 
+const authImport = Command.make("import-token", localCommandConfigs.authImport, ({ json, profile, stdin, storage }) =>
+  Effect.gen(function* () {
+    const ports = yield* LocalCliService
+    const profiles = yield* ports.store.readProfiles().pipe(Effect.mapError(storeError))
+    const requested = optionValue(profile) ?? ports.environment["HULY_PROFILE"] ?? profiles.activeProfile
+    if (requested === undefined)
+      return yield* new CliRuntimeError({
+        kind: "input",
+        message: "Create and select a profile before importing a token.",
+        retryable: false
+      })
+    const name = yield* profileName(requested)
+    const target = profiles.profiles[name]
+    if (target === undefined)
+      return yield* new CliRuntimeError({
+        kind: "input",
+        message: "Selected Huly profile does not exist.",
+        retryable: false
+      })
+    const destination = yield* profileWithStorage(ports, name, target, optionValue(storage))
+    const token = stdin ? yield* ports.readTokenStdin() : yield* ports.prompt("Huly token", true)
+    const request = yield* Schema.decodeUnknownEffect(TokenImportSchema)({ name, destination: target, token }).pipe(
+      Effect.mapError(
+        () =>
+          new CliRuntimeError({ kind: "input", message: "Token must be a nonempty single value.", retryable: false })
+      )
+    )
+    yield* importLocalToken(request, {
+      save: (value) => saveLogin(ports.store, name, destination, value.token),
+      read: (value) =>
+        ports
+          .checkConnection({
+            auth: { method: "token", token: value.token },
+            url: value.destination.url,
+            workspace: value.destination.workspace
+          })
+          .pipe(Effect.mapError((error) => new CliProfileStoreError({ kind: "integration", message: error.message })))
+    }).pipe(Effect.mapError(storeError))
+    yield* print(`Imported and verified token for Huly profile '${name}'.`, json)
+  })
+).pipe(
+  Command.withDescription(
+    "Import a token using hidden terminal input or explicitly selected --stdin; verify before saving. Never pass a token as an argument."
+  )
+)
+
+const authCheck = Command.make("check", localCommandConfigs.authCheck, ({ json, profile }) =>
+  Effect.gen(function* () {
+    const ports = yield* LocalCliService
+    const configuration = yield* resolveCliConfiguration(ports.store, ports.environment, optionValue(profile)).pipe(
+      Effect.mapError(storeError)
+    )
+    yield* ports.checkConnection(configuration)
+    yield* print(
+      { verified: true, ...(configuration.profile === undefined ? {} : { profile: configuration.profile }) },
+      json
+    )
+  })
+).pipe(
+  Command.withDescription("Explicitly check Huly connectivity with a bounded live read. Does not save credentials.")
+)
+
 export const authCommand = Command.make("auth").pipe(
   Command.withDescription("Authentication commands"),
-  Command.withSubcommands([authLogin, authStatus, authLogout])
+  Command.withSubcommands([authLogin, authImport, authCheck, authStatus, authLogout])
 )
 
 const profileCreate = Command.make(
@@ -324,7 +354,9 @@ const profileList = Command.make("list", localCommandConfigs.profileList, ({ jso
     const rows = Object.entries(profiles.profiles).map(([name, profile]) => ({
       name,
       active: name === profiles.activeProfile,
-      authenticated: Object.hasOwn(credentials.tokens, name),
+      configured: Object.hasOwn(credentials.tokens, name) || Object.hasOwn(credentials.native ?? {}, name),
+      verified: false,
+      authenticated: Object.hasOwn(credentials.tokens, name) || Object.hasOwn(credentials.native ?? {}, name),
       ...profile
     }))
     yield* print(rows.length === 0 && !json ? "No Huly CLI profiles." : rows, json)

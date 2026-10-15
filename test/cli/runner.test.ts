@@ -21,6 +21,9 @@ import { TelemetryService } from "../../src/telemetry/telemetry.js"
 const emptyBundle = {} as ClientBundle
 
 const localCliTestLayer = Layer.succeed(LocalCliService, {
+  platform: "linux",
+  checkConnection: () => Effect.void,
+  readTokenStdin: () => Effect.succeed("stdin-token"),
   authenticate: () => Effect.die("authenticate is not used by runner tests"),
   environment: {},
   prompt: () => Effect.die("prompt is not used by runner tests"),

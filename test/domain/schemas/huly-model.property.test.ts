@@ -136,6 +136,20 @@ describe("Huly model schema properties", () => {
     }
   })
 
+  it("rejects a numeric enum of field even when enumRef is present", () => {
+    expect(
+      decodeSucceeds(CustomFieldInfoWireSchema, {
+        id: "a",
+        name: "",
+        label: "",
+        ownerClassId: "a:interface:a",
+        ownerLabel: "",
+        type: "enum",
+        typeDetails: { of: 0, enumRef: "status" }
+      })
+    ).toBe(false)
+  })
+
   it("CustomFieldInfoWireSchema enforces typeDetails required by the custom field type", () => {
     fc.assert(
       fc.property(customFieldBaseArbitrary, primitiveCustomFieldTypeArbitrary, (base, type) => {
@@ -154,9 +168,10 @@ describe("Huly model schema properties", () => {
     fc.assert(
       fc.property(
         customFieldBaseArbitrary,
-        rawDetailsArbitrary,
         detailsWithoutRequiredCustomFieldKeysArbitrary,
-        (base, extraDetails, missingDetails) => {
+        detailsWithoutRequiredCustomFieldKeysArbitrary,
+        rawDetailsArbitrary,
+        (base, extraDetails, missingDetails, unknownDetails) => {
           expect(
             decodeSucceeds(CustomFieldInfoWireSchema, {
               ...base,
@@ -179,7 +194,7 @@ describe("Huly model schema properties", () => {
             })
           ).toBe(true)
           expect(
-            decodeSucceeds(CustomFieldInfoWireSchema, { ...base, type: "unknown", typeDetails: extraDetails })
+            decodeSucceeds(CustomFieldInfoWireSchema, { ...base, type: "unknown", typeDetails: unknownDetails })
           ).toBe(true)
 
           expect(

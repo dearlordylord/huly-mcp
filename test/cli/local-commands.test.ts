@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from "vitest"
 
 import { buildRootCommand } from "../../packages/huly-cli/src/command-tree.js"
 import { LocalCliService, type LocalCliPorts } from "../../packages/huly-cli/src/local-commands.js"
+import { CliRuntimeError } from "../../packages/huly-cli/src/render.js"
 import { CliAuthStatusSchema } from "../../packages/huly-cli/src/profile-operations.js"
 import { cliProfilePaths, makeCliProfileStore } from "../../packages/huly-cli/src/profile-store.js"
 import { TelemetryService } from "../../src/telemetry/telemetry.js"
@@ -19,6 +20,9 @@ const makePorts = async (): Promise<LocalCliPorts> => {
   const directory = await fs.mkdtemp(path.join(process.cwd(), ".local-cli-test-"))
   temporaryDirectories.push(directory)
   return {
+    platform: "linux",
+    checkConnection: () => Effect.void,
+    readTokenStdin: () => Effect.succeed("stdin-token"),
     authenticate: (request) => {
       expect(request.email).toBe("agent@example.com")
       expect(Redacted.value(request.password)).toBe("never-store-this")
@@ -75,6 +79,8 @@ describe("Effect CLI local commands", () => {
       {
         name: "work",
         active: true,
+        configured: false,
+        verified: false,
         authenticated: false,
         url: "https://huly.example",
         workspace: "main",
@@ -257,4 +263,57 @@ it("reports a selected logged-out profile without prompting", async () => {
     authenticated: false,
     authMethod: "none"
   })
+})
+
+it("imports a token through explicit stdin, verifies before saving, and checks without exposing secrets", async () => {
+  const base = await makePorts()
+  const events: Array<string> = []
+  const ports: LocalCliPorts = {
+    ...base,
+    prompt: () => Effect.die("explicit stdin must not prompt"),
+    readTokenStdin: () => Effect.succeed("private-import-sentinel"),
+    checkConnection: (configuration) =>
+      Effect.sync(() => {
+        expect(configuration.auth.method).toBe("token")
+        if (configuration.auth.method === "token")
+          expect(Redacted.value(configuration.auth.token)).toBe("private-import-sentinel")
+        events.push("checked")
+      })
+  }
+  await run(ports, ["profile", "create", "work", "--url", "https://huly.example", "--workspace", "main"])
+  const imported = await run(ports, ["auth", "import-token", "--stdin", "--profile", "work", "--json"])
+  const checked = await run(ports, ["auth", "check", "--json"])
+  expect(checked.join("\n")).toContain('"verified": true')
+  expect([...imported, ...checked].join("\n")).not.toContain("private-import-sentinel")
+  expect(events).toEqual(["checked", "checked"])
+  const offline = await run(ports, ["auth", "status", "--json"])
+  expect(offline.join("\n")).toContain('"verified": false')
+  expect(events).toHaveLength(2)
+})
+
+it("uses hidden token input and preserves a working token after failed verification", async () => {
+  const base = await makePorts()
+  const ports: LocalCliPorts = {
+    ...base,
+    prompt: (label, hidden) =>
+      Effect.sync(() => {
+        expect(label).toBe("Huly token")
+        expect(hidden).toBe(true)
+        return "hidden-token-sentinel"
+      })
+  }
+  await run(ports, ["profile", "create", "work", "--url", "https://huly.example", "--workspace", "main"])
+  await run(ports, ["auth", "import-token"])
+  const before = await fs.readFile(ports.store.paths.credentials, "utf8")
+  await expect(
+    run(
+      {
+        ...ports,
+        checkConnection: () =>
+          Effect.fail(new CliRuntimeError({ kind: "authentication", message: "Rejected.", retryable: false }))
+      },
+      ["auth", "import-token"]
+    )
+  ).rejects.toThrow("Rejected")
+  expect(await fs.readFile(ports.store.paths.credentials, "utf8")).toBe(before)
 })

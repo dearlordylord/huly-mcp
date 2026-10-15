@@ -23,7 +23,7 @@
     "prepare": "husky",
     "start": "node dist/index.cjs",
     "build": "pnpm build:mcp && pnpm build:cli",
-    "build:mcp": "PKG_VERSION=$(node -p \"require('./package.json').version\") NODE_ENGINE_REQUIREMENT=$(node -p \"require('./package.json').engines.node\") && esbuild src/launcher.ts --bundle --platform=node --format=cjs --log-level=warning --outfile=dist/index.cjs --external:ws \"--define:PKG_VERSION=\\\"$PKG_VERSION\\\"\" \"--define:NODE_ENGINE_REQUIREMENT=\\\"$NODE_ENGINE_REQUIREMENT\\\"\"",
+    "build:mcp": "PKG_VERSION=$(node -p \"require('./package.json').version\") NODE_ENGINE_REQUIREMENT=$(node -p \"require('./package.json').engines.node\") && esbuild src/launcher.ts --bundle --platform=node --format=cjs --log-level=warning --outfile=dist/index.cjs --external:ws --external:@napi-rs/keyring --external:dbus-next \"--define:PKG_VERSION=\\\"$PKG_VERSION\\\"\" \"--define:NODE_ENGINE_REQUIREMENT=\\\"$NODE_ENGINE_REQUIREMENT\\\"\"",
     "build:cli": "pnpm --filter @firfi/huly-cli build",
     "typecheck": "pnpm typecheck:tsc && pnpm typecheck:effect",
     "typecheck:tsc": "node node_modules/@typescript/native/bin/tsc -p tsconfig.json --noEmit 2>&1 | grep -v \": suggestion TS\" | { grep -E '^(src/|packages/|scripts/|test/|tsconfig\\.json)' && exit 1 || exit 0; }",
@@ -121,6 +121,8 @@
     "@hcengineering/tracker": "0.7.0",
     "@hcengineering/view": "0.7.0",
     "@hcengineering/workbench": "0.7.0",
+    "@napi-rs/keyring": "2.1.1",
+    "dbus-next": "0.10.2",
     "ws": "^8.18.0"
   },
   "lint-staged": {
