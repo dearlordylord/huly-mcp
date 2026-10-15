@@ -7,10 +7,19 @@ import {
   macosSecurityArguments,
   MacosSecurityReplySchema
 } from "../../src/profiles/macos-keychain-protocol.js"
-import { makeMacosPasswords } from "../../src/profiles/macos-passwords.js"
+import { loadMacosPasswordSdk, makeMacosPasswords } from "../../src/profiles/macos-passwords.js"
 
 const reply = (status: number) =>
   Effect.succeed(Schema.decodeUnknownSync(MacosSecurityReplySchema)({ status, output: "" }))
+
+it("cancels a native read subprocess before it can wait for authorization", async () => {
+  const sdk = await loadMacosPasswordSdk()
+  const controller = new AbortController()
+  controller.abort()
+  await expect(sdk.list("cancelled-qualification-read", controller.signal)).rejects.toMatchObject({
+    name: "AbortError"
+  })
+})
 
 it.each([0, 44])("refuses deletion status %s when the credential remains in the search list", async (status) => {
   const native = makeMacosKeychain(

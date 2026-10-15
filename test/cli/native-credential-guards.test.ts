@@ -143,6 +143,14 @@ it("cleans all retired entries while preserving metadata if deletion fails", asy
   expect(f.credentials.native?.[f.name]).toEqual(f.reference)
 })
 
+it("logs out a legacy native reference without retired-key metadata", async () => {
+  const f = await fixture()
+  f.setCredentials({ version: 1, tokens: {}, native: { [f.name]: f.reference } })
+  await Effect.runPromise(selectCredentialStore(f.store).remove(f.name))
+  expect(f.removed).toEqual(["entry"])
+  expect(f.credentials.native).toEqual({})
+})
+
 it("preserves selection when metadata publication fails or a replacement changes backend", async () => {
   const f = await fixture()
   const failing: CliProfileStore = {

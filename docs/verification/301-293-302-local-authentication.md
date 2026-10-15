@@ -300,15 +300,31 @@ Focused regressions exercise ineffective deletion acknowledgements, locked
 reads, malformed/ambiguous records, and real-file metadata preservation through
 lock/failure/unlock/success. The native macOS workflow installs the packed CLI
 and reproduces the report's default-change sequence against a disposable
-Keychain. Actual execution of this revised native fixture remains pending.
+Keychain. [Native macOS run 38823671921](https://github.com/dearlordylord/huly-mcp/actions/runs/38823671921)
+passes this exact packed-CLI fixture and native CRUD on `f5137afd`, macOS 26 arm64
+and Node 24.15.0. The locked operation returns a typed failure within the 10s
+adapter deadline; both metadata files remain byte-identical, unlock restores
+the previous credential, and subsequent logout removes its reference.
+
+The complete job then fails movement process checks: the runner lacks the
+required Bash/GNU timeout tools, and the artifact-hash fixture needs a canonical
+temporary root. These are fixture/environment repairs, not reduced custody
+checks. Earlier runs 38822817578, 38823027332, and 38823401426 passed native CRUD
+but failed the new fixture before lock because default restoration invalidated
+its search-list setup. Setting search-list membership after default restoration
+fixes that preparation error; those failed receipts are not passing evidence.
 Standards and Spec reviews found no new demonstrated issues in the revision.
 
 The host report also identified portable harness defects. CLI input fixtures
 now use the actual OS profile paths; early stdin closure retains the child's
 exit receipt without an unhandled EPIPE; permission-denied process-group probes
 remain explicitly unconfirmed cleanup. Movement custody fixtures canonicalize
-their temporary roots without relaxing production custody checks. A fresh
-complete gate and macOS gate are required for this candidate.
+their temporary roots without relaxing production custody checks. The first fresh complete gate passed 5,454 tests but failed coverage
+(functions 98.93%, branches 98.89%). The second passed 5,459 tests but failed
+branches at 98.99% (functions 99.00%). Meaningful subprocess receipt, schema
+failure, TestClock cleanup, pre-aborted read, and legacy-reference logout tests
+address uncovered native boundaries without exclusions or threshold changes.
+The next complete Linux and macOS gates remain pending.
 
 The fix prevents new reference loss. It does not reconstruct a reference that an
 earlier successful-looking logout already discarded; restore its metadata

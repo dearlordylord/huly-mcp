@@ -28,7 +28,7 @@ require(modulePath).findCredentialsAsync(service).then(
   () => { process.exitCode = 1; }
 );
 `
-const loadSdk: LoadMacosPasswordSdk = async () => {
+export const loadMacosPasswordSdk: LoadMacosPasswordSdk = async () => {
   const sdk = await import("@napi-rs/keyring")
   const load = typeof require === "function" ? require : createRequire(`${process.cwd()}/package.json`)
   return {
@@ -44,7 +44,7 @@ const loadSdk: LoadMacosPasswordSdk = async () => {
   }
 }
 
-export const makeMacosPasswords = (load: LoadMacosPasswordSdk = loadSdk): MacosPasswords => ({
+export const makeMacosPasswords = (load: LoadMacosPasswordSdk = loadMacosPasswordSdk): MacosPasswords => ({
   read: (key) =>
     Effect.gen(function* () {
       const raw = yield* Effect.tryPromise({

@@ -1,9 +1,9 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {mkdtemp,mkdir,writeFile,chmod,rm,symlink} from 'node:fs/promises'
+import {mkdtemp,mkdir,writeFile,chmod,rm,symlink,realpath} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {snapshotEvidenceArtifacts,auditEvidenceArtifacts} from './movement-artifact-hashes.mjs'
-const fixture=async check=>{const directory=await mkdtemp(`${tmpdir()}/movement-artifacts-`);await chmod(directory,0o700);try{await check(directory)}finally{await rm(directory,{recursive:true})}}
+const fixture=async check=>{const directory=await realpath(await mkdtemp(`${tmpdir()}/movement-artifacts-`));await chmod(directory,0o700);try{await check(directory)}finally{await rm(directory,{recursive:true})}}
 test('nested empty custody directory and regular file share one audited snapshot',()=>fixture(async directory=>{
  await mkdir(directory+'/custody',{mode:0o700})
  await writeFile(directory+'/report.json','report',{mode:0o600})

@@ -29,6 +29,10 @@ jobs:
           node-version: 24.15.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Install quality harness shell dependencies
+        run: |
+          brew install bash coreutils jq
+          printf '%s\n' "$(brew --prefix bash)/bin" "$(brew --prefix coreutils)/libexec/gnubin" >> "$GITHUB_PATH"
       - name: Install the packed CLI for the logout regression
         shell: bash
         run: |
