@@ -4,6 +4,10 @@ This checklist records evidence still required by #293. A passing hosted-runner
 Keychain CRUD probe establishes native adapter behavior only. It does not establish
 desktop authorization prompts, live Huly access, or a particular MCP host's access.
 
+The [2026-10-15 host report](macos-local-authentication-2026-10-15.md) records
+completed happy paths and the predecessor's locked-logout failure. Use a corrected
+candidate for remaining checks; same-version reinstall does not qualify upgrade.
+
 Use the candidate's packed CLI and MCP packages on the same macOS account and
 login session as the intended MCP host. Record the candidate commit, package
 versions, macOS version, Node executable, MCP host/version, date, and observations.
@@ -32,6 +36,11 @@ Use a disposable Huly account/profile; never record token or password values.
    outcomes: failure must be actionable and must preserve selected metadata and
    the saved token. Restore access explicitly and confirm the prior credential
    still works. Offline status must not request Keychain access.
+   Include the reported default-change regression: save into an unlocked disposable
+   Keychain, restore the original default, then explicitly retain the disposable
+   Keychain in the search list. Confirm access before locking it. Locked logout
+   must fail and keep both application files byte-identical; unlock must restore
+   access to the same credential. Lock only the disposable Keychain.
 6. Repeat after replacing/upgrading the packaged executable. Record whether macOS
    requests authorization again; the application does not promise to suppress
    system prompts. Also check a session where the selected Keychain is unavailable.

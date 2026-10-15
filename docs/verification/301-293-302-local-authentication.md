@@ -9,7 +9,15 @@ Scope: GitHub #301 (private local token management), #293 (macOS Keychain), and
 The combined objective is **incomplete**. Current runtime candidate `6bdaf85f`
 fixes the locked-Keychain logout blocker and passes fresh local `pnpm check-all`:
 5,461 tests; statements 99.47%, branches 99.00%, functions 99.03%, lines 99.57%.
-Its final macOS and Node 22/24 CI gates remain pending.
+The fixture-only successor `f95f4706` passes
+[Node 22/24 CI](https://github.com/dearlordylord/huly-mcp/actions/runs/38824941669)
+and [Package Smoke](https://github.com/dearlordylord/huly-mcp/actions/runs/38824941635).
+Its [complete native macOS gate](https://github.com/dearlordylord/huly-mcp/actions/runs/38824941679)
+also passes: real CRUD, installed packed-CLI locked/logout/unlock recovery,
+package dependency closure and all 5,461 tests. macOS 26.6.2 arm64 / Node 24.15.0
+coverage matches the Linux receipt above. The blocker is corrected; remaining
+actual-host denial/unavailable-session, upgrade and visual-prompt criteria keep
+#293 and the combined objective incomplete.
 The [macOS 27 host report](macos-local-authentication-2026-10-15.md) establishes
 packed CLI and actual Codex MCP-host happy paths, and records the predecessor's
 blocking logout failure. The corrected installed-CLI regression passes on a real
@@ -337,8 +345,9 @@ idempotent. Standards review found no behavior change or gate weakening.
 The fourth complete Linux gate passes on runtime `6bdaf85f`: 420 files / 5,461
 tests; statements 99.47%, branches 99.00%, functions 99.03%, lines 99.57%.
 All build, TypeScript/Effect diagnostics, movement process checks, architecture,
-complexity, formatting, duplication and artifact closure gates pass. The final
-macOS, Node 22/24 CI and Package Smoke results remain pending.
+complexity, formatting, duplication and artifact closure gates pass. The fixture-only `f95f4706` successor passes Node 22/24 CI
+(run 38824941669) and Package Smoke (run 38824941635). Its full macOS gate (run 38824941679)
+also passes: 420 files / 5,461 tests, with the same four coverage percentages.
 
 The fix prevents new reference loss. It does not reconstruct a reference that an
 earlier successful-looking logout already discarded; restore its metadata
@@ -357,3 +366,15 @@ constructing explicit negative symlink, permission, owner, noncanonical-path and
 overwrite cases. Both files / 13 tests pass locally; fresh Standards and Spec
 reviews report no findings. This fixture-only repair follows the successful
 runtime `6bdaf85f` Linux gate; it does not relax production custody checks.
+
+
+Final correction receipt (`f95f4706`, runtime unchanged from `6bdaf85f`):
+
+- [Native macOS and complete gate](https://github.com/dearlordylord/huly-mcp/actions/runs/38824941679): PASS on macOS 26.6.2 arm64, Node 24.15.0; exact packed-CLI default-change/lock/logout failure/unchanged files/unlock recovery/successful logout sequence, real native CRUD and all 5,461 tests.
+- [Node 22/24 CI](https://github.com/dearlordylord/huly-mcp/actions/runs/38824941669): PASS for both jobs.
+- [Package Smoke](https://github.com/dearlordylord/huly-mcp/actions/runs/38824941635): PASS.
+- Fresh Standards and Spec reviews: no findings in the runtime and final fixture deltas.
+
+The original macOS 27 report remains an unchanged predecessor receipt. This
+correction does not manufacture its outstanding actual-host observations or
+recover references already discarded by the predecessor. PR #318 remains draft.

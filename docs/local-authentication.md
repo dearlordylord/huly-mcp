@@ -71,6 +71,11 @@ prompts and may display one after an update or when the executable identity
 changes. Explicit native-storage selection authorizes Keychain access; the
 application does not promise suppression of OS prompts. Denied or unavailable
 access fails without plaintext fallback or an application-owned unlock prompt.
+Lookup and deletion use the current Keychain search list. Keep the credential's
+Keychain in that list when changing the default. Locked logout retains its lookup
+reference and reports an error; unlock the same Keychain to restore access or
+retry logout. A reference discarded by an older version requires its metadata
+backup or explicit authentication again.
 
 On Linux, CLI and the MCP host must share access to the same user's desktop
 session D-Bus and unlocked Secret Service collection (for example GNOME Keyring).
