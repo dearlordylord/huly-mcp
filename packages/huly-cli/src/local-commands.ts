@@ -6,6 +6,7 @@ import {
   CliProfilePatchSchema,
   createProfile,
   getAuthStatus,
+  getProfileSummaries,
   logoutProfile,
   saveLogin,
   selectProfile,
@@ -14,14 +15,23 @@ import {
 } from "./profile-operations.js"
 import {
   type CliProfile,
-  type CredentialStorage,
   CliProfileSchema,
   CliProfileStoreError,
   parseProfileName,
   type ProfileName,
   resolveCliConfiguration
 } from "./profile-store.js"
-import { TokenImportSchema, importLocalToken } from "../../../src/profiles/token-management.js"
+import {
+  nativeBackendForPlatform,
+  selectProfileStorage,
+  StoragePreferenceSchema
+} from "../../../src/profiles/credential-storage-policy.js"
+import {
+  ConnectionCheckResultSchema,
+  type ConnectionCheckResult,
+  TokenImportSchema,
+  importLocalToken
+} from "../../../src/profiles/token-management.js"
 import { CliRuntimeError } from "./render.js"
 
 export { LocalCliService, type LocalCliPorts } from "./local-cli-ports.js"
@@ -56,7 +66,7 @@ const valueOrPrompt = (
   value: string | undefined,
   ports: LocalCliPorts,
   label: string
-): Effect.Effect<string, CliRuntimeError> => (value === undefined ? ports.prompt(label, false) : Effect.succeed(value))
+): Effect.Effect<string, CliRuntimeError> => (value === undefined ? ports.prompt(label) : Effect.succeed(value))
 
 const profileForLogin = (
   ports: LocalCliPorts,
@@ -111,8 +121,8 @@ const defaultProjectFlag = optionalTextFlag("default-project", "project")
 const clearDefaultProjectFlag = optionalBooleanFlag("clear-default-project")
 
 const storageFlag = {
-  param: Flag.Literals("storage", ["file", "os"]).pipe(Flag.optional),
-  syntax: "[--storage file|os]"
+  param: Flag.Literals("storage", StoragePreferenceSchema.literals).pipe(Flag.optional),
+  syntax: `[--storage ${StoragePreferenceSchema.literals.join("|")}]`
 }
 
 const localCommandConfigs = {
@@ -187,46 +197,19 @@ const profilePatch = (
     )
   )
 
-const nativeStorageFor = (platform: NodeJS.Platform): Effect.Effect<CredentialStorage, CliRuntimeError> => {
-  if (platform === "darwin") return Effect.succeed("macos-keychain")
-  if (platform === "linux") return Effect.succeed("linux-secret-service")
-  return Effect.fail(
-    new CliRuntimeError({
-      kind: "input",
-      message:
-        "OS credential storage is supported on macOS and Linux. Use file storage or environment injection on this platform.",
-      retryable: false
-    })
-  )
-}
-
-const profileWithStorage = Effect.fn("Cli.profileWithStorage")(function* (
-  ports: LocalCliPorts,
-  name: ProfileName,
-  profile: CliProfile,
-  requested: "file" | "os" | undefined
-) {
-  if (requested === undefined) return profile
-  const backend = requested === "file" ? "file" : yield* nativeStorageFor(ports.platform)
-  const credentials = yield* ports.store.readCredentials().pipe(Effect.mapError(storeError))
-  const saved = credentials.tokens[name] !== undefined || credentials.native?.[name] !== undefined
-  if (saved && backend !== (profile.credentialStorage ?? "file"))
-    return yield* new CliRuntimeError({
-      kind: "input",
-      message:
-        "Replacement retains the selected credential backend. Use a new profile for a different backend; no credential migration is performed.",
-      retryable: false
-    })
-  return { ...profile, credentialStorage: backend }
-})
-
 const authLogin = Command.make("login", localCommandConfigs.authLogin, ({ json, profile, storage }) =>
   Effect.gen(function* () {
     const ports = yield* LocalCliService
     const target = yield* profileForLogin(ports, optionValue(profile))
-    const destination = yield* profileWithStorage(ports, target.name, target.profile, optionValue(storage))
-    const email = yield* ports.prompt("Huly email", false)
-    const password = yield* ports.prompt("Huly password", true)
+    const destination = yield* selectProfileStorage(
+      ports.store,
+      target.name,
+      target.profile,
+      optionValue(storage),
+      nativeBackendForPlatform(ports.platform)
+    ).pipe(Effect.mapError(storeError))
+    const email = yield* ports.prompt("Huly email")
+    const password = yield* ports.promptSecret("Huly password")
     const request = yield* Schema.decodeUnknownEffect(LoginRequestSchema)({ ...target.profile, email, password }).pipe(
       Effect.mapError(
         () => new CliRuntimeError({ kind: "input", message: "Email or password is empty.", retryable: false })
@@ -277,8 +260,14 @@ const authImport = Command.make("import-token", localCommandConfigs.authImport, 
         message: "Selected Huly profile does not exist.",
         retryable: false
       })
-    const destination = yield* profileWithStorage(ports, name, target, optionValue(storage))
-    const token = stdin ? yield* ports.readTokenStdin() : yield* ports.prompt("Huly token", true)
+    const destination = yield* selectProfileStorage(
+      ports.store,
+      name,
+      target,
+      optionValue(storage),
+      nativeBackendForPlatform(ports.platform)
+    ).pipe(Effect.mapError(storeError))
+    const token = stdin ? yield* ports.readTokenStdin() : yield* ports.promptSecret("Huly token")
     const request = yield* Schema.decodeUnknownEffect(TokenImportSchema)({ name, destination: target, token }).pipe(
       Effect.mapError(
         () =>
@@ -311,10 +300,11 @@ const authCheck = Command.make("check", localCommandConfigs.authCheck, ({ json, 
       Effect.mapError(storeError)
     )
     yield* ports.checkConnection(configuration)
-    yield* print(
-      { verified: true, ...(configuration.profile === undefined ? {} : { profile: configuration.profile }) },
-      json
-    )
+    const result: ConnectionCheckResult = {
+      verified: true,
+      ...(configuration.profile === undefined ? {} : { profile: configuration.profile })
+    }
+    yield* print(Schema.encodeSync(ConnectionCheckResultSchema)(result), json)
   })
 ).pipe(
   Command.withDescription("Explicitly check Huly connectivity with a bounded live read. Does not save credentials.")
@@ -349,16 +339,7 @@ const profileCreate = Command.make(
 const profileList = Command.make("list", localCommandConfigs.profileList, ({ json }) =>
   Effect.gen(function* () {
     const ports = yield* LocalCliService
-    const profiles = yield* ports.store.readProfiles().pipe(Effect.mapError(storeError))
-    const credentials = yield* ports.store.readCredentials().pipe(Effect.mapError(storeError))
-    const rows = Object.entries(profiles.profiles).map(([name, profile]) => ({
-      name,
-      active: name === profiles.activeProfile,
-      configured: Object.hasOwn(credentials.tokens, name) || Object.hasOwn(credentials.native ?? {}, name),
-      verified: false,
-      authenticated: Object.hasOwn(credentials.tokens, name) || Object.hasOwn(credentials.native ?? {}, name),
-      ...profile
-    }))
+    const rows = yield* getProfileSummaries(ports.store).pipe(Effect.mapError(storeError))
     yield* print(rows.length === 0 && !json ? "No Huly CLI profiles." : rows, json)
   })
 ).pipe(Command.withDescription("List named profiles without exposing credentials."))

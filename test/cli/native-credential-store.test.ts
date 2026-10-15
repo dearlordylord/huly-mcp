@@ -15,12 +15,44 @@ import {
 import type { NativeCredentialPort } from "../../src/profiles/native-credential-port.js"
 import { resolveCliConfiguration } from "../../src/profiles/resolve.js"
 
+it("reports complete environment configuration without reading saved credentials or native storage", async () => {
+  const name = await Effect.runPromise(parseProfileName("work"))
+  const store: CliProfileStore = {
+    paths: {
+      directory: "/environment-status",
+      profiles: "/environment-status/profiles",
+      credentials: "/environment-status/credentials"
+    },
+    readProfiles: () =>
+      Effect.succeed({
+        version: 1,
+        activeProfile: name,
+        profiles: {
+          [name]: { url: "https://saved.example", workspace: "saved", credentialStorage: "linux-secret-service" }
+        }
+      }),
+    readCredentials: () => Effect.die("Complete environment status must not read saved credentials"),
+    writeProfiles: () => Effect.die("Status must not write"),
+    writeCredentials: () => Effect.die("Status must not write")
+  }
+  expect(
+    await Effect.runPromise(
+      getAuthStatus(store, {
+        HULY_URL: "https://environment.example",
+        HULY_WORKSPACE: "environment",
+        HULY_TOKEN: "environment-sentinel"
+      })
+    )
+  ).toMatchObject({ configured: true, verified: false, sources: { authentication: "environment" } })
+})
+
 it("shares native credentials across entrypoints, keeps secrets out of serialized metadata, and inspects status without reading native storage", async () => {
   let profiles: CliProfilesFile = { version: 1, profiles: {} }
   let credentials: CliCredentialsFile = { version: 1, tokens: {} }
   const values = new Map<string, Redacted.Redacted<string>>()
   let reads = 0
   let denied = false
+  let sequence = 0
   const native: NativeCredentialPort = {
     backend: "linux-secret-service",
     read: (key) =>
@@ -29,11 +61,20 @@ it("shares native credentials across entrypoints, keeps secrets out of serialize
         return values.get(key)
       }),
     save: (key, value) =>
-      denied
-        ? Effect.fail(new CliProfileStoreError({ kind: "integration", message: "Native store denied replacement." }))
-        : Effect.sync(() => {
-            values.set(key, value)
-          }),
+      Effect.sync(() => {
+        values.set(key, value)
+      }).pipe(
+        Effect.andThen(
+          denied
+            ? Effect.fail(
+                new CliProfileStoreError({
+                  kind: "integration",
+                  message: "Native store denied replacement after an ambiguous write."
+                })
+              )
+            : Effect.void
+        )
+      ),
     remove: (key) =>
       Effect.sync(() => {
         values.delete(key)
@@ -41,6 +82,7 @@ it("shares native credentials across entrypoints, keeps secrets out of serialize
   }
   const store: CliProfileStore = {
     nativeCredentials: native,
+    newCredentialId: () => Effect.sync(() => `credential-${++sequence}`),
     paths: {
       directory: "/native-test",
       credentials: "/native-test/credentials.json",
@@ -78,6 +120,7 @@ it("shares native credentials across entrypoints, keeps secrets out of serialize
     ).rejects.toThrow("denied replacement")
     const preserved = await Effect.runPromise(selectCredentialStore(reader).read(name, profile))
     expect(preserved === undefined ? undefined : Redacted.value(preserved)).toBe("native-original-sentinel")
+    expect(values.size).toBe(1)
     const serialized =
       JSON.stringify(Schema.encodeSync(CliCredentialsFileSchema)(credentials)) +
       JSON.stringify(Schema.encodeSync(CliProfilesFileSchema)(profiles))

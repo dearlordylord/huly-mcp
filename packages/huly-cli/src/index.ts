@@ -65,6 +65,13 @@ const moveGlobalOptionsToLeaf = (argv: ReadonlyArray<string>): ReadonlyArray<str
 const makeCli = (argv: ReadonlyArray<string>) =>
   Command.runWith(buildRootCommand(argv), { version: cliVersion, renderErrors: false })(moveGlobalOptionsToLeaf(argv))
 
+const isPrivateAuthInvocation = (argv: ReadonlyArray<string>): boolean => {
+  const normalized = moveGlobalOptionsToLeaf(argv)
+  return normalized.some(
+    (part, index) => part === "auth" && ["login", "import-token"].includes(normalized[index + 1] ?? "")
+  )
+}
+
 export const runEffectCli = (argv: ReadonlyArray<string>) =>
   Console.consoleWith((currentConsole) => {
     const bufferedLogs: Array<ReadonlyArray<unknown>> = []
@@ -81,6 +88,13 @@ export const runEffectCli = (argv: ReadonlyArray<string>) =>
     Effect.catch((error) => {
       if (!CliError.isCliError(error)) return Effect.fail(error)
       if (error._tag === "ShowHelp" && error.errors.length === 0) return Effect.void
+      if (isPrivateAuthInvocation(argv))
+        return Effect.fail(
+          new CliInputError({
+            message:
+              "Invalid private authentication arguments. Use hidden terminal prompts or auth import-token --stdin; token and password argument values are unsupported."
+          })
+        )
       const message =
         error._tag === "ShowHelp" ? error.errors.map((nested) => nested.message).join("; ") : error.message
       const parityMessage =

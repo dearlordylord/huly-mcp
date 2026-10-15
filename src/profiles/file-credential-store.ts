@@ -1,6 +1,7 @@
 import { Effect } from "effect"
 import { CliProfileStoreError } from "./model.js"
 import type { CredentialStoreSelector } from "./credential-store.js"
+import { matchesCredentialDestination } from "./credential-destination.js"
 
 export const selectFileCredentialStore: CredentialStoreSelector = (store) => ({
   read: (name, destination) =>
@@ -9,7 +10,7 @@ export const selectFileCredentialStore: CredentialStoreSelector = (store) => ({
       const token = credentials.tokens[name]
       if (token === undefined) return undefined
       const binding = credentials.destinations?.[name]
-      if (binding === undefined || binding.url !== destination.url || binding.workspace !== destination.workspace) {
+      if (binding === undefined || !matchesCredentialDestination(binding, destination)) {
         return yield* new CliProfileStoreError({
           kind: "input",
           message:

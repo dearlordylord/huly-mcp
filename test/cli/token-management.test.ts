@@ -11,7 +11,7 @@ it("retains the saved credential when the live token check fails", async () => {
   const request = Schema.decodeUnknownSync(TokenImportSchema)({
     name: "work",
     destination: { url: "https://huly.example", workspace: "work" },
-    token: "replacement-sentinel"
+    token: Redacted.make("replacement-sentinel")
   })
   const result = await Effect.runPromise(
     importLocalToken(request, {
@@ -32,7 +32,7 @@ it("saves a replacement only after the live read succeeds", async () => {
   const request = Schema.decodeUnknownSync(TokenImportSchema)({
     name: "work",
     destination: { url: "https://huly.example", workspace: "work" },
-    token: "replacement-sentinel"
+    token: Redacted.make("replacement-sentinel")
   })
   await Effect.runPromise(
     importLocalToken(request, {
@@ -59,7 +59,7 @@ effectIt.effect("bounds an unresponsive token verification without saving", () =
     const request = Schema.decodeUnknownSync(TokenImportSchema)({
       name: "work",
       destination: { url: "https://huly.example", workspace: "work" },
-      token: "timeout-sentinel"
+      token: Redacted.make("timeout-sentinel")
     })
     const fiber = yield* importLocalToken(request, {
       read: () => Deferred.succeed(entered, undefined).pipe(Effect.andThen(Effect.never)),

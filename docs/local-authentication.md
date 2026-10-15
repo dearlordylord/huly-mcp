@@ -80,6 +80,8 @@ storage, and requested interaction return an actionable error within a bounded
 operation. Container and headless runners should explicitly inject complete
 environment credentials when native storage is unavailable.
 
+Native replacement writes a separate OS entry before selecting it, so a failed or timed-out write leaves the previous selected credential intact. Metadata contains nonsecret lookup IDs rather than decryption keys. After selection succeeds, cleanup of the previous entry is attempted; retained lookup IDs let logout retry deletion if cleanup was unavailable.
+
 Native mode writes no token or decryption key beside profile metadata. Windows
 continues to support file credentials and environment injection. File-backed and
 environment-only operations do not access Keychain or Secret Service.

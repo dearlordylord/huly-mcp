@@ -5,9 +5,15 @@ import { CredentialDestinationSchema, CliProfileStoreError, ProfileNameSchema } 
 export const TokenImportSchema = Schema.Struct({
   name: ProfileNameSchema,
   destination: CredentialDestinationSchema,
-  token: Schema.RedactedFromValue(Schema.Trimmed.pipe(Schema.check(Schema.isNonEmpty(), Schema.isPattern(/^\S+$/u))))
+  token: Schema.Redacted(Schema.Trimmed.pipe(Schema.check(Schema.isNonEmpty(), Schema.isPattern(/^\S+$/u))))
 })
 export type TokenImport = Schema.Schema.Type<typeof TokenImportSchema>
+
+export const ConnectionCheckResultSchema = Schema.Struct({
+  verified: Schema.Literal(true),
+  profile: Schema.optionalKey(ProfileNameSchema)
+})
+export type ConnectionCheckResult = Schema.Schema.Type<typeof ConnectionCheckResultSchema>
 
 // Internal live-read port. Requests have already been parsed by TokenImportSchema.
 export interface TokenVerification {

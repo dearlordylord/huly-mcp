@@ -1,5 +1,5 @@
 import { NodeServices } from "@effect/platform-node"
-import { Effect, Layer, Logger, References, Schema } from "effect"
+import { Effect, Layer, Logger, References, Redacted, Schema } from "effect"
 import { describe, expect, it } from "vitest"
 import type { ClientBundle } from "../../src/mcp/server.js"
 
@@ -21,9 +21,10 @@ import { TelemetryService } from "../../src/telemetry/telemetry.js"
 const emptyBundle = {} as ClientBundle
 
 const localCliTestLayer = Layer.succeed(LocalCliService, {
+  promptSecret: () => Effect.die("secret prompt is not used by runner tests"),
   platform: "linux",
   checkConnection: () => Effect.void,
-  readTokenStdin: () => Effect.succeed("stdin-token"),
+  readTokenStdin: () => Effect.succeed(Redacted.make("stdin-token")),
   authenticate: () => Effect.die("authenticate is not used by runner tests"),
   environment: {},
   prompt: () => Effect.die("prompt is not used by runner tests"),

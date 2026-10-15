@@ -139,6 +139,8 @@ const writeFile = <A, I>(
 
 export interface CliProfileStore {
   readonly nativeCredentials?: NativeCredentialPort
+  // Internal entropy port. Native references store only the resulting nonsecret lookup ID.
+  readonly newCredentialId?: () => Effect.Effect<string>
   readonly paths: CliProfilePaths
   readonly readCredentials: () => Effect.Effect<CliCredentialsFile, CliProfileStoreError>
   readonly readProfiles: () => Effect.Effect<CliProfilesFile, CliProfileStoreError>

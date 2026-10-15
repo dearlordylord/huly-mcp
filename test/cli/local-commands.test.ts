@@ -20,9 +20,10 @@ const makePorts = async (): Promise<LocalCliPorts> => {
   const directory = await fs.mkdtemp(path.join(process.cwd(), ".local-cli-test-"))
   temporaryDirectories.push(directory)
   return {
+    promptSecret: () => Effect.succeed(Redacted.make("never-store-this")),
     platform: "linux",
     checkConnection: () => Effect.void,
-    readTokenStdin: () => Effect.succeed("stdin-token"),
+    readTokenStdin: () => Effect.succeed(Redacted.make("stdin-token")),
     authenticate: (request) => {
       expect(request.email).toBe("agent@example.com")
       expect(Redacted.value(request.password)).toBe("never-store-this")
@@ -79,6 +80,7 @@ describe("Effect CLI local commands", () => {
       {
         name: "work",
         active: true,
+        credentialStorage: "file",
         configured: false,
         verified: false,
         authenticated: false,
@@ -271,7 +273,7 @@ it("imports a token through explicit stdin, verifies before saving, and checks w
   const ports: LocalCliPorts = {
     ...base,
     prompt: () => Effect.die("explicit stdin must not prompt"),
-    readTokenStdin: () => Effect.succeed("private-import-sentinel"),
+    readTokenStdin: () => Effect.succeed(Redacted.make("private-import-sentinel")),
     checkConnection: (configuration) =>
       Effect.sync(() => {
         expect(configuration.auth.method).toBe("token")
@@ -295,11 +297,10 @@ it("uses hidden token input and preserves a working token after failed verificat
   const base = await makePorts()
   const ports: LocalCliPorts = {
     ...base,
-    prompt: (label, hidden) =>
+    promptSecret: (label) =>
       Effect.sync(() => {
         expect(label).toBe("Huly token")
-        expect(hidden).toBe(true)
-        return "hidden-token-sentinel"
+        return Redacted.make("hidden-token-sentinel")
       })
   }
   await run(ports, ["profile", "create", "work", "--url", "https://huly.example", "--workspace", "main"])

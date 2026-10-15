@@ -78,8 +78,9 @@ files pass: two files / twelve tests. No timeout or quality threshold was raised
 The expanded Linux native command fixture rejected locked CLI reads/import/
 logout and locked stdio, but its restoration step initially started a second
 daemon instead of unlocking the existing one. A disposable-fixture-only daemon
-replacement/unlock now restores the same persisted collection; a fresh focused
-live run is in progress. This is a fixture repair, not a native adapter fallback.
+replacement/unlock now restores the same persisted collection. The repaired
+packaged live run passed (`/tmp/hulymcp-local-auth-native-final-repair.log`),
+including locked CLI/stdio and missing-session failures. This is a fixture repair, not a native adapter fallback.
 
 Required remaining evidence at this checkpoint:
 
@@ -93,3 +94,64 @@ Required remaining evidence at this checkpoint:
   Linux evidence do not satisfy #293's native-platform criteria.
 
 The three issues and the overall goal are not claimed complete.
+
+
+## Review and successor candidate
+
+The first implementation was committed as `2a6acb83`; normal hooks passed
+TypeScript/Effect diagnostics and gitleaks. Standards and Spec reviews compared
+that commit with `1e74e625`.
+
+### Standards
+
+The review reported four hard issues: raw token strings leaving input adapters,
+non-schema-owned generic outbound D-Bus calls, file values permitted in native
+backend metadata, and replacement policy embedded in CLI handlers. It also noted
+repeated platform mapping. The successor redacts input at the adapter, uses a
+closed schema-owned Secret Service operation set with colocated encodings,
+restricts native backend values, and shares storage policy/platform mapping in
+application modules. The D-Bus module is loaded only on native access. Typed
+transport injection permits prompt-return and timeout/cleanup tests without
+module mocks.
+
+### Spec
+
+The review reported missing macOS qualification, missing final full-gate/broad
+live evidence, and an unsupported 64-KiB stdin-limit claim. The size limit is now
+implemented with a bounded typed stream adapter and covered through actual CLI
+processes. Process tests also prove that positional token mistakes, token flags,
+and JSON parse failures do not echo token values. Terminal reads close on
+cancellation. Required platform and broad qualification remain explicit below.
+
+Additional successor safety work uses immutable native entries with atomic
+selection publication. An injected native port can change a staged OS entry and
+then return failure; the prior selected credential remains usable. Nonsecret
+retired lookup IDs permit idempotent cleanup retry on logout. File/environment
+operations do not access native facilities; complete environment status also
+avoids reading unrelated saved credentials.
+
+Focused successor checks pass for private input, protocol requests, prompt
+refusal, injected-clock timeout/cleanup, backend policy, native publication,
+profile status, and existing profile behavior. Representative focused run:
+eight files / 59 tests (`/tmp/hulymcp-local-auth-review-ready-tests.log`), followed
+by three files / 17 tests after schema-owned profile-summary output was added
+(`/tmp/hulymcp-local-auth-status-schema-tests.log`). The broad MCP integration
+process continues against the preserved first-candidate bundle; it is not yet a
+complete passing receipt. A fresh full gate, final native workflow after the
+lookup-ID publication change, and delta reviews remain required. macOS has no
+execution receipt.
+
+Successor delta reviews found no remaining hard Standards violations. The
+Standards reviewer noted that retained retired lookup IDs grow with replacements;
+they remain deliberately conservative cleanup receipts, including already-deleted
+IDs, so cleanup can be retried without a second metadata publication that could
+misreport a committed replacement. This is a retained-state tradeoff, not a
+credential-material sidecar. The Spec reviewer found one checklist mistake:
+stdio selection requires `HULY_PROFILE`, not a CLI flag; the checklist is corrected.
+
+Latest successor checks: TypeScript/Effect diagnostics pass (1,211 files, zero
+warnings/errors), lint passes (0.93% duplication), seven focused files / 26 tests
+pass, and three private-input/process files / 22 tests pass. GitHub Actions is
+enabled; `.github/workflows/native-macos.yml` prepares an isolated real Keychain
+CRUD job. It has not executed and does not certify desktop prompts or live Huly.
+The host checklist is [macOS qualification](macos-local-authentication.md).
