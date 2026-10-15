@@ -1,0 +1,38 @@
+PASS packaged CLI login through hidden password prompt; password absent from output
+PASS offline status configured=true verified=false
+PASS native auth check verified=true
+PASS hidden token replacement; verified access retained; token absent from output
+PASS invalid token rejected; metadata unchanged; previous credential still verified
+PASS application JSON files contain neither test token nor password; native profile has no file token
+PASS packaged CLI project read; count=8
+PASS replacement entry located in disposable test keychain; original default restored
+Disposable keychain locked; testing offline status and access refusal
+PASS offline status while disposable keychain locked
+Disposable keychain removed; original search list/default restored
+PASS replacement entry located in disposable test keychain; original default restored
+Disposable keychain locked; testing offline status and access refusal
+PASS offline status while disposable keychain locked
+Locked command sanitized outcome: {"code":"INVALID_INPUT","message":"Selected Huly profile has no usable credentials. Run huly auth login for this profile or supply complete environment credentials.","retryable":false,"hint":"Run the command with --help and correct the supplied arguments."}
+FAIL locked read lacks Keychain-specific guidance
+PASS locked projects list actionable error; metadata preserved
+Disposable keychain removed; original search list/default restored
+PASS actual running Codex app-server 0.163.0 list_projects matches packed CLI: 8 projects
+PASS complete environment-backed project read
+PASS explicit file-backed login and verified live read
+PASS file test credential removed
+PASS replacement entry located in disposable test keychain; original default restored
+Disposable keychain locked; testing offline status and access refusal
+PASS offline status while disposable keychain locked
+Locked command exit code: 2
+Locked command sanitized outcome: {"code":"INVALID_INPUT","message":"Selected Huly profile has no usable credentials. Run huly auth login for this profile or supply complete environment credentials.","retryable":false,"hint":"Run the command with --help and correct the supplied arguments."}
+FAIL locked read lacks Keychain-specific guidance
+Locked metadata preserved: True
+Locked command exit code: 0
+Locked command sanitized outcome: "Logged out of Huly profile 'macos-qualification'."
+FAIL locked read lacks Keychain-specific guidance
+Locked metadata preserved: False
+Original credential still in keychain after unlock: True
+Restored access auth check exit code: 2
+Disposable keychain removed; original search list/default restored
+PASS normal logout removes native entry and retains profile metadata/selection
+PASS fresh CLI read after logout requires credentials without terminal prompt

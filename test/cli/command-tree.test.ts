@@ -37,6 +37,22 @@ const renderedHelp = (argv: ReadonlyArray<string>, terminalColumns: unknown = 80
   Option.getOrThrow(Option.flatMap(parsedHelpRequest(argv, terminalColumns), renderCliHelp))
 
 describe("CLI command tree", () => {
+  it("accepts private-auth help without obtaining credentials", async () => {
+    await expect(runCommand(["auth", "import-token", "--help"])).resolves.toBeUndefined()
+  })
+  it("never echoes private authentication values on argument parse failure", async () => {
+    for (const argv of [
+      ["auth", "login", "--token", "private-argv-sentinel"],
+      ["--json", "auth", "import-token", "private-argv-sentinel"],
+      ["--profile=work", "auth", "import-token", "private-argv-sentinel"],
+      ["auth", "import-token", "--json=false", "private-argv-sentinel"]
+    ]) {
+      const error = await rejected(runCommand(argv))
+      expect(errorMessage(error)).toContain("Invalid private authentication arguments")
+      expect(errorMessage(error)).not.toContain("private-argv-sentinel")
+    }
+  })
+
   it("renders progressive root help within the requested terminal width", () => {
     const help = renderedHelp(["--help"], 40)
     const booleanHelp = renderedHelp(["--help"], 120)

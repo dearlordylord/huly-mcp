@@ -20,7 +20,9 @@ Use `huly profile create|list|select|update` for named URL, workspace, and defau
 
 Key local command surfaces:
 
-`huly auth login [--profile <name>] [--json]`
+`huly auth import-token [--storage file|os] [--profile <name>] [--stdin] [--json]`
+`huly auth check [--profile <name>] [--json]`
+`huly auth login [--storage file|os] [--profile <name>] [--json]`
 `huly auth status [--profile <name>] [--json]`
 `huly auth logout [--profile <name>] [--json]`
 `huly profile create <name> --url <url> --workspace <workspace> [--default-project <project>] [--json]`

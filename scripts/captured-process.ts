@@ -1,12 +1,13 @@
 import { spawn } from "node:child_process"
 
-import { Schema } from "effect"
+import { Result, Schema } from "effect"
 
 import { type CapturedProcessResult, CapturedProcessResultSchema } from "./captured-process-schema.js"
 
 const PROCESS_TIMEOUT_MILLISECONDS = 15_000
 const PROCESS_TERMINATION_GRACE_MILLISECONDS = 1_000
 const PROCESS_EXIT_SIGNALLED = -1
+const ClosedInputSchema = Schema.Struct({ code: Schema.Literal("EPIPE") })
 
 export const runCapturedProcess = (
   executable: string,
@@ -28,10 +29,17 @@ export const runCapturedProcess = (
     }, timeoutMilliseconds)
     child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk))
     child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk))
-    child.on("error", (error) => {
+    const rejectProcess = (error: unknown) => {
       clearTimeout(timeout)
       if (forceKillTimeout !== undefined) clearTimeout(forceKillTimeout)
+      child.kill()
       reject(error)
+    }
+    child.on("error", rejectProcess)
+    child.stdin.on("error", (error) => {
+      // An early input refusal still has a meaningful child exit/output receipt.
+      if (Result.isSuccess(Schema.decodeUnknownResult(ClosedInputSchema)(error))) return
+      rejectProcess(error)
     })
     child.on("close", (exitCode) => {
       clearTimeout(timeout)

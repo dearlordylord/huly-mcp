@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
-import { mkdtempSync, readFileSync, statSync, chmodSync, rmSync } from "node:fs"
+import { mkdtempSync, realpathSync, readFileSync, statSync, chmodSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { test } from "node:test"
@@ -13,7 +13,7 @@ const run = (directory, value) => spawnSync(process.execPath,
   ["scripts/run-bundled.mjs", "scripts/integration-issue-tree-ledger.ts", JSON.stringify({ directory, snapshot: value })],
   { encoding: "utf8", timeout: 15000, killSignal: "SIGKILL" })
 const fixture = (check) => {
-  const directory = mkdtempSync(join(tmpdir(), "tree-ledger-"))
+  const directory = realpathSync(mkdtempSync(join(tmpdir(), "tree-ledger-")))
   chmodSync(directory, 0o700)
   try { check(directory) } finally { rmSync(directory, { recursive: true, force: true }) }
 }

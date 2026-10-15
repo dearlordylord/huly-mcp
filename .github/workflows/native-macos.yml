@@ -1,0 +1,69 @@
+name: Native macOS credentials
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - src/profiles/**
+      - packages/huly-cli/**
+      - scripts/native-credentials-probe.ts
+      - scripts/macos-logout-probe.ts
+      - pnpm-lock.yaml
+      - .github/workflows/native-macos.yml
+
+permissions:
+  contents: read
+
+jobs:
+  native-keychain:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.15.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install quality harness shell dependencies
+        run: |
+          brew install bash coreutils jq
+          printf '%s\n' "$(brew --prefix bash)/bin" "$(brew --prefix coreutils)/libexec/gnubin" >> "$GITHUB_PATH"
+      - name: Install the packed CLI for the logout regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          source scripts/packed-cli-test-helpers.sh
+          prepare_packed_cli "$RUNNER_TEMP/huly-logout-package"
+          printf 'HULY_TEST_PACKED_CLI=%s\n' "$HULY_PREPARED_CLI" >> "$GITHUB_ENV"
+      - name: Verify real Keychain CRUD in an isolated runner keychain
+        shell: bash
+        run: |
+          set -euo pipefail
+          previous_keychain=$(security default-keychain -d user | xargs)
+          qualification_keychain="$RUNNER_TEMP/huly-qualification.keychain-db"
+          qualification_password=$(openssl rand -hex 24)
+          cleanup() {
+            security default-keychain -d user -s "$previous_keychain"
+            security delete-keychain "$qualification_keychain"
+          }
+          security create-keychain -p "$qualification_password" "$qualification_keychain"
+          trap cleanup EXIT
+          security unlock-keychain -p "$qualification_password" "$qualification_keychain"
+          security default-keychain -d user -s "$qualification_keychain"
+          pnpm exec tsx scripts/native-credentials-probe.ts
+          export HULY_TEST_KEYCHAIN_PATH="$qualification_keychain"
+          export HULY_TEST_ORIGINAL_KEYCHAIN="$previous_keychain"
+          export HULY_TEST_KEYCHAIN_PASSWORD="$qualification_password"
+          pnpm exec tsx scripts/macos-logout-probe.ts "$HULY_TEST_PACKED_CLI"
+      - name: Build and verify packaged CLI dependency closure
+        run: |
+          pnpm build:cli
+          pnpm verify-cli-package-closure
+      - name: Run the complete quality gate on macOS
+        run: pnpm check-all
+

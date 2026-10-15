@@ -15,14 +15,14 @@ const cliPackageJson = Schema.decodeUnknownSync(Schema.fromJsonString(CliPackage
   readFileSync("packages/huly-cli/package.json", "utf8")
 )
 const bundle = readFileSync("packages/huly-cli/dist/index.cjs", "utf8")
-const requirePattern = /require\("([^".][^"]*)"\)/g
+const requirePattern = /(?:require|import)\("([^".][^"]*)"\)/g
 const requiredModules = new Set(
   Array.from(bundle.matchAll(requirePattern), (match) => match[1]).filter((name): name is string => name !== undefined)
 )
 const builtins = new Set([...builtinModules, ...builtinModules.map((name) => `node:${name}`)])
 const externalModules = [...requiredModules].filter((name) => !name.startsWith("node:") && !builtins.has(name)).sort()
 const undeclared = externalModules.filter((name) => cliPackageJson.dependencies[name] === undefined)
-const EXPECTED_EXTERNAL_MODULES: ReadonlyArray<string> = ["ws"]
+const EXPECTED_EXTERNAL_MODULES: ReadonlyArray<string> = ["@napi-rs/keyring", "dbus-next", "ws"]
 const EXPECTED_PACKAGE_FILE_COUNT = 2
 
 const errors = [
@@ -44,7 +44,7 @@ if (errors.length > 0) {
 } else {
   Effect.runSync(
     Console.log(
-      `CLI package closure verified: bundled shared registry plus exactly one declared external runtime dependency (${EXPECTED_EXTERNAL_MODULES[0]}).`
+      `CLI package closure verified: bundled shared registry plus the exact declared external runtime dependencies (${EXPECTED_EXTERNAL_MODULES.join(", ")}).`
     )
   )
 }

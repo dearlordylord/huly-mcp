@@ -1,4 +1,4 @@
-import { chmod, lstat, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
+import { chmod, lstat, mkdtemp, readdir, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Effect, Schema } from "effect"
@@ -16,7 +16,7 @@ const permissionMask = 0o777
 
 for (const mode of ["owned", "public", "symlink", "wrong-owner"]) {
   test(`private movement report directory ${mode}`, async () => {
-    const directory = await mkdtemp(join(tmpdir(), "movement-report-"))
+    const directory = await realpath(await mkdtemp(join(tmpdir(), "movement-report-")))
     const link = `${directory}-link`
     try {
       await chmod(directory, mode === "public" ? publicDirectoryMode : privateDirectoryMode)
@@ -75,7 +75,7 @@ test("configuration codecs refuse relative report paths and invalid process iden
 
 for (const kind of ["missing", "broken-link", "noncanonical", "file"]) {
   test(`report configuration refuses ${kind} before observing an operation`, async () => {
-    const directory = await mkdtemp(join(tmpdir(), "movement-report-invalid-"))
+    const directory = await realpath(await mkdtemp(join(tmpdir(), "movement-report-invalid-")))
     const entry = join(directory, "entry")
     try {
       await chmod(directory, privateDirectoryMode)

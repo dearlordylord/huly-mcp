@@ -25,12 +25,20 @@ const JsonRpcResponseSchema = Schema.Struct({
 type JsonRpcResponse = Schema.Schema.Type<typeof JsonRpcResponseSchema>
 type JsonRpcMessage = Parameters<Transport["send"]>[0]
 const parseJsonRpcResponse = Schema.decodeUnknownSync(Schema.fromJsonString(JsonRpcResponseSchema))
+const JsonRpcNotificationSchema = Schema.Struct({
+  jsonrpc: Schema.Literal("2.0"),
+  method: Schema.String,
+  params: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown))
+})
+const parseIncomingMessage = Schema.decodeUnknownSync(Schema.Union([JsonRpcResponseSchema, JsonRpcNotificationSchema]))
 
 const sendAndReceive = (transport: Transport, message: JsonRpcMessage): Promise<JsonRpcResponse> =>
   new Promise((resolve, reject) => {
     transport.onmessage = (response) => {
       try {
-        resolve(Schema.decodeUnknownSync(JsonRpcResponseSchema)(response))
+        const parsed = parseIncomingMessage(response)
+        if (!("id" in parsed)) return
+        if ("id" in message && parsed.id === message.id) resolve(parsed)
       } catch (error) {
         reject(error)
       }
@@ -45,6 +53,20 @@ const meta = {
 }
 
 describe("MCP 2026-07-28 stdio transport with 2025 compatibility", () => {
+  it("matches responses by ID while allowing notifications and other in-flight responses", async () => {
+    const transport: Transport = {
+      start: async () => {},
+      close: async () => {},
+      send: async () => {
+        transport.onmessage?.({ jsonrpc: "2.0", method: "notifications/tools/list_changed" })
+        transport.onmessage?.({ jsonrpc: "2.0", id: 99, result: {} })
+        transport.onmessage?.({ jsonrpc: "2.0", id: 1, result: { accepted: true } })
+      }
+    }
+    expect((await sendAndReceive(transport, { jsonrpc: "2.0", id: 1, method: "initialize" })).result).toEqual({
+      accepted: true
+    })
+  })
   beforeAll(async () => {
     const build = await buildIsolatedStdioServer(SPAWNED_PROCESS_TEST_TIMEOUT_MS)
     builtServerPath = build.path
