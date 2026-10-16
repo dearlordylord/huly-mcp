@@ -202,14 +202,14 @@ test.skipIf(process.platform === "win32")(
     const leader = `
     const {spawn} = require('node:child_process');
     const {writeFileSync} = require('node:fs');
-    const child = spawn(process.execPath,['-e',"process.on('SIGTERM',()=>{});setInterval(()=>{},1000)"],{stdio:'ignore'});
+    const child = spawn(process.execPath,['-e',"process.on('SIGTERM',()=>{});setInterval(()=>{},1000);process.send('ready')"],{stdio:['ignore','ignore','ignore','ipc']});
     writeFileSync(${JSON.stringify(pidFile)},String(child.pid));
-    child.unref();
+    child.once('message', () => { child.disconnect(); child.unref(); });
   `
     const program = `
     const {runBoundedCommand,Milliseconds} = await import('./scripts/run-bounded-command.ts');
     const clock = {value:0};
-    try { await runBoundedCommand({executable:process.execPath,args:['-e',${JSON.stringify(leader)}],name:'custody fixture',timeoutMilliseconds:Milliseconds.make(30000),cleanup:{now:()=>clock.value,pause:async()=>{clock.value+=10000}}}); }
+    try { await runBoundedCommand({executable:process.execPath,args:['-e',${JSON.stringify(leader)}],name:'custody fixture',timeoutMilliseconds:Milliseconds.make(30000),cleanup:{now:()=>clock.value,pause:async()=>{await new Promise(resolve=>setTimeout(resolve,10));clock.value+=10000}}}); }
     catch(error) { console.log(error.message); }
   `
     try {
