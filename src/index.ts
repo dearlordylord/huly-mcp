@@ -19,7 +19,7 @@ import {
   ConfigProvider,
   type Duration,
   Effect,
-  Exit,
+  type Exit,
   Layer,
   Option,
   type Redacted,
@@ -50,11 +50,7 @@ import {
 import type { RequestClientLease } from "./mcp/request-client-lifecycle.js"
 import { type McpServerError, McpServerService, type McpTransportType } from "./mcp/server.js"
 import { type ConsoleRedirectHandle, redirectConsoleToStderr } from "./mcp/stdio-output.js"
-import {
-  buildCombinedClientLayer,
-  createClientResolver,
-  isRecoverableClientUnavailableCause
-} from "./runtime/huly-clients.js"
+import { buildCombinedClientLayer, createClientResolver } from "./runtime/huly-clients.js"
 import type { ClientBundle, ClientResolver, HulyClientBundleError } from "./runtime/client-resolver.js"
 import { createHttpClientLeaseResolver } from "./runtime/http-client-leases.js"
 import { TelemetryService } from "./telemetry/telemetry.js"
@@ -192,6 +188,18 @@ const resolveConfiguredProfile = (transport: McpTransportType, environment: Node
     ? defaultProfileStore(environment).pipe(Effect.flatMap((store) => resolveStdioProfile(environment, store)))
     : Effect.succeed(undefined)
 
+const prepareClientConfig = (
+  configLayer: Layer.Layer<HulyConfigService, ConfigValidationError>,
+  transport: McpTransportType,
+  lazyEnvs: boolean
+) =>
+  !lazyEnvs && transport === "stdio"
+    ? HulyConfigService.pipe(
+        Effect.provide(configLayer),
+        Effect.map((config) => Layer.succeed(HulyConfigService, config))
+      )
+    : Effect.succeed(configLayer)
+
 const runConfiguredServer = (transport: McpTransportType): Effect.Effect<void, AppError> =>
   Effect.gen(function* () {
     const environment = { ...process.env }
@@ -209,21 +217,14 @@ const runConfiguredServer = (transport: McpTransportType): Effect.Effect<void, A
       profile === undefined
         ? HulyConfigService.layer
         : HulyConfigService.layer.pipe(Layer.provide(ConfigProvider.layer(resolvedConfigProvider(profile))))
-    const combinedClientLayer = buildCombinedClientLayer(configLayer)
+    // Validate once before discovery; Huly network acquisition belongs to the requested operation.
+    const clientConfigLayer = yield* prepareClientConfig(configLayer, transport, lazyEnvs)
+    const combinedClientLayer = buildCombinedClientLayer(clientConfigLayer)
     yield* Effect.acquireUseRelease(
       Effect.sync(() => createClientResolver(combinedClientLayer)),
       ({ close: closeClients, resolve: resolveClients }) => {
         const resolveHttpClientLease = createHttpClientLeaseResolver(combinedClientLayer, resolveClients)
         return Effect.gen(function* () {
-          if (!lazyEnvs && transport === "stdio") {
-            // Eager init uses the same process-owned resolver as subsequent tool calls.
-            yield* Effect.gen(function* () {
-              const clientExit = yield* Effect.promise(resolveClients)
-              if (Exit.isSuccess(clientExit) || isRecoverableClientUnavailableCause(clientExit.cause)) return
-              return yield* Effect.failCause(clientExit.cause)
-            })
-          }
-
           // stdout reserved for MCP protocol in stdio mode - no console output here
           const appLayer = buildAppLayer(
             transport,
