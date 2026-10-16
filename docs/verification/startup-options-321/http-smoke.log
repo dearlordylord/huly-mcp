@@ -1,0 +1,6 @@
+
+> @firfi/huly-mcp@0.53.1 smoke:http-no-config /private/tmp/hulymcp-perf-startup
+> node scripts/smoke-http-no-config.mjs
+
+HTTP no-config MCP smoke passed at http://127.0.0.1:50057/mcp (Huly env absent)
+HTTP no-config MCP smoke passed at http://127.0.0.1:50077/mcp (empty Huly env placeholders)

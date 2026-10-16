@@ -1,0 +1,38 @@
+[
+  {
+    "mode": "direct",
+    "trial": 0,
+    "discoveryAndReadMs": 94.76191699999998,
+    "projectCount": 8
+  },
+  {
+    "mode": "full",
+    "trial": 0,
+    "discoveryAndReadMs": 1284.607708,
+    "projectCount": 8
+  },
+  {
+    "mode": "full",
+    "trial": 1,
+    "discoveryAndReadMs": 1212.61275,
+    "projectCount": 8
+  },
+  {
+    "mode": "direct",
+    "trial": 1,
+    "discoveryAndReadMs": 29.838083000000097,
+    "projectCount": 8
+  },
+  {
+    "mode": "direct",
+    "trial": 2,
+    "discoveryAndReadMs": 31.540665999999874,
+    "projectCount": 8
+  },
+  {
+    "mode": "full",
+    "trial": 2,
+    "discoveryAndReadMs": 1132.3518750000003,
+    "projectCount": 8
+  }
+]

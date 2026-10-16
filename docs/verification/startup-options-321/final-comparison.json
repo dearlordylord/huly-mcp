@@ -1,0 +1,254 @@
+[
+  {
+    "variant": "narrow",
+    "delay": 0,
+    "trial": 0,
+    "network": true,
+    "handshakeMs": 559.904541,
+    "catalogMs": 567.6195,
+    "calls": [
+      1331.008375,
+      22.187167000000045,
+      26.210625000000164
+    ],
+    "usage": "613504   0:01.96"
+  },
+  {
+    "variant": "narrow-background",
+    "delay": 0,
+    "trial": 0,
+    "network": true,
+    "handshakeMs": 609.6239999999998,
+    "catalogMs": 615.1417919999999,
+    "calls": [
+      1411.9446660000003,
+      19.812832999999955,
+      18.168249999999716
+    ],
+    "usage": "620064   0:02.51"
+  },
+  {
+    "variant": "narrow-model-background",
+    "delay": 0,
+    "trial": 0,
+    "network": true,
+    "handshakeMs": 605.2134999999998,
+    "catalogMs": 611.1475829999999,
+    "calls": [
+      1215.056458,
+      21.581375000000662,
+      23.40758300000016
+    ],
+    "usage": "613584   0:02.04"
+  },
+  {
+    "variant": "narrow",
+    "delay": 2000,
+    "trial": 0,
+    "network": true,
+    "handshakeMs": 576.963041,
+    "catalogMs": 581.8919580000002,
+    "calls": [
+      1253.525208000001,
+      20.077290999999605,
+      19.786000000000058
+    ],
+    "usage": "616128   0:02.12"
+  },
+  {
+    "variant": "narrow-background",
+    "delay": 2000,
+    "trial": 0,
+    "network": true,
+    "handshakeMs": 611.4891250000001,
+    "catalogMs": 616.945208000001,
+    "calls": [
+      40.81154200000128,
+      27.36133300000074,
+      23.616125000000466
+    ],
+    "usage": "619456   0:02.52"
+  },
+  {
+    "variant": "narrow-model-background",
+    "delay": 2000,
+    "trial": 0,
+    "network": true,
+    "handshakeMs": 613.3622080000005,
+    "catalogMs": 619.2908750000006,
+    "calls": [
+      44.32154199999968,
+      25.00249999999869,
+      27.54083299999911
+    ],
+    "usage": "613312   0:02.20"
+  },
+  {
+    "variant": "narrow-model-background",
+    "delay": 0,
+    "trial": 1,
+    "network": true,
+    "handshakeMs": 590.3138330000002,
+    "catalogMs": 595.7795000000006,
+    "calls": [
+      1203.866750000001,
+      21.877166999998735,
+      20.292124999999942
+    ],
+    "usage": "614688   0:02.04"
+  },
+  {
+    "variant": "narrow-background",
+    "delay": 0,
+    "trial": 1,
+    "network": true,
+    "handshakeMs": 583.1413329999996,
+    "catalogMs": 589.0054999999993,
+    "calls": [
+      1446.6365829999995,
+      22.04370899999776,
+      21.347458000000188
+    ],
+    "usage": "626864   0:02.52"
+  },
+  {
+    "variant": "narrow",
+    "delay": 0,
+    "trial": 1,
+    "network": true,
+    "handshakeMs": 605.085750000002,
+    "catalogMs": 610.1121249999997,
+    "calls": [
+      1254.546542,
+      20.787124999998923,
+      20.75287500000195
+    ],
+    "usage": "613408   0:02.20"
+  },
+  {
+    "variant": "narrow-model-background",
+    "delay": 2000,
+    "trial": 1,
+    "network": true,
+    "handshakeMs": 601.0918749999983,
+    "catalogMs": 606.3469579999983,
+    "calls": [
+      47.51874999999927,
+      42.65937499999927,
+      29.26062500000262
+    ],
+    "usage": "616256   0:02.06"
+  },
+  {
+    "variant": "narrow-background",
+    "delay": 2000,
+    "trial": 1,
+    "network": true,
+    "handshakeMs": 568.5017499999994,
+    "catalogMs": 573.6455410000017,
+    "calls": [
+      34.677834000001894,
+      24.513624999999593,
+      26.22679199999766
+    ],
+    "usage": "626272   0:02.46"
+  },
+  {
+    "variant": "narrow",
+    "delay": 2000,
+    "trial": 1,
+    "network": true,
+    "handshakeMs": 588.773500000003,
+    "catalogMs": 593.9731670000001,
+    "calls": [
+      1176.2204160000001,
+      22.920999999998457,
+      22.370249999999942
+    ],
+    "usage": "615488   0:02.00"
+  },
+  {
+    "variant": "narrow",
+    "delay": 0,
+    "trial": 2,
+    "network": true,
+    "handshakeMs": 578.8394999999982,
+    "catalogMs": 584.2621669999971,
+    "calls": [
+      1206.6396669999995,
+      20.76970799999981,
+      19.545666999998502
+    ],
+    "usage": "614976   0:01.99"
+  },
+  {
+    "variant": "narrow-background",
+    "delay": 0,
+    "trial": 2,
+    "network": true,
+    "handshakeMs": 569.8359159999964,
+    "catalogMs": 574.926790999998,
+    "calls": [
+      1416.8645839999954,
+      21.727790999997524,
+      20.60041700000147
+    ],
+    "usage": "627344   0:02.44"
+  },
+  {
+    "variant": "narrow-model-background",
+    "delay": 0,
+    "trial": 2,
+    "network": true,
+    "handshakeMs": 574.242707999998,
+    "catalogMs": 579.5211249999993,
+    "calls": [
+      1259.492707999998,
+      20.50445800000307,
+      25.878665999996883
+    ],
+    "usage": "609136   0:01.99"
+  },
+  {
+    "variant": "narrow",
+    "delay": 2000,
+    "trial": 2,
+    "network": true,
+    "handshakeMs": 721.6794169999994,
+    "catalogMs": 730.0486669999955,
+    "calls": [
+      1211.689542,
+      22.520708999996714,
+      21.095832999999402
+    ],
+    "usage": "609024   0:02.19"
+  },
+  {
+    "variant": "narrow-background",
+    "delay": 2000,
+    "trial": 2,
+    "network": true,
+    "handshakeMs": 647.5434580000001,
+    "catalogMs": 652.2520420000001,
+    "calls": [
+      25.848791999997047,
+      22.755083999996714,
+      21.93000000000029
+    ],
+    "usage": "625248   0:02.53"
+  },
+  {
+    "variant": "narrow-model-background",
+    "delay": 2000,
+    "trial": 2,
+    "network": true,
+    "handshakeMs": 599.159040999999,
+    "catalogMs": 605.3317079999979,
+    "calls": [
+      34.30829200000153,
+      26.04699999999866,
+      37.30070800000249
+    ],
+    "usage": "608464   0:02.05"
+  }
+]

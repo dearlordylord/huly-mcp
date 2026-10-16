@@ -1,0 +1,794 @@
+{
+  "comparison.json": {
+    "baseline/0/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 736.6323330000014,
+        "min": 716.3808749999953,
+        "max": 759.193041
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 1208.5990410000013,
+        "min": 1199.1614589999954,
+        "max": 1705.5047080000002
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 21.914270500000157,
+        "min": 20.12333299999591,
+        "max": 24.33050000000003
+      }
+    },
+    "lazy/0/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 690.1950830000023,
+        "min": 684.5742500000051,
+        "max": 711.7538330000002
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 1245.2624580000047,
+        "min": 1242.2633750000023,
+        "max": 1309.0824169999996
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 20.503374999996595,
+        "min": 18.330333999998402,
+        "max": 26.069915999999466
+      }
+    },
+    "background/0/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 691.3315419999999,
+        "min": 654.6219579999961,
+        "max": 749.6374580000002
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 1355.3693329999987,
+        "min": 1352.294584000003,
+        "max": 1521.0279170000003
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 22.107166999999663,
+        "min": 19.52087500000198,
+        "max": 27.48720800000592
+      }
+    },
+    "light/0/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 784.9807089999958,
+        "min": 782.690458,
+        "max": 919.2744160000002
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 457.64729199999783,
+        "min": 442.8734999999997,
+        "max": 477.51104199999827
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 20.67150000000038,
+        "min": 17.647541999998793,
+        "max": 22.01812499999869
+      }
+    },
+    "background-light/0/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 687.2363750000004,
+        "min": 641.479459000002,
+        "max": 740.0560000000005
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 631.3076669999973,
+        "min": 572.2394580000037,
+        "max": 643.4848749999983
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 22.09618749999936,
+        "min": 16.993000000002212,
+        "max": 26.558583
+      }
+    },
+    "baseline/2000/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 803.8398750000015,
+        "min": 713.1629999999932,
+        "max": 815.9590830000016
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 1319.1295830000017,
+        "min": 1233.5429170000061,
+        "max": 1381.0256249999984
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 21.67052099999819,
+        "min": 19.278166000003694,
+        "max": 28.15908300000592
+      }
+    },
+    "lazy/2000/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 714.8795000000009,
+        "min": 699.4120420000036,
+        "max": 764.3942910000042
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 1292.6638749999984,
+        "min": 1250.5668749999968,
+        "max": 1453.9802920000002
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 22.88952099999733,
+        "min": 20.184000000001106,
+        "max": 25.062292000002344
+      }
+    },
+    "background/2000/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 722.7330419999998,
+        "min": 690.0319159999926,
+        "max": 823.8145829999994
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 39.33387500000026,
+        "min": 32.668791999996756,
+        "max": 70.86262500000157
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 25.670042000003377,
+        "min": 23.566166999997222,
+        "max": 26.90625
+      }
+    },
+    "light/2000/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 722.1338749999995,
+        "min": 709.8864999999932,
+        "max": 767.0838750000039
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 485.49512499999764,
+        "min": 435.2308750000084,
+        "max": 539.903416000001
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 24.910812500000247,
+        "min": 19.869292000003043,
+        "max": 35.3227920000063
+      }
+    },
+    "background-light/2000/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 690.2284170000057,
+        "min": 644.351582999996,
+        "max": 730.6209170000002
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 29.49754199999734,
+        "min": 23.042874999999185,
+        "max": 59.1439169999976
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 23.495229000003746,
+        "min": 18.77429200000188,
+        "max": 51.040375000000495
+      }
+    },
+    "baseline/0/false": {
+      "catalogMs": {
+        "n": 10,
+        "median": 1705.2071454999968,
+        "min": 1627.848582999999,
+        "max": 1774.7044999999925
+      }
+    },
+    "lazy/0/false": {
+      "catalogMs": {
+        "n": 10,
+        "median": 1804.5224999999991,
+        "min": 1719.9995000000054,
+        "max": 1885.078084000008
+      }
+    },
+    "background/0/false": {
+      "catalogMs": {
+        "n": 10,
+        "median": 2396.0203959999926,
+        "min": 2091.0432919999876,
+        "max": 2565.0752079999947
+      }
+    }
+  },
+  "schema-comparison.json": {
+    "baseline/0/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 745.7547909999994,
+        "min": 718.3455000000031,
+        "max": 894.436625
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 1282.1087499999999,
+        "min": 1251.3969579999975,
+        "max": 1294.1661669999958
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 19.53004200000214,
+        "min": 17.47362499999872,
+        "max": 22.304499999999734
+      },
+      "residentMiB": {
+        "n": 3,
+        "median": 552.421875,
+        "min": 546.0625,
+        "max": 553.640625
+      }
+    },
+    "narrow/0/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 618.2330419999998,
+        "min": 603.2039580000001,
+        "max": 655.8542500000003
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 1250.6292089999997,
+        "min": 1180.2555840000023,
+        "max": 1302.6680839999972
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 23.10699999999997,
+        "min": 19.37749999999869,
+        "max": 35.455832999999984
+      },
+      "residentMiB": {
+        "n": 3,
+        "median": 597.140625,
+        "min": 593.703125,
+        "max": 599.390625
+      }
+    },
+    "narrow-background/0/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 624.6952089999977,
+        "min": 597.2307499999988,
+        "max": 632.4767919999995
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 1489.8668749999997,
+        "min": 1443.390958,
+        "max": 1622.9635839999974
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 23.427354000001742,
+        "min": 20.742457999999715,
+        "max": 32.50074999999924
+      },
+      "residentMiB": {
+        "n": 3,
+        "median": 610.828125,
+        "min": 606.875,
+        "max": 611.703125
+      }
+    },
+    "baseline/2000/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 737.2729589999999,
+        "min": 707.0294999999969,
+        "max": 787.4442920000001
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 1270.1545410000035,
+        "min": 1260.4595000000008,
+        "max": 1338.5792500000025
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 21.308625000000575,
+        "min": 17.96616599999834,
+        "max": 25.245750000001863
+      },
+      "residentMiB": {
+        "n": 3,
+        "median": 552.6875,
+        "min": 551.828125,
+        "max": 554.140625
+      }
+    },
+    "narrow/2000/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 647.4079579999998,
+        "min": 641.5300839999982,
+        "max": 663.5662080000002
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 1281.6681669999962,
+        "min": 1225.0576669999991,
+        "max": 1357.4590420000022
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 23.378167000002577,
+        "min": 19.911000000000058,
+        "max": 24.64799999999923
+      },
+      "residentMiB": {
+        "n": 3,
+        "median": 600.609375,
+        "min": 593.203125,
+        "max": 605.40625
+      }
+    },
+    "narrow-background/2000/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 638.6619169999994,
+        "min": 600.7775409999995,
+        "max": 771.5300829999978
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 35.02362499999799,
+        "min": 22.18683400000009,
+        "max": 39.60412499999802
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 24.47125000000051,
+        "min": 20.767916999997396,
+        "max": 30.208874999996624
+      },
+      "residentMiB": {
+        "n": 3,
+        "median": 611.484375,
+        "min": 610.296875,
+        "max": 612.453125
+      }
+    }
+  },
+  "final-comparison.json": {
+    "narrow/0/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 584.2621669999971,
+        "min": 567.6195,
+        "max": 610.1121249999997
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 1254.546542,
+        "min": 1206.6396669999995,
+        "max": 1331.008375
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 20.778416499999366,
+        "min": 19.545666999998502,
+        "max": 26.210625000000164
+      },
+      "residentMiB": {
+        "n": 3,
+        "median": 599.125,
+        "min": 599.03125,
+        "max": 600.5625
+      }
+    },
+    "narrow-background/0/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 589.0054999999993,
+        "min": 574.926790999998,
+        "max": 615.1417919999999
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 1416.8645839999954,
+        "min": 1411.9446660000003,
+        "max": 1446.6365829999995
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 20.97393750000083,
+        "min": 18.168249999999716,
+        "max": 22.04370899999776
+      },
+      "residentMiB": {
+        "n": 3,
+        "median": 612.171875,
+        "min": 605.53125,
+        "max": 612.640625
+      }
+    },
+    "narrow-model-background/0/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 595.7795000000006,
+        "min": 579.5211249999993,
+        "max": 611.1475829999999
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 1215.056458,
+        "min": 1203.866750000001,
+        "max": 1259.492707999998
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 21.7292709999997,
+        "min": 20.292124999999942,
+        "max": 25.878665999996883
+      },
+      "residentMiB": {
+        "n": 3,
+        "median": 599.203125,
+        "min": 594.859375,
+        "max": 600.28125
+      }
+    },
+    "narrow/2000/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 593.9731670000001,
+        "min": 581.8919580000002,
+        "max": 730.0486669999955
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 1211.689542,
+        "min": 1176.2204160000001,
+        "max": 1253.525208000001
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 21.733041499999672,
+        "min": 19.786000000000058,
+        "max": 22.920999999998457
+      },
+      "residentMiB": {
+        "n": 3,
+        "median": 601.0625,
+        "min": 594.75,
+        "max": 601.6875
+      }
+    },
+    "narrow-background/2000/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 616.945208000001,
+        "min": 573.6455410000017,
+        "max": 652.2520420000001
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 34.677834000001894,
+        "min": 25.848791999997047,
+        "max": 40.81154200000128
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 24.06487500000003,
+        "min": 21.93000000000029,
+        "max": 27.36133300000074
+      },
+      "residentMiB": {
+        "n": 3,
+        "median": 610.59375,
+        "min": 604.9375,
+        "max": 611.59375
+      }
+    },
+    "narrow-model-background/2000/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 606.3469579999983,
+        "min": 605.3317079999979,
+        "max": 619.2908750000006
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 44.32154199999968,
+        "min": 34.30829200000153,
+        "max": 47.51874999999927
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 28.400729000000865,
+        "min": 25.00249999999869,
+        "max": 42.65937499999927
+      },
+      "residentMiB": {
+        "n": 3,
+        "median": 598.9375,
+        "min": 594.203125,
+        "max": 601.8125
+      }
+    }
+  },
+  "baseline-final.json": {
+    "baseline/0/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 700.023083,
+        "min": 699.270625000001,
+        "max": 712.090084
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 1274.3042079999977,
+        "min": 1190.4301250000008,
+        "max": 1330.458875
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 20.823687499999778,
+        "min": 18.096999999999753,
+        "max": 21.603417000002082
+      },
+      "residentMiB": {
+        "n": 3,
+        "median": 551.828125,
+        "min": 548.65625,
+        "max": 552.90625
+      }
+    },
+    "narrow-model-background/0/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 603.2981249999998,
+        "min": 597.3539999999994,
+        "max": 608.7189580000013
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 1234.1295,
+        "min": 1228.3871660000004,
+        "max": 1242.9499579999992
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 21.806958500000746,
+        "min": 19.450292000001355,
+        "max": 39.824249999999665
+      },
+      "residentMiB": {
+        "n": 3,
+        "median": 601.015625,
+        "min": 598.984375,
+        "max": 602.0625
+      }
+    },
+    "baseline/2000/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 718.0398750000004,
+        "min": 712.5695000000014,
+        "max": 725.4873340000013
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 1273.6333749999994,
+        "min": 1258.835332999999,
+        "max": 1286.4149170000019
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 21.6366665000005,
+        "min": 19.19525000000067,
+        "max": 22.621250000000146
+      },
+      "residentMiB": {
+        "n": 3,
+        "median": 551.90625,
+        "min": 545.625,
+        "max": 552.828125
+      }
+    },
+    "narrow-model-background/2000/true": {
+      "catalogMs": {
+        "n": 3,
+        "median": 592.4025419999998,
+        "min": 587.1987499999996,
+        "max": 594.6313750000008
+      },
+      "firstCallMs": {
+        "n": 3,
+        "median": 36.12516600000163,
+        "min": 32.41666699999769,
+        "max": 43.62970800000039
+      },
+      "warmCallMs": {
+        "n": 6,
+        "median": 27.464853999999832,
+        "min": 22.62433300000339,
+        "max": 40.5570000000007
+      },
+      "residentMiB": {
+        "n": 3,
+        "median": 601.15625,
+        "min": 593.1875,
+        "max": 601.359375
+      }
+    }
+  },
+  "modelParity": [
+    {
+      "type": "parity",
+      "variant": "light",
+      "name": "list_projects",
+      "equal": true
+    },
+    {
+      "type": "parity",
+      "variant": "light",
+      "name": "list_notification_providers",
+      "equal": false
+    },
+    {
+      "type": "parity",
+      "variant": "light",
+      "name": "list_notification_types",
+      "equal": false
+    },
+    {
+      "type": "parity",
+      "variant": "light",
+      "name": "list_workbench_applications",
+      "equal": false
+    },
+    {
+      "type": "parity",
+      "variant": "light",
+      "name": "list_viewlets",
+      "equal": false
+    },
+    {
+      "type": "parity",
+      "variant": "light",
+      "name": "list_huly_classes",
+      "equal": true
+    },
+    {
+      "type": "parity",
+      "variant": "lazy",
+      "name": "list_projects",
+      "equal": true
+    },
+    {
+      "type": "parity",
+      "variant": "lazy",
+      "name": "list_notification_providers",
+      "equal": true
+    },
+    {
+      "type": "parity",
+      "variant": "lazy",
+      "name": "list_notification_types",
+      "equal": true
+    },
+    {
+      "type": "parity",
+      "variant": "lazy",
+      "name": "list_workbench_applications",
+      "equal": true
+    },
+    {
+      "type": "parity",
+      "variant": "lazy",
+      "name": "list_viewlets",
+      "equal": true
+    },
+    {
+      "type": "parity",
+      "variant": "lazy",
+      "name": "list_huly_classes",
+      "equal": true
+    },
+    {
+      "type": "parity",
+      "variant": "narrow",
+      "name": "list_projects",
+      "equal": true
+    },
+    {
+      "type": "parity",
+      "variant": "narrow",
+      "name": "list_notification_providers",
+      "equal": true
+    },
+    {
+      "type": "parity",
+      "variant": "narrow",
+      "name": "list_notification_types",
+      "equal": true
+    },
+    {
+      "type": "parity",
+      "variant": "narrow",
+      "name": "list_workbench_applications",
+      "equal": true
+    },
+    {
+      "type": "parity",
+      "variant": "narrow",
+      "name": "list_viewlets",
+      "equal": true
+    },
+    {
+      "type": "parity",
+      "variant": "narrow",
+      "name": "list_huly_classes",
+      "equal": true
+    }
+  ],
+  "directRead": {
+    "direct": {
+      "n": 3,
+      "median": 31.540665999999874,
+      "min": 29.838083000000097,
+      "max": 94.76191699999998
+    },
+    "full": {
+      "n": 3,
+      "median": 1212.61275,
+      "min": 1132.3518750000003,
+      "max": 1284.607708
+    }
+  },
+  "http": {
+    "firstCallMs": {
+      "n": 3,
+      "median": 1277.1049590000002,
+      "min": 1271.9660000000003,
+      "max": 1321.6695
+    },
+    "subsequentConnectionCallMs": {
+      "n": 6,
+      "median": 23.60668699999951,
+      "min": 21.44741699999986,
+      "max": 30.665916999998444
+    },
+    "subsequentConnectionCatalogMs": {
+      "n": 6,
+      "median": 6.499749999999494,
+      "min": 4.713875000000371,
+      "max": 11.5106250000008
+    }
+  }
+}
