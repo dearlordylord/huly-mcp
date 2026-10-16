@@ -1,0 +1,10 @@
+
+ RUN  v5.0.1 /private/tmp/hulymcp-perf-startup
+
+················
+
+ Test Files  4 passed (4)
+      Tests  16 passed (16)
+   Start at  12:47:40
+   Duration  1.57s (import 65%, transform 24%, tests 9%, setup 1%, worker 1%)
+

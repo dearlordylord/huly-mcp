@@ -13,7 +13,7 @@ import {
   makeFileMovementStageObserver
 } from "./mcp/movement-stage-report.js"
 
-import { NodeRuntime } from "@effect/platform-node"
+import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
 import {
   Config,
   ConfigProvider,

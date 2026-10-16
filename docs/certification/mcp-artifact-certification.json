@@ -1,17 +1,15 @@
 {
-  "archiveBytes": 1796177,
-  "bundleBytes": 10275663,
-  "bundleGzipBytes": 1750100,
+  "archiveBytes": 1577377,
+  "bundleBytes": 8549173,
+  "bundleGzipBytes": 1531500,
   "entryCount": 4,
   "executableMode": 493,
   "externalModules": [
     "@napi-rs/keyring",
-    "@node-rs/xxhash",
-    "@opentelemetry/api",
     "dbus-next",
     "ws"
   ],
   "name": "@firfi/huly-mcp",
-  "unpackedBytes": 10459827,
+  "unpackedBytes": 8733337,
   "version": "0.53.1"
 }

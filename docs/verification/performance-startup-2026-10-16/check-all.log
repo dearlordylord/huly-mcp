@@ -1,0 +1,185 @@
+
+> @firfi/huly-mcp@0.53.1 check-all /private/tmp/hulymcp-perf-startup
+> tsx scripts/run-quality-gate.ts
+
+
+> @firfi/huly-mcp@0.53.1 verify-movement-fixtures /private/tmp/hulymcp-perf-startup
+> node scripts/verify-movement-fixtures.mjs
+
+Verified 5 movement fixture scripts.
+
+> @firfi/huly-mcp@0.53.1 test:movement-process /private/tmp/hulymcp-perf-startup
+> node --test --test-reporter=dot scripts/completion-evidence.test.mjs scripts/verify-movement-fixtures.test.mjs scripts/movement-artifact-hashes.test.mjs scripts/issue-tree-aggregates.test.mjs scripts/issue-tree-completion.test.mjs scripts/issue-tree-ledger.test.mjs scripts/integration-mcp-adapter.test.mjs scripts/issue-movement-concurrency/select-cases.test.mjs test/scripts/run-movement-certification.node.test.mjs
+
+....................
+....................
+....................
+....................
+....................
+....
+
+> @firfi/huly-mcp@0.53.1 verify:effect-cohort /private/tmp/hulymcp-perf-startup
+> node scripts/verify-effect-cohort.mjs
+
+Verified exact Effect 4.0.0 dependency cohort and native tsgo 0.36.4 startup.
+
+> @firfi/huly-mcp@0.53.1 build /private/tmp/hulymcp-perf-startup
+> pnpm build:mcp && pnpm build:cli
+
+
+> @firfi/huly-mcp@0.53.1 build:mcp /private/tmp/hulymcp-perf-startup
+> PKG_VERSION=$(node -p "require('./package.json').version") NODE_ENGINE_REQUIREMENT=$(node -p "require('./package.json').engines.node") && esbuild src/launcher.ts --bundle --platform=node --format=cjs --log-level=warning --outfile=dist/index.cjs --external:ws --external:@napi-rs/keyring --external:dbus-next "--define:PKG_VERSION=\"$PKG_VERSION\"" "--define:NODE_ENGINE_REQUIREMENT=\"$NODE_ENGINE_REQUIREMENT\""
+
+
+> @firfi/huly-mcp@0.53.1 build:cli /private/tmp/hulymcp-perf-startup
+> pnpm --filter @firfi/huly-cli build
+
+
+> @firfi/huly-cli@0.51.1 build /private/tmp/hulymcp-perf-startup/packages/huly-cli
+> PKG_VERSION=$(node -p "require('./package.json').version") && esbuild src/index.ts --bundle --platform=node --format=cjs --log-level=warning --outfile=dist/index.cjs --external:ws --external:@napi-rs/keyring --external:dbus-next "--define:PKG_VERSION=\"$PKG_VERSION\""
+
+
+> @firfi/huly-mcp@0.53.1 typecheck /private/tmp/hulymcp-perf-startup
+> pnpm typecheck:tsc && pnpm typecheck:effect
+
+
+> @firfi/huly-mcp@0.53.1 typecheck:tsc /private/tmp/hulymcp-perf-startup
+> node node_modules/@typescript/native/bin/tsc -p tsconfig.json --noEmit 2>&1 | grep -v ": suggestion TS" | { grep -E '^(src/|packages/|scripts/|test/|tsconfig\.json)' && exit 1 || exit 0; }
+
+
+> @firfi/huly-mcp@0.53.1 typecheck:effect /private/tmp/hulymcp-perf-startup
+> effect-tsgo diagnostics --project tsconfig.json --strict --severity error,warning
+
+Checked 1231 files out of 1231 files. 
+0 errors, 0 warnings and 0 messages.
+
+> @firfi/huly-mcp@0.53.1 verify-schema-boundaries /private/tmp/hulymcp-perf-startup
+> node scripts/verify-schema-boundaries.mjs
+
+
+> @firfi/huly-mcp@0.53.1 circular /private/tmp/hulymcp-perf-startup
+> dpdm --no-warning --no-tree --no-progress --exit-code circular:1 --transform 'src/**/*.ts' 'packages/huly-cli/src/**/*.ts'
+
+- Start analyzing dependencies...
+✔ [715/715] Analyze done!
+• Circular Dependencies
+  ✅ Congratulations, no circular dependency was found in your project.
+
+
+> @firfi/huly-mcp@0.53.1 complexity /private/tmp/hulymcp-perf-startup
+> oxlint -c oxlint.complexity.json src packages/huly-cli/src
+
+
+> @firfi/huly-mcp@0.53.1 verify-registry-metadata /private/tmp/hulymcp-perf-startup
+> node scripts/sync-registry-metadata.mjs --check
+
+server.json is in sync with package.json
+
+> @firfi/huly-mcp@0.53.1 verify-registry-schema /private/tmp/hulymcp-perf-startup
+> node scripts/verify-registry-schema.mjs
+
+server.json validates against https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json
+
+> @firfi/huly-mcp@0.53.1 verify-cli-integration-coverage /private/tmp/hulymcp-perf-startup
+> node scripts/run-bundled.mjs scripts/verify-cli-integration-coverage.ts
+
+CLI live coverage is in sync: 19 behavior/risk cases, 121 directly exercised commands, 542 routes covered by shared operations plus adapter-class cases, 604 catalog routes, zero deferrals.
+
+> @firfi/huly-mcp@0.53.1 verify-sdk-parity /private/tmp/hulymcp-perf-startup
+> node scripts/audit-sdk-parity.mjs
+
+PARTIAL: .reference/platform/models not found — skipping optional reference model area parity. Clone the Huly platform repo there to enable this check.
+SDK parity ledger covers 316 SDK model exports (covered: 137, gap: 55, ignored: 1, not-mcp-facing: 123) and 55 reference model areas
+
+> @firfi/huly-mcp@0.53.1 verify-readme /private/tmp/hulymcp-perf-startup
+> tsx scripts/update-readme-tools.mjs --check
+
+✅ README.md is up to date with 604 native tools, 4 proxy tools, 47 categories, and 3 resource templates
+
+> @firfi/huly-mcp@0.53.1 verify-cli-readme /private/tmp/hulymcp-perf-startup
+> node scripts/run-bundled.mjs scripts/update-cli-readme.ts --check
+
+
+> @firfi/huly-mcp@0.53.1 verify-cli-skill /private/tmp/hulymcp-perf-startup
+> node scripts/run-bundled.mjs scripts/update-cli-skill.ts --check
+
+Huly CLI Agent Skill matches command and failure contracts.
+
+> @firfi/huly-mcp@0.53.1 verify-cli-skill-package /private/tmp/hulymcp-perf-startup
+> node scripts/run-bundled.mjs scripts/verify-cli-skill-package.ts
+
+CLI tarball contains byte-identical generated Huly CLI Agent Skill files.
+
+> @firfi/huly-mcp@0.53.1 verify-cli-package-closure /private/tmp/hulymcp-perf-startup
+> node scripts/run-bundled.mjs scripts/verify-cli-package-closure.ts
+
+CLI package closure verified: bundled shared registry plus the exact declared external runtime dependencies (@napi-rs/keyring, dbus-next, ws).
+
+> @firfi/huly-mcp@0.53.1 lint /private/tmp/hulymcp-perf-startup
+> find src packages scripts test -name '*.ts' -print0 | xargs -0 oxlint --deny-warnings && dprint check && jscpd --silent src packages/huly-cli/src
+
+Duplications detection: Found [1m122[22m exact clones with [1m1116[22m(0.93%) duplicated lines in [1m704[22m (1 formats) files.
+
+> @firfi/huly-mcp@0.53.1 test:coverage /private/tmp/hulymcp-perf-startup
+> vitest run --coverage
+
+
+ RUN  v5.0.1 /private/tmp/hulymcp-perf-startup
+      Coverage enabled with v8
+
+····································································································································································································································MCP HTTP server listening on http://127.0.0.1:49456/mcp
+··MCP HTTP server listening on http://127.0.0.1:49459/mcp
+···························MCP HTTP server listening on http://127.0.0.1:49462/mcp
+·MCP HTTP server listening on http://127.0.0.1:49464/mcp
+·····························MCP HTTP server listening on http://127.0.0.1:49469/mcp
+············MCP HTTP server listening on http://127.0.0.1:49471/mcp
+·MCP HTTP server listening on http://127.0.0.1:49476/mcp
+························································MCP HTTP server listening on http://127.0.0.1:49481/mcp
+·MCP HTTP server listening on http://127.0.0.1:49483/mcp
+·MCP HTTP server listening on http://127.0.0.1:49485/mcp
+·MCP HTTP server listening on http://127.0.0.1:49490/mcp
+·MCP HTTP server listening on http://127.0.0.1:49492/mcp
+·········MCP HTTP server listening on http://127.0.0.1:49496/mcp
+···MCP HTTP server listening on http://127.0.0.1:49501/mcp
+··MCP HTTP server listening on http://127.0.0.1:49503/mcp
+··································MCP HTTP server listening on http://127.0.0.1:49507/mcp
+··················MCP HTTP server listening on http://127.0.0.1:49509/mcp
+·MCP HTTP server listening on http://127.0.0.1:49511/mcp
+·MCP HTTP server listening on http://127.0.0.1:49514/mcp
+·····························MCP HTTP server listening on http://127.0.0.1:49518/mcp
+MCP HTTP server listening on http://127.0.0.1:49519/mcp
+········································MCP HTTP server listening on http://127.0.0.1:49523/mcp
+································{"phase":"bundle-ready","elapsedMilliseconds":0}
+{"phase":"connect-start","elapsedMilliseconds":2.286041021347046}
+{"phase":"connect-ready","elapsedMilliseconds":127.5995409488678}
+{"phase":"list-start","elapsedMilliseconds":127.7422080039978}
+{"phase":"list-ready","elapsedMilliseconds":202.03854095935822}
+{"phase":"close-start","elapsedMilliseconds":202.26312494277954}
+{"phase":"closed","elapsedMilliseconds":206.15337491035461}
+··············································MCP HTTP server listening on http://127.0.0.1:49549/mcp
+MCP HTTP server listening on http://127.0.0.1:49552/mcp
+·MCP HTTP server listening on http://127.0.0.1:49556/mcp
+MCP HTTP server listening on http://0.0.0.0:49559/mcp
+MCP HTTP server listening on http://127.0.0.1:49561/mcp
+MCP HTTP server listening on http://127.0.0.1:49562/mcp
+{"observerStatus":"recorded"}
+{"observerStatus":"unavailable"}
+·············{"observerStatus":"unavailable"}
+{"observerStatus":"unavailable"}
+···································································································································································································································Warning: unknown toolset category "nonexistent_category_default_writer", ignoring. Valid categories: projects, issues, labels, tags, tag-categories, templates, comments, collaborators, milestones, documents, planner, drive, associations, hr, inventory, spaces, sdk-discovery, model-administration, security-administration, sequence-administration, storage, support, attachments, contacts, channels, mail, boards, views, cards, leads, recruiting, custom-fields, calendar, time tracking, preferences, approvals, search, activity, notifications, user-statuses, virtual-office, processes, workspace, workflow-statuses, workbench, task-management, test-management
+···················································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································
+
+ Test Files  424 passed (424)
+      Tests  5475 passed (5475)
+   Start at  12:50:53
+   Duration  64.11s (tests 45%, import 44%, transform 9%, worker 1%, setup 1%)
+
+ % Coverage report from v8
+
+=============================== Coverage summary ===============================
+Statements   : 99.47% ( 28315/28465 )
+Branches     : 99% ( 11974/12094 )
+Functions    : 99.03% ( 7582/7656 )
+Lines        : 99.56% ( 26041/26154 )
+================================================================================
+Quality gate emitted 180/300 successful output lines.

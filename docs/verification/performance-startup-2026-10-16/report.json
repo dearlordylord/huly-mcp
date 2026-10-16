@@ -1,0 +1,117 @@
+{
+  "base": "90b700064ff8c253aee2d9b54fbabaca56b2620f",
+  "environment": {
+    "macOS": "27.0",
+    "architecture": "arm64",
+    "node": "v25.6.1",
+    "pnpm": "10.29.3",
+    "process": "released MCP SDK2.0.0 legacy client named codex; real Codex app-server0.163.0 checked separately",
+    "scope": "same-account fresh child launches with OS filesystem caches warm, sequential alternating old/new builds; no system-cache flushing or isolated machine claim"
+  },
+  "pairedSummary": [
+    {
+      "mode": "auto",
+      "version": "baseline",
+      "trials": 4,
+      "handshakeMedianMs": 747.646083,
+      "listingMedianMs": 754.835542,
+      "warmSearchMedianMs": 15.17729200000008,
+      "toolCount": 6,
+      "listingBytes": 26711
+    },
+    {
+      "mode": "auto",
+      "version": "optimized",
+      "trials": 4,
+      "handshakeMedianMs": 696.7688330000001,
+      "listingMedianMs": 703.6040830000001,
+      "warmSearchMedianMs": 7.40504199999998,
+      "toolCount": 6,
+      "listingBytes": 26711
+    },
+    {
+      "mode": "native",
+      "version": "baseline",
+      "trials": 4,
+      "handshakeMedianMs": 744.02575,
+      "listingMedianMs": 915.889375,
+      "warmSearchMedianMs": null,
+      "toolCount": 606,
+      "listingBytes": 2586744
+    },
+    {
+      "mode": "native",
+      "version": "optimized",
+      "trials": 4,
+      "handshakeMedianMs": 696.684125,
+      "listingMedianMs": 875.5102919999999,
+      "warmSearchMedianMs": null,
+      "toolCount": 606,
+      "listingBytes": 2586744
+    }
+  ],
+  "bundle": {
+    "beforeBytes": 10275663,
+    "afterBytes": 8549173,
+    "reductionPercent": 16.80173824307006
+  },
+  "changes": [
+    "Use public platform-node subpath imports to avoid eagerly loading unrelated Node platform subsystems.",
+    "Prebuild input-schema decoder functions; optional/malformed schema fragments use Option and absent fields avoid decode work instead of thrown SchemaError."
+  ],
+  "runtime": "Real localHuly read tests pass for native and proxy. Warm calls remain around20ms; first call1.35\u20132.16s remains network-client acquisition. No demonstrated network-bound throughput improvement.",
+  "actualCodex": "Fresh packed auto-mode Keychain profile:6tools; status connected4697ms, successful invoke_tool list_projects4724ms, including config reload. This is not a paired host-mode comparison.",
+  "nextPriorities": [
+    {
+      "priority": 1,
+      "proposal": "Profile and reduce eager schema/catalog preparation if startup needs another large reduction; consider build-time static tool metadata, preserving runtime validation.",
+      "status": "not implemented; requires separate design and measurements"
+    },
+    {
+      "priority": 2,
+      "proposal": "Measure shared server-config/auth lookups across Huly/storage/workspace acquisition and avoid redundant requests or initialize only required clients.",
+      "status": "not implemented; must preserve client ownership, retries, auth errors and config isolation"
+    },
+    {
+      "priority": 3,
+      "proposal": "For slow real workloads, measure exact tool/query and data volume before changing pagination, batching or consistency behavior.",
+      "status": "no blanket optimization claimed"
+    }
+  ],
+  "validation": {
+    "focused": "4 files16tests pass, includes schema composition/ref/invalid-input and proxy property behavior",
+    "standardsFindings": 0,
+    "specFindings": 0,
+    "fullGate": {
+      "result": "PASS",
+      "files": 424,
+      "tests": 5475,
+      "statements": 99.47,
+      "branches": 99,
+      "functions": 99.03,
+      "lines": 99.56
+    },
+    "packed": "MCP exact artifact/external inventory passes; CLI artifact report regenerated with Node24",
+    "catalogParity": "Exact deep equality of auto/native tool lists/schema payloads and3 search query responses against baseline"
+  },
+  "limits": [
+    "Timings describe this Mac and workload; medians are measurements, not latency guarantees.",
+    "No credential cache or change to backend/session/prompt rules.",
+    "CLI help preliminary5pairs633->605ms; small/noisy effect, no broad CLI throughput claim."
+  ],
+  "cleanup": "PASS native test credential removed; own temporary actual Codex registration disabled; original keychain default/search list unchanged.",
+  "reproduction": {
+    "build": "pnpm install --frozen-lockfile; pnpm build",
+    "benchmark": "node benchmark.cjs (captured harness defaults to the original temporary worktree; set/update root and output paths for another checkout)",
+    "paired": "node paired.cjs alternates baseline/optimized order for4rounds per exposure mode; baseline bundle captured from90b70006 before edits",
+    "profile": "PERF_CPU=1 PERF_TRIALS=1 PERF_PHASE=profile node benchmark.cjs (Node CPU profiles inspected locally, not committed)",
+    "live": "Source local integration environment without printing credentials, then node live.cjs;6 read calls per mode/build; output contains timings only",
+    "nativeProfile": "PERF_AUTH=profile PERF_MODE=auto PERF_TRIALS=3 PERF_PHASE=keychain node benchmark.cjs; separate profile explicitly selects OS storage"
+  },
+  "nativeProfileMeasurement": {
+    "baselineMedianMs": 844.899041,
+    "optimizedMedianMs": 879.963958,
+    "trialsPerBuild": 3,
+    "interpretation": "No demonstrated Keychain-profile startup improvement in this small unpaired run. Both remain below1s; OS credential-access variance can dominate the roughly50ms process improvement."
+  }
+}

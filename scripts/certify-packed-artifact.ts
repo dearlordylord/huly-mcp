@@ -32,8 +32,7 @@ const expected =
     ? {
         binName: "huly-mcp",
         expectedEntries: ["package/LICENSE", "package/README.md", "package/dist/index.cjs", "package/package.json"],
-        // Redis's bundled optional digest helper also contains a lazy xxhash import.
-        expectedExternalModules: ["@napi-rs/keyring", "@node-rs/xxhash", "@opentelemetry/api", "dbus-next", "ws"],
+        expectedExternalModules: ["@napi-rs/keyring", "dbus-next", "ws"],
         name: "@firfi/huly-mcp",
         version
       }

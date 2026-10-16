@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { Option, Schema } from "effect"
 
 import { collectJsonSchemaDefinitions } from "./json-schema-refs.js"
 
@@ -19,24 +19,23 @@ const UnknownRecordSchema = Schema.Record(Schema.String, Schema.Unknown)
 const UnknownArraySchema = Schema.Array(Schema.Unknown)
 type UnknownRecord = Schema.Schema.Type<typeof UnknownRecordSchema>
 
-const parseUnknownRecord = (value: unknown): UnknownRecord | undefined => {
-  try {
-    return Schema.decodeUnknownSync(UnknownRecordSchema)(value)
-  } catch {
-    return undefined
-  }
-}
+const decodeUnknownRecord = Schema.decodeUnknownOption(UnknownRecordSchema)
+const decodeUnknownArray = Schema.decodeUnknownOption(UnknownArraySchema)
 
-const parseUnknownRecordArray = (value: unknown): ReadonlyArray<UnknownRecord> => {
-  try {
-    return Schema.decodeUnknownSync(UnknownArraySchema)(value).flatMap((item) => {
-      const record = parseUnknownRecord(item)
-      return record === undefined ? [] : [record]
-    })
-  } catch {
-    return []
-  }
-}
+const parseUnknownRecord = (value: unknown): UnknownRecord | undefined =>
+  value === undefined ? undefined : Option.getOrUndefined(decodeUnknownRecord(value))
+
+const parseUnknownRecordArray = (value: unknown): ReadonlyArray<UnknownRecord> =>
+  value === undefined
+    ? []
+    : Option.match(decodeUnknownArray(value), {
+        onNone: () => [],
+        onSome: (items) =>
+          items.flatMap((item) => {
+            const record = parseUnknownRecord(item)
+            return record === undefined ? [] : [record]
+          })
+      })
 
 const mergeObjectFields = (sources: ReadonlyArray<unknown>): Record<string, unknown> | undefined => {
   const merged = sources.reduce<Record<string, unknown>>((acc, source) => {

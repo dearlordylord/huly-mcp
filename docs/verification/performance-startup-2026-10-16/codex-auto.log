@@ -1,0 +1,3 @@
+PASS connected to running Codex app-server and reloaded MCP config
+Host status: {"ms":4696.529708,"data":[{"name":"huly-pr319-perf-auto","status":"connected","error":null,"toolCount":6}]}
+PASS actual Codex business tool, ms=4724

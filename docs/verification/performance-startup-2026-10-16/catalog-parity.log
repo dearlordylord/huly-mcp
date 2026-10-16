@@ -1,0 +1,2 @@
+PASS exact auto tool/schema/catalog-search parity, 6 tools
+PASS exact native tool/schema/catalog-search parity, 606 tools
