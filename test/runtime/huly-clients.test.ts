@@ -1,5 +1,5 @@
 import { it } from "@effect/vitest"
-import { Cause, Deferred, Effect, Exit, Fiber, Layer } from "effect"
+import { Cause, ConfigProvider, Deferred, Effect, Exit, Fiber, Layer } from "effect"
 import { describe, expect } from "vitest"
 
 import { HulyClient } from "../../src/huly/client.js"
@@ -7,7 +7,11 @@ import { HulyConnectionError, HulyUnavailableError } from "../../src/huly/errors
 import { HulyStorageClient } from "../../src/huly/storage.js"
 import { normalizeHulyOrigin } from "../../src/huly/unavailable-diagnostics.js"
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
-import { buildScopedClientBundle, createClientResolver } from "../../src/runtime/huly-clients.js"
+import {
+  buildCombinedClientLayer,
+  buildScopedClientBundle,
+  createClientResolver
+} from "../../src/runtime/huly-clients.js"
 
 const clientLayer = Layer.merge(
   Layer.merge(HulyClient.testLayer({}), HulyStorageClient.testLayer({})),
@@ -15,6 +19,16 @@ const clientLayer = Layer.merge(
 )
 
 describe("shared Huly client runtime", () => {
+  it.effect("rejects missing default configuration before acquiring network clients", () =>
+    Effect.gen(function* () {
+      const error = yield* buildScopedClientBundle(buildCombinedClientLayer()).pipe(
+        Effect.provide(ConfigProvider.layer(ConfigProvider.fromUnknown({}))),
+        Effect.flip
+      )
+      expect(error._tag).toBe("ConfigValidationError")
+    })
+  )
+
   it("builds scoped client bundles and closes them exactly once", async () => {
     let releases = 0
     const trackedLayer = clientLayer.pipe(Layer.tap(() => Effect.addFinalizer(() => Effect.sync(() => releases++))))
