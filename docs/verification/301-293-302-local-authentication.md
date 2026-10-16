@@ -1,10 +1,19 @@
 # Local authentication implementation and qualification
 
+Latest host qualification: **FAIL** on the merged PR #318 runtime. The
+[final macOS report](macos-pr318-qualification-final-2026-10-15.md) confirms
+locked-import rejection/recovery and executable replacement checks, but exposes
+unavailable-Keychain logout reference loss and missing actionable MCP startup
+diagnostics. Follow-up [PR #319](https://github.com/dearlordylord/huly-mcp/pull/319)
+is tracked in [its correction receipt](293-unavailable-keychain-mcp-startup.md).
+#293 remains open; earlier passing locked-keychain receipts do not qualify the
+unavailable-keychain case or actual Codex diagnostics.
+
 Scope: GitHub #301 (private local token management), #293 (macOS Keychain), and
 #302 (Linux Secret Service), based on `1e74e625`. Worktree:
 `/tmp/hulymcp-local-auth`, branch `implement/local-auth-301-293-302`.
 
-## Current completion audit
+## PR #318 completion audit (historical)
 
 The combined objective is **incomplete**. Current runtime candidate `6bdaf85f`
 fixes the locked-Keychain logout blocker and passes fresh local `pnpm check-all`:

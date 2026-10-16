@@ -1,0 +1,8 @@
+Preparing packed CLI
+Creating isolated profile
+Created Huly profile 'shared-live'.
+Login complete; testing private token import and failed replacement
+Testing stdio with saved profile
+Testing changed destination
+Testing missing credential
+PASS: packed CLI login, shared CLI/stdio live reads, independent active selection, destination binding, prompt-free missing credential.

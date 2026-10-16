@@ -47,8 +47,31 @@ project reads, destination refusal and diagnostic-only startup after logout.
 
 The macOS workflow now installs both packed packages and tests search-list
 exclusion, lock, recovery and post-logout diagnostics through real SDK clients.
-Actual execution of this revised native fixture and the final full gate are
-pending. An earlier complete run passed 5,466 tests but failed branches at 98.99%;
+Candidate `6cce4477` passes fresh local `pnpm check-all`: 423 files / 5,472
+tests; coverage statements 99.47%, branches 99.00%, functions 99.03%, lines 99.57%.
+Build, TypeScript/Effect diagnostics, architecture, complexity, lint/duplication
+and complete test gates pass. The installed CLI/shared stdio workflow also passes
+against real GNOME Keyring 42.1 / private session D-Bus and local Huly, including
+lock and missing-session diagnostics, replacement preservation and unlock
+recovery. Two preceding native-fixture runs failed before this passing receipt:
+missing `secret-tool` on PATH, then an initial unlock password with an unintended
+newline. Neither is credited as passing runtime evidence; the fixture setup was
+corrected without weakening checks. No dependencies were reinstalled in the
+canonical Darwin checkout.
+
+[macOS run 38830401576](https://github.com/dearlordylord/huly-mcp/actions/runs/38830401576)
+has passed real CRUD and the installed CLI/MCP unavailable/locked/recovery/logout
+fixture on `6cce4477`. Both SDK protocol versions receive the diagnostic-only
+session. Node 22/24 CI ([run 38830401672](https://github.com/dearlordylord/huly-mcp/actions/runs/38830401672))
+and Package Smoke ([run 38830401578](https://github.com/dearlordylord/huly-mcp/actions/runs/38830401578)) pass.
+The first complete macOS gate fails in the unchanged resistant-descendant
+process-group cleanup test: `permission denied`, with 5,471 tests passing and
+one failing. This is not credited as a passing gate. The single failed-job rerun on the same candidate passes that process-group
+test but fails the unchanged private-token-input `64 KiB` rejection test at its
+5-second timeout (5,471 passed / one failed). Native CRUD and the installed
+CLI/MCP fixture pass again. Thus neither macOS full gate is credited as passing;
+no process-custody behavior, test expectation or timeout was changed. Further
+macOS harness qualification remains pending. An earlier complete run passed 5,466 tests but failed branches at 98.99%;
 subsequent retirement changes require a new receipt. No thresholds, timeouts,
 inventory or diagnostics were reduced. Intermediate compiler/lint failures were
 corrected without changing their gates.
@@ -57,3 +80,14 @@ Actual Codex presentation after this correction has not been observed. The
 report's separate normal-start timeout after executable replacement remains an
 unestablished failure; a diagnostic-handshake test does not prove its cause or
 resolution. Keep these limitations distinct from the F1/F2 correction evidence.
+
+
+Local receipts on `6cce4477`:
+
+- [Complete gate](293-unavailable-keychain-mcp-startup/local-check-all.log): PASS, 5,472 tests and all four coverage metrics at least 99%.
+- [File profile / local Huly](293-unavailable-keychain-mcp-startup/local-file.log): PASS.
+- [Real Secret Service / local Huly](293-unavailable-keychain-mcp-startup/local-native.log): PASS, including CLI/MCP lock and missing-session diagnostics and recovery.
+
+These receipt files were scanned for secrets before retention. The predecessor's
+host qualification remains FAIL; these are new-candidate evidence, not edits to
+its observations.
