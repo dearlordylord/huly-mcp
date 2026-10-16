@@ -21,6 +21,6 @@ See `docs/verification/startup-production-321/REPORT.md` for raw measurements, l
 
 ## Merge Danger
 
-Changes affect shared Huly initialization and tool dispatch across MCP and CLI. No data migration is involved. Full-model behavior is retained for every operation except the qualified project-summary read. Mutation integration and actual Codex invocation remain pending under the operator's current restriction; this candidate is not certified for release.
+Changes affect shared Huly initialization and tool dispatch across MCP and CLI. No data migration is involved. Full-model behavior is retained for every operation except the qualified project-summary read. The operator authorized delivery to master and full local-Huly integration qualification. MCP 0.54.0 / CLI 0.52.0 are prepared; npm publication has not occurred. Final mutation-integration results are pending qualification.
 
 Refs #321.

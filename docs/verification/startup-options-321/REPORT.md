@@ -1,6 +1,6 @@
 # MCP startup experiments and recommended direction
 
-Current decision evidence for [#321](https://github.com/dearlordylord/huly-mcp/issues/321), 2026-10-16. This is an experimental comparison, not a production implementation or a proposal to merge the prototype transformations.
+Current decision evidence for [#321](https://github.com/dearlordylord/huly-mcp/issues/321), 2026-10-16. The throwaway executable prototypes have been removed after replacement by production code. Current implementation and qualification are recorded in [the production report](../startup-production-321/REPORT.md); this report retains the useful design comparisons.
 
 ## Recommendation
 

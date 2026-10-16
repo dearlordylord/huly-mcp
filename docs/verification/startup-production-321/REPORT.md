@@ -1,6 +1,6 @@
 # MCP startup implementation and verification
 
-Implementation for [#321](https://github.com/dearlordylord/huly-mcp/issues/321), prepared in PR #320. Production source replaces the experimental transformations; the prototype is retained pending permission to remove it. No merge, release, Codex configuration change, or external message is part of this verification.
+Implementation for [#321](https://github.com/dearlordylord/huly-mcp/issues/321), prepared in PR #320. Production source replaces the experimental transformations. The user subsequently authorized delivery to master, the next version bump and full integration qualification. One-off executable prototypes and generated experimental bundles have been removed; measured design comparisons remain. npm publication and Codex configuration changes are outside this delivery.
 
 ## Implemented design
 
@@ -36,7 +36,7 @@ The default MCP SDK client compiles every cached output schema on its first `cal
 
 Focused lifecycle, metadata, projects, recovery and lazy-handler checks pass. The complete quality gate and final build measurements are recorded below. No quality threshold, timeout, expected catalog, or external dependency inventory has been relaxed.
 
-The local-Huly comparison is read-only. Whole-server/CLI mutation campaigns and actual Codex tool invocation remain pending under the user's current restriction on destructive actions and tool dispatch. An earlier native integration run reached 102 passing checks before being stopped on an older candidate; it is not final integration evidence.
+The local-Huly comparison is read-only. Whole-server/CLI mutation campaigns are now authorized and their release-candidate results will be recorded separately. Actual Codex desktop invocation remains a separate host qualification. An earlier native integration run reached 102 passing checks before being stopped on an older candidate; it is not final integration evidence.
 
 ## Review
 
