@@ -2,7 +2,6 @@ import {
   createMilestoneParamsJsonSchema,
   deleteMilestoneParamsJsonSchema,
   getMilestoneParamsJsonSchema,
-  HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
   listMilestonesParamsJsonSchema,
   parseCreateMilestoneParams,
   parseDeleteMilestoneParams,
@@ -11,9 +10,7 @@ import {
   parseSetIssueMilestoneParams,
   parseUpdateMilestoneParams,
   setIssueMilestoneParamsJsonSchema,
-  updateMilestoneParamsJsonSchema
-} from "../../domain/schemas.js"
-import {
+  updateMilestoneParamsJsonSchema,
   CreateMilestoneResultSchema,
   DeleteMilestoneResultSchema,
   GetMilestoneResultSchema,
@@ -21,6 +18,7 @@ import {
   SetIssueMilestoneResultSchema,
   UpdateMilestoneResultSchema
 } from "../../domain/schemas/milestones.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "../../domain/schemas/document-native-references.js"
 import {
   createMilestone,
   deleteMilestone,

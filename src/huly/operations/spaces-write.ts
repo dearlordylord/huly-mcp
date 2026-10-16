@@ -1,23 +1,30 @@
 import type { AccountUuid as HulyAccountUuid, DocumentUpdate, Role, Space, SpaceType } from "@hcengineering/core"
 import { Effect } from "effect"
 
-import type {
-  SetSpaceOwnersParams,
-  SetSpaceOwnersResult,
-  SetSpaceRoleMembersParams,
-  SpaceMemberMutationParams,
-  SpaceMemberMutationResult,
-  SpaceRoleMemberMutationParams,
-  SpaceRoleMembersResult,
-  UpdateSpaceParams,
-  UpdateSpaceResult
-} from "../../domain/schemas.js"
-import { DEFAULT_SPACE_OWNER_ENSURE_MEMBERS, UPDATE_SPACE_FIELDS } from "../../domain/schemas.js"
+import {
+  type SetSpaceOwnersParams,
+  type SetSpaceOwnersResult,
+  type SetSpaceRoleMembersParams,
+  type SpaceMemberMutationParams,
+  type SpaceMemberMutationResult,
+  type SpaceRoleMemberMutationParams,
+  type SpaceRoleMembersResult,
+  type UpdateSpaceParams,
+  type UpdateSpaceResult,
+  DEFAULT_SPACE_OWNER_ENSURE_MEMBERS,
+  UPDATE_SPACE_FIELDS
+} from "../../domain/schemas/spaces.js"
+
 import { AccountUuid, NonEmptyString, RoleId, SpaceId, SpaceTypeId } from "../../domain/schemas/shared.js"
 import { assertAt } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
-import type { SpaceRoleAssignmentsMalformedError } from "../errors-spaces.js"
-import { SpaceNotTypedError, SpaceRoleIdentifierAmbiguousError, SpaceRoleNotFoundError } from "../errors-spaces.js"
+import {
+  type SpaceRoleAssignmentsMalformedError,
+  SpaceNotTypedError,
+  SpaceRoleIdentifierAmbiguousError,
+  SpaceRoleNotFoundError
+} from "../errors-spaces.js"
+
 import { core } from "../huly-plugins.js"
 import { clearTextAsEmptyString } from "./clear-field-updates.js"
 import { hulyQuery } from "./query-helpers.js"

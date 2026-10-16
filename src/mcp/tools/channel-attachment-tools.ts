@@ -9,7 +9,7 @@ import {
   parseListChatMessageAttachmentsParams,
   parseUpdateChatMessageAttachmentParams,
   updateChatMessageAttachmentParamsJsonSchema
-} from "../../domain/schemas.js"
+} from "../../domain/schemas/chat-message-attachments.js"
 import {
   AddChatMessageAttachmentResultSchema,
   DeleteChatMessageAttachmentResultSchema,

@@ -1,3 +1,4 @@
+import { expectRegisteredMetadata } from "../../helpers/registered-tool.js"
 import { assertAt } from "../../../src/utils/assertions.js"
 /* eslint-disable no-restricted-syntax -- Huly SDK phantom refs are erased at runtime; this test file builds in-memory SDK fixtures. */
 import { describe, it } from "@effect/vitest"
@@ -296,7 +297,7 @@ describe("driveTools", () => {
 
       for (const tool of driveTools) {
         expect(tool.category).toBe("drive")
-        expect(TOOL_DEFINITIONS[tool.name]).toBe(tool)
+        expectRegisteredMetadata(TOOL_DEFINITIONS[tool.name], tool)
       }
 
       expect(driveTools.find((tool) => tool.name === "move_drive_item")?.description).toContain("file or folder")

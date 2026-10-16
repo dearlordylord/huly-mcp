@@ -9,16 +9,14 @@ import {
   parseGetProjectTypeParams,
   parseListProjectTypesParams,
   parseListTaskTypesParams,
-  StatusCategoryValues
-} from "../../domain/schemas.js"
-import { enumValuesDescription } from "../../domain/schemas/shared.js"
-import {
+  StatusCategoryValues,
   CreateIssueStatusResultSchema,
   CreateTaskTypeResultSchema,
   GetProjectTypeResultSchema,
   ListProjectTypesResultSchema,
   ListTaskTypesResultSchema
 } from "../../domain/schemas/task-management.js"
+import { enumValuesDescription } from "../../domain/schemas/shared.js"
 import {
   createIssueStatus,
   createTaskType,

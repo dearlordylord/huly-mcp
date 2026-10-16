@@ -3,33 +3,30 @@ import { SortingOrder } from "@hcengineering/core"
 import type { FilteredView, Viewlet, ViewletDescriptor, ViewletPreference } from "@hcengineering/view"
 import { Effect } from "effect"
 
-import type {
-  BoardCommonPreferenceResult,
-  BoardSavedViewDetail,
-  BoardSavedViewSummary,
-  BoardViewletSummary,
-  GetBoardSavedViewParams,
-  ListBoardMenuPagesParams,
-  ListBoardMenuPagesResult,
-  ListBoardSavedViewsParams,
-  ListBoardSavedViewsResult,
-  ListBoardViewletsParams,
-  ListBoardViewletsResult
-} from "../../domain/schemas.js"
 import {
+  type BoardCommonPreferenceResult,
+  type BoardSavedViewDetail,
+  type BoardSavedViewSummary,
+  type BoardViewletSummary,
+  type GetBoardSavedViewParams,
+  type ListBoardMenuPagesParams,
+  type ListBoardMenuPagesResult,
+  type ListBoardSavedViewsParams,
+  type ListBoardSavedViewsResult,
+  type ListBoardViewletsParams,
+  type ListBoardViewletsResult,
+  type BoardMenuPageIdentifier,
+  type BoardSavedViewIdentifier,
+  type BoardViewletIdentifier,
   BoardCommonPreferenceId,
   BoardMenuPageId,
   BoardSavedViewId,
   BoardViewletDescriptorId,
   BoardViewletId,
-  BoardViewletPreferenceId,
-  Count
-} from "../../domain/schemas.js"
-import type {
-  BoardMenuPageIdentifier,
-  BoardSavedViewIdentifier,
-  BoardViewletIdentifier
+  BoardViewletPreferenceId
 } from "../../domain/schemas/board-views.js"
+
+import { Count } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import {
   BoardMenuPageIdentifierAmbiguousError,

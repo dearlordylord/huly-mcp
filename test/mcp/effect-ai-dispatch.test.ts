@@ -506,6 +506,27 @@ const clientService = (name: string) =>
   })
 
 describe("Effect AI registered tool handlers", () => {
+  it("starts optional background preparation once on discovery without waiting for it", () => {
+    let starts = 0
+    const visible = effectMcpFirstListVisibility(
+      {
+        resolveClients: failedResolver,
+        telemetry: { sessionStart: () => {}, firstListTools: () => {}, toolCalled: () => {}, shutdown: async () => {} },
+        registry: toolRegistry,
+        getHulyContext: (exposure) => Effect.succeed(contextResult(exposure)),
+        onDiscovery: () => {
+          starts++
+        }
+      },
+      protocols,
+      proxyOptions
+    )
+    expect(starts).toBe(0)
+    expect(visible(initializePayload("codex-cli"))).toBe(true)
+    expect(visible(initializePayload("codex-cli"))).toBe(true)
+    expect(starts).toBe(1)
+  })
+
   it("applies initialized-client exposure, telemetry, and quiescing", async () => {
     const calls: Array<ToolCalledProps> = []
     const firstLists: Array<unknown> = []

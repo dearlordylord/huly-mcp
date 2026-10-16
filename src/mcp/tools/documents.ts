@@ -3,7 +3,6 @@ import {
   createTeamspaceParamsJsonSchema,
   deleteDocumentParamsJsonSchema,
   deleteTeamspaceParamsJsonSchema,
-  DOCUMENT_NATIVE_REFERENCE_TOOL_USAGE,
   editDocumentParamsJsonSchema,
   getDocumentParamsJsonSchema,
   getTeamspaceParamsJsonSchema,
@@ -21,9 +20,7 @@ import {
   parseListInlineCommentsParams,
   parseListTeamspacesParams,
   parseUpdateTeamspaceParams,
-  updateTeamspaceParamsJsonSchema
-} from "../../domain/schemas.js"
-import {
+  updateTeamspaceParamsJsonSchema,
   CreateDocumentResultSchema,
   CreateTeamspaceResultSchema,
   DeleteDocumentResultSchema,
@@ -36,6 +33,7 @@ import {
   ListTeamspacesResultSchema,
   UpdateTeamspaceResultSchema
 } from "../../domain/schemas/documents.js"
+import { DOCUMENT_NATIVE_REFERENCE_TOOL_USAGE } from "../../domain/schemas/document-native-references.js"
 import {
   createDocument,
   createTeamspace,

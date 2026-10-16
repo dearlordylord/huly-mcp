@@ -6,32 +6,52 @@
  *
  * @module
  */
-import type { Data, DocumentQuery, DocumentUpdate, Ref, Space } from "@hcengineering/core"
-import { generateId, SortingOrder } from "@hcengineering/core"
-import type { IssueStatus, Project as HulyProject } from "@hcengineering/tracker"
-import { TimeReportDayType } from "@hcengineering/tracker"
+/**
+ * Project domain operations for Huly MCP server.
+ *
+ * Provides typed operations for querying projects from Huly platform.
+ * Operations use HulyClient service and return typed domain objects.
+ *
+ * @module
+ */
+import {
+  type Data,
+  type DocumentQuery,
+  type DocumentUpdate,
+  type Ref,
+  type Space,
+  generateId,
+  SortingOrder
+} from "@hcengineering/core"
+
+import { type IssueStatus, type Project as HulyProject, TimeReportDayType } from "@hcengineering/tracker"
+
 import { Effect, Schema } from "effect"
 
-import type {
-  CreateProjectParams,
-  CreateProjectResult,
-  DeleteProjectParams,
-  DeleteProjectResult,
-  GetProjectParams,
-  ListProjectsParams,
-  ListProjectsResult,
-  ListStatusesParams,
-  Project,
-  UpdateProjectParams,
-  UpdateProjectResult
-} from "../../domain/schemas.js"
-import type { ListStatusesResult, StatusDetail } from "../../domain/schemas/projects.js"
-import { parseProject, ProjectSummarySchema, UPDATE_PROJECT_FIELDS } from "../../domain/schemas/projects.js"
+import {
+  type CreateProjectParams,
+  type CreateProjectResult,
+  type DeleteProjectParams,
+  type DeleteProjectResult,
+  type GetProjectParams,
+  type ListProjectsParams,
+  type ListProjectsResult,
+  type ListStatusesParams,
+  type Project,
+  type UpdateProjectParams,
+  type UpdateProjectResult,
+  type ListStatusesResult,
+  type StatusDetail,
+  parseProject,
+  ProjectSummarySchema,
+  UPDATE_PROJECT_FIELDS
+} from "../../domain/schemas/projects.js"
+
 import { ProjectIdentifier, StatusName } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type { Diagnostics } from "../diagnostics.js"
-import type { NoUpdateFieldsError, ProjectNotFoundError } from "../errors.js"
-import { HulyDataInvalidError } from "../errors.js"
+import { type NoUpdateFieldsError, type ProjectNotFoundError, HulyDataInvalidError } from "../errors.js"
+
 import { tracker } from "../huly-plugins.js"
 import { listTotal } from "./counts.js"
 import { findProject, findProjectWithStatuses } from "./issues-shared.js"
@@ -59,10 +79,10 @@ export const listProjects = (
 
     const limit = clampLimit(params.limit)
 
-    const projects = yield* client.findAll<HulyProject>(tracker.class.Project, query, {
-      limit,
-      sort: { name: SortingOrder.Ascending }
-    })
+    const options = { limit, sort: { name: SortingOrder.Ascending } }
+    const projects = yield* client.findProjectDocuments === undefined
+      ? client.findAll<HulyProject>(tracker.class.Project, query, options)
+      : client.findProjectDocuments(query, options)
 
     const total = projects.total
 

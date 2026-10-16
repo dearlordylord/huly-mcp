@@ -1,6 +1,6 @@
 import type { Employee, Person } from "@hcengineering/contact"
-import type { Ref } from "@hcengineering/core"
-import { SortingOrder } from "@hcengineering/core"
+import { type Ref, SortingOrder } from "@hcengineering/core"
+
 import type { Department as HulyDepartment, Staff as HulyStaff } from "@hcengineering/hr"
 import { Effect, Schema } from "effect"
 

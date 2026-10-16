@@ -10,9 +10,7 @@ import {
   parseListProjectsParams,
   parseListStatusesParams,
   parseUpdateProjectParams,
-  updateProjectParamsJsonSchema
-} from "../../domain/schemas.js"
-import {
+  updateProjectParamsJsonSchema,
   CreateProjectResultSchema,
   DeleteProjectResultSchema,
   GetProjectResultSchema,

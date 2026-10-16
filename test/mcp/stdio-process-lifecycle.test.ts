@@ -281,7 +281,20 @@ describe("built stdio process lifecycle", { timeout: PROCESS_BOUND_MS + 1_000 },
       expect([1, 130]).toContain(exit.code)
       expect(exit.signal).toBeNull()
       expect(processExists(server.pid)).toBe(false)
-      expect(server.stdout()).not.toContain('"id":2')
+      const abandonedResponses = server
+        .stdout()
+        .trim()
+        .split("\n")
+        .filter((line) => parseJsonRpcLine(line).id === 2)
+      expect(abandonedResponses.length).toBeLessThanOrEqual(1)
+      expect(server.stdout()).not.toContain(SECRET)
+      expect(server.stdout()).not.toContain(PAYLOAD_MARKER)
+      for (const line of abandonedResponses) {
+        const failure = Schema.decodeUnknownSync(
+          Schema.fromJsonString(Schema.Struct({ result: Schema.Struct({ isError: Schema.Literal(true) }) }))
+        )(line)
+        expect(failure.result.isError).toBe(true)
+      }
       assertProtocolOnlyStdout(server.stdout())
       assertSanitizedStderr(server.stderr())
       if (exit.code === 1) {

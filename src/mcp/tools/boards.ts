@@ -1,54 +1,18 @@
 import {
   addBoardCardLabelParamsJsonSchema,
-  BoardCardDetailSchema,
   boardCardLabelParamsJsonSchema,
-  boardCardMutationParamsJsonSchema,
-  BoardDetailSchema,
-  boardMutationParamsJsonSchema,
-  BoardSavedViewDetailSchema,
-  createBoardCardParamsJsonSchema,
   createBoardLabelParamsJsonSchema,
-  createBoardParamsJsonSchema,
   deleteBoardLabelParamsJsonSchema,
-  getBoardCardParamsJsonSchema,
-  getBoardCommonPreferenceParamsJsonSchema,
-  getBoardParamsJsonSchema,
-  getBoardSavedViewParamsJsonSchema,
-  HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
-  listBoardCardsParamsJsonSchema,
   listBoardLabelsParamsJsonSchema,
-  listBoardMenuPagesParamsJsonSchema,
-  listBoardSavedViewsParamsJsonSchema,
-  listBoardsParamsJsonSchema,
-  listBoardViewletsParamsJsonSchema,
   parseAddBoardCardLabelParams,
   parseBoardCardLabelParams,
-  parseBoardCardMutationParams,
-  parseBoardMutationParams,
-  parseCreateBoardCardParams,
   parseCreateBoardLabelParams,
-  parseCreateBoardParams,
   parseDeleteBoardLabelParams,
-  parseGetBoardCardParams,
-  parseGetBoardCommonPreferenceParams,
-  parseGetBoardParams,
-  parseGetBoardSavedViewParams,
-  parseListBoardCardsParams,
   parseListBoardLabelsParams,
-  parseListBoardMenuPagesParams,
-  parseListBoardSavedViewsParams,
-  parseListBoardsParams,
-  parseListBoardViewletsParams,
   parseRemoveBoardCardLabelParams,
-  parseUpdateBoardCardParams,
   parseUpdateBoardLabelParams,
-  parseUpdateBoardParams,
   removeBoardCardLabelParamsJsonSchema,
-  updateBoardCardParamsJsonSchema,
   updateBoardLabelParamsJsonSchema,
-  updateBoardParamsJsonSchema
-} from "../../domain/schemas.js"
-import {
   AddBoardCardLabelResultSchema,
   BoardLabelMutationResultSchema,
   ListBoardCardLabelsResultSchema,
@@ -56,12 +20,8 @@ import {
   RemoveBoardCardLabelResultSchema
 } from "../../domain/schemas/board-labels.js"
 import {
-  BoardCommonPreferenceResultSchema,
-  ListBoardMenuPagesResultSchema,
-  ListBoardSavedViewsResultSchema,
-  ListBoardViewletsResultSchema
-} from "../../domain/schemas/board-views.js"
-import {
+  BoardCardDetailSchema,
+  BoardDetailSchema,
   BoardCardMutationResultSchema,
   BoardMutationResultSchema,
   CreateBoardCardResultSchema,
@@ -70,6 +30,47 @@ import {
   ListBoardCardsResultSchema,
   ListBoardsResultSchema
 } from "../../domain/schemas/boards-results.js"
+import {
+  boardCardMutationParamsJsonSchema,
+  boardMutationParamsJsonSchema,
+  createBoardCardParamsJsonSchema,
+  createBoardParamsJsonSchema,
+  getBoardCardParamsJsonSchema,
+  getBoardParamsJsonSchema,
+  listBoardCardsParamsJsonSchema,
+  listBoardsParamsJsonSchema,
+  parseBoardCardMutationParams,
+  parseBoardMutationParams,
+  parseCreateBoardCardParams,
+  parseCreateBoardParams,
+  parseGetBoardCardParams,
+  parseGetBoardParams,
+  parseListBoardCardsParams,
+  parseListBoardsParams,
+  parseUpdateBoardCardParams,
+  parseUpdateBoardParams,
+  updateBoardCardParamsJsonSchema,
+  updateBoardParamsJsonSchema
+} from "../../domain/schemas/boards.js"
+import {
+  BoardSavedViewDetailSchema,
+  getBoardCommonPreferenceParamsJsonSchema,
+  getBoardSavedViewParamsJsonSchema,
+  listBoardMenuPagesParamsJsonSchema,
+  listBoardSavedViewsParamsJsonSchema,
+  listBoardViewletsParamsJsonSchema,
+  parseGetBoardCommonPreferenceParams,
+  parseGetBoardSavedViewParams,
+  parseListBoardMenuPagesParams,
+  parseListBoardSavedViewsParams,
+  parseListBoardViewletsParams,
+  BoardCommonPreferenceResultSchema,
+  ListBoardMenuPagesResultSchema,
+  ListBoardSavedViewsResultSchema,
+  ListBoardViewletsResultSchema
+} from "../../domain/schemas/board-views.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "../../domain/schemas/document-native-references.js"
+
 import {
   addBoardCardLabel,
   createBoardLabel,

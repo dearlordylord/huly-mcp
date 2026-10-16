@@ -25,7 +25,7 @@ import * as Stream from "effect/Stream"
 import { McpProtocol, McpServer } from "effect/ai"
 
 import { type SanitizedHulyRuntimeConfigContext, sanitizeHulyRuntimeConfigFromEnv } from "../config/config.js"
-import type { GetHulyContextResult } from "../domain/schemas/index.js"
+import type { GetHulyContextResult } from "../domain/schemas/huly-context.js"
 import type { ClientBundle, ClientResolver, HulyClientBundleError } from "../runtime/client-resolver.js"
 import { VERSION } from "../version.js"
 import { makeEffectMcpRegistry, type EffectMcpRegistry } from "./effect-ai-registry.js"
@@ -72,6 +72,7 @@ interface McpServerConfigData {
 }
 
 interface McpServerConfigCallbacks {
+  readonly onDiscovery?: () => void
   readonly observeMovement?: MovementStageObserver
   readonly resolveClients: ClientResolver
   readonly resolveClientLeaseForHttpRequest?: (
@@ -379,6 +380,7 @@ export class McpServerService extends Context.Service<McpServerService, McpServe
                 const runtimeConfig = getRuntimeConfigContext()
                 const registry = makeEffectMcpRegistry({
                   resolveClients: config.resolveClients,
+                  ...(config.onDiscovery === undefined ? {} : { onDiscovery: config.onDiscovery }),
                   ...(config.observeMovement === undefined ? {} : { observeMovement: config.observeMovement }),
                   telemetry,
                   registry: registries,

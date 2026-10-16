@@ -1,5 +1,5 @@
 import { once } from "node:events"
-import { createServer } from "node:http"
+import { createServer, type ServerResponse } from "node:http"
 import { Client } from "@modelcontextprotocol/client"
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"
 import { afterAll, beforeAll, expect, it } from "vitest"
@@ -18,13 +18,16 @@ afterAll(async () => {
 })
 
 it.each(["2025-06-18", "2026-07-28"])(
-  "completes %s stdio discovery before connecting to Huly",
+  "completes %s stdio discovery while Huly initialization is blocked",
   { timeout: 30000 },
   async (version) => {
     let requests = 0
+    let releaseResponses = false
+    const held: Array<ServerResponse> = []
     const endpoint = createServer((_request, response) => {
       requests += 1
-      response.writeHead(503).end()
+      if (releaseResponses) response.writeHead(503).end()
+      else held.push(response)
     })
     endpoint.listen(0, "127.0.0.1")
     await once(endpoint, "listening")
@@ -51,7 +54,8 @@ it.each(["2025-06-18", "2026-07-28"])(
       await client.connect(transport, { timeout: 10000 })
       const listed = await client.listTools()
       expect(listed.tools.some((tool) => tool.name === "list_projects")).toBe(true)
-      expect(requests).toBe(0)
+      releaseResponses = true
+      for (const response of held) response.writeHead(503).end()
       const result = await client.callTool({ name: "list_projects", arguments: {} })
       expect(requests).toBeGreaterThan(0)
       expect(result.isError).toBe(true)

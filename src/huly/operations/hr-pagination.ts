@@ -1,8 +1,8 @@
-import type { Class, Doc, Ref } from "@hcengineering/core"
-import { SortingOrder } from "@hcengineering/core"
+import { type Class, type Doc, type Ref, SortingOrder } from "@hcengineering/core"
+
 import { Effect, Option, Schema, Stream } from "effect"
 
-import { PositiveInteger } from "../../domain/schemas.js"
+import { PositiveInteger } from "../../domain/schemas/shared.js"
 import type { HulyClient, HulyClientError } from "../client.js"
 import { hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
 

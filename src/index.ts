@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { preloadToolHandlers } from "./mcp/tools/index.js"
 /**
  * Main entry point for Huly MCP server.
  *
@@ -48,7 +49,7 @@ import {
   HttpServerFactoryService
 } from "./mcp/http-transport.js"
 import type { RequestClientLease } from "./mcp/request-client-lifecycle.js"
-import { type McpServerError, McpServerService, type McpTransportType } from "./mcp/server.js"
+import { McpServerError, McpServerService, type McpTransportType } from "./mcp/server.js"
 import { type ConsoleRedirectHandle, redirectConsoleToStderr } from "./mcp/stdio-output.js"
 import { buildCombinedClientLayer, createClientResolver } from "./runtime/huly-clients.js"
 import type { ClientBundle, ClientResolver, HulyClientBundleError } from "./runtime/client-resolver.js"
@@ -154,6 +155,13 @@ export const buildAppLayer = (
     ...(mcpAuthToken === undefined ? {} : { mcpAuthToken }),
     authMethod,
     resolveClients,
+    ...(transport === "stdio"
+      ? {
+          onDiscovery: () => {
+            void resolveClients()
+          }
+        }
+      : {}),
     ...(observeMovement === undefined ? {} : { observeMovement }),
     ...(closeClients === undefined ? {} : { closeClients }),
     resolveClientLeaseForHttpRequest,
@@ -219,11 +227,17 @@ const runConfiguredServer = (transport: McpTransportType): Effect.Effect<void, A
         : HulyConfigService.layer.pipe(Layer.provide(ConfigProvider.layer(resolvedConfigProvider(profile))))
     // Validate once before discovery; Huly network acquisition belongs to the requested operation.
     const clientConfigLayer = yield* prepareClientConfig(configLayer, transport, lazyEnvs)
+    if (yield* Config.Boolean("MCP_PRELOAD_TOOLS").pipe(Config.withDefault(false))) {
+      yield* preloadToolHandlers.pipe(Effect.mapError((error) => new McpServerError({ message: error.message })))
+    }
     const combinedClientLayer = buildCombinedClientLayer(clientConfigLayer)
     yield* Effect.acquireUseRelease(
       Effect.sync(() => createClientResolver(combinedClientLayer)),
       ({ close: closeClients, resolve: resolveClients }) => {
-        const resolveHttpClientLease = createHttpClientLeaseResolver(combinedClientLayer, resolveClients)
+        const resolveHttpClientLease = createHttpClientLeaseResolver(
+          buildCombinedClientLayer(clientConfigLayer, "on-demand"),
+          resolveClients
+        )
         return Effect.gen(function* () {
           // stdout reserved for MCP protocol in stdio mode - no console output here
           const appLayer = buildAppLayer(

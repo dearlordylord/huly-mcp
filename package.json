@@ -23,7 +23,7 @@
     "prepare": "husky",
     "start": "node dist/index.cjs",
     "build": "pnpm build:mcp && pnpm build:cli",
-    "build:mcp": "PKG_VERSION=$(node -p \"require('./package.json').version\") NODE_ENGINE_REQUIREMENT=$(node -p \"require('./package.json').engines.node\") && esbuild src/launcher.ts --bundle --platform=node --format=cjs --log-level=warning --outfile=dist/index.cjs --external:ws --external:@napi-rs/keyring --external:dbus-next \"--define:PKG_VERSION=\\\"$PKG_VERSION\\\"\" \"--define:NODE_ENGINE_REQUIREMENT=\\\"$NODE_ENGINE_REQUIREMENT\\\"\"",
+    "build:mcp": "pnpm verify-tool-catalog && PKG_VERSION=$(node -p \"require('./package.json').version\") NODE_ENGINE_REQUIREMENT=$(node -p \"require('./package.json').engines.node\") && esbuild src/launcher.ts --bundle --platform=node --format=cjs --log-level=warning --outfile=dist/index.cjs --external:ws --external:@napi-rs/keyring --external:dbus-next \"--define:PKG_VERSION=\\\"$PKG_VERSION\\\"\" \"--define:NODE_ENGINE_REQUIREMENT=\\\"$NODE_ENGINE_REQUIREMENT\\\"\"",
     "build:cli": "pnpm --filter @firfi/huly-cli build",
     "typecheck": "pnpm typecheck:tsc && pnpm typecheck:effect",
     "typecheck:tsc": "node node_modules/@typescript/native/bin/tsc -p tsconfig.json --noEmit 2>&1 | grep -v \": suggestion TS\" | { grep -E '^(src/|packages/|scripts/|test/|tsconfig\\.json)' && exit 1 || exit 0; }",
@@ -73,7 +73,9 @@
     "verify-movement-fixtures": "node scripts/verify-movement-fixtures.mjs",
     "test:movement-process": "node --test --test-reporter=dot scripts/completion-evidence.test.mjs scripts/verify-movement-fixtures.test.mjs scripts/movement-artifact-hashes.test.mjs scripts/issue-tree-aggregates.test.mjs scripts/issue-tree-completion.test.mjs scripts/issue-tree-ledger.test.mjs scripts/integration-mcp-adapter.test.mjs scripts/issue-movement-concurrency/select-cases.test.mjs test/scripts/run-movement-certification.node.test.mjs",
     "integration:movement": "node scripts/run-movement-certification.mjs --prepare scripts/prepare-movement-certification.sh",
-    "verify-completion-evidence": "node scripts/verify-completion-evidence.mjs"
+    "verify-completion-evidence": "node scripts/verify-completion-evidence.mjs",
+    "update-tool-catalog": "node scripts/run-bundled.mjs scripts/update-tool-catalog.ts",
+    "verify-tool-catalog": "node scripts/run-bundled.mjs scripts/update-tool-catalog.ts --check"
   },
   "bin": {
     "huly-mcp": "./dist/index.cjs"

@@ -1,5 +1,8 @@
-import { listUserStatusesParamsJsonSchema, parseListUserStatusesParams } from "../../domain/schemas.js"
-import { ListUserStatusesResultSchema } from "../../domain/schemas/user-statuses.js"
+import {
+  listUserStatusesParamsJsonSchema,
+  parseListUserStatusesParams,
+  ListUserStatusesResultSchema
+} from "../../domain/schemas/user-statuses.js"
 import { listUserStatuses } from "../../huly/operations/user-statuses.js"
 import { defineTool, type RegisteredTool } from "./registry.js"
 const CATEGORY = "user-statuses" as const

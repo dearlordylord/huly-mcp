@@ -1,4 +1,4 @@
-import { Count, DEFAULT_LIMIT, NonNegativeInteger } from "../../domain/schemas.js"
+import { Count, DEFAULT_LIMIT, NonNegativeInteger } from "../../domain/schemas/shared.js"
 
 export const pageHrRequestResults = <T>(
   items: ReadonlyArray<T>,

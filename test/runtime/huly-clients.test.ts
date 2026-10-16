@@ -19,13 +19,16 @@ const clientLayer = Layer.merge(
 )
 
 describe("shared Huly client runtime", () => {
-  it.effect("rejects missing default configuration before acquiring network clients", () =>
+  it.effect("rejects missing configuration before network acquisition in background and on-demand modes", () =>
     Effect.gen(function* () {
-      const error = yield* buildScopedClientBundle(buildCombinedClientLayer()).pipe(
-        Effect.provide(ConfigProvider.layer(ConfigProvider.fromUnknown({}))),
-        Effect.flip
-      )
-      expect(error._tag).toBe("ConfigValidationError")
+      for (const mode of ["background", "on-demand"] as const) {
+        const layer = mode === "background" ? buildCombinedClientLayer() : buildCombinedClientLayer(undefined, mode)
+        const error = yield* buildScopedClientBundle(layer).pipe(
+          Effect.provide(ConfigProvider.layer(ConfigProvider.fromUnknown({}))),
+          Effect.flip
+        )
+        expect(error._tag).toBe("ConfigValidationError")
+      }
     })
   )
 

@@ -135,7 +135,7 @@ const defaultRunnerPorts: CliRunnerPorts = {
   writeImage: writeImageToFile,
   useClientBundle: (use) =>
     Effect.acquireUseRelease(
-      buildScopedClientBundle(buildCombinedClientLayer()).pipe(
+      buildScopedClientBundle(buildCombinedClientLayer(undefined, "on-demand")).pipe(
         Effect.mapError((error) => new CliRuntimeError({ message: errorMessage(error) }))
       ),
       ({ bundle }) => use(bundle),

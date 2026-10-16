@@ -294,6 +294,7 @@ For a Smithery publish schema example, see [docs/SMITHERY_URL_PUBLISH.md](docs/S
 | `HULY_WORKSPACE` | Yes | Workspace identifier |
 | `HULY_CONNECTION_TIMEOUT` | No | Connection timeout in ms. Omit to use the package default. |
 | `MCP_TRANSPORT` | No | Transport type: `stdio` (default) or `http` |
+| `MCP_PRELOAD_TOOLS` | No | Load every tool handler before serving requests. Defaults to `false`; use `true` for smoke tests that check all handler imports. |
 | `MCP_HTTP_PORT` | No | HTTP server port (falls back to `PORT`, then 3000) |
 | `MCP_HTTP_HOST` | No | HTTP server host. Omit to bind to the package default loopback host. |
 | `MCP_AUTH_TOKEN` | No | Optional bearer token required by HTTP clients for `/mcp`. This protects the MCP endpoint only; it is not a Huly API token. |
@@ -305,6 +306,14 @@ For a Smithery publish schema example, see [docs/SMITHERY_URL_PUBLISH.md](docs/S
 
 *Auth: Prefer `HULY_TOKEN`. Use `HULY_EMAIL` + `HULY_PASSWORD` only when the Huly deployment does not support a
 managed API token or another compatibility constraint requires password authentication.
+
+## Startup and initialization
+
+Tool discovery reads a generated catalog without loading operation handlers or waiting for Huly. Handlers load by tool group on demand; concurrent calls share the group's load. Run `pnpm update-tool-catalog` after changing tool definitions. Builds reject a stale catalog.
+
+For stdio, the first tool-list request starts the process-owned Huly connection in the background. Calls that need the full Huly model wait for the same initialization. Cancelling a waiting call does not cancel initialization for other calls. A failed model initialization can be retried by a later call. Project listing uses a separate REST read and does not wait for the full model. Other operations retain the full model and their existing behavior.
+
+The default transport remains stdio: each process launched by an MCP host owns its connection and model. HTTP lets clients share one running server. Connections created from request credential headers initialize the model only when needed; the CLI also uses this on-demand policy.
 
 ## Built-in Diagnostic Tools
 

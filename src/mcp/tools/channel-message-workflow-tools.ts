@@ -11,7 +11,7 @@ import {
   SetChatMessagePinnedResultSchema,
   translateChatMessageParamsJsonSchema,
   TranslateChatMessageResultSchema
-} from "../../domain/schemas.js"
+} from "../../domain/schemas/chat-message-workflows.js"
 import {
   listPinnedChatMessages,
   requestChannelAccess,

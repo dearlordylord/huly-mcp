@@ -18,6 +18,7 @@
 
     // Import Handling
     "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
     "rewriteRelativeImportExtensions": true,
 
     // Type Safety
@@ -48,6 +49,7 @@
   },
   "include": [
     "src/**/*.ts",
+    "src/**/*.json",
     "packages/**/*.ts",
     "scripts/**/*.ts",
     "test/**/*.ts",

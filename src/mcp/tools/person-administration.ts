@@ -1,6 +1,6 @@
 import * as PersonSchemas from "../../domain/schemas/person-administration.js"
 import * as PersonMergeSchemas from "../../domain/schemas/person-merge.js"
-import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "../../domain/schemas.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "../../domain/schemas/document-native-references.js"
 import {
   addPersonAttachment,
   deletePersonAttachment,

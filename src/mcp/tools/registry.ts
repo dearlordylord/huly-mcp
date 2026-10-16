@@ -80,8 +80,8 @@ export interface ToolDefinition<Name extends string = string> {
 
 // Raw static declaration input. createToolDefinition parses these literals into
 // branded ToolDefinition metadata before any registry/listing/call path sees them.
-interface ToolDefinitionSpec {
-  readonly name: string
+interface ToolDefinitionSpec<Name extends string> {
+  readonly name: Name
   readonly description: string
   readonly inputSchema: object
   readonly outputSchema: McpOutputSchema
@@ -89,7 +89,7 @@ interface ToolDefinitionSpec {
   readonly annotations?: ToolAnnotations
 }
 
-export const createToolDefinition = (spec: ToolDefinitionSpec): ToolDefinition => ({
+export const createToolDefinition = <Name extends string>(spec: ToolDefinitionSpec<Name>): ToolDefinition<Name> => ({
   name: spec.name,
   description: makeToolDescription(spec.description),
   inputSchema: spec.inputSchema,

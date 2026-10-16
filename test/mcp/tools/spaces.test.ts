@@ -1,3 +1,4 @@
+import { expectRegisteredMetadata } from "../../helpers/registered-tool.js"
 import { describe, it } from "@effect/vitest"
 import type { Class, Doc, DocumentQuery, Ref, Space } from "@hcengineering/core"
 import { toFindResult } from "@hcengineering/core"
@@ -105,7 +106,7 @@ describe("spaceTools", () => {
       ])
       for (const tool of spaceTools) {
         expect(tool.category).toBe("spaces")
-        expect(TOOL_DEFINITIONS[tool.name]).toBe(tool)
+        expectRegisteredMetadata(TOOL_DEFINITIONS[tool.name], tool)
       }
     })
   )

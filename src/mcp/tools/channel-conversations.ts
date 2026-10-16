@@ -10,9 +10,7 @@ import {
   parseSetConversationClosedParams,
   parseSetConversationStarredParams,
   setConversationClosedParamsJsonSchema,
-  setConversationStarredParamsJsonSchema
-} from "../../domain/schemas.js"
-import {
+  setConversationStarredParamsJsonSchema,
   AddChannelMembersResultSchema,
   ArchiveChannelResultSchema,
   CreateGroupDirectMessageResultSchema,

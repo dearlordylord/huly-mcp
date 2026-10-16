@@ -41,9 +41,12 @@ interface ActiveClientAcquisition {
  * Build the combined client layer (not yet evaluated — deferred until first use).
  */
 export const buildCombinedClientLayer = (
-  configLayer: Layer.Layer<HulyConfigService, ConfigValidationError> = HulyConfigService.layer
+  configLayer: Layer.Layer<HulyConfigService, ConfigValidationError> = HulyConfigService.layer,
+  modelLoading: "background" | "on-demand" = "background"
 ): CombinedClientLayer => {
-  const hulyClientLayer = HulyClient.layer.pipe(Layer.provide(configLayer))
+  const hulyClientLayer = (modelLoading === "background" ? HulyClient.layer : HulyClient.onDemandLayer).pipe(
+    Layer.provide(configLayer)
+  )
 
   const storageClientLayer = HulyStorageClient.layer.pipe(Layer.provide(configLayer))
 

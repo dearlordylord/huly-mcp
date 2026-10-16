@@ -1,15 +1,15 @@
-import type { UserStatus } from "@hcengineering/core"
-import { SortingOrder } from "@hcengineering/core"
+import { type UserStatus, SortingOrder } from "@hcengineering/core"
+
 import { Effect } from "effect"
 
 import {
   type ListUserStatusesParams,
   type ListUserStatusesResult,
   ListUserStatusesResultSchema,
-  Timestamp,
   UserStatusAccountUuid,
   UserStatusId
-} from "../../domain/schemas.js"
+} from "../../domain/schemas/user-statuses.js"
+import { Timestamp } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { core } from "../huly-plugins.js"
 import { listTotal } from "./counts.js"

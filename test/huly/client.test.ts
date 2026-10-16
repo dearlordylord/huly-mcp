@@ -2730,4 +2730,126 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
       })
     )
   })
+  it.effect("serves project reads while the full model is pending and joins one model acquisition", () =>
+    Effect.gen(function* () {
+      mockFindAllInModel.mockReturnValue(toFindResult([]))
+      const modelReady = yield* Deferred.make<void>()
+      const modelStarted = yield* Deferred.make<void>()
+      const createRestTxOperations = mockFn<HulySdkDependencies["createRestTxOperations"]>().mockImplementation(
+        async (...args) => {
+          await Effect.runPromise(Deferred.succeed(modelStarted, undefined))
+          await Effect.runPromise(Deferred.await(modelReady))
+          return testSdk.createRestTxOperations(...args)
+        }
+      )
+      const createRestClient = mockFn<HulySdkDependencies["createRestClient"]>().mockImplementation((...args) => ({
+        ...testSdk.createRestClient(...args),
+        findAll: mockFindAll
+      }))
+      const layer = HulyClient.lazyLayerWithDependencies.pipe(
+        Layer.provide(
+          Layer.merge(testConfigLayer, Layer.succeed(HulySdk, { ...testSdk, createRestClient, createRestTxOperations }))
+        )
+      )
+      yield* Effect.gen(function* () {
+        const client = yield* HulyClient
+        yield* Deferred.await(modelStarted)
+        const findProjects = assertExists(client.findProjectDocuments)
+        yield* findProjects({})
+        expect(createRestTxOperations.mock.calls).toHaveLength(1)
+        yield* Deferred.succeed(modelReady, undefined)
+        yield* Effect.all(
+          [client.findAllInModel(core.class.Status, {}), client.findAllInModel(core.class.Status, {})],
+          { concurrency: "unbounded" }
+        )
+        expect(createRestTxOperations.mock.calls).toHaveLength(1)
+      }).pipe(Effect.provide(layer), Effect.scoped)
+      expect(mockClose.mock.calls).toHaveLength(1)
+    })
+  )
+  it.effect("does not speculate on full model acquisition in a request-owned client", () =>
+    Effect.gen(function* () {
+      const createRestClient = mockFn<HulySdkDependencies["createRestClient"]>().mockImplementation((...args) => ({
+        ...testSdk.createRestClient(...args),
+        findAll: mockFindAll
+      }))
+      const layer = HulyClient.onDemandLayerWithDependencies.pipe(
+        Layer.provide(Layer.merge(testConfigLayer, Layer.succeed(HulySdk, { ...testSdk, createRestClient })))
+      )
+      yield* Effect.gen(function* () {
+        const client = yield* HulyClient
+        yield* assertExists(client.findProjectDocuments)({})
+        expect(mockCreateRestTxOperations.mock.calls).toHaveLength(0)
+      }).pipe(Effect.provide(layer), Effect.scoped)
+      expect(mockClose.mock.calls).toHaveLength(0)
+    })
+  )
+  it.effect("uses refreshed transaction transport for a write after background model acquisition retries", () =>
+    Effect.gen(function* () {
+      const sent: Array<string> = []
+      const readEndpoints: Array<string> = []
+      const createRestClient: HulySdkDependencies["createRestClient"] = (endpoint, ...args) => ({
+        ...testSdk.createRestClient(endpoint, ...args),
+        findAll: (...query) => {
+          readEndpoints.push(endpoint)
+          return mockFindAll(...query)
+        }
+      })
+      const getWorkspaceToken = mockFn<HulySdkDependencies["getWorkspaceToken"]>()
+        .mockImplementationOnce(async (...args) => ({
+          ...(await testSdk.getWorkspaceToken(...args)),
+          endpoint: "http://retired-transactor.test"
+        }))
+        .mockImplementation(async (...args) => ({
+          ...(await testSdk.getWorkspaceToken(...args)),
+          endpoint: "http://replacement-transactor.test"
+        }))
+      const createRestTxOperations = mockFn<HulySdkDependencies["createRestTxOperations"]>().mockImplementation(
+        async (endpoint, ...args) => {
+          if (endpoint === "http://retired-transactor.test") throw new Error("fetch failed")
+          return testSdk.createRestTxOperations(endpoint, ...args)
+        }
+      )
+      const sdk: HulySdkDependencies = {
+        ...testSdk,
+        getWorkspaceToken,
+        createRestTxOperations,
+        createRestClient,
+        movementHttp: {
+          send: (request) =>
+            Effect.sync(() => {
+              sent.push(request.endpoint.href)
+              return { status: PositiveInteger.make(200), body: JSON.stringify({ success: true, serverTime: 0 }) }
+            })
+        }
+      }
+      const layer = HulyClient.lazyLayerWithDependencies.pipe(
+        Layer.provide(Layer.merge(testConfigLayer, Layer.succeed(HulySdk, sdk)))
+      )
+      yield* Effect.gen(function* () {
+        const client = yield* HulyClient
+        const write = Schema.decodeUnknownSync(TransferWriteSchema)({
+          issueId: "root",
+          sourceId: "source",
+          destinationId: "destination",
+          previousParent: "old",
+          parentId: "parent",
+          modifiedOn: 1,
+          number: 2,
+          identifier: "NEW-2",
+          rank: "0|hzzzzz:",
+          records: [],
+          recordClasses: []
+        })
+        const pending = yield* assertExists(client.commitTransfer)(write).pipe(Effect.forkChild)
+        yield* TestClock.adjust("500 millis")
+        expect(yield* Fiber.join(pending)).toBe("applied")
+        expect(sent).toHaveLength(1)
+        expect(sent[0]).toContain("http://replacement-transactor.test/")
+        yield* assertExists(client.findProjectDocuments)({})
+        expect(readEndpoints).toEqual(["http://replacement-transactor.test"])
+        expect(getWorkspaceToken.mock.calls).toHaveLength(2)
+      }).pipe(Effect.provide(layer), Effect.scoped)
+    })
+  )
 })

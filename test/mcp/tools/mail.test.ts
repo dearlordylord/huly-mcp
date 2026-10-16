@@ -1,3 +1,4 @@
+import { expectRegisteredMetadata } from "../../helpers/registered-tool.js"
 /* eslint-disable no-restricted-syntax -- generic Huly SDK port fixtures require nominal-ref bridges at this isolated test boundary. */
 import { describe, it } from "@effect/vitest"
 import type { Card as HulyCard, MasterTag } from "@hcengineering/card"
@@ -111,7 +112,7 @@ describe("mailTools", () => {
   it("registers the provider-neutral read-only tool globally", () => {
     expect(tool.name).toBe("list_mail_threads")
     expect(tool.category).toBe("mail")
-    expect(TOOL_DEFINITIONS.list_mail_threads).toBe(tool)
+    expectRegisteredMetadata(TOOL_DEFINITIONS.list_mail_threads, tool)
   })
 
   it.effect("encodes metadata-only structured output without card content or attachment fields", () =>

@@ -1,53 +1,49 @@
 import {
   addIssueRelationParamsJsonSchema,
+  listIssueRelationsParamsJsonSchema,
+  parseAddIssueRelationParams,
+  parseListIssueRelationsParams,
+  parseRemoveIssueRelationParams,
+  removeIssueRelationParamsJsonSchema,
+  AddIssueRelationResultSchema,
+  ListIssueRelationsResultSchema,
+  RemoveIssueRelationResultSchema
+} from "../../domain/schemas/relations.js"
+import {
   addLabelParamsJsonSchema,
+  createIssueParamsJsonSchema,
+  deleteIssueParamsJsonSchema,
+  getIssueParamsJsonSchema,
+  listIssuesParamsJsonSchema,
+  moveIssueParamsJsonSchema,
+  parseAddLabelParams,
+  parseCreateIssueParams,
+  parseDeleteIssueParams,
+  parseGetIssueParams,
+  parseListIssuesParams,
+  parseMoveIssueParams,
+  parseRemoveLabelParams,
+  parseUpdateIssueParams,
+  removeLabelParamsJsonSchema,
+  updateIssueParamsJsonSchema
+} from "../../domain/schemas/issues.js"
+import {
   addTemplateChildParamsJsonSchema,
   createIssueFromTemplateParamsJsonSchema,
-  createIssueParamsJsonSchema,
   createIssueTemplateParamsJsonSchema,
-  deleteIssueParamsJsonSchema,
   deleteIssueTemplateParamsJsonSchema,
-  getIssueParamsJsonSchema,
   getIssueTemplateParamsJsonSchema,
-  HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
-  linkDocumentToIssueParamsJsonSchema,
-  listIssueRelationsParamsJsonSchema,
-  listIssuesParamsJsonSchema,
   listIssueTemplatesParamsJsonSchema,
-  moveIssueParamsJsonSchema,
-  parseAddIssueRelationParams,
-  parseAddLabelParams,
   parseAddTemplateChildParams,
   parseCreateIssueFromTemplateParams,
-  parseCreateIssueParams,
   parseCreateIssueTemplateParams,
-  parseDeleteIssueParams,
   parseDeleteIssueTemplateParams,
-  parseGetIssueParams,
   parseGetIssueTemplateParams,
-  parseLinkDocumentToIssueParams,
-  parseListIssueRelationsParams,
-  parseListIssuesParams,
   parseListIssueTemplatesParams,
-  parseMoveIssueParams,
-  parseRemoveIssueRelationParams,
-  parseRemoveLabelParams,
   parseRemoveTemplateChildParams,
-  parseUnlinkDocumentFromIssueParams,
-  parseUpdateIssueParams,
   parseUpdateIssueTemplateParams,
-  removeIssueRelationParamsJsonSchema,
-  removeLabelParamsJsonSchema,
   removeTemplateChildParamsJsonSchema,
-  unlinkDocumentFromIssueParamsJsonSchema,
-  updateIssueParamsJsonSchema,
-  updateIssueTemplateParamsJsonSchema
-} from "../../domain/schemas.js"
-import {
-  LinkDocumentToIssueResultSchema,
-  UnlinkDocumentFromIssueResultSchema
-} from "../../domain/schemas/document-relations.js"
-import {
+  updateIssueTemplateParamsJsonSchema,
   AddTemplateChildResultSchema,
   CreateIssueFromTemplateResultSchema,
   CreateIssueTemplateResultSchema,
@@ -57,6 +53,16 @@ import {
   RemoveTemplateChildResultSchema,
   UpdateIssueTemplateResultSchema
 } from "../../domain/schemas/issue-templates.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "../../domain/schemas/document-native-references.js"
+import {
+  linkDocumentToIssueParamsJsonSchema,
+  parseLinkDocumentToIssueParams,
+  parseUnlinkDocumentFromIssueParams,
+  unlinkDocumentFromIssueParamsJsonSchema,
+  LinkDocumentToIssueResultSchema,
+  UnlinkDocumentFromIssueResultSchema
+} from "../../domain/schemas/document-relations.js"
+
 import {
   AddIssueLabelResultSchema,
   CreateIssueResultSchema,
@@ -67,11 +73,6 @@ import {
   RemoveIssueLabelResultSchema,
   UpdateIssueResultSchema
 } from "../../domain/schemas/issues-results.js"
-import {
-  AddIssueRelationResultSchema,
-  ListIssueRelationsResultSchema,
-  RemoveIssueRelationResultSchema
-} from "../../domain/schemas/relations.js"
 import { enumValuesDescription } from "../../domain/schemas/shared.js"
 import { StatusCategoryValues } from "../../domain/schemas/task-management.js"
 import { linkDocumentToIssue, unlinkDocumentFromIssue } from "../../huly/operations/document-relations.js"

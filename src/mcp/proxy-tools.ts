@@ -1,6 +1,6 @@
 import { Effect, Result, Schema } from "effect"
 
-import { Count } from "../domain/schemas/index.js"
+import { Count } from "../domain/schemas/shared.js"
 import type { HulyStorageClient } from "../huly/storage.js"
 import type { WorkspaceClientOperations } from "../huly/workspace-client.js"
 import {
@@ -22,8 +22,8 @@ import {
   ToolSearchQuery
 } from "./proxy-tool-catalog.js"
 import { createToolOutputSchema } from "./tool-output-schema.js"
-import type { ToolRegistry } from "./tools/index.js"
-import { resolveAnnotations } from "./tools/index.js"
+import { type ToolRegistry, resolveAnnotations } from "./tools/index.js"
+
 import type { ToolAnnotations } from "./tools/tool-annotations.js"
 import {
   createToolDefinition,

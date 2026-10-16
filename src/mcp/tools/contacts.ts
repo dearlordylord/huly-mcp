@@ -1,55 +1,82 @@
 import {
   addOrganizationChannelParamsJsonSchema,
   addOrganizationMemberParamsJsonSchema,
-  addPersonChannelParamsJsonSchema,
   createOrganizationParamsJsonSchema,
-  createPersonParamsJsonSchema,
   deleteOrganizationParamsJsonSchema,
-  deletePersonParamsJsonSchema,
   getOrganizationParamsJsonSchema,
-  getPersonParamsJsonSchema,
-  HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
-  listContactChannelProvidersParamsJsonSchema,
-  listOrganizationChannelsParamsJsonSchema,
   listOrganizationMembersParamsJsonSchema,
   listOrganizationsParamsJsonSchema,
-  listPersonChannelsParamsJsonSchema,
   listPersonOrganizationsParamsJsonSchema,
-  listPersonsParamsJsonSchema,
-  makePersonCustomerParamsJsonSchema,
-  MakePersonCustomerResultSchema,
   parseAddOrganizationChannelParams,
   parseAddOrganizationMemberParams,
-  parseAddPersonChannelParams,
   parseCreateOrganizationParams,
-  parseCreatePersonParams,
   parseDeleteOrganizationParams,
-  parseDeletePersonParams,
   parseGetOrganizationParams,
-  parseGetPersonParams,
-  parseListContactChannelProvidersParams,
-  parseListOrganizationChannelsParams,
   parseListOrganizationMembersParams,
   parseListOrganizationsParams,
-  parseListPersonChannelsParams,
   parseListPersonOrganizationsParams,
-  parseListPersonsParams,
-  parseMakePersonCustomerParams,
-  parseRemoveOrganizationChannelParams,
   parseRemoveOrganizationMemberParams,
+  parseUpdateOrganizationParams,
+  removeOrganizationMemberParamsJsonSchema,
+  updateOrganizationParamsJsonSchema,
+  AddOrganizationMemberResultSchema,
+  CreateOrganizationResultSchema,
+  DeleteOrganizationResultSchema,
+  GetOrganizationResultSchema,
+  ListOrganizationMembersResultSchema,
+  ListOrganizationsResultSchema,
+  ListPersonOrganizationsResultSchema,
+  MakeOrganizationCustomerResultSchema,
+  RemoveOrganizationMemberResultSchema,
+  UpdateOrganizationResultSchema
+} from "../../domain/schemas/contact-organizations.js"
+import {
+  addPersonChannelParamsJsonSchema,
+  listContactChannelProvidersParamsJsonSchema,
+  listOrganizationChannelsParamsJsonSchema,
+  listPersonChannelsParamsJsonSchema,
+  parseAddPersonChannelParams,
+  parseListContactChannelProvidersParams,
+  parseListOrganizationChannelsParams,
+  parseListPersonChannelsParams,
+  parseRemoveOrganizationChannelParams,
   parseRemovePersonChannelParams,
   parseUpdateOrganizationChannelParams,
-  parseUpdateOrganizationParams,
   parseUpdatePersonChannelParams,
-  parseUpdatePersonParams,
   removeOrganizationChannelParamsJsonSchema,
-  removeOrganizationMemberParamsJsonSchema,
   removePersonChannelParamsJsonSchema,
   updateOrganizationChannelParamsJsonSchema,
-  updateOrganizationParamsJsonSchema,
   updatePersonChannelParamsJsonSchema,
-  updatePersonParamsJsonSchema
-} from "../../domain/schemas.js"
+  AddOrganizationChannelResultSchema,
+  AddPersonChannelResultSchema,
+  ListContactChannelProvidersResultSchema,
+  ListOrganizationChannelsResultSchema,
+  ListPersonChannelsResultSchema,
+  RemoveOrganizationChannelResultSchema,
+  RemovePersonChannelResultSchema,
+  UpdateOrganizationChannelResultSchema,
+  UpdatePersonChannelResultSchema
+} from "../../domain/schemas/contact-channels.js"
+import {
+  createPersonParamsJsonSchema,
+  deletePersonParamsJsonSchema,
+  getPersonParamsJsonSchema,
+  listPersonsParamsJsonSchema,
+  parseCreatePersonParams,
+  parseDeletePersonParams,
+  parseGetPersonParams,
+  parseListPersonsParams,
+  parseUpdatePersonParams,
+  updatePersonParamsJsonSchema,
+  CreatePersonResultSchema,
+  DeletePersonResultSchema,
+  GetPersonResultSchema,
+  ListPersonsResultSchema,
+  UpdatePersonResultSchema
+} from "../../domain/schemas/contacts.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "../../domain/schemas/document-native-references.js"
+import { makePersonCustomerParamsJsonSchema, parseMakePersonCustomerParams } from "../../domain/schemas/leads.js"
+import { MakePersonCustomerResultSchema } from "../../domain/schemas/leads-mutations.js"
 import {
   addPersonChannel,
   listContactChannelProviders,
@@ -81,36 +108,6 @@ import {
   updatePerson
 } from "../../huly/operations/persons.js"
 
-import {
-  AddOrganizationChannelResultSchema,
-  AddPersonChannelResultSchema,
-  ListContactChannelProvidersResultSchema,
-  ListOrganizationChannelsResultSchema,
-  ListPersonChannelsResultSchema,
-  RemoveOrganizationChannelResultSchema,
-  RemovePersonChannelResultSchema,
-  UpdateOrganizationChannelResultSchema,
-  UpdatePersonChannelResultSchema
-} from "../../domain/schemas/contact-channels.js"
-import {
-  AddOrganizationMemberResultSchema,
-  CreateOrganizationResultSchema,
-  DeleteOrganizationResultSchema,
-  GetOrganizationResultSchema,
-  ListOrganizationMembersResultSchema,
-  ListOrganizationsResultSchema,
-  ListPersonOrganizationsResultSchema,
-  MakeOrganizationCustomerResultSchema,
-  RemoveOrganizationMemberResultSchema,
-  UpdateOrganizationResultSchema
-} from "../../domain/schemas/contact-organizations.js"
-import {
-  CreatePersonResultSchema,
-  DeletePersonResultSchema,
-  GetPersonResultSchema,
-  ListPersonsResultSchema,
-  UpdatePersonResultSchema
-} from "../../domain/schemas/contacts.js"
 import { makePersonCustomer } from "../../huly/operations/leads-mutations.js"
 import { contactEmployeeTools } from "./contact-employee-tools.js"
 import { personAdministrationTools } from "./person-administration.js"

@@ -1,4 +1,4 @@
-import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "../../domain/schemas.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "../../domain/schemas/document-native-references.js"
 import {
   ApplicantMatchDetailSchema,
   DeleteRecruitingOpinionResultSchema,

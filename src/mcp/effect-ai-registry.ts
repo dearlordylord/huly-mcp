@@ -12,12 +12,17 @@ import { Clock, Context, Effect, type Exit, Layer } from "effect"
 import { McpServer } from "effect/ai/McpServer"
 import * as McpSchema from "effect/ai/McpSchema"
 
-import type { GetHulyContextResult } from "../domain/schemas/index.js"
+import type { GetHulyContextResult } from "../domain/schemas/huly-context.js"
 import { HulyError } from "../huly/errors-base.js"
 import type { ClientBundle, ClientResolver, HulyClientBundleError } from "../runtime/client-resolver.js"
 import type { TelemetryOperations } from "../telemetry/telemetry.js"
-import type { McpToolResponse } from "./error-mapping.js"
-import { createServerShuttingDownError, createUnknownToolError, mapDomainErrorToMcp } from "./error-mapping.js"
+import {
+  type McpToolResponse,
+  createServerShuttingDownError,
+  createUnknownToolError,
+  mapDomainErrorToMcp
+} from "./error-mapping.js"
+
 import { getHulyContextToolDefinition, type ToolExposureContext, versionToolDefinition } from "./huly-context-tool.js"
 import { createRequestAdmission, type RequestAdmission } from "./request-admission.js"
 import type { RequestClientLease } from "./request-client-lifecycle.js"
@@ -32,16 +37,17 @@ import {
 } from "./protocol-tool-exposure.js"
 import { proxyToolDefinitions } from "./proxy-tools.js"
 import type { ToolRegistry } from "./tools/index.js"
-import { makeToolCategory, resolveAnnotations } from "./tools/registry.js"
-import type { ToolDefinition } from "./tools/registry.js"
-import type { McpClientInfoLike } from "./tool-mode.js"
-import { parseMcpClientInfo } from "./tool-mode.js"
+import { makeToolCategory, resolveAnnotations, type ToolDefinition } from "./tools/registry.js"
+
+import { type McpClientInfoLike, parseMcpClientInfo } from "./tool-mode.js"
+
 import { registerEffectMcpResources } from "./effect-ai-resources.js"
 import { toEffectCallToolResult } from "./effect-ai-content.js"
 import { dispatchEffectMcpTool, effectMcpEditMode, fetchLatestNpmVersion } from "./effect-ai-dispatch.js"
 
 /** Inputs needed to build a transport-independent Effect MCP registry. */
 export interface EffectMcpRegistryOptions {
+  readonly onDiscovery?: () => void
   readonly observeMovement?: MovementStageObserver
   readonly resolveClients: ClientResolver
   readonly resolveResourceClientLease?: (
@@ -118,13 +124,17 @@ const asToolDefinition = (definition: (typeof builtinToolDefinitions)[number]): 
 const contextForVisibility = (enabledWhen: (profile: McpExposureProfile) => boolean): Context.Context<never> =>
   Context.add(Context.empty(), McpSchema.EnabledWhen, enabledWhen)
 
-export const effectMcpFirstListVisibility =
-  (
-    options: EffectMcpRegistryOptions,
-    registries: ProtocolToolRegistries,
-    exposureOptions: ProtocolExposureOptions
-  ): ((profile: McpExposureProfile) => boolean) =>
-  (profile) => {
+export const effectMcpFirstListVisibility = (
+  options: EffectMcpRegistryOptions,
+  registries: ProtocolToolRegistries,
+  exposureOptions: ProtocolExposureOptions
+): ((profile: McpExposureProfile) => boolean) => {
+  let discovered = false
+  return (profile) => {
+    if (!discovered) {
+      discovered = true
+      options.onDiscovery?.()
+    }
     const exposure = initializeExposure(registries, exposureOptions, profile)
     options.telemetry.firstListTools({
       clientKind: exposure.context.clientKind,
@@ -132,6 +142,7 @@ export const effectMcpFirstListVisibility =
     })
     return true
   }
+}
 
 const initializeExposure = (
   registries: ProtocolToolRegistries,

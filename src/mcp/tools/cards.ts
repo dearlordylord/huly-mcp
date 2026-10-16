@@ -2,23 +2,17 @@ import {
   createCardParamsJsonSchema,
   deleteCardParamsJsonSchema,
   getCardParamsJsonSchema,
-  HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
   listCardSpacesParamsJsonSchema,
   listCardsParamsJsonSchema,
-  listCardVersionsParamsJsonSchema,
   listMasterTagsParamsJsonSchema,
   parseCreateCardParams,
   parseDeleteCardParams,
   parseGetCardParams,
   parseListCardSpacesParams,
   parseListCardsParams,
-  parseListCardVersionsParams,
   parseListMasterTagsParams,
   parseUpdateCardParams,
-  updateCardParamsJsonSchema
-} from "../../domain/schemas.js"
-import { ListCardVersionsResultSchema } from "../../domain/schemas/card-versions.js"
-import {
+  updateCardParamsJsonSchema,
   CreateCardResultSchema,
   DeleteCardResultSchema,
   GetCardResultSchema,
@@ -27,6 +21,13 @@ import {
   ListMasterTagsResultSchema,
   UpdateCardResultSchema
 } from "../../domain/schemas/cards.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "../../domain/schemas/document-native-references.js"
+import {
+  listCardVersionsParamsJsonSchema,
+  parseListCardVersionsParams,
+  ListCardVersionsResultSchema
+} from "../../domain/schemas/card-versions.js"
+
 import {
   createCard,
   deleteCard,

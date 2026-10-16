@@ -1,0 +1,14 @@
+{
+  "baseline": {
+    "bytes": 8549173,
+    "sha256": "8993627220a71cb1b2beaaf59912f3df15183ab079118af3352e5f61d0e6b0c8"
+  },
+  "production": {
+    "bytes": 8778183,
+    "sha256": "b10c57909a6fae6d0d1d18945113844df793fd22728d2e4affc70812e8394404"
+  },
+  "cli": {
+    "bytes": 8412327,
+    "sha256": "dcfcd7a04f835d26d39d06fa7909995ca8fbdbf93f39218451ccc6373e55e0de"
+  }
+}
