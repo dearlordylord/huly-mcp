@@ -1,0 +1,26 @@
+# Generated executable prototypes and build-only metadata.
+baseline.cjs
+lazy.cjs
+light.cjs
+background.cjs
+background-light.cjs
+narrow.cjs
+narrow-background.cjs
+narrow-model-background.cjs
+trace.cjs
+trace-background.cjs
+snapshot.cjs
+groups.cjs
+direct-read.cjs
+*.meta.json
+catalog.json
+# Retain only the selected evidence files in version control.
+*.log
+!check-all.log
+!lifecycle-tests.log
+!trace-parity.log
+!lifecycle.log
+!direct-read.log
+!http-smoke.log
+narrow-comparison.json
+http-model.json

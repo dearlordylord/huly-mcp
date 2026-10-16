@@ -1,0 +1,74 @@
+[
+  {
+    "type": "http",
+    "trial": 0,
+    "connection": 0,
+    "listenMs": 1501.739583,
+    "catalogMs": 52.88458300000002,
+    "callMs": 1321.6695
+  },
+  {
+    "type": "http",
+    "trial": 0,
+    "connection": 1,
+    "listenMs": 1501.739583,
+    "catalogMs": 6.649082999999791,
+    "callMs": 21.779583000000002
+  },
+  {
+    "type": "http",
+    "trial": 0,
+    "connection": 2,
+    "listenMs": 1501.739583,
+    "catalogMs": 4.713875000000371,
+    "callMs": 21.44741699999986
+  },
+  {
+    "type": "http",
+    "trial": 1,
+    "connection": 0,
+    "listenMs": 1501.092791,
+    "catalogMs": 33.689000000000306,
+    "callMs": 1277.1049590000002
+  },
+  {
+    "type": "http",
+    "trial": 1,
+    "connection": 1,
+    "listenMs": 1501.092791,
+    "catalogMs": 6.627457999999933,
+    "callMs": 23.701207999999497
+  },
+  {
+    "type": "http",
+    "trial": 1,
+    "connection": 2,
+    "listenMs": 1501.092791,
+    "catalogMs": 5.046707999999853,
+    "callMs": 23.512165999999525
+  },
+  {
+    "type": "http",
+    "trial": 2,
+    "connection": 0,
+    "listenMs": 1500.6054999999997,
+    "catalogMs": 38.61004200000025,
+    "callMs": 1271.9660000000003
+  },
+  {
+    "type": "http",
+    "trial": 2,
+    "connection": 1,
+    "listenMs": 1500.6054999999997,
+    "catalogMs": 6.372041999999055,
+    "callMs": 30.57770900000105
+  },
+  {
+    "type": "http",
+    "trial": 2,
+    "connection": 2,
+    "listenMs": 1500.6054999999997,
+    "catalogMs": 11.5106250000008,
+    "callMs": 30.665916999998444
+  }
+]

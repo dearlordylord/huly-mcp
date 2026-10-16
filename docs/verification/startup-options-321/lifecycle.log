@@ -1,0 +1,4 @@
+waiter canceled
+["[ACQUIRE321] start","[ACQUIRE321] ready"]
+PASS canceled waiter followed by 3 concurrent calls shares one successful acquisition
+PASS background preload evaluates all 59 production tool groups
