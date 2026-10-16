@@ -1,5 +1,6 @@
 import { Effect, Redacted, Schema } from "effect"
 
+import { cleanRetiredNativeCredentials, requireNativeCredential } from "./native-credential-cleanup.js"
 import { NativeCredentialPayloadSchema, publishNativeCredential } from "./native-credential-publication.js"
 import type { CredentialStoreSelector } from "./credential-store.js"
 import { matchesCredentialDestination } from "./credential-destination.js"
@@ -38,8 +39,7 @@ export const selectCredentialStore: CredentialStoreSelector = (store) => {
         if (!matchesCredentialDestination(reference.destination, destination))
           return yield* failure("Saved Huly credential destination changed. Log in again for this profile.")
         const port = yield* nativePort(backend)
-        const raw = yield* port.read(reference.key)
-        if (raw === undefined) return undefined
+        const raw = yield* requireNativeCredential(port, reference.key)
         const payload = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(NativeCredentialPayloadSchema))(
           Redacted.value(raw)
         ).pipe(
@@ -73,8 +73,9 @@ export const selectCredentialStore: CredentialStoreSelector = (store) => {
             "Saved credential backend changed. Restore the selected profile backend before deleting it."
           )
         const port = yield* nativePort(backend)
+        yield* requireNativeCredential(port, reference.key)
+        yield* cleanRetiredNativeCredentials(store, name, metadata, port)
         yield* port.remove(reference.key)
-        yield* Effect.forEach(reference.retiredKeys ?? [], (retired) => port.remove(retired), { discard: true })
         const { [name]: _removed, ...native } = savedNative
         yield* store.writeCredentials({ ...metadata, native })
       })

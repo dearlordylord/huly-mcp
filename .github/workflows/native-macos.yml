@@ -40,6 +40,11 @@ jobs:
           source scripts/packed-cli-test-helpers.sh
           prepare_packed_cli "$RUNNER_TEMP/huly-logout-package"
           printf 'HULY_TEST_PACKED_CLI=%s\n' "$HULY_PREPARED_CLI" >> "$GITHUB_ENV"
+          pnpm build:mcp
+          npm_config_ignore_scripts=true pnpm pack --pack-destination "$RUNNER_TEMP/huly-logout-package/package"
+          mcp_version=$(node -p "require('./package.json').version")
+          pnpm --dir "$RUNNER_TEMP/huly-logout-package/install" add "$RUNNER_TEMP/huly-logout-package/package/firfi-huly-mcp-${mcp_version}.tgz"
+          printf 'HULY_TEST_PACKED_MCP=%s\n' "$RUNNER_TEMP/huly-logout-package/install/node_modules/@firfi/huly-mcp/dist/index.cjs" >> "$GITHUB_ENV"
       - name: Verify real Keychain CRUD in an isolated runner keychain
         shell: bash
         run: |
@@ -59,7 +64,7 @@ jobs:
           export HULY_TEST_KEYCHAIN_PATH="$qualification_keychain"
           export HULY_TEST_ORIGINAL_KEYCHAIN="$previous_keychain"
           export HULY_TEST_KEYCHAIN_PASSWORD="$qualification_password"
-          pnpm exec tsx scripts/macos-logout-probe.ts "$HULY_TEST_PACKED_CLI"
+          pnpm exec tsx scripts/macos-logout-probe.ts "$HULY_TEST_PACKED_CLI" "$HULY_TEST_PACKED_MCP"
       - name: Build and verify packaged CLI dependency closure
         run: |
           pnpm build:cli

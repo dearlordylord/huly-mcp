@@ -1,0 +1,3 @@
+PASS connected to running Codex app-server and reloaded MCP config
+Host status: {"data":[{"name":"huly-pr318","runtimeStatus":"failed","pluginId":null,"httpOrigin":null,"serverInfo":null,"serverCapabilities":null,"tools":{},"toolsError":"MCP startup failed: timed out handshaking with MCP server after 29.99999975s","resources":[],"resourceTemplates":[],"authStatus":"unsupported"}],"nextCursor":null}
+{"code":-32603,"message":"failed to get client: MCP startup failed: timed out handshaking with MCP server after 29.99999975s"}

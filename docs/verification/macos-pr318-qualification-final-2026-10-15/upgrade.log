@@ -1,0 +1,3 @@
+PASS upgraded executable verifies existing macos-keychain profile; backend retained without login
+PASS upgraded executable verifies existing file profile; backend retained without login
+PASS upgraded executable complete environment-backed project read

@@ -14,7 +14,18 @@ import {
 } from "./mcp/movement-stage-report.js"
 
 import { NodeRuntime } from "@effect/platform-node"
-import { Config, ConfigProvider, type Duration, Effect, Exit, Layer, Option, type Redacted, Schema } from "effect"
+import {
+  Config,
+  ConfigProvider,
+  type Duration,
+  Effect,
+  Exit,
+  Layer,
+  Option,
+  type Redacted,
+  Result,
+  Schema
+} from "effect"
 
 import {
   type ConfigValidationError,
@@ -26,6 +37,7 @@ import { resolvedConfigProvider } from "./profiles/config-provider.js"
 import type { CliProfileStoreError } from "./profiles/model.js"
 import { profileRuntimeContext } from "./profiles/runtime-context.js"
 import { defaultProfileStore, resolveStdioProfile } from "./profiles/stdio.js"
+import { runProfileStartupDiagnostic } from "./profiles/startup-diagnostic.js"
 import type { HulyClientError } from "./huly/client.js"
 import type { StorageClientError } from "./huly/storage.js"
 import {
@@ -175,6 +187,11 @@ const configureMovementObserver = Effect.fn("configureMovementObserver")(functio
     : undefined
 })
 
+const resolveConfiguredProfile = (transport: McpTransportType, environment: NodeJS.ProcessEnv) =>
+  transport === "stdio" && environment["HULY_PROFILE"] !== undefined
+    ? defaultProfileStore(environment).pipe(Effect.flatMap((store) => resolveStdioProfile(environment, store)))
+    : Effect.succeed(undefined)
+
 const runConfiguredServer = (transport: McpTransportType): Effect.Effect<void, AppError> =>
   Effect.gen(function* () {
     const environment = { ...process.env }
@@ -183,10 +200,9 @@ const runConfiguredServer = (transport: McpTransportType): Effect.Effect<void, A
     const mcpAuthToken = transport === "http" ? Option.getOrUndefined(yield* getMcpAuthToken) : undefined
     const lazyEnvs = yield* getLazyEnvs
     const observeMovement = yield* configureMovementObserver()
-    const profile =
-      transport === "stdio" && environment["HULY_PROFILE"] !== undefined
-        ? yield* resolveStdioProfile(environment, yield* defaultProfileStore(environment))
-        : undefined
+    const profileResult = yield* Effect.result(resolveConfiguredProfile(transport, environment))
+    if (Result.isFailure(profileResult)) return yield* runProfileStartupDiagnostic(profileResult.failure, PKG_VERSION)
+    const profile = profileResult.success
     const authMethod: "token" | "password" =
       profile?.auth.method === "token" || environment["HULY_TOKEN"] ? "token" : "password"
     const configLayer =

@@ -1,0 +1,43 @@
+PASS packaged CLI login through hidden password prompt; password absent from output
+PASS offline status configured=true verified=false
+PASS native auth check verified=true
+PASS hidden token replacement; verified access retained; token absent from output
+PASS invalid token rejected; metadata unchanged; previous credential still verified
+PASS application JSON files contain neither test token nor password; native profile has no file token
+PASS packaged CLI project read; count=8
+PASS complete environment-backed project read
+PASS explicit file-backed login and verified live read
+PASS file test credential removed
+PASS replacement entry located in disposable test keychain; original default restored
+Disposable keychain locked; testing offline status and access refusal
+PASS offline status while disposable keychain locked
+Locked command exit code: 1
+Locked command sanitized outcome: {"code":"INTEGRATION_FAILED","message":"macOS Keychain access failed. Unlock the credential's Keychain and check the current OS user/session and search list, or explicitly inject complete environment credentials. macOS controls access prompts, including after updates. No file fallback was used.","retryable":false,"hint":"Verify Huly URL, workspace, network access, and service availability."}
+PASS locked command refused; profile and credential files byte-identical
+Locked command exit code: 1
+Locked command sanitized outcome: {"code":"INTEGRATION_FAILED","message":"macOS Keychain access failed. Unlock the credential's Keychain and check the current OS user/session and search list, or explicitly inject complete environment credentials. macOS controls access prompts, including after updates. No file fallback was used.","retryable":false,"hint":"Verify Huly URL, workspace, network access, and service availability."}
+PASS locked command refused; profile and credential files byte-identical
+Original credential still in keychain after unlock: True
+PASS explicit unlock restores verified Huly access
+Disposable keychain removed; original search list/default restored
+PASS complete environment-backed project read
+PASS explicit file-backed login and verified live read
+File credential retained until locked fallback tests finish
+PASS replacement entry located in disposable test keychain; original default restored
+Disposable keychain locked; testing offline status and access refusal
+PASS offline status while disposable keychain locked
+Locked command exit code: 1
+Locked command sanitized outcome: {"code":"INTEGRATION_FAILED","message":"macOS Keychain access failed. Unlock the credential's Keychain and check the current OS user/session and search list, or explicitly inject complete environment credentials. macOS controls access prompts, including after updates. No file fallback was used.","retryable":false,"hint":"Verify Huly URL, workspace, network access, and service availability."}
+PASS locked command refused; profile and credential files byte-identical
+Locked command exit code: 1
+Locked command sanitized outcome: {"code":"INTEGRATION_FAILED","message":"macOS Keychain access failed. Unlock the credential's Keychain and check the current OS user/session and search list, or explicitly inject complete environment credentials. macOS controls access prompts, including after updates. No file fallback was used.","retryable":false,"hint":"Verify Huly URL, workspace, network access, and service availability."}
+PASS locked command refused; profile and credential files byte-identical
+PASS complete environment-backed live read while native keychain locked
+PASS file-backed live read while native keychain locked
+Disposable keychain removed; original search list/default restored
+PASS final actual Codex host read equals packed CLI: 8 projects; initial two 30-second handshake timeouts retained as inconclusive startup failures
+PASS normal logout removes native entry and retains profile metadata/selection
+PASS fresh CLI read after logout requires credentials without terminal prompt
+NOT RUN to completion: locked-default-keychain token import interrupted after OS unlock dialog; fixture cleanup completed.
+PASS cleanup: disposable keychain removed; original default/search list restored; native/file credentials logged out; temporary Codex config entries removed; owned MCP processes terminated.
+HOST CLEANUP LIMIT: config/mcpServer/reload after removing registrations returned invalid transport in mcp_servers.huly-pr318; config file has no test entries. Owned test server processes were terminated explicitly.

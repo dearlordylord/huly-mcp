@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto"
 import { Effect, Redacted, Schema } from "effect"
 
+import { cleanRetiredNativeCredentials } from "./native-credential-cleanup.js"
 import type { CliProfileStore } from "./file-store.js"
 import {
   CredentialDestinationSchema,
@@ -51,19 +52,18 @@ export const publishNativeCredential = Effect.fn("Profiles.publishNativeCredenti
   const retiredKeys = retiredKeysFor(previous)
   const stagedKey = yield* allocateNativeKey(store, name, retiredKeys)
   // The active entry is immutable. An ambiguous native write failure cannot replace it.
+  const selected = {
+    ...metadata,
+    native: {
+      ...metadata.native,
+      [name]: { backend: port.backend, destination: payload.destination, key: stagedKey, retiredKeys }
+    }
+  }
   yield* port.save(stagedKey, Redacted.make(encoded)).pipe(
-    Effect.andThen(
-      store.writeCredentials({
-        ...metadata,
-        native: {
-          ...metadata.native,
-          [name]: { backend: port.backend, destination: payload.destination, key: stagedKey, retiredKeys }
-        }
-      })
-    ),
+    Effect.andThen(store.writeCredentials(selected)),
     Effect.catch((error) => Effect.ignore(port.remove(stagedKey)).pipe(Effect.andThen(Effect.fail(error))))
   )
   // Selection has committed. Retained nonsecret IDs let logout retry cleanup without
   // misreporting a successful replacement as a failure after its active pointer changed.
-  if (previous !== undefined) yield* Effect.ignore(port.remove(previous.key))
+  yield* Effect.ignore(cleanRetiredNativeCredentials(store, name, selected, port))
 })

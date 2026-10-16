@@ -96,3 +96,11 @@ profile. CLI uses `--profile`, then `HULY_PROFILE`, then the active profile. Std
 requires explicit profile selection and otherwise preserves environment-only
 configuration. Complete environment credentials and destination override a saved
 profile without reading its native store; partial credential overrides fail.
+
+When a selected profile cannot be resolved at MCP startup, the process exposes
+only `get_huly_startup_diagnostic`, with recovery instructions in MCP and stderr.
+Restore storage or credentials and restart the MCP server to enable Huly tools.
+An item absent from the macOS search list cannot prove native deletion; logout
+keeps its reference and fails. Uncertain legacy retired-entry cleanup also fails
+before deleting the selected credential. Confirmed retired deletions are removed
+from metadata as cleanup progresses.

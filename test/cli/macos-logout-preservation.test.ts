@@ -12,7 +12,7 @@ import { MacosSecurityReplySchema } from "../../src/profiles/macos-keychain-prot
 import { parseProfileName } from "../../src/profiles/model.js"
 import { resolveCliConfiguration } from "../../src/profiles/resolve.js"
 
-it("retains the reference on locked logout and restores access after unlock", async () => {
+it.each(["locked", "unavailable"])("retains the reference on %s logout and restores access", async (state) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "huly-keychain-logout-"))
   const values = new Map<string, string>()
   let locked = false
@@ -23,9 +23,15 @@ it("retains the reference on locked logout and restores access after unlock", as
     }
   }))
   const native = makeMacosKeychain(passwords, (request) => {
-    if (request._tag === "Remove" && !locked) values.delete(request.key)
+    if (request._tag === "Remove" && !locked) {
+      values.delete(request.key)
+      return Effect.succeed(Schema.decodeUnknownSync(MacosSecurityReplySchema)({ status: 0, output: "" }))
+    }
     return Effect.succeed(
-      Schema.decodeUnknownSync(MacosSecurityReplySchema)({ status: values.has(request.key) ? 0 : 44, output: "" })
+      Schema.decodeUnknownSync(MacosSecurityReplySchema)({
+        status: values.has(request.key) && !(locked && state === "unavailable") ? 0 : 44,
+        output: ""
+      })
     )
   })
   const store = makeCliProfileStore(cliProfilePaths("linux", { XDG_CONFIG_HOME: directory }, directory), native)
@@ -33,6 +39,9 @@ it("retains the reference on locked logout and restores access after unlock", as
   const profile = { url: "https://huly.example", workspace: "work", credentialStorage: native.backend }
   try {
     await Effect.runPromise(saveLogin(store, name, profile, Redacted.make("retained-token-sentinel")))
+    await Effect.runPromise(saveLogin(store, name, profile, Redacted.make("retained-token-sentinel")))
+    expect(values.size).toBe(1)
+    expect((await Effect.runPromise(store.readCredentials())).native?.[name]?.retiredKeys).toEqual([])
     const profiles = await fs.readFile(store.paths.profiles, "utf8")
     const credentials = await fs.readFile(store.paths.credentials, "utf8")
     locked = true
