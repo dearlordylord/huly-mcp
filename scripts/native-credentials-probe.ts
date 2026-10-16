@@ -62,7 +62,12 @@ const program = Effect.gen(function* () {
   }
   yield* native.remove(key)
   assert.equal(yield* native.read(key), undefined)
-  yield* native.remove(key)
+  if (process.platform === "darwin")
+    assert(
+      Result.isFailure(yield* native.remove(key).pipe(Effect.result)),
+      "Unproven missing deletion must fail closed."
+    )
+  else yield* native.remove(key)
 })
 
 Effect.runPromise(program).then(

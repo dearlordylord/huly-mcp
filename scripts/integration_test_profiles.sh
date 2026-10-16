@@ -120,6 +120,16 @@ cat >"$TEST_TMPDIR/request.jsonl" <<'JSON'
 {"jsonrpc":"2.0","method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"profile-integration","version":"1.0"}}},"id":1}
 {"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_projects","arguments":{},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"profile-integration","version":"1.0"}}},"id":2}
 JSON
+cat >"$TEST_TMPDIR/failure-request.jsonl" <<'JSON'
+{"jsonrpc":"2.0","method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}},"id":1}
+{"jsonrpc":"2.0","method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}},"id":2}
+{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_huly_startup_diagnostic","arguments":{},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}},"id":3}
+JSON
+assert_profile_startup_refused() {
+  timeout 10 node dist/index.cjs <"$TEST_TMPDIR/failure-request.jsonl" >"$TEST_TMPDIR/error.out" 2>"$TEST_TMPDIR/stdio.err"
+  jq -es --arg expected "$1" 'length == 3 and any(.[]; .id == 1 and (.result.instructions | contains($expected))) and any(.[]; .id == 2 and [.result.tools[].name] == ["get_huly_startup_diagnostic"]) and any(.[]; .id == 3 and .result.isError == true and .result.structuredContent.error.code == "PROFILE_CREDENTIALS_UNAVAILABLE" and (.result.structuredContent.error.message | contains($expected)))' "$TEST_TMPDIR/error.out" >/dev/null
+  grep -q "$1" "$TEST_TMPDIR/stdio.err"
+}
 echo "Testing stdio with saved profile"
 if ! HULY_TOOL_MODE=native MCP_AUTO_EXIT=true timeout 30 node dist/index.cjs <"$TEST_TMPDIR/request.jsonl" >"$TEST_TMPDIR/stdio.jsonl" 2>"$TEST_TMPDIR/stdio.err"; then
   echo "Stdio live read failed"
@@ -136,7 +146,7 @@ jq -S 'select(.id == 2) | .result.content[] | select(.type == "text") | .text | 
 cmp "$TEST_TMPDIR/cli-projects.json" "$TEST_TMPDIR/stdio-projects.json"
 if [[ "${HULY_TEST_CREDENTIAL_STORAGE:-file}" == os && -n "${HULY_TEST_KEYRING_DAEMON:-}" ]]; then
   echo "Testing locked native storage through CLI"
-  HULY_TEST_MCP_REQUEST="$TEST_TMPDIR/request.jsonl" python3 scripts/profile_native_failures.py
+  HULY_TEST_MCP_REQUEST="$TEST_TMPDIR/failure-request.jsonl" python3 scripts/profile_native_failures.py
 fi
 echo "Testing changed destination"
 "$HULY_PREPARED_CLI" profile update shared-live --workspace changed >/dev/null
@@ -145,7 +155,7 @@ if ! grep -q 'destination changed' "$TEST_TMPDIR/error.out" "$TEST_TMPDIR/error.
   cat "$TEST_TMPDIR/error.out" "$TEST_TMPDIR/error.err"
   exit 1
 fi
-if timeout 10 node dist/index.cjs <"$TEST_TMPDIR/request.jsonl" >"$TEST_TMPDIR/error.out" 2>"$TEST_TMPDIR/stdio.err"; then echo 'Stdio accepted changed destination!' >&2; exit 1; fi
+assert_profile_startup_refused "destination changed"
 if ! grep -q 'destination changed' "$TEST_TMPDIR/error.out" "$TEST_TMPDIR/stdio.err"; then cat "$TEST_TMPDIR/stdio.err"; exit 1; fi
 python3 - "$TEST_TMPDIR" <<'PY'
 import json, os, pathlib, sys
@@ -165,7 +175,7 @@ echo "Testing missing credential"
 cp "$XDG_CONFIG_HOME/huly/profiles.json" "$TEST_TMPDIR/metadata-before-logout.json"
 "$HULY_PREPARED_CLI" auth logout --profile shared-live >/dev/null
 cmp "$XDG_CONFIG_HOME/huly/profiles.json" "$TEST_TMPDIR/metadata-before-logout.json"
-if timeout 10 node dist/index.cjs <"$TEST_TMPDIR/request.jsonl" >"$TEST_TMPDIR/error.out" 2>"$TEST_TMPDIR/stdio.err"; then echo 'Stdio accepted missing credential!' >&2; exit 1; fi
+assert_profile_startup_refused "no usable credentials"
 grep -q 'no usable credentials' "$TEST_TMPDIR/error.out" "$TEST_TMPDIR/stdio.err"
 
 echo 'PASS: packed CLI login, shared CLI/stdio live reads, independent active selection, destination binding, prompt-free missing credential.'

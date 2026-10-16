@@ -8,6 +8,19 @@ import time
 from profile_test_credentials import saved_token
 
 
+def assert_profile_diagnostic(result):
+    assert result.returncode == 0, "Diagnostic MCP failed to complete its protocol session."
+    replies = [json.loads(line) for line in result.stdout.splitlines()]
+    assert len(replies) == 3, "Diagnostic MCP did not return all three responses."
+    by_id = {reply["id"]: reply["result"] for reply in replies}
+    assert "Secret Service" in by_id[1]["instructions"]
+    assert [tool["name"] for tool in by_id[2]["tools"]] == ["get_huly_startup_diagnostic"]
+    assert by_id[3]["isError"] is True
+    assert by_id[3]["structuredContent"]["error"]["code"] == "PROFILE_CREDENTIALS_UNAVAILABLE"
+    assert "Secret Service" in by_id[3]["structuredContent"]["error"]["message"]
+    assert "Secret Service" in result.stderr
+
+
 def run_private_native_failures(cli, root):
     token = saved_token(root)
     profiles = (root / "profiles.json").read_bytes()
@@ -32,7 +45,7 @@ def run_private_native_failures(cli, root):
     request = pathlib.Path(os.environ["HULY_TEST_MCP_REQUEST"]).read_text()
     mcp_environment = {**os.environ, "MCP_AUTO_EXIT": "true", "HULY_TOOL_MODE": "native"}
     locked_mcp = subprocess.run(["node", "dist/index.cjs"], input=request, text=True, capture_output=True, env=mcp_environment, timeout=10)
-    assert locked_mcp.returncode != 0, "Locked stdio unexpectedly succeeded."
+    assert_profile_diagnostic(locked_mcp)
     assert "Secret Service" in locked_mcp.stdout + locked_mcp.stderr, "Stdio omitted actionable native-store failure."
     assert token not in locked_mcp.stdout + locked_mcp.stderr, "Locked stdio exposed token."
     status = subprocess.run([cli, "auth", "status", "--profile", "shared-live", "--json"], text=True, capture_output=True, timeout=10)
@@ -59,7 +72,10 @@ def run_private_native_failures(cli, root):
     missing_session = {key: value for key, value in mcp_environment.items() if key != "DBUS_SESSION_BUS_ADDRESS"}
     for argv, stdin in [([cli, "projects", "list", "--profile", "shared-live", "--json"], None), (["node", "dist/index.cjs"], request)]:
         result = subprocess.run(argv, input=stdin, text=True, capture_output=True, env=missing_session, timeout=10)
-        assert result.returncode != 0, "Missing D-Bus session unexpectedly succeeded."
+        if argv[0] == "node":
+            assert_profile_diagnostic(result)
+        else:
+            assert result.returncode != 0, "Missing D-Bus session unexpectedly succeeded."
         assert "Secret Service" in result.stdout + result.stderr, "Missing actionable D-Bus session error."
         assert token not in result.stdout + result.stderr, "Missing-session failure exposed token."
 

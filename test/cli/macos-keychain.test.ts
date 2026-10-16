@@ -44,7 +44,7 @@ it("refuses locked or denied reads before attempting deletion", async () => {
   expect(removed).toBe(false)
 })
 
-it("supports write/read/replace/delete and missing deletion across the search list", async () => {
+it("supports write/read/replace/delete and refuses unproven missing deletion across the search list", async () => {
   const values = new Map<string, string>()
   const passwords = makeMacosPasswords(async () => ({
     list: async () => JSON.stringify([...values].map(([account, password]) => ({ account, password }))),
@@ -53,8 +53,11 @@ it("supports write/read/replace/delete and missing deletion across the search li
     }
   }))
   const native = makeMacosKeychain(passwords, (request) => {
-    if (request._tag === "Remove") values.delete(request.key)
-    return reply(request._tag === "Remove" || values.has(request.key) ? 0 : 44)
+    if (request._tag === "Remove") {
+      values.delete(request.key)
+      return reply(0)
+    }
+    return reply(values.has(request.key) ? 0 : 44)
   })
   expect(await Effect.runPromise(native.read("account"))).toBeUndefined()
   await Effect.runPromise(native.save("account", Redacted.make("first-sentinel")))
@@ -64,7 +67,7 @@ it("supports write/read/replace/delete and missing deletion across the search li
   await Effect.runPromise(native.save("account", Redacted.make("second-sentinel")))
   expect(values.get("account")).toBe("second-sentinel")
   await Effect.runPromise(native.remove("account"))
-  await Effect.runPromise(native.remove("account"))
+  expect(Result.isFailure(await Effect.runPromise(native.remove("account").pipe(Effect.result)))).toBe(true)
   expect(values.size).toBe(0)
 })
 

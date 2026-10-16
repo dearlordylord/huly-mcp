@@ -1,0 +1,16 @@
+
+> @firfi/huly-mcp@0.53.1 build /private/tmp/hulymcp-macos-pr318
+> pnpm build:mcp && pnpm build:cli
+
+
+> @firfi/huly-mcp@0.53.1 build:mcp /private/tmp/hulymcp-macos-pr318
+> PKG_VERSION=$(node -p "require('./package.json').version") NODE_ENGINE_REQUIREMENT=$(node -p "require('./package.json').engines.node") && esbuild src/launcher.ts --bundle --platform=node --format=cjs --log-level=warning --outfile=dist/index.cjs --external:ws --external:@napi-rs/keyring --external:dbus-next "--define:PKG_VERSION=\"$PKG_VERSION\"" "--define:NODE_ENGINE_REQUIREMENT=\"$NODE_ENGINE_REQUIREMENT\""
+
+
+> @firfi/huly-mcp@0.53.1 build:cli /private/tmp/hulymcp-macos-pr318
+> pnpm --filter @firfi/huly-cli build
+
+
+> @firfi/huly-cli@0.51.1 build /private/tmp/hulymcp-macos-pr318/packages/huly-cli
+> PKG_VERSION=$(node -p "require('./package.json').version") && esbuild src/index.ts --bundle --platform=node --format=cjs --log-level=warning --outfile=dist/index.cjs --external:ws --external:@napi-rs/keyring --external:dbus-next "--define:PKG_VERSION=\"$PKG_VERSION\""
+

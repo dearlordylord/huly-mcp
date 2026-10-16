@@ -24,10 +24,9 @@ export const makeMacosKeychain = (
     remove: (key) =>
       Effect.gen(function* () {
         // Establish access before deletion; locked/denied reads must retain the reference.
-        if ((yield* read(key)) === undefined) return
+        if ((yield* read(key)) === undefined) return yield* macosKeychainUnavailable()
         const reply = yield* security({ _tag: "Remove", key })
-        if (reply.status !== 0 && reply.status !== MACOS_KEYCHAIN_ITEM_NOT_FOUND)
-          return yield* macosKeychainUnavailable()
+        if (reply.status !== 0) return yield* macosKeychainUnavailable()
         if ((yield* read(key)) !== undefined) return yield* macosKeychainUnavailable()
       })
   }
