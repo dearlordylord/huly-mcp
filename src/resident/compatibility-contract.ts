@@ -26,9 +26,11 @@ export const CompatibilityChallenge = Schema.Struct({
 export type CompatibilityChallenge = Schema.Schema.Type<typeof CompatibilityChallenge>
 export const CompatibilityProof = Schema.Struct({ ...CompatibilityChallenge.fields, mac: CompatibilityMac })
 export type CompatibilityProof = Schema.Schema.Type<typeof CompatibilityProof>
+export const RESIDENT_COMPATIBILITY_PATH = "/resident/compatibility"
+export const MAX_COMPATIBILITY_REQUEST_BYTES = 4_096
 
 export class CompatibilityError extends Schema.TaggedError<CompatibilityError>()("CompatibilityError", {
-  kind: Schema.Literals(["capacity", "unknown", "mismatch", "encoding", "entropy"]),
+  kind: Schema.Literals(["capacity", "unknown", "mismatch", "encoding", "entropy", "input"]),
   message: Schema.String
 }) {}
 

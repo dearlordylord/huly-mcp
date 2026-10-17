@@ -143,7 +143,7 @@ export const buildAppLayer = (
   closeClients?: () => Promise<void>,
   runtimeConfigContext = () => sanitizeHulyRuntimeConfigFromEnv(process.env),
   observeMovement?: MovementStageObserver,
-  httpMiddleware?: HttpMiddleware
+  httpPolicy?: { readonly httpMiddleware: HttpMiddleware; readonly beforeHttpShutdown: Effect.Effect<void> }
 ): Layer.Layer<McpServerService | HttpServerFactoryService, McpServerError, never> => {
   const mcpServerConfig = {
     transport,
@@ -153,7 +153,7 @@ export const buildAppLayer = (
     authMethod,
     resolveClients,
     ...(observeMovement === undefined ? {} : { observeMovement }),
-    ...(httpMiddleware === undefined ? {} : { httpMiddleware }),
+    ...httpPolicy,
     ...(closeClients === undefined ? {} : { closeClients }),
     resolveClientLeaseForHttpRequest,
     getRuntimeConfigContext: runtimeConfigContext,
@@ -244,7 +244,7 @@ const runConfiguredServer = (
                 ? sanitizeHulyRuntimeConfigFromEnv(environment)
                 : profileRuntimeContext(profile, environment),
             observeMovement,
-            resident?.middleware
+            resident?.httpPolicy
           )
 
           yield* Effect.gen(function* () {

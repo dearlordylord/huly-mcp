@@ -29,3 +29,21 @@ Managed acquisition and idle shutdown, last-adapter scenarios under managed
 ownership, complete lifecycle observation alignment, live Huly qualification and
 native platform certification remain required. None is established by metadata
 fixtures or the calibration receipt. The prototype branch remains preserved.
+
+The admission service now has an irreversible generation fence. It rejects new
+attachments immediately, including when another admission is paused, and fences
+lookup, renewal, and new work through captured owners. Existing work and native
+capabilities remain owned until explicit cleanup succeeds. Five Effect tests
+exercise these boundaries, and a real TLS control test observes closing refusal.
+The manual backend bundles its HTTP middleware with a shutdown fence that runs
+before native registry and client cleanup. An additional real TLS test holds
+native client cleanup, observes admission refusal while the descriptor remains
+readable, then releases cleanup and verifies owned shutdown. An outer fence also
+covers run failure and interruption before closing its inner scope. This
+does not yet provide managed idle policy, whole-generation draining, or confirmed
+outer process-client retirement.
+
+The corrected admission increment passes the complete project gate with 5,541
+tests and the original coverage thresholds. Standards and Spec have no remaining
+scoped finding. The receipt and failed earlier run are recorded in
+[the issue 325 report](issue-325.md#authenticated-http-increment).

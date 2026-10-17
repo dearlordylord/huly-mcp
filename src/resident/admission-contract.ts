@@ -32,6 +32,6 @@ export const AdmissionPolicy = Schema.Struct({
 export type AdmissionPolicy = Schema.Schema.Type<typeof AdmissionPolicy>
 
 export class AdmissionError extends Schema.TaggedError<AdmissionError>()("AdmissionError", {
-  kind: Schema.Literals(["capacity", "unknown", "cleanup", "pending"]),
+  kind: Schema.Literals(["capacity", "unknown", "cleanup", "pending", "closing"]),
   message: Schema.String
 }) {}

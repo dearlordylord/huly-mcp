@@ -23,6 +23,8 @@ const digest = (token: AttachmentToken): AttachmentDigest =>
   createHash("sha256").update(Redacted.value(token)).digest("hex")
 const unknownAttachment = () =>
   new AdmissionError({ kind: "unknown", message: "Resident attachment is unavailable or expired" })
+const generationClosing = () =>
+  new AdmissionError({ kind: "closing", message: "Resident generation no longer admits attachments" })
 const randomToken = Effect.sync(() => randomBytes(TOKEN_BYTES).toString("hex")).pipe(
   Effect.flatMap(Schema.decodeUnknownEffect(AttachmentToken)),
   Effect.mapError(unknownAttachment)
@@ -31,11 +33,18 @@ const randomToken = Effect.sync(() => randomBytes(TOKEN_BYTES).toString("hex")).
 // Internal entropy port permits deterministic collision tests without replacing node:crypto.
 export const makeResidentAdmissions = Effect.fn("makeResidentAdmissions")(function* (
   policy: AdmissionPolicy,
-  tokens: Effect.Effect<AttachmentToken, AdmissionError> = randomToken
+  tokens: Effect.Effect<AttachmentToken, AdmissionError> = randomToken,
+  createOwner: (eligible: Effect.Effect<boolean>) => ReturnType<typeof makeAttachmentOwner> = makeAttachmentOwner
 ) {
   const generationScope = yield* Effect.scope
   const members = new Map<AttachmentDigest, Member>()
   const admission = yield* Semaphore.make(1)
+  let accepting = true
+  const fence = Effect.sync(() => {
+    accepting = false
+  })
+  const requireAccepting = Effect.suspend(() => (accepting ? Effect.void : Effect.fail(generationClosing())))
+  yield* Effect.addFinalizer(() => fence)
   const forget = (key: AttachmentDigest, member: Member) =>
     Effect.sync(() => {
       if (members.get(key) === member) members.delete(key)
@@ -58,34 +67,47 @@ export const makeResidentAdmissions = Effect.fn("makeResidentAdmissions")(functi
     )
   }
 
-  const admit = admission.withPermits(1)(
-    Effect.gen(function* () {
-      if (members.size >= policy.capacity)
-        return yield* new AdmissionError({ kind: "capacity", message: "Resident attachment capacity reached" })
-      const token = yield* tokens
-      const key = digest(token)
-      if (members.has(key)) return yield* unknownAttachment()
-      const authority = { lease: makeAttachmentLease(yield* Clock.monotonicTimeNanos, policy.lease.durationMillis) }
-      const eligible = Clock.clockWith((clock) =>
-        Effect.sync(() => leaseIsEligible(authority.lease, clock.monotonicTimeNanosUnsafe()))
-      )
-      const owner = yield* makeAttachmentOwner(eligible).pipe(Scope.provide(generationScope))
-      const member: Member = { owner, authority }
-      members.set(key, member)
-      yield* watch(key, member).pipe(Effect.forkIn(generationScope))
-      return AttachmentAdmitted.make({ version: 1, token, lease: policy.lease })
-    }).pipe(Effect.uninterruptible)
+  const admit = Effect.andThen(
+    requireAccepting,
+    admission.withPermits(1)(
+      Effect.gen(function* () {
+        yield* requireAccepting
+        if (members.size >= policy.capacity)
+          return yield* new AdmissionError({ kind: "capacity", message: "Resident attachment capacity reached" })
+        const token = yield* tokens
+        yield* requireAccepting
+        const key = digest(token)
+        if (members.has(key)) return yield* unknownAttachment()
+        const authority = { lease: makeAttachmentLease(yield* Clock.monotonicTimeNanos, policy.lease.durationMillis) }
+        const eligible = Clock.clockWith((clock) =>
+          Effect.sync(() => accepting && leaseIsEligible(authority.lease, clock.monotonicTimeNanosUnsafe()))
+        )
+        const owner = yield* createOwner(eligible).pipe(Scope.provide(generationScope))
+        if (!accepting) {
+          yield* owner.close.pipe(
+            Effect.mapError(
+              () => new AdmissionError({ kind: "cleanup", message: "Resident attachment cleanup is unverified" })
+            )
+          )
+          return yield* generationClosing()
+        }
+        const member: Member = { owner, authority }
+        members.set(key, member)
+        yield* watch(key, member).pipe(Effect.forkIn(generationScope))
+        return AttachmentAdmitted.make({ version: 1, token, lease: policy.lease })
+      }).pipe(Effect.uninterruptible)
+    )
   )
 
   const withLiveMember = <A>(token: AttachmentToken, use: (member: Member, now: MonotonicNanos) => A) =>
     Effect.gen(function* () {
       const member = members.get(digest(token))
       if (member === undefined) return yield* unknownAttachment()
-      const accepting = yield* member.owner.accepting
+      const ownerAccepting = yield* member.owner.accepting
       return yield* Clock.clockWith((clock) =>
         Effect.suspend(() => {
           const now = clock.monotonicTimeNanosUnsafe()
-          return accepting && leaseIsEligible(member.authority.lease, now)
+          return accepting && ownerAccepting && leaseIsEligible(member.authority.lease, now)
             ? Effect.succeed(use(member, now))
             : Effect.fail(unknownAttachment())
         })
@@ -115,5 +137,5 @@ export const makeResidentAdmissions = Effect.fn("makeResidentAdmissions")(functi
     yield* forget(key, member)
   })
 
-  return { admit, find, renew, release }
+  return { admit, find, renew, release, fence }
 })

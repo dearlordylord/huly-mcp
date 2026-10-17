@@ -79,7 +79,8 @@ Registry names contain no credential-derived lookup value. Private compatibility
 uses a domain-separated MAC over a canonical selection and a backend-issued
 one-use challenge. It binds package, wire version, generation, and operation.
 The canonical encoder and challenge limits are recorded below. HTTP comparison
-and its connection to admission remain unwired. No transcript is persisted or logged.
+and admission are connected at the transport module boundary. Production profile
+resolution and startup do not yet supply a selection. No transcript is persisted or logged.
 
 The comparison wire format is version 1. Its challenge contains the package
 version, expected random generation, and a fresh 32-byte random nonce encoded as
@@ -109,6 +110,37 @@ time. TLS authenticates the expected generation and the control response. This
 operation proves compatibility only; attachment admission remains separately
 required under the generation's shutdown fence. No comparison transcript or
 credential-derived value is written to the registry.
+
+When a backend supplies a compatibility authority, POST
+`/resident/compatibility` issues a challenge. POST `/resident/attachments` then
+requires the schema-encoded proof, verifies it, and attempts admission under the
+generation fence. Missing, malformed, replayed, or incompatible proofs never
+fall back to unverified admission. A server without a compatibility authority
+retains the explicit manual attachment contract.
+
+Proof request bodies are limited to 4,096 bytes. Oversized bodies cause the
+installed Node transport to close the socket; ordinary malformed JSON receives
+a static 400 response. The adapter bounds challenge responses to the existing
+4,096-byte admission response limit. Challenge and admission together share one
+five-second acquisition allowance. Renewal and release retain their existing
+individual five-second allowances. A failed or lost control exchange dispatches
+no Huly request and authorizes no replay.
+
+The adapter verifies challenge package and generation against its own package
+and authenticated descriptor before computing a proof. Successful comparison
+does not bypass admission: a fence between comparison and admission produces a
+409 refusal. Challenge replay then fails because verification consumed the nonce.
+
+The admission service's irreversible fence blocks new admission, lookup, renewal,
+and new work through previously captured owners. It does not cancel running work.
+Explicit draining still owns cancellation and waits for confirmed target and
+client cleanup. The fence does not wait for a paused admission or the filesystem
+selection claim. Pending admissions check eligibility again after asynchronous
+resource acquisition before publishing a capability. Manual backend HTTP policy
+bundles its middleware with a fence that runs before native registry and client
+cleanup. Its outer run cleanup also fences before the inner scope closes.
+These mechanisms do not yet implement
+managed idle retirement or prove outer process-client retirement.
 
 A stable outer registry envelope distinguishes known incompatible versions from
 corrupt or unknown records before decoding the current attachment descriptor.

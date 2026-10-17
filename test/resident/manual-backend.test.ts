@@ -12,12 +12,81 @@ import { HostMessage } from "../../src/resident/request-headers.js"
 import { readResidentAttachment } from "../../src/resident/attachment-file.js"
 import { makeManualResidentBackend } from "../../src/resident/manual-backend.js"
 import type { ResidentFilePath } from "../../src/resident/protected-path.js"
-import { ResidentEndpoint } from "../../src/resident/tls-channel.js"
+import { ResidentEndpoint, withResidentHttpsAgent } from "../../src/resident/tls-channel.js"
+import { NodeHttpClient } from "@effect/platform-node"
+import { HttpClientRequest } from "effect/http"
+import { RESIDENT_ATTACHMENTS_PATH } from "../../src/resident/admission-contract.js"
 import { TelemetryService } from "../../src/telemetry/telemetry.js"
 
 const RESPONSE_BOUND = 5_000
 const NON_PRIVATE_DIRECTORY = 0o755
 const READY_PREFIX = "MCP HTTP server listening on "
+
+it("fences attachment admission before held native client cleanup during normal stop", async () => {
+  const directory = await fs.mkdtemp(path.join(await fs.realpath(tmpdir()), "resident-stop-fence-"))
+  try {
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const backend = yield* makeManualResidentBackend
+        const cleaning = yield* Deferred.make<void>()
+        const finish = yield* Deferred.make<void>()
+        yield* Effect.gen(function* () {
+          const server = yield* McpServerService
+          const published = yield* Deferred.make<ResidentFilePath>()
+          const owner = yield* backend
+            .run(server, (file) => Effect.runSync(Deferred.succeed(published, file)))
+            .pipe(Effect.forkScoped)
+          const file = yield* Deferred.await(published)
+          const descriptor = yield* readResidentAttachment(file)
+          const stopping = yield* server.stop().pipe(Effect.forkScoped)
+          yield* Deferred.await(cleaning)
+          try {
+            const status = yield* withResidentHttpsAgent(descriptor.endpoint, descriptor.identity, (agent) =>
+              Effect.gen(function* () {
+                const client = yield* NodeHttpClient.makeNodeHttp.pipe(
+                  Effect.provideService(NodeHttpClient.HttpAgent, { http: agent, https: agent })
+                )
+                const response = yield* client.execute(
+                  HttpClientRequest.post(new URL(RESIDENT_ATTACHMENTS_PATH, descriptor.endpoint).href).pipe(
+                    HttpClientRequest.setHeader("authorization", `Bearer ${Redacted.value(descriptor.authorization)}`)
+                  )
+                )
+                yield* response.text
+                return response.status
+              })
+            )
+            expect(status).toBe(409)
+            expect((yield* readResidentAttachment(file)).identity.generation).toBe(descriptor.identity.generation)
+          } finally {
+            yield* Deferred.succeed(finish, undefined)
+          }
+          yield* Fiber.join(stopping)
+          yield* Fiber.join(owner)
+          expect(yield* Effect.promise(() => fs.readdir(directory))).toEqual([])
+        }).pipe(
+          Effect.provide(
+            McpServerService.layer({
+              transport: "http",
+              httpHost: "127.0.0.1",
+              httpPort: 0,
+              mcpAuthToken: backend.authorization,
+              ...backend.httpPolicy,
+              resolveClients: () => Promise.reject(new Error("Shutdown fixture must not acquire Huly")),
+              closeClients: () =>
+                Effect.runPromise(Deferred.succeed(cleaning, undefined).pipe(Effect.andThen(Deferred.await(finish))))
+            }).pipe(Layer.provide(TelemetryService.testLayer({})))
+          )
+        )
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(ConfigProvider.layer(ConfigProvider.fromUnknown({ MCP_RESIDENT_STATE_DIRECTORY: directory }))),
+        Effect.timeout(RESPONSE_BOUND)
+      )
+    )
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
+})
 
 const isListening = (endpoint: ResidentEndpoint) =>
   new Promise<boolean>((resolve, reject) => {
@@ -86,7 +155,7 @@ it.each(["stop", "interrupt"])("publishes after native application readiness and
               httpHost: "127.0.0.1",
               httpPort: 0,
               mcpAuthToken: backend.authorization,
-              httpMiddleware: backend.middleware,
+              ...backend.httpPolicy,
               resolveClients: () => Promise.reject(new Error("Application readiness must not acquire Huly"))
             }).pipe(Layer.provide(TelemetryService.testLayer({})))
           )
@@ -152,7 +221,7 @@ it.each(["publication", "readiness", "timeout"])("closes the bound listener afte
               httpHost: "127.0.0.1",
               httpPort: 0,
               mcpAuthToken: backend.authorization,
-              httpMiddleware: backend.middleware,
+              ...backend.httpPolicy,
               resolveClients: () => Promise.reject(new Error("Failed startup must not acquire Huly")),
               writeError: (line) => {
                 if (line.startsWith(READY_PREFIX))

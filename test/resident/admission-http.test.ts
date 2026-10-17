@@ -164,6 +164,8 @@ it("authenticates attachment membership before native MCP and fences foreign leg
             )
             expect((yield* control(endpoint, identity, "DELETE", thirdToken)).status).toBe(HTTP_CONFLICT)
             yield* admissions.release(secondToken)
+            yield* admissions.fence
+            expect((yield* control(endpoint, identity, "POST")).status).toBe(HTTP_CONFLICT)
           }),
         { middleware: (app) => residentAdmissionMiddleware(admissions)(nativeContext(app)) }
       )

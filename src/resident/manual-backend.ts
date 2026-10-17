@@ -93,7 +93,11 @@ export const makeManualResidentBackend = Effect.gen(function* () {
         )
       })
       yield* Effect.raceFirst(publish, Fiber.join(serving))
-    }).pipe(Effect.scoped)
+    }).pipe(Effect.ensuring(admissions.fence), Effect.scoped)
 
-  return { authorization, middleware: residentAdmissionMiddleware(admissions), run }
+  return {
+    authorization,
+    httpPolicy: { httpMiddleware: residentAdmissionMiddleware(admissions), beforeHttpShutdown: admissions.fence },
+    run
+  }
 })

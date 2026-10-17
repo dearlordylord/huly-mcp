@@ -61,6 +61,7 @@ interface McpServerConfigData {
 
 interface McpServerConfigCallbacks {
   readonly httpMiddleware?: HttpMiddleware
+  readonly beforeHttpShutdown?: Effect.Effect<void>
   readonly observeMovement?: MovementStageObserver
   readonly resolveClients: ClientResolver
   readonly resolveClientLeaseForHttpRequest?: (
@@ -295,7 +296,11 @@ const runHttpTransport = (
           )
         : Effect.fail(new HttpTransportError({ message: "MCP HTTP transport requires a TCP listener" })),
     onReady: () => Deferred.succeed(control.ready, undefined),
-    onShutdown: () => runHttpShutdownResources(registry, telemetry, config.closeClients),
+    onShutdown: () =>
+      Effect.andThen(
+        config.beforeHttpShutdown ?? Effect.void,
+        runHttpShutdownResources(registry, telemetry, config.closeClients)
+      ),
     shutdownGracePeriod: config.shutdownGracePeriod ?? DEFAULT_SHUTDOWN_GRACE_PERIOD
   }
   return startHttpTransport(httpConfig, appLayer, writeError).pipe(
