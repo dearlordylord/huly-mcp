@@ -40,3 +40,5 @@ Offer a separately managed, shared environment-backed HTTP daemon for multiple c
 HTTP header mode remains useful for credential isolation. Its model-dependent requests repeatedly initialize their own clients; a repeat call is not warm merely because it reaches the same HTTP process. Do not pool different credentials/workspaces to reproduce environment-mode timings.
 
 This resolves the performance-study question, not the outstanding [release qualification failures](RELEASE-QUALIFICATION.md). Current movement verification, native stdio attachment expectation and HTTP-header attachment response remain unresolved. Broader model-light paths, cold-disk startup, actual multi-thread Codex lifecycle and sustained load remain separate questions. Temporary probe executables are removed after retaining data/provenance.
+
+Existing implementations and lifecycle pitfalls for preserving stdio through a shared backend are surveyed in [resident-daemon research](RESIDENT-DAEMON-RESEARCH.md). That survey does not change the measured transport configuration or implement an automatic daemon.
