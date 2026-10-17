@@ -16,7 +16,7 @@ import {
   type CliHelpWidth,
   type CliPackageVersion
 } from "./help-schema.js"
-import { authCommand, profileCommand } from "./local-commands.js"
+import { localCliCommands } from "./local-commands.js"
 import { cliFieldOptionHelpRows, cliGlobalOptionHelpRows } from "./cli-options.js"
 import { hasExplicitCliConfirmationPolicy } from "./safety-policies.js"
 
@@ -97,7 +97,7 @@ const progressiveRootRows = (): ReadonlyArray<HelpRow> => {
       description: CliHelpDescription.make(`${count} ${count === 1 ? "command" : "commands"}`)
     }
   }
-  const localRows = [localCommandRow(authCommand), localCommandRow(profileCommand)]
+  const localRows = localCliCommands.map(localCommandRow)
   return [...localRows, ...generatedRows].sort((left, right) => left.command.localeCompare(right.command))
 }
 

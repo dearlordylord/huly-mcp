@@ -6,7 +6,6 @@ import { Effect, Redacted, Schema } from "effect"
 import { VERSION } from "../version.js"
 import { ResidentAttachment } from "./attachment-file.js"
 import {
-  ManagedLaunchError,
   MANAGED_PACKAGE_NAME,
   MAX_REGISTRY_BYTES,
   MAX_REGISTRY_RECORDS,
@@ -22,22 +21,12 @@ import {
   ResidentDirectory,
   ResidentFilePath
 } from "./protected-path.js"
-import { readPrivateText } from "./private-text.js"
-import { ResidentTlsIdentity } from "./tls-channel.js"
-
-const RECORD_SUFFIX = ".json"
+import { openRegistryInventory, registryFailure, registryIo } from "./registry-inventory.js"
 
 class RegistryDirectoryOccupied extends Schema.TaggedError<RegistryDirectoryOccupied>()(
   "RegistryDirectoryOccupied",
   {}
 ) {}
-const registryFailure = () =>
-  new ManagedLaunchError({
-    reason: "ownership",
-    message: "Resident registry is unresolved; inspect its private state before retrying"
-  })
-const registryIo = <A>(operation: () => Promise<A>) => Effect.tryPromise({ try: operation, catch: registryFailure })
-
 export const openGenerationRegistry = Effect.fn("openGenerationRegistry")(function* (root: ResidentDirectory) {
   const owner = yield* currentPosixOwner
   const parent = yield* inspectPrivateDirectory(root, owner)
@@ -45,41 +34,7 @@ export const openGenerationRegistry = Effect.fn("openGenerationRegistry")(functi
   yield* registryIo(() => fs.mkdir(requested, { mode: PRIVATE_DIRECTORY_MODE, recursive: true }))
   const directory = yield* inspectPrivateDirectory(requested, owner)
 
-  const listRecords = Effect.acquireUseRelease(
-    registryIo(() => fs.opendir(directory)),
-    (entries) =>
-      Effect.gen(function* () {
-        const files: Array<{
-          readonly file: ResidentFilePath
-          readonly generation: ResidentAttachment["identity"]["generation"]
-        }> = []
-        for (let count = 0; ; count++) {
-          const entry = yield* registryIo(() => entries.read())
-          if (entry === null) return files
-          if (count === MAX_REGISTRY_RECORDS) return yield* registryCapacityFailure()
-          if (!entry.isFile() || !entry.name.endsWith(RECORD_SUFFIX)) return yield* registryFailure()
-          const generation = yield* Schema.decodeUnknownEffect(ResidentTlsIdentity.fields.generation)(
-            entry.name.slice(0, -RECORD_SUFFIX.length)
-          ).pipe(Effect.mapError(registryFailure))
-          files.push({ file: ResidentFilePath.make(join(directory, entry.name)), generation })
-        }
-      }),
-    (entries) => registryIo(() => entries.close())
-  )
-  const inventory = listRecords.pipe(
-    Effect.flatMap((files) =>
-      Effect.forEach(files, ({ file, generation }) =>
-        Effect.gen(function* () {
-          const text = yield* readPrivateText(file, MAX_REGISTRY_BYTES)
-          const envelope = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(ResidentRegistryEnvelope))(
-            text
-          ).pipe(Effect.mapError(registryFailure))
-          if (envelope.generation !== generation || envelope.format !== 1) return yield* registryFailure()
-          return { file, envelope }
-        })
-      )
-    )
-  )
+  const { inventory, listRecords } = yield* openRegistryInventory(directory)
 
   const publish = Effect.fn("GenerationRegistry.publish")(function* (descriptor: ResidentAttachment) {
     if ((yield* listRecords).length === MAX_REGISTRY_RECORDS) return yield* registryCapacityFailure()

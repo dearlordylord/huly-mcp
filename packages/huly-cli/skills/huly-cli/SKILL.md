@@ -20,6 +20,7 @@ Use `huly profile create|list|select|update` for named URL, workspace, and defau
 
 Key local command surfaces:
 
+`huly resident status [--state-directory <path>] [--json]`
 `huly auth login [--profile <name>] [--json]`
 `huly auth status [--profile <name>] [--json]`
 `huly auth logout [--profile <name>] [--json]`
@@ -27,6 +28,12 @@ Key local command surfaces:
 `huly profile list [--json]`
 `huly profile select <name> [--json]`
 `huly profile update <name> [--url <url>] [--workspace <workspace>] [--default-project <project> | --clear-default-project] [--json]`
+
+Use `huly resident status --json` to inspect protected local ownership records.
+Add `--state-directory <path>` to inspect an explicit namespace. This command
+does not start a backend or change records. Its snapshot proves neither
+readiness nor retirement; never infer permission to kill a PID, delete state or
+replay an operation from this output.
 
 ## Discover before acting
 

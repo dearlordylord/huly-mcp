@@ -5,6 +5,7 @@ import { Console, Effect, Schema } from "effect"
 import { cliCommandCatalog } from "../packages/huly-cli/src/catalog.js"
 import { CLI_FAILURE_CONTRACT } from "../packages/huly-cli/src/failures.js"
 import { authCommand, localCommandSkillSurfaces, profileCommand } from "../packages/huly-cli/src/local-commands.js"
+import { residentCommand } from "../packages/huly-cli/src/resident-commands.js"
 
 const skillPath = "packages/huly-cli/skills/huly-cli/SKILL.md"
 const automationPath = "packages/huly-cli/skills/huly-cli/references/automation.md"
@@ -29,6 +30,7 @@ const requireSubcommand = (group: LocalCommandMetadata, expectedGroup: string, n
 
 requireSubcommand(authCommand, "auth", ["login", "status", "logout"])
 requireSubcommand(profileCommand, "profile", ["create", "list", "select", "update"])
+requireSubcommand(residentCommand, "resident", ["status"])
 
 const commandDescription = (group: LocalCommandMetadata, name: string): string => {
   const command = group.subcommands.flatMap((entry) => entry.commands).find((candidate) => candidate.name === name)
@@ -63,6 +65,12 @@ ${Object.values(localCommandSkillSurfaces)
   .map((surface) => `\`${surface}\``)
   .join("\n")}
 
+Use \`huly resident status --json\` to inspect protected local ownership records.
+Add \`--state-directory <path>\` to inspect an explicit namespace. This command
+does not start a backend or change records. Its snapshot proves neither
+readiness nor retirement; never infer permission to kill a PID, delete state or
+replay an operation from this output.
+
 ## Discover before acting
 
 1. Run \`huly --help\` to discover groups.
@@ -93,6 +101,12 @@ For scripts, read [references/automation.md](references/automation.md) before ha
 `
 
 const requiredLocalSurface = [
+  {
+    documentedSurface: localCommandSkillSurfaces.residentStatus,
+    descriptionSource: commandDescription(residentCommand, "status"),
+    command: "resident status",
+    description: "Liveness and retirement remain unverified"
+  },
   {
     documentedSurface: localCommandSkillSurfaces.authLogin,
     descriptionSource: commandDescription(authCommand, "login"),

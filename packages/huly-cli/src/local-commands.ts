@@ -27,6 +27,7 @@ import {
   type ProfileName
 } from "./profile-store.js"
 import { CliRuntimeError } from "./render.js"
+import { residentCommand, residentStatusSkillSurface } from "./resident-commands.js"
 
 const JSON_INDENT_SPACES = 2
 
@@ -216,6 +217,7 @@ const localCommandConfigs = {
 const stripOuterBrackets = (syntax: string): string => syntax.slice("[".length, syntax.length - "]".length)
 
 export const localCommandSkillSurfaces = {
+  residentStatus: residentStatusSkillSurface,
   authLogin: `huly auth login ${profileFlag.syntax} ${jsonFlag.syntax}`,
   authStatus: `huly auth status ${profileFlag.syntax} ${jsonFlag.syntax}`,
   authLogout: `huly auth logout ${profileFlag.syntax} ${jsonFlag.syntax}`,
@@ -365,4 +367,4 @@ export const profileCommand = Command.make("profile").pipe(
   Command.withSubcommands([profileCreate, profileList, profileSelect, profileUpdate])
 )
 
-export const localCliCommands = [authCommand, profileCommand]
+export const localCliCommands = [authCommand, profileCommand, residentCommand]

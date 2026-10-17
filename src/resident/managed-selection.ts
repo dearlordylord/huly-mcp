@@ -1,5 +1,4 @@
 import * as fs from "node:fs/promises"
-import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { Cause, Effect, Exit, Fiber, Option, Result, Scope } from "effect"
 
@@ -25,7 +24,7 @@ import {
 } from "./protected-path.js"
 import { acquireSelectionClaim, SelectionClaimError } from "./selection-claim.js"
 import type { StartupBudget } from "./startup-budget.js"
-import { readManagedDirectory } from "./managed-directory-config.js"
+import { readManagedDirectoryForOwner } from "./managed-directory-config.js"
 
 const withSelectionOwnership = <A, E, R>(
   directory: ResidentDirectory,
@@ -55,10 +54,7 @@ const withSelectionOwnership = <A, E, R>(
 
 export const prepareManagedDirectory = Effect.gen(function* () {
   const owner = yield* currentPosixOwner
-  const requested = yield* readManagedDirectory(
-    owner.platform,
-    ResidentDirectory.make(join(tmpdir(), `huly-mcp-${owner.userId}`))
-  )
+  const requested = yield* readManagedDirectoryForOwner(owner)
   const directory = ResidentDirectory.make(resolve(requested))
   yield* Effect.tryPromise({
     try: () => fs.mkdir(directory, { mode: PRIVATE_DIRECTORY_MODE, recursive: true }),

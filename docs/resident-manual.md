@@ -114,3 +114,40 @@ with distinct implementation versions. It checks separate-parent attachment,
 generation isolation and independent retirement. This is compatibility evidence
 for that version boundary, not certification of arbitrary released-version
 upgrades, package-manager installation or native macOS/Windows behavior.
+
+## Inspect managed ownership state
+
+Run the CLI without Huly credentials:
+
+```bash
+huly resident status --json
+huly resident status --state-directory /absolute/private/namespace --json
+```
+
+The default uses the same directory configuration as managed startup, including
+its legacy-directory upgrade guard. An explicit path can inspect the old
+namespace. The command reads existing state without creating directories,
+starting a backend, acquiring a selection claim or changing records.
+
+JSON reports `absent` or `observed`. An observed snapshot includes implementation
+versions, generation IDs, diagnostic PIDs and whether a selection claim is
+present. Liveness is always `unverified`. A PID is diagnostic information, not
+process ownership evidence. No endpoint, authorization value, channel key,
+attachment payload or operation history is returned.
+
+Inspection accepts at most 16 generation records of 65,536 bytes each. Root
+inspection allows at most 34 entries, accounting for each generation's
+descriptor and protected publication directory plus the shared registry and
+claim directories. Unknown entries or formats, corrupt registry envelopes,
+missing expected descriptor/registry names, unsafe permissions and symbolic
+entries in the ownership namespace cause a structured refusal. Concurrent publication or cleanup can also
+invalidate the snapshot; preserve the state and inspect again after that
+transition finishes. The command leaves all evidence in place.
+
+Neither an empty snapshot nor an absent directory proves that an old backend
+and its resources retired. Status does not authenticate a live backend or
+interpret opaque implementation-specific attachment payloads. It cannot
+authorize killing a PID, deleting ownership state or replaying an unconfirmed
+operation. Verified local retirement and safe recovery remain separate work;
+this command supplies no force-stop or reset action. Linux executable evidence
+exists for this path; native macOS and Windows qualification remains pending.

@@ -1,5 +1,5 @@
 import * as fs from "node:fs/promises"
-import { homedir } from "node:os"
+import { homedir, tmpdir } from "node:os"
 import { isAbsolute, join } from "node:path"
 import { Config, Effect, Option, Result, Schema } from "effect"
 
@@ -58,3 +58,6 @@ export const readManagedDirectory = Effect.fn("readManagedDirectory")(function* 
   yield* refuseLegacyState(legacyDirectory)
   return ResidentDirectory.make(join(base, "huly-mcp", "resident"))
 })
+
+export const readManagedDirectoryForOwner = (owner: PosixOwner) =>
+  readManagedDirectory(owner.platform, ResidentDirectory.make(join(tmpdir(), `huly-mcp-${owner.userId}`)))

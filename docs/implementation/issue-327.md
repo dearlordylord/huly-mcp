@@ -126,6 +126,73 @@ Standards reviewer confirmed the fix with no residual finding. Runtime logic
 did not change after the final process pass. This review does not accept the
 remaining criteria or replace the combined final gate.
 
+## Read-only managed ownership status
+
+The CLI now provides `huly resident status [--state-directory <path>] --json`.
+It resolves the same protected namespace and legacy-directory guard as startup,
+without creating a root or registry, launching a backend, acquiring a claim,
+probing a PID or modifying records. Default selection is shared through
+`readManagedDirectoryForOwner`; an explicit directory permits inspection of a
+legacy namespace without selecting it for a new backend.
+
+Registry inventory moved unchanged into `registry-inventory.ts`, shared by
+startup/publication and status. It retains the 16-record and 65,536-byte limits,
+protected file reads and unknown-format refusal. Status additionally bounds
+root inspection to 34 entries and checks claim/publication directories,
+descriptor file handles, and descriptor/registry generation-name correspondence.
+Opaque implementation-specific descriptor payloads are not interpreted or
+returned. The Schema-owned result includes only recorded versions, generations,
+diagnostic PIDs, claim presence and explicit unverified liveness. `absent` does
+not prove retirement. Corruption, missing expected state or unsafe permissions
+causes refusal without repair. This supplies neither historical operation
+status nor force-stop/reset/recovery authority.
+
+The packaged CLI process fixture runs without Huly credentials and confirms
+JSON success, empty stderr, absence without creation, unchanged private records,
+and one structured `INVALID_INPUT` failure for unsafe state. CLI help and the
+packaged agent skill include the new surface; the skill generator and its
+verification contract were updated together. The final focused run passed all
+21 cases in `/tmp/resident-status-reviewed-fixes-tests.log`, SHA-256
+`cba4cf23b8459b0e7ce0f6843bc915def7fb00c642d74b684cc1a865c55f08bc`.
+TypeScript/Effect, full lint (including formatting and duplication), circular
+dependency and focused complexity checks passed on that source.
+Earlier registry and existing CLI suites passed all 64 cases in
+`/tmp/resident-status-cli-tests.log`; these totals overlap and are not added.
+
+Fresh Standards and Spec reviews compared the increment against `930b4a62`.
+Both found missing descriptor-file permission inspection; Standards additionally
+found duplicated legacy namespace construction. Both fixes were rechecked with
+no residual finding. The new descriptor-mode test first failed before the fix
+(`/tmp/resident-status-descriptor-permissions-red.log`, SHA-256
+`411521d42e6e05f10aa80c2c148344e4367ec24f27e0c9cdd1749b33b19391be`),
+then passed while verifying that refusal leaves mode `0644` unchanged.
+
+### Retained launch timing failures
+
+The unchanged ten-parent regression failed while waiting for connections:
+`/tmp/resident-status-ten-parent-regression.log`, SHA-256
+`f13412eef674df498381a171adb68559eca3f243e8486bc9c3e7a991d56f8963`.
+The retained fixture and candidate executable are in
+`dist/stdio-suite-pVXbEe/`. An unchanged baseline executable also failed the
+same fixture; its ten parents eventually connected, but the last connection
+arrived 5,059 ms after the coordinator began its five-second wait. Baseline
+stdout and phases are retained under
+`/tmp/resident-status-baseline-race-x7kjblpg`.
+
+A subsequent controlled run of the same retained candidate executable and
+fixture passed all ten parents, creator exit, survivor requests and final
+retirement in 22.83 seconds. Its receipt-like stdout is
+`/tmp/resident-status-candidate-race-ep66x72y.stdout`, SHA-256
+`50314992d0cf506c9bd267a27de3603da716ed57840becf4e987386500abcecb`;
+phase log SHA-256 is
+`1e375b378720ab2b2a30d2fa94a177f9b4a6f88111b1eaa370dccac22f18e08e`.
+No deadline, caller count or hold/retirement assertion changed. This pass does
+not explain the earlier failures or establish launch reliability. The later
+review fixes affect status permission inspection and centralize an unchanged
+directory-selection expression; final qualification must use a fresh combined
+artifact. Full gate, the remaining recovery/fault/native scenarios and final
+live-Huly certification remain pending.
+
 ## Committed-write response loss
 
 `test/resident/uncertain-write-process.test.ts` drives the packaged manual adapter
