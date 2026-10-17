@@ -44,14 +44,19 @@ const rejection = (error: AdmissionError) =>
   })
 
 const compatibilityRejection = (error: CompatibilityError) =>
-  HttpServerResponse.text(error.message, {
-    status:
-      error.kind === "input"
-        ? HTTP_BAD_REQUEST
-        : error.kind === "unknown" || error.kind === "mismatch"
-          ? HTTP_FORBIDDEN
-          : HTTP_CAPACITY
-  })
+  Schema.encodeEffect(CompatibilityError)(error).pipe(
+    Effect.orDie,
+    Effect.map((encoded) =>
+      HttpServerResponse.jsonUnsafe(encoded, {
+        status:
+          error.kind === "input"
+            ? HTTP_BAD_REQUEST
+            : error.kind === "unknown" || error.kind === "mismatch"
+              ? HTTP_FORBIDDEN
+              : HTTP_CAPACITY
+      })
+    )
+  )
 
 const hasHulyOverrides = (
   request: HttpServerRequest.HttpServerRequest,
@@ -132,6 +137,6 @@ export const residentAdmissionMiddleware =
       ),
       Effect.catchIf(
         (error): error is CompatibilityError => error instanceof CompatibilityError,
-        (error) => Effect.succeed(compatibilityRejection(error))
+        compatibilityRejection
       )
     )

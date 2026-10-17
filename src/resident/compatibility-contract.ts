@@ -36,3 +36,8 @@ export class CompatibilityError extends Schema.TaggedError<CompatibilityError>()
 
 export const MAX_COMPATIBILITY_CHALLENGES = 32
 export const COMPATIBILITY_CHALLENGE_MILLIS = 5_000
+
+export class ResidentSelectionMismatch extends Schema.TaggedError<ResidentSelectionMismatch>()(
+  "ResidentSelectionMismatch",
+  { message: Schema.String }
+) {}

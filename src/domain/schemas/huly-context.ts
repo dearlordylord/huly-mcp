@@ -85,6 +85,13 @@ const ConfigSourcesSchema = Schema.Struct({
   headers: Schema.optional(HeaderConfigSourcesSchema)
 })
 
+export const SanitizedHulyRuntimeConfigContextSchema = Schema.Struct({
+  huly: HulyRuntimeContextSchema,
+  auth: AuthContextSchema,
+  configSources: ConfigSourcesSchema
+})
+export type SanitizedHulyRuntimeConfigContext = Schema.Schema.Type<typeof SanitizedHulyRuntimeConfigContextSchema>
+
 const ToolsetsContextSchema = Schema.Struct({
   filteringActive: Schema.Boolean,
   requestedCategories: Schema.Array(NonEmptyTrimmedString),
@@ -141,9 +148,7 @@ export const GetHulyContextResultSchema = Schema.Struct({
       })
     )
   }),
-  huly: HulyRuntimeContextSchema,
-  auth: AuthContextSchema,
-  configSources: ConfigSourcesSchema,
+  ...SanitizedHulyRuntimeConfigContextSchema.fields,
   toolsets: ToolsetsContextSchema,
   toolScope: ToolScopeContextSchema,
   toolExposure: ToolExposureContextSchema

@@ -14,6 +14,10 @@ if (unsupportedRuntime) {
     serverVersion: PKG_VERSION
   })
   startUnsupportedNodeMcp(config)
+} else if (process.env.MCP_TRANSPORT === "resident-child") {
+  void import("./resident/managed-child-main.js")
+} else if (process.env.MCP_TRANSPORT === "stdio-resident") {
+  void import("./resident/managed-adapter-main.js")
 } else if (process.env.MCP_TRANSPORT === "stdio-http") {
   void import("./resident/manual-adapter-main.js")
 } else {

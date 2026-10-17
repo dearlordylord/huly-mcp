@@ -2,7 +2,7 @@ import { expect, it } from "vitest"
 
 import { type ChildStartEvent, type ChildStartState, decideChildStart } from "../../src/resident/start-authorization.js"
 
-const events: ReadonlyArray<ChildStartEvent> = ["start", "disconnect", "timeout"]
+const events: ReadonlyArray<ChildStartEvent> = ["start", "disconnect", "timeout", "invalid"]
 const states: ReadonlyArray<ChildStartState> = ["authorized", "retired"]
 
 it("authorizes one claim when Start precedes disconnect or timeout", () => {
@@ -12,11 +12,14 @@ it("authorizes one claim when Start precedes disconnect or timeout", () => {
     expect(decideChildStart(first.state, event)).toEqual({ state: "authorized", action: "none" })
 })
 
-it.each(["disconnect", "timeout"] satisfies Array<ChildStartEvent>)("retires before a late Start after %s", (event) => {
-  const first = decideChildStart("prepared", event)
-  expect(first).toEqual({ state: "retired", action: "exit" })
-  expect(decideChildStart(first.state, "start")).toEqual({ state: "retired", action: "none" })
-})
+it.each(["disconnect", "timeout", "invalid"] satisfies Array<ChildStartEvent>)(
+  "retires before a late Start after %s",
+  (event) => {
+    const first = decideChildStart("prepared", event)
+    expect(first).toEqual({ state: "retired", action: "exit" })
+    expect(decideChildStart(first.state, "start")).toEqual({ state: "retired", action: "none" })
+  }
+)
 
 it("never repeats a committed claim or exit action", () => {
   for (const state of states) {

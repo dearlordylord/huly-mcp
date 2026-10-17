@@ -11,6 +11,7 @@ import { AdmissionPolicy, DEFAULT_LEASE_POLICY } from "./admission-contract.js"
 import { makeResidentAdmissions } from "./admissions.js"
 import { residentAdmissionMiddleware } from "./admission-http.js"
 import { makeCompatibilityAuthority } from "./compatibility-authority.js"
+import type { StartupBudget } from "./startup-budget.js"
 import type { ResidentSelection } from "./compatibility-contract.js"
 import { withResidentHeaderRedaction } from "./private-http.js"
 
@@ -25,9 +26,20 @@ const defaultAdmissionPolicy = Schema.decodeUnknownSync(AdmissionPolicy)({
 })
 const startupFailure = () => new ProtectedFileError({ kind: "input", message: "Resident backend startup failed" })
 
+// Internal owner configuration; IPC uses ResidentStartupCapture instead of this runtime port.
+type ResidentBackendConfiguration =
+  | { readonly mode: "manual" }
+  | {
+      readonly mode: "configured"
+      readonly selection: ResidentSelection
+      readonly lifetime: "foreground" | "managed"
+      readonly startup: StartupBudget
+    }
+
 export const makeManualResidentBackend = Effect.fn("makeManualResidentBackend")(function* (
-  selection?: ResidentSelection
+  configuration: ResidentBackendConfiguration = { mode: "manual" }
 ) {
+  const selection = configuration.mode === "manual" ? undefined : configuration.selection
   yield* currentPosixOwner
   const directory = yield* Config.schema(ResidentDirectory, "MCP_RESIDENT_STATE_DIRECTORY")
   const identity = yield* Schema.decodeUnknownEffect(ResidentTlsIdentity)({
@@ -61,50 +73,73 @@ export const makeManualResidentBackend = Effect.fn("makeManualResidentBackend")(
   }
 
   // This runtime owns a fresh immutable generation; it never replaces another generation's path.
-  const run = (server: McpServerOperations, report: (file: ResidentFilePath) => void) =>
-    Effect.gen(function* () {
-      if (yield* Ref.getAndSet(claimed, true))
-        return yield* new ProtectedFileError({
-          kind: "conflict",
-          message: "Resident generation already started; create a fresh generation"
-        })
-      const serving = yield* server
-        .run()
-        .pipe(withResidentHeaderRedaction, Effect.provideService(HttpServerFactoryService, factory), Effect.forkScoped)
-      const publish = Effect.gen(function* () {
-        const endpoint = yield* Effect.gen(function* () {
-          const endpoint = yield* Deferred.await(bound)
-          yield* server.awaitReady()
-          return endpoint
-        }).pipe(
-          Effect.timeoutOrElse({
-            duration: STARTUP_ALLOWANCE,
-            orElse: () =>
-              Effect.fail(
-                new ProtectedFileError({
-                  kind: "io",
-                  message: "Resident application readiness timed out after five seconds; no attachment was published"
-                })
+  const run = <E, R>(server: McpServerOperations, report: (file: ResidentFilePath) => Effect.Effect<void, E, R>) =>
+    Effect.acquireUseRelease(
+      Effect.void,
+      () =>
+        Effect.gen(function* () {
+          if (yield* Ref.getAndSet(claimed, true))
+            return yield* new ProtectedFileError({
+              kind: "conflict",
+              message: "Resident generation already started; create a fresh generation"
+            })
+          const serving = yield* server
+            .run()
+            .pipe(
+              withResidentHeaderRedaction,
+              Effect.provideService(HttpServerFactoryService, factory),
+              Effect.forkScoped
+            )
+          const publish = Effect.gen(function* () {
+            const readiness = Effect.gen(function* () {
+              const endpoint = yield* Deferred.await(bound)
+              yield* server.awaitReady()
+              return endpoint
+            }).pipe(
+              Effect.timeoutOrElse({
+                duration: STARTUP_ALLOWANCE,
+                orElse: () =>
+                  Effect.fail(
+                    new ProtectedFileError({
+                      kind: "io",
+                      message:
+                        "Resident application readiness timed out after five seconds; no attachment was published"
+                    })
+                  )
+              })
+            )
+            const endpoint = yield* configuration.mode === "manual"
+              ? readiness
+              : configuration.startup.within(readiness)
+            const descriptor = ResidentAttachment.make({
+              version: 1,
+              transport: "tls13-external-psk-v1",
+              implementation: { name: "@firfi/huly-mcp", version: VERSION },
+              endpoint,
+              identity,
+              authorization
+            })
+            return yield* withPublishedResidentAttachment(directory, descriptor, (file) =>
+              report(file).pipe(
+                Effect.andThen(
+                  configuration.mode === "configured" && configuration.lifetime === "managed"
+                    ? admissions.awaitIdleAndFence.pipe(
+                        Effect.andThen(server.stop()),
+                        Effect.andThen(Fiber.join(serving))
+                      )
+                    : Fiber.join(serving)
+                )
               )
+            )
           })
-        )
-        const descriptor = ResidentAttachment.make({
-          version: 1,
-          transport: "tls13-external-psk-v1",
-          implementation: { name: "@firfi/huly-mcp", version: VERSION },
-          endpoint,
-          identity,
-          authorization
-        })
-        return yield* withPublishedResidentAttachment(directory, descriptor, (file) =>
-          Effect.sync(() => report(file)).pipe(Effect.andThen(Fiber.join(serving)))
-        )
-      })
-      yield* Effect.raceFirst(publish, Fiber.join(serving))
-    }).pipe(Effect.ensuring(admissions.fence), Effect.scoped)
+          yield* Effect.raceFirst(publish, Fiber.join(serving))
+        }),
+      () => admissions.drain
+    ).pipe(Effect.scoped)
 
   return {
     authorization,
+    beforeClientsClose: admissions.drain,
     httpPolicy: {
       httpMiddleware: residentAdmissionMiddleware(admissions, authority),
       beforeHttpShutdown: admissions.fence,

@@ -4,7 +4,7 @@ import { HttpClientRequest } from "effect/http"
 import { expect, it } from "vitest"
 
 import { requestContextMiddleware } from "../../src/mcp/http-request-context.js"
-import { withAdapterAttachment } from "../../src/resident/adapter-attachment.js"
+import { withAdapterAttachment, withAdapterCandidate } from "../../src/resident/adapter-attachment.js"
 import {
   AdmissionPolicy,
   DEFAULT_LEASE_POLICY,
@@ -16,6 +16,7 @@ import { ResidentAttachment } from "../../src/resident/attachment-file.js"
 import { makeCompatibilityAuthority } from "../../src/resident/compatibility-authority.js"
 import {
   CompatibilityChallenge,
+  CompatibilityError,
   CompatibilityProof,
   MAX_COMPATIBILITY_CHALLENGES,
   MAX_COMPATIBILITY_REQUEST_BYTES,
@@ -47,6 +48,29 @@ const policy = Schema.decodeUnknownSync(AdmissionPolicy)({
   capacity: 1,
   closeAllowanceMillis: 1_000,
   lease: DEFAULT_LEASE_POLICY
+})
+
+it("blocks unresolved compatibility refusal instead of treating it as a different configuration", async () => {
+  let admitted = false
+  await Effect.runPromise(
+    withCompatibleServer(
+      (attachment) =>
+        Effect.gen(function* () {
+          const error = yield* withAdapterCandidate(attachment, selected, () =>
+            Effect.sync(() => {
+              admitted = true
+            })
+          ).pipe(Effect.flip)
+          expect(error._tag).toBe("BackendResponseError")
+          expect(admitted).toBe(false)
+        }),
+      (authority) => ({
+        ...authority,
+        verify: () =>
+          Effect.fail(new CompatibilityError({ kind: "unknown", message: "Fixture compatibility evidence expired" }))
+      })
+    )
+  )
 })
 type Admissions = Effect.Success<ReturnType<typeof makeResidentAdmissions>>
 type Authority = Effect.Success<ReturnType<typeof makeCompatibilityAuthority>>

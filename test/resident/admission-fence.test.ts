@@ -1,6 +1,7 @@
 import { it } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Ref, Schema, Scope } from "effect"
 import { expect } from "vitest"
+import { TestClock } from "effect/testing"
 
 import { AdmissionPolicy, AttachmentToken, DEFAULT_LEASE_POLICY } from "../../src/resident/admission-contract.js"
 import { makeResidentAdmissions } from "../../src/resident/admissions.js"
@@ -124,5 +125,86 @@ it.effect("does not allow a captured admission service to allocate after its own
     const registry = yield* makeResidentAdmissions(policy).pipe(Scope.provide(scope))
     yield* Scope.close(scope, Exit.void)
     expect((yield* Effect.flip(registry.admit)).kind).toBe("closing")
+  }).pipe(Effect.scoped)
+)
+
+it.effect("retains failed cleanup for an owner acquired while generation fencing wins", () =>
+  Effect.gen(function* () {
+    const acquired = yield* Deferred.make<Effect.Success<ReturnType<typeof makeAttachmentOwner>>>()
+    const resume = yield* Deferred.make<void>()
+    const released = yield* Ref.make(false)
+    const token = Schema.decodeUnknownSync(AttachmentToken)("d".repeat(64))
+    const registry = yield* makeResidentAdmissions(policy, Effect.succeed(token), (eligible) =>
+      Effect.gen(function* () {
+        const owner = yield* makeAttachmentOwner(eligible)
+        const started = yield* Deferred.make<void>()
+        yield* owner
+          .withWork({
+            use: (session) =>
+              session
+                .adopt({ id: "unpublished-retained", release: Ref.set(released, true).pipe(Effect.as(true)) })
+                .pipe(Effect.andThen(Deferred.succeed(started, undefined)), Effect.andThen(Effect.never)),
+            cleanup: () => Effect.fail("Unconfirmed fixture cleanup")
+          })
+          .pipe(Effect.exit, Effect.forkScoped)
+        yield* Deferred.await(started)
+        yield* Deferred.succeed(acquired, owner)
+        yield* Deferred.await(resume)
+        return owner
+      })
+    )
+    const admitting = yield* registry.admit.pipe(Effect.flip, Effect.forkChild)
+    const owner = yield* Deferred.await(acquired)
+    yield* registry.fence
+    yield* Deferred.succeed(resume, undefined)
+    expect((yield* Fiber.join(admitting)).kind).toBe("cleanup")
+    expect(yield* owner.ownsSession("unpublished-retained")).toBe(true)
+    expect(yield* Ref.get(released)).toBe(false)
+    expect(Exit.isFailure(yield* registry.drain.pipe(Effect.exit))).toBe(true)
+    expect(Exit.isFailure(yield* registry.drain.pipe(Effect.exit))).toBe(true)
+  }).pipe(Effect.scoped)
+)
+
+it.effect("bounds an unpublished owner's cleanup wait and retains it until late cleanup confirms closure", () =>
+  Effect.gen(function* () {
+    const acquired = yield* Deferred.make<void>()
+    const resume = yield* Deferred.make<void>()
+    const finish = yield* Deferred.make<void>()
+    const cleaning = yield* Deferred.make<void>()
+    const done = yield* Deferred.make<void>()
+    const token = Schema.decodeUnknownSync(AttachmentToken)("e".repeat(64))
+    const registry = yield* makeResidentAdmissions(policy, Effect.succeed(token), (eligible) =>
+      Effect.gen(function* () {
+        const owner = yield* makeAttachmentOwner(eligible)
+        const started = yield* Deferred.make<void>()
+        yield* owner
+          .withWork({
+            use: () => Deferred.succeed(started, undefined).pipe(Effect.andThen(Effect.never)),
+            cleanup: () => Deferred.succeed(cleaning, undefined).pipe(Effect.andThen(Deferred.await(finish)))
+          })
+          .pipe(Effect.exit, Effect.forkScoped)
+        yield* Deferred.await(started)
+        yield* Deferred.succeed(acquired, undefined)
+        yield* Deferred.await(resume)
+        return owner
+      })
+    )
+    const admitting = yield* registry.admit.pipe(
+      Effect.flip,
+      Effect.tap(() => Deferred.succeed(done, undefined)),
+      Effect.forkChild
+    )
+    yield* Deferred.await(acquired)
+    yield* registry.fence
+    yield* Deferred.succeed(resume, undefined)
+    yield* Deferred.await(cleaning)
+    try {
+      yield* TestClock.adjust("1 second")
+      expect(yield* Deferred.isDone(done)).toBe(true)
+    } finally {
+      yield* Deferred.succeed(finish, undefined)
+    }
+    expect((yield* Fiber.join(admitting)).kind).toBe("pending")
+    yield* registry.drain
   }).pipe(Effect.scoped)
 )

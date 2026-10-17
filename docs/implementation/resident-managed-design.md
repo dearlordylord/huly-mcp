@@ -140,8 +140,9 @@ selection claim. Pending admissions check eligibility again after asynchronous
 resource acquisition before publishing a capability. Manual backend HTTP policy
 bundles its middleware with a fence that runs before native registry and client
 cleanup. Its outer run cleanup also fences before the inner scope closes.
-These mechanisms do not yet implement
-managed idle retirement or prove outer process-client retirement.
+The automatic-startup candidate now adds managed idle retirement and guarded
+outer process-client closure. Its qualification status is recorded in the issue
+324 and 326 reports; the fence alone is not proof of completed retirement.
 
 A stable outer registry envelope distinguishes known incompatible versions from
 corrupt or unknown records before decoding the current attachment descriptor.
@@ -149,6 +150,9 @@ Unreadable or missing descriptors for unresolved records cause refusal.
 
 Missing configuration is decided before launch using existing parsed startup
 semantics. Existing lazy discovery can remain local without acquiring Huly.
+The automatic adapter now chooses that local path only for parsed lazy startup
+with no explicit Huly authority fields. Explicit profile or authority selection
+continues through the existing strict resolver, including its failure path.
 Ordinary stdio defaults to eager acquisition unless configured otherwise; managed
 startup must not silently change that default. Invalid selected profiles retain
 their existing error path. Authentication or ownership failure never triggers a
@@ -186,3 +190,50 @@ limits, the total monotonic deadline including configuration resolution, and the
 local retry cadence. A per-process counter cannot enforce a global contender
 limit. Packaged process tests, observed lifecycle transitions, fresh reviews,
 the complete project gate, and final live Huly qualification remain required.
+
+## Managed launch bounds selected before wiring
+
+Managed mode will be explicitly selected as `MCP_TRANSPORT=stdio-resident`.
+Configured explicit `resident-http` starts will use the same selector; the
+unconfigured descriptor-only manual contract remains available. A prepared child
+uses the exact executing package and a private Node IPC channel, with detached
+lifetime and independent standard streams. The parent verifies the package and a
+fresh per-launch nonce before sending its schema-encoded captured configuration.
+Huly configuration variables are removed from the child's initial environment.
+The parent consumes its pre-Start termination capability before attempting Start;
+send errors, cancellation and missing acknowledgments cannot restore it.
+
+Selection has a ten-second monotonic acquisition budget beginning before profile
+resolution. Failure cleanup has a separate five-second allowance, giving a
+fifteen-second caller failure envelope under a functioning local OS/filesystem.
+No existing five-second application readiness or attachment control allowance is
+increased. Prepared children retire after five seconds without authorization.
+Claim contenders retry only the typed busy result every 25 milliseconds within
+the selection budget. A deadline or unresolved record is a refusal, never
+permission to remove another owner's state or replay a request.
+
+The private `generations` inventory accepts at most sixteen records and reads at
+most seventeen directory entries before refusing overflow. Each registry record
+is limited to 65,536 UTF-8 bytes, including its stable version/package envelope
+and descriptor. Thus selection reads at most one MiB of record payload; directory
+iteration is bounded independently of record decoding. Unknown envelope formats,
+corrupt entries and unresolved current-generation endpoints block selection.
+Known incompatible package versions can coexist without decoding their current
+protocol payload or contacting their listener. Generation identifiers remain
+random and independent of credentials. Registry entries outlive the temporary
+manual descriptor and are removed only by their one-use inode-fenced retirement
+capability after the outer server/client owner confirms closure.
+
+Private IPC frames are UTF-8 JSON strings limited to 65,536 bytes. The protocol
+has prepared, Start, ready and refused frames; only Start carries the captured
+configuration. It is not a general command channel. One parent may own one
+prepared child. This does not claim a global limit on independent parents.
+
+The managed backend's fixed ordinary idle interval is five seconds with no
+admitted attachments, pending admissions or retained request cleanup. Active
+leases and work retain the backend; expiring a lease still waits for its target
+and client cleanup. The idle decision and admission fence are ordered in the
+admission owner, independently of the filesystem selector. This interval is a
+new managed policy; explicit foreground backends do not acquire idle shutdown.
+Process qualification must verify these bounds and retain failures. None of
+these selected constants is performance or native-platform certification.

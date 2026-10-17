@@ -182,12 +182,15 @@ describe("Main Entry Point", () => {
       })
     )
 
-    it.effect("wires MCP_AUTH_TOKEN from bootstrap config through the server HTTP boundary", () =>
+    it.effect.each([true, false])("preserves HTTP bootstrap authorization when configured=%s", (authenticated) =>
       Effect.gen(function* () {
         const configuredToken = yield* getMcpAuthToken.pipe(
-          provideConfig({ MCP_AUTH_TOKEN: "mcp-endpoint-secret", HULY_TOKEN: "huly-api-token" })
+          provideConfig(
+            authenticated
+              ? { MCP_AUTH_TOKEN: "mcp-endpoint-secret", HULY_TOKEN: "huly-api-token" }
+              : { HULY_TOKEN: "huly-api-token" }
+          )
         )
-        if (Option.isNone(configuredToken)) return yield* Effect.die(new Error("Expected configured MCP auth token"))
 
         let resolveListening: ((server: http.Server) => void) | undefined
         const listening = new Promise<http.Server>((resolve) => {
@@ -207,7 +210,7 @@ describe("Main Entry Point", () => {
           "http",
           HttpPort.make(0),
           DEFAULT_HTTP_HOST,
-          configuredToken.value,
+          Option.getOrUndefined(configuredToken),
           "token",
           resolveClients,
           async () => ({ bundle: await resolveClients(), close: () => {} }),
@@ -228,11 +231,11 @@ describe("Main Entry Point", () => {
           yield* Effect.gen(function* () {
             const rejected = yield* Effect.promise(() => fetch(endpoint, discoveryRequest()))
             const accepted = yield* Effect.promise(() =>
-              fetch(endpoint, discoveryRequest("Bearer mcp-endpoint-secret"))
+              fetch(endpoint, discoveryRequest(authenticated ? "Bearer mcp-endpoint-secret" : undefined))
             )
             yield* Effect.promise(() => Promise.all([rejected.text(), accepted.text()]))
 
-            expect(rejected.status).toBe(401)
+            expect(rejected.status).toBe(authenticated ? 401 : 200)
             expect(accepted.status).toBe(200)
           }).pipe(Effect.ensuring(Effect.ignore(operations.stop())))
 
@@ -327,6 +330,18 @@ describe("Main Entry Point", () => {
   })
 
   describe("error handling", () => {
+    it.effect("rejects invalid direct HTTP listener configuration before Huly acquisition", () =>
+      Effect.gen(function* () {
+        process.env["MCP_TRANSPORT"] = "http"
+        process.env["MCP_HTTP_PORT"] = "invalid-port"
+        const error = yield* main.pipe(
+          provideConfig({ MCP_TRANSPORT: "http", MCP_HTTP_PORT: "invalid-port" }),
+          Effect.flip
+        )
+        expect(error._tag).toBe("ConfigError")
+      })
+    )
+
     it.effect("reports config validation errors clearly", () =>
       Effect.gen(function* () {
         // Invalid URL

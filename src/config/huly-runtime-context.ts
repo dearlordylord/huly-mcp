@@ -1,5 +1,6 @@
 import { Schema } from "effect"
 
+import type { SanitizedHulyRuntimeConfigContext } from "../domain/schemas/huly-context.js"
 import {
   DEFAULT_HULY_CONNECTION_TIMEOUT,
   HULY_CONFIG_HEADERS,
@@ -11,61 +12,11 @@ const HeaderValueSchema = Schema.Union([Schema.String, Schema.Array(Schema.Strin
 const HeaderRecordSchema = Schema.Record(Schema.String, HeaderValueSchema)
 type HeaderValue = Schema.Schema.Type<typeof HeaderValueSchema>
 
-interface SanitizedUrlContext {
-  readonly configured: boolean
-  readonly valid?: boolean
-  readonly origin?: string
-  readonly host?: string
-  readonly protocol?: "http:" | "https:"
-}
+export type { SanitizedHulyRuntimeConfigContext } from "../domain/schemas/huly-context.js"
 
-interface SanitizedWorkspaceContext {
-  readonly configured: boolean
-  readonly value?: string
-}
-
-interface SanitizedConnectionTimeoutContext {
-  readonly configured: boolean
-  readonly valid?: boolean
-  readonly valueMs?: number
-  readonly defaultMs: number
-  readonly source: "env" | "header" | "default" | "missing" | "invalid"
-}
-
-export interface SanitizedHulyRuntimeConfigContext {
-  readonly huly: {
-    readonly url: SanitizedUrlContext
-    readonly workspace: SanitizedWorkspaceContext
-    readonly connectionTimeout: SanitizedConnectionTimeoutContext
-  }
-  readonly auth: {
-    readonly method: "token" | "password" | "unknown"
-    readonly source: "env" | "header" | "profile" | "none"
-    readonly tokenConfigured: boolean
-    readonly emailConfigured: boolean
-    readonly passwordConfigured: boolean
-  }
-  readonly configSources: {
-    readonly env: {
-      readonly hulyUrl: boolean
-      readonly hulyWorkspace: boolean
-      readonly hulyToken: boolean
-      readonly hulyEmail: boolean
-      readonly hulyPassword: boolean
-      readonly hulyConnectionTimeout: boolean
-      readonly lazyEnvs: boolean
-    }
-    readonly headers?: {
-      readonly present: boolean
-      readonly requiredComplete: boolean
-      readonly hulyUrl: boolean
-      readonly hulyWorkspace: boolean
-      readonly hulyToken: boolean
-      readonly hulyConnectionTimeout: boolean
-      readonly unsupportedHulyHeaders: ReadonlyArray<string>
-    }
-  }
-}
+type SanitizedUrlContext = SanitizedHulyRuntimeConfigContext["huly"]["url"]
+type SanitizedWorkspaceContext = SanitizedHulyRuntimeConfigContext["huly"]["workspace"]
+type SanitizedConnectionTimeoutContext = SanitizedHulyRuntimeConfigContext["huly"]["connectionTimeout"]
 
 const hulyConfigHeaderSet = new Set<string>(HULY_CONFIG_HEADERS)
 

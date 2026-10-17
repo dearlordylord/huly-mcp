@@ -3,24 +3,23 @@ import * as fs from "node:fs/promises"
 import * as path from "node:path"
 import { Effect, Schema } from "effect"
 
+import { readPrivateText } from "./private-text.js"
 import { VERSION } from "../version.js"
+import type { ResidentDirectory } from "./protected-path.js"
 import {
   closePrivateFile,
   currentPosixOwner,
   fileFailure,
   inspectPrivateDirectory,
   inspectPrivateFile,
-  openPrivateFile,
   PRIVATE_DIRECTORY_MODE,
   PRIVATE_FILE_MODE,
   ProtectedFileError,
-  ResidentDirectory,
   ResidentFilePath
 } from "./protected-path.js"
 import { ResidentEndpoint, ResidentTlsIdentity } from "./tls-channel.js"
 
 const MAX_ATTACHMENT_BYTES = 65_536
-const TRAILING_BYTE = 1
 const FILE_FORMAT = 1
 export const ResidentAttachment = Schema.Struct({
   version: Schema.Literal(FILE_FORMAT),
@@ -40,44 +39,13 @@ const invalidAttachment = () =>
 const conflict = () =>
   new ProtectedFileError({ kind: "conflict", message: "Resident attachment ownership changed; cleanup refused" })
 
-const readBounded = (handle: fs.FileHandle) =>
-  Effect.gen(function* () {
-    const bytes = Buffer.alloc(MAX_ATTACHMENT_BYTES + TRAILING_BYTE)
-    let offset = 0
-    while (offset < bytes.length) {
-      const next = yield* Effect.tryPromise({
-        try: () => handle.read(bytes, offset, bytes.length - offset, offset),
-        catch: fileFailure
-      })
-      if (next.bytesRead === 0) break
-      offset += next.bytesRead
-    }
-    if (offset > MAX_ATTACHMENT_BYTES) return yield* invalidAttachment()
-    return yield* Effect.try({
-      try: () => new TextDecoder("utf-8", { fatal: true }).decode(bytes.subarray(0, offset)),
-      catch: invalidAttachment
-    })
-  })
-
 export const readResidentAttachment = (selection: ResidentFilePath) =>
   Effect.gen(function* () {
-    const owner = yield* currentPosixOwner
-    const absolute = path.resolve(selection)
-    const directory = yield* inspectPrivateDirectory(ResidentDirectory.make(path.dirname(absolute)), owner)
-    const file = ResidentFilePath.make(path.join(directory, path.basename(absolute)))
-    const descriptor = yield* Effect.acquireUseRelease(
-      openPrivateFile(file),
-      (handle) =>
-        Effect.gen(function* () {
-          yield* inspectPrivateFile(handle, owner)
-          const text = yield* readBounded(handle)
-          return yield* Schema.decodeUnknownEffect(Schema.fromJsonString(CompatibleResidentAttachment))(text).pipe(
-            Effect.mapError(invalidAttachment)
-          )
-        }),
-      closePrivateFile
-    )
-    if (path.basename(file) !== `${descriptor.identity.generation}.json`) return yield* invalidAttachment()
+    const text = yield* readPrivateText(selection, MAX_ATTACHMENT_BYTES)
+    const descriptor = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(CompatibleResidentAttachment))(
+      text
+    ).pipe(Effect.mapError(invalidAttachment))
+    if (path.basename(selection) !== `${descriptor.identity.generation}.json`) return yield* invalidAttachment()
     return descriptor
   })
 

@@ -34,7 +34,7 @@ it("fences attachment admission before held native client cleanup during normal 
           const server = yield* McpServerService
           const published = yield* Deferred.make<ResidentFilePath>()
           const owner = yield* backend
-            .run(server, (file) => Effect.runSync(Deferred.succeed(published, file)))
+            .run(server, (file) => Deferred.succeed(published, file).pipe(Effect.asVoid))
             .pipe(Effect.forkScoped)
           const file = yield* Deferred.await(published)
           const descriptor = yield* readResidentAttachment(file)
@@ -124,7 +124,7 @@ it.each(["stop", "interrupt"])("publishes after native application readiness and
                       Effect.andThen(Deferred.await(releaseReady))
                     )
               },
-              (file) => Effect.runSync(Deferred.succeed(published, file))
+              (file) => Deferred.succeed(published, file).pipe(Effect.asVoid)
             )
             .pipe(Effect.forkScoped)
           yield* Deferred.await(reachedReady)
@@ -143,7 +143,7 @@ it.each(["stop", "interrupt"])("publishes after native application readiness and
           if (release === "stop") {
             yield* server.stop()
             yield* Fiber.join(owner)
-            const repeated = yield* Effect.result(backend.run(server, () => {}))
+            const repeated = yield* Effect.result(backend.run(server, () => Effect.void))
             expect(Result.isFailure(repeated)).toBe(true)
             if (Result.isFailure(repeated)) expect(repeated.failure._tag).toBe("ProtectedFileError")
           } else yield* Fiber.interrupt(owner)
@@ -199,9 +199,7 @@ it.each(["publication", "readiness", "timeout"])("closes the bound listener afte
                       )
                     )
               },
-              () => {
-                throw new Error("Failed startup must not announce an attachment")
-              }
+              () => Effect.die(new Error("Failed startup must not announce an attachment"))
             )
           ).pipe(Effect.forkScoped)
           const endpoint = yield* Deferred.await(bound)

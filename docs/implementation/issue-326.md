@@ -47,3 +47,50 @@ The corrected admission increment passes the complete project gate with 5,541
 tests and the original coverage thresholds. Standards and Spec have no remaining
 scoped finding. The receipt and failed earlier run are recorded in
 [the issue 325 report](issue-325.md#authenticated-http-increment).
+
+## Managed retirement candidate, 2026-10-17
+
+The current candidate tracks pending admissions as well as admitted members and
+retained cleanup. Managed owners fence after five seconds with no such work;
+foreground explicit owners retain their independent lifetime. Shutdown fences,
+waits for pending acquisition, drains admitted owners and confirms process-client
+closure before successful registry retirement. A typed closure failure retains
+the generation record. Native HTTP shutdown uses that same guarded closure.
+
+The ten-parent Linux fixture observes automatic idle exit and private-state
+removal after independent callers close, including a killed caller and a
+surviving adapter. Focused owner tests observe retained registry evidence when
+shutdown reports failure. Evidence paths and the current gate status are recorded
+in [issue 324](issue-324.md#automatic-startup-candidate-2026-10-17).
+Complete pending/held-cleanup idle schedules, observation/model alignment, live
+Huly and native-platform certification remain pending.
+
+## Contention and unpublished-owner corrections
+
+A real filesystem test exposes an unbounded retirement wait behind another
+selector's claim (`/tmp/resident-managed-owner-bounded-lock-tests.log`): the
+unchanged thirty-second test bound expires despite the five-second retirement
+allowance. The pinned Effect implementation masks acquisition in
+`acquireUseRelease`. The retry loop was inside that acquisition. Selection now
+brackets each single atomic claim attempt and retries a busy result between
+brackets. A successful attempt always has its release registered; operation
+failures are not retried. The corrected twelve-test owner run passes with the
+original startup, retirement and test bounds
+(`/tmp/resident-managed-owner-bounded-lock-fixed.log`).
+
+A second real owner/work/session schedule shows that an owner completing
+acquisition after fencing could fail cleanup without ever entering the member
+inventory. A later drain then falsely succeeds
+(`/tmp/resident-unpublished-owner-retention-red.log`). Inventory insertion now
+precedes the post-acquisition fence check. The existing member close operation
+removes only confirmed cleanup. Thirteen related admission/idle tests pass after
+the fix (`/tmp/resident-unpublished-owner-retention-green.log`).
+
+A separate TestClock schedule holds unpublished-owner cleanup, verifies the
+admission caller receives `pending` before opening the cleanup Deferred, then
+confirms a later drain after closure. It passes without another timeout change.
+Spec review reruns this schedule and retracts its initial inherited-mask concern:
+the pinned Effect4 `timeoutOption`/`raceFirst` starts its competing fibers with
+interruption enabled. This differs from an acquisition that establishes its own
+uninterruptible mask. Standards review reports no scoped finding in either fix.
+Complete model alignment and native/live qualification remain pending.

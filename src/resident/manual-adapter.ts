@@ -80,7 +80,11 @@ const forward = (
         const observedRequest = message.id === undefined ? undefined : request
         observeResidentResponse({ request: observedRequest, event: "Started", accepted: true })
         yield* decodeBackendMessages({
-          body: response.stream.pipe(Stream.mapError(() => fail("Backend response disconnected"))),
+          body: response.stream.pipe(
+            Stream.mapError(() =>
+              fail("Backend response disconnected; operation outcome may be unknown. No request was replayed.")
+            )
+          ),
           contentType: response.headers["content-type"] ?? "",
           maxBytes: MAX_RESPONSE_BYTES
         }).pipe(
@@ -110,7 +114,7 @@ const forward = (
     )
   })
 
-const runBridge = (exchange: AdapterExchange) =>
+export const runAdapterBridge = (exchange: AdapterExchange) =>
   Effect.gen(function* () {
     const stdio = yield* Stdio.Stdio
     const output = yield* Queue.bounded<string, Cause.Done>(OUTPUT_CAPACITY)
@@ -162,5 +166,5 @@ export const runManualAdapter = Effect.fn("runManualAdapter")(function* (selecti
   const attachment = yield* readResidentAttachment(
     yield* Config.schema(ResidentFilePath, "MCP_RESIDENT_ATTACHMENT_FILE")
   )
-  yield* withAdapterAttachment(attachment, runBridge, selection)
+  yield* withAdapterAttachment(attachment, runAdapterBridge, selection)
 })
