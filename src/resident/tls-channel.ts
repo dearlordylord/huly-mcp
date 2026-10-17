@@ -1,6 +1,7 @@
 import { NodeHttpServer } from "@effect/platform-node"
 import { constants, randomBytes } from "node:crypto"
-import { Agent, createServer, type RequestOptions } from "node:https"
+import { Agent, Server, type RequestOptions } from "node:https"
+import type { Socket } from "node:net"
 import type { Duplex } from "node:stream"
 import { connect, type SecureContextOptions, type TLSSocket } from "node:tls"
 import { Effect, Redacted, Schema } from "effect"
@@ -132,31 +133,65 @@ export const withResidentHttpsAgent = <A, E, R>(
       )
   )
 
+class ResidentListener extends Server {
+  private readonly pending = new Set<Socket>()
+  private retiring = false
+
+  constructor(identity: ResidentTlsIdentity) {
+    const approved = new WeakSet<TLSSocket>()
+    const key = Buffer.from(Redacted.value(identity.key), "hex")
+    super({
+      ...TLS_POLICY,
+      secureOptions: constants.SSL_OP_NO_TICKET,
+      ticketKeys: randomBytes(TLS_TICKET_KEY_BYTES),
+      pskCallback: (socket, channelIdentity) => {
+        if (channelIdentity !== `${TLS_IDENTITY_PREFIX}${identity.generation}`) return null
+        approved.add(socket)
+        return key
+      }
+    })
+    this.on("connection", (socket) => {
+      if (this.retiring) {
+        socket.destroy()
+        return
+      }
+      this.pending.add(socket)
+      socket.once("close", () => this.pending.delete(socket))
+    })
+    this.prependListener("secureConnection", (socket) => {
+      if (
+        !approved.has(socket) ||
+        socket.destroyed ||
+        socket.remoteAddress === undefined ||
+        socket.remotePort === undefined
+      ) {
+        socket.destroy()
+        return
+      }
+      // TLS wraps the accepted TCP socket; its live peer pair identifies the ownership handoff.
+      for (const pending of this.pending) {
+        if (pending.remoteAddress === socket.remoteAddress && pending.remotePort === socket.remotePort)
+          this.pending.delete(pending)
+      }
+    })
+  }
+
+  override close(...args: Parameters<Server["close"]>): this {
+    this.retiring = true
+    for (const socket of this.pending) socket.destroy()
+    return super.close(...args)
+  }
+}
+
 export const makeResidentHttpServerFactory = (identity: ResidentTlsIdentity): HttpServerFactory => ({
   protocol: "https",
   make: (port, host, gracefulShutdownTimeout) => {
     if (host !== "127.0.0.1" && host !== "::1")
       return Effect.fail(new HttpTransportError({ message: "Resident listener requires a literal loopback binding" }))
-    return NodeHttpServer.make(
-      () => {
-        const approved = new WeakSet<TLSSocket>()
-        const key = Buffer.from(Redacted.value(identity.key), "hex")
-        const server = createServer({
-          ...TLS_POLICY,
-          secureOptions: constants.SSL_OP_NO_TICKET,
-          ticketKeys: randomBytes(TLS_TICKET_KEY_BYTES),
-          pskCallback: (socket, channelIdentity) => {
-            if (channelIdentity !== `${TLS_IDENTITY_PREFIX}${identity.generation}`) return null
-            approved.add(socket)
-            return key
-          }
-        })
-        server.prependListener("secureConnection", (socket) => {
-          if (!approved.has(socket)) socket.destroy()
-        })
-        return server
-      },
-      { port, host, ...(gracefulShutdownTimeout === undefined ? {} : { gracefulShutdownTimeout }) }
-    ).pipe(Effect.mapError(() => new HttpTransportError({ message: "Resident TLS listener could not start" })))
+    return NodeHttpServer.make(() => new ResidentListener(identity), {
+      port,
+      host,
+      ...(gracefulShutdownTimeout === undefined ? {} : { gracefulShutdownTimeout })
+    }).pipe(Effect.mapError(() => new HttpTransportError({ message: "Resident TLS listener could not start" })))
   }
 })

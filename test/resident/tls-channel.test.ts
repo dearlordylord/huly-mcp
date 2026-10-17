@@ -2,9 +2,10 @@ import { NodeStream } from "@effect/platform-node"
 import { randomBytes, randomUUID } from "node:crypto"
 import { request } from "node:https"
 import type { IncomingMessage } from "node:http"
-import { createServer, type Socket } from "node:net"
+import { createConnection, createServer, type Socket } from "node:net"
 import { once } from "node:events"
 import { ConfigProvider, Deferred, Effect, Exit, Fiber, Layer, Option, Redacted, Schema, Stream } from "effect"
+import { HttpServerResponse } from "effect/http"
 import { expect, it } from "vitest"
 
 import { sanitizeHulyRuntimeConfigFromEnv } from "../../src/config/config.js"
@@ -12,7 +13,7 @@ import { GetHulyContextResultSchema } from "../../src/domain/schemas/index.js"
 import { HttpServerFactoryService } from "../../src/mcp/http-transport.js"
 import { McpServerService } from "../../src/mcp/server.js"
 import { HostMessage, requestHeaders } from "../../src/resident/request-headers.js"
-import { BackendResponseError, decodeBackendMessages } from "../../src/resident/response-stream.js"
+import { BackendMessage, BackendResponseError, decodeBackendMessages } from "../../src/resident/response-stream.js"
 import {
   makeResidentHttpServerFactory,
   ResidentEndpoint,
@@ -212,5 +213,104 @@ it("closes an interrupted TLS handshake before it can hand a socket to HTTP", { 
     for (const socket of sockets) socket.destroy()
     await Effect.runPromise(Fiber.interrupt(fiber))
     await new Promise<void>((resolve, reject) => backend.close((error) => (error ? reject(error) : resolve())))
+  }
+})
+
+it("retires its listener while a peer withholds the TLS handshake", { timeout: 15_000 }, async () => {
+  const connected = await Effect.runPromise(Deferred.make<void>())
+  const retire = await Effect.runPromise(Deferred.make<void>())
+  let peer: Socket | undefined
+  const fiber = Effect.runFork(
+    Effect.gen(function* () {
+      const server = yield* makeResidentHttpServerFactory(identity()).make(0, "127.0.0.1", "5 seconds")
+      const address = server.address
+      if (address._tag === "UnixPathAddress") return yield* Effect.die("Expected TCP listener")
+      yield* Effect.tryPromise({
+        try: () =>
+          new Promise<void>((resolve, reject) => {
+            peer = createConnection({ host: "127.0.0.1", port: address.port }, resolve)
+            peer.once("error", reject)
+            peer.resume()
+          }),
+        catch: () => new BackendResponseError({ message: "Owned peer could not connect" })
+      })
+      yield* Deferred.succeed(connected, undefined)
+      yield* Deferred.await(retire)
+    }).pipe(Effect.scoped)
+  )
+  try {
+    await Effect.runPromise(Deferred.await(connected).pipe(Effect.timeout(RESPONSE_BOUND)))
+    await Effect.runPromise(Deferred.succeed(retire, undefined))
+    const exit = await Effect.runPromiseExit(Fiber.join(fiber).pipe(Effect.timeout(RESPONSE_BOUND)))
+    expect(Exit.isSuccess(exit)).toBe(true)
+    if (peer !== undefined && !peer.closed) await once(peer, "close", { signal: AbortSignal.timeout(RESPONSE_BOUND) })
+    expect(peer?.destroyed).toBe(true)
+  } finally {
+    peer?.destroy()
+    await Effect.runPromise(Fiber.interrupt(fiber))
+  }
+})
+
+it("lets an authenticated response finish after listener retirement begins", { timeout: 15_000 }, async () => {
+  const owner = identity()
+  const bound = await Effect.runPromise(Deferred.make<ResidentEndpoint>())
+  const entered = await Effect.runPromise(Deferred.make<void>())
+  const complete = await Effect.runPromise(Deferred.make<void>())
+  const retire = await Effect.runPromise(Deferred.make<void>())
+  const listener = Effect.runFork(
+    Effect.gen(function* () {
+      const server = yield* makeResidentHttpServerFactory(owner).make(0, "127.0.0.1", "5 seconds")
+      const address = server.address
+      if (address._tag === "UnixPathAddress") return yield* Effect.die("Expected TCP listener")
+      yield* server.serve(
+        Effect.gen(function* () {
+          yield* Deferred.succeed(entered, undefined)
+          yield* Deferred.await(complete)
+          return HttpServerResponse.text(
+            Schema.encodeSync(Schema.fromJsonString(BackendMessage))({
+              jsonrpc: "2.0",
+              id: 1,
+              result: { retained: true }
+            }),
+            { contentType: "application/json" }
+          )
+        })
+      )
+      yield* Deferred.succeed(
+        bound,
+        Schema.decodeUnknownSync(ResidentEndpoint)(`https://127.0.0.1:${address.port}/mcp`)
+      )
+      yield* Deferred.await(retire)
+    }).pipe(Effect.scoped)
+  )
+  const endpoint = await Effect.runPromise(Deferred.await(bound).pipe(Effect.timeout(RESPONSE_BOUND)))
+  const response = Effect.runFork(
+    exchange(endpoint, owner, HostMessage.make({ jsonrpc: "2.0", id: 1, method: "ping" }))
+  )
+  try {
+    await Effect.runPromise(Deferred.await(entered).pipe(Effect.timeout(RESPONSE_BOUND)))
+    await Effect.runPromise(Deferred.succeed(retire, undefined))
+    const refused = Effect.callback<boolean, BackendResponseError>((resume) => {
+      const probe = createConnection({ host: "127.0.0.1", port: Number(endpoint.port) })
+      probe.once("connect", () => resume(Effect.succeed(false)))
+      probe.once("error", (error) =>
+        resume(
+          Schema.is(Schema.Struct({ code: Schema.Literal("ECONNREFUSED") }))(error)
+            ? Effect.succeed(true)
+            : Effect.fail(new BackendResponseError({ message: "Retirement probe failed" }))
+        )
+      )
+      return Effect.sync(() => probe.destroy())
+    })
+    await Effect.runPromise(refused.pipe(Effect.repeat({ until: (closed) => closed }), Effect.timeout(RESPONSE_BOUND)))
+    await Effect.runPromise(Deferred.succeed(complete, undefined))
+    expect(await Effect.runPromise(Fiber.join(response).pipe(Effect.timeout(RESPONSE_BOUND)))).toEqual([
+      { jsonrpc: "2.0", id: 1, result: { retained: true } }
+    ])
+    await Effect.runPromise(Fiber.join(listener).pipe(Effect.timeout(RESPONSE_BOUND)))
+  } finally {
+    await Effect.runPromise(Deferred.succeed(complete, undefined))
+    await Effect.runPromise(Fiber.interrupt(response))
+    await Effect.runPromise(Fiber.interrupt(listener))
   }
 })

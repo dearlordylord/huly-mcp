@@ -191,3 +191,21 @@ behavior against an otherwise trusted replacement.
 
 Implement protected explicit attachment selection and backend publication using
 this primitive, then connect the packaged manual adapter to that boundary.
+
+## Listener retirement correction
+
+An unauthenticated peer withholding TLS prevented native listener retirement
+from completing within five seconds. `/tmp/resident-tls-listener-retire-red.log`
+reproduces it. The resident listener now owns accepted TCP sockets until
+authentication hands their live peer connection to native HTTP. Retirement
+destroys the remaining unauthenticated sockets and refuses late raw accepts.
+Authenticated HTTP responses keep native drain behavior.
+
+`/tmp/resident-tls-listener-final-tests.log` passes 16 focused transport checks,
+including stalled-handshake retirement and a held authenticated response that
+finishes after the port refuses new connections. Removing the authentication
+handoff makes the latter test fail
+(`/tmp/resident-tls-authenticated-drain-mutant.log`); the mutation was restored
+before the passing run. TypeScript/Effect diagnostics check 1,204 files with zero
+errors or warnings in `/tmp/resident-tls-listener-drain-typecheck.log`.
+Scoped Standards and Spec reviews report no new actionable findings.
