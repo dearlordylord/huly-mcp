@@ -270,3 +270,39 @@ full issue requirements remain unfinished. Current transport evidence is in
 `/tmp/resident-tls-coherent-typecheck.log` reports 1,204 files and zero errors or
 warnings. Full quality gate, live Huly and native platform certification remain
 pending.
+
+## Protected attachment file increment
+
+`src/resident/attachment-file.ts` defines the schema-owned generation descriptor.
+It pins the file format, transport and package version, and parses channel and
+bearer secrets into `Redacted` values. Reads use no-follow, nonblocking opens,
+verify the opened regular file's owner and private permissions, bound input to
+64 KiB, and reject invalid UTF-8. The file name must match the parsed generation.
+
+POSIX publication checks original and canonical ancestors and refuses an
+existing non-private directory without changing its permissions. It writes and
+syncs a private temporary file before an exclusive hard link publishes the
+immutable generation path. Scoped cleanup closes handles and removes temporary
+files on interruption. Device and inode comparisons use `bigint`.
+
+Evidence is scoped to this increment:
+
+- `/tmp/resident-attachment-file-coherent-tests.log`: six real-filesystem checks
+  and four native TLS checks pass. Cases cover private readback, permissions,
+  symlinks, malformed and oversized content, wrong generation names, incompatible
+  package versions, duplicate publication, interruption and a replacement
+  installed before cleanup.
+- `/tmp/resident-attachment-file-final-typecheck.log`: 1,207 files checked with
+  zero TypeScript or Effect errors or warnings. Focused lint and complexity pass.
+- Independent Standards review found no actionable issue. Spec review identified
+  the cleanup race below. Initial malformed test expressions and failed
+  formatting attempts were fixture errors, corrected before these passing runs.
+
+The cleanup inode check and unlink are separate operations. They detect a
+replacement already present at the check, but cannot protect against a same-user
+writer replacing that path between the check and unlink. Production integration
+must enforce one writer for each immutable generation through the ownership
+protocol before claiming replacement-safe cleanup. This module is not wired into
+the launcher. It does not establish application readiness, managed ownership,
+Windows ACL isolation, or completion of any issue. Full qualification remains
+pending.

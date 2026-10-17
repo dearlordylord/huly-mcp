@@ -209,3 +209,15 @@ handoff makes the latter test fail
 before the passing run. TypeScript/Effect diagnostics check 1,204 files with zero
 errors or warnings in `/tmp/resident-tls-listener-drain-typecheck.log`.
 Scoped Standards and Spec reviews report no new actionable findings.
+
+## Protected descriptor implementation limit
+
+The POSIX descriptor codec and scoped publisher now exist in
+`src/resident/attachment-file.ts`. Exclusive publication never overwrites an
+existing generation. Reading checks the opened file, and cleanup detects a
+replacement installed before its inode check. The check and unlink are not an
+atomic conditional removal. Before production wiring, the ownership protocol
+must enforce one writer for each immutable generation. No concurrent replacement
+of that generation's path is supported. A non-cooperating same-user writer can
+race the check, so the current helper does not prove unconditional replacement
+preservation. Managed locator replacement requires its own ownership protocol.
