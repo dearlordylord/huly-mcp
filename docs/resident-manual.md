@@ -151,3 +151,29 @@ authorize killing a PID, deleting ownership state or replaying an unconfirmed
 operation. Verified local retirement and safe recovery remain separate work;
 this command supplies no force-stop or reset action. Linux executable evidence
 exists for this path; native macOS and Windows qualification remains pending.
+
+## Request a managed generation stop
+
+Use the exact generation UUID from status:
+
+```bash
+huly resident stop --generation <uuid> --json
+huly resident stop --generation <uuid> --state-directory /absolute/private/namespace --json
+```
+
+The command authenticates that generation, checks its control-wire capability
+and submits one stop request. It needs no Huly credentials. Configured managed
+backends fence new admission and follow their existing normal cleanup path.
+Manual and foreground backends refuse this control. The command does not start
+a backend, signal a PID, remove records or reset a namespace.
+
+Exit zero and `kind: "accepted"` mean admission was fenced. The result explicitly
+says `retirement: "unconfirmed"`; it does not prove cleanup or permit resetting
+ownership. If acknowledgment is lost or invalid after possible submission, the
+CLI returns a nonretryable CONFLICT failure (exit 5). With `--json`, that failure
+is JSON on stderr and stdout is empty. No stop request is automatically retried.
+
+Stopping locally does not settle earlier unconfirmed Huly mutations. Preserve
+that uncertainty and use operation-specific reconciliation before repeating a
+mutation. Full packaged lifecycle, cleanup-failure, replacement and native
+platform qualification remain pending for this command.

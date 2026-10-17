@@ -13,7 +13,11 @@ stop-request route. It reuses admissions fencing and the existing cleanup owner;
 202 means acceptance with retirement unconfirmed. Manual/foreground lifetimes
 refuse. See [design and pending work](resident-stop-design.md) and the
 [checkpoint evidence](issue-327.md#managed-stop-server-checkpoint-2026-10-17).
-The bounded one-shot operator client, CLI and process fault schedules are next.
+The subsequent bounded one-shot operator client and CLI are implemented, with
+11 native TLS/file client tests and source CLI acceptance/uncertainty checks.
+Packaged CLI absent-target refusal also passes without state creation. A single
+discriminated invocation state preserves submission/acceptance knowledge.
+Full packaged stop process fault schedules are next.
 Nineteen focused tests and TypeScript/Effect, lint, circular and complexity checks
 pass; fresh Standards/Spec reviews found no actionable server-half defect. This
 is not a full gate or six-ticket completion. Status secret assertions were also

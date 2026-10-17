@@ -5,6 +5,7 @@ import { readManagedDirectoryForOwner } from "../../../src/resident/managed-dire
 import { ManagedLaunchError } from "../../../src/resident/managed-contract.js"
 import { currentPosixOwner, ProtectedFileError, ResidentDirectory } from "../../../src/resident/protected-path.js"
 import { inspectResidentState, ResidentStateStatus } from "../../../src/resident/state-status.js"
+import { requestResidentStop, ResidentStopReport, ResidentStopTarget } from "../../../src/resident/operator-stop.js"
 import { CliRuntimeError } from "./render.js"
 
 const STATE_DIRECTORY_FLAG = "state-directory"
@@ -19,10 +20,10 @@ const statusFailure = (error: ResidentStatusFailure) =>
     message:
       error instanceof ManagedLaunchError || error instanceof ProtectedFileError
         ? error.message
-        : "Resident status could not select a protected state directory. Check configuration and ownership; preserve unresolved state.",
+        : "Resident ownership could not select a protected state directory. Check configuration and ownership; preserve unresolved state.",
     retryable: false
   })
-const selectDirectory = Effect.fn("ResidentStatus.selectDirectory")(function* (requested: Option.Option<string>) {
+const selectDirectory = Effect.fn("Resident.selectDirectory")(function* (requested: Option.Option<string>) {
   if (Option.isSome(requested)) return yield* Schema.decodeUnknownEffect(ResidentDirectory)(requested.value)
   const owner = yield* currentPosixOwner
   return yield* readManagedDirectoryForOwner(owner)
@@ -64,8 +65,67 @@ const statusCommand = Command.make(
   )
 )
 
+const stopCommand = Command.make(
+  "stop",
+  {
+    generation: Flag.String("generation").pipe(
+      Flag.withDescription("Exact generation UUID from resident status; never selects a replacement implicitly.")
+    ),
+    directory: Flag.String(STATE_DIRECTORY_FLAG).pipe(
+      Flag.optional,
+      Flag.withDescription("Use this existing protected ownership namespace.")
+    ),
+    json: Flag.Boolean("json").pipe(Flag.withDefault(false))
+  },
+  ({ directory, generation, json }) =>
+    Effect.gen(function* () {
+      const selected = yield* selectDirectory(directory)
+      const target = yield* Schema.decodeUnknownEffect(ResidentStopTarget.fields.generation)(generation).pipe(
+        Effect.mapError(
+          () =>
+            new CliRuntimeError({
+              kind: "input",
+              message: "Resident stop requires an exact generation UUID from resident status.",
+              retryable: false
+            })
+        )
+      )
+      const result = yield* requestResidentStop({ directory: selected, generation: target }).pipe(
+        Effect.mapError(
+          (error) =>
+            new CliRuntimeError({
+              kind:
+                error.reason === "target-missing"
+                  ? "lookup"
+                  : error.reason === "unsupported-wire"
+                    ? "input"
+                    : "conflict",
+              message: error.message,
+              retryable: false
+            })
+        )
+      )
+      if (result.kind === "unconfirmed")
+        return yield* new CliRuntimeError({
+          kind: "conflict",
+          retryable: false,
+          message: `Stop request for generation ${result.generation} may have been accepted; submission and retirement are unconfirmed. No request was retried. Preserve unresolved state; this is not permission to reset ownership or replay Huly operations.`
+        })
+      yield* Console.log(
+        json
+          ? yield* Schema.encodeEffect(Schema.fromJsonString(ResidentStopReport))(result).pipe(Effect.orDie)
+          : `Stop accepted for generation ${result.generation}; retirement is unconfirmed.`
+      )
+    })
+).pipe(
+  Command.withDescription(
+    "Request graceful stop of one exact managed generation. Exit zero confirms admission fencing only; retirement remains unconfirmed. Lost acknowledgment is a nonretryable conflict. Never resets state or starts a replacement."
+  )
+)
+
 export const residentCommand = Command.make("resident").pipe(
-  Command.withDescription("Inspect local resident backend ownership"),
-  Command.withSubcommands([statusCommand])
+  Command.withDescription("Inspect resident ownership or request a managed generation stop"),
+  Command.withSubcommands([statusCommand, stopCommand])
 )
 export const residentStatusSkillSurface = `huly resident status [--${STATE_DIRECTORY_FLAG} <path>] [--json]`
+export const residentStopSkillSurface = `huly resident stop --generation <uuid> [--${STATE_DIRECTORY_FLAG} <path>] [--json]`

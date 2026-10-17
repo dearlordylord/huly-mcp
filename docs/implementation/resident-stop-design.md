@@ -1,9 +1,8 @@
 # Authenticated managed stop request
 
 The operator targets one exact generation in an existing private namespace.
-The intended public operation is `requestResidentStop({ directory, generation })`;
-the intended CLI is `huly resident stop --generation <uuid>`. Neither client nor
-CLI is implemented by the server checkpoint described here. The existing
+The public operation is `requestResidentStop({ directory, generation })`;
+the CLI is `huly resident stop --generation <uuid>`. The existing
 `resident status` command remains observational.
 
 The selected design reuses the managed backend's admissions fence. Its existing
@@ -41,10 +40,24 @@ proof. The client must preserve unknown submission after possible dispatch and
 must not automatically retry, reset the namespace or launch a replacement.
 
 Control wire compatibility is independent of the CLI package version. The client
-must negotiate the supported wire before POST and authenticate the selected
+negotiates the supported wire before POST and authenticates the selected
 generation. Ordinary adapter compatibility remains exact implementation version
 plus captured Huly identity and policy. This design changes no mutation outcome
 or reconciliation contract.
+
+The client inspects the existing bounded namespace and immutable registry
+descriptor without creating directories or acquiring a claim. Its single
+invocation state is not-submitted, submitted or accepted with an authenticated
+receipt. A failed channel finalizer cannot erase validated acceptance; its
+diagnostic remains redacted and retirement remains unconfirmed. Selection/control
+uses the existing ten-second budget, individual exchanges retain five-second
+limits and owned TLS cleanup keeps its existing five-second bound. These are
+not a new total server-shutdown deadline.
+
+CLI exit zero means accepted only. Uncertain submission is the existing
+nonretryable conflict failure (exit 5), including JSON failure output on stderr;
+it does not emit a success result. Missing target is NOT_FOUND, invalid generation
+is INVALID_INPUT. All outcomes leave registry ownership to the existing owner.
 
 ## Alternatives and synthesis
 
@@ -72,8 +85,14 @@ the owner is still running and publication remains, then release cleanup and
 join the owner before checking publication removal. These tests do not exercise
 the enclosing managed registry receipt or a packaged operator client.
 
-Implement protected read-only target selection, the one-shot bounded client and
-CLI next. Add process schedules for lost acknowledgment, active operations,
+The client now has real protected-file/TLS schedules for acknowledgment loss,
+malformed/wrong-generation acknowledgment, pre-POST wire/authentication refusal,
+explicit post-capability refusal and compatibility with a different recorded
+implementation version. Source CLI acceptance and uncertainty, plus packaged CLI
+absent-target refusal, are covered. These do not constitute qualification of two
+released installations or the full packaged stop process lifecycle.
+
+Add process schedules for lost acknowledgment, active operations,
 cleanup failure retaining ownership, unrelated generations, CLI death and
 verified replacement after actual owned retirement. Preserve existing deadlines,
 inventory bounds, no replay and native/Huly qualification. No ticket is complete

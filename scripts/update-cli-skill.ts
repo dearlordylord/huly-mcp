@@ -30,7 +30,7 @@ const requireSubcommand = (group: LocalCommandMetadata, expectedGroup: string, n
 
 requireSubcommand(authCommand, "auth", ["login", "status", "logout"])
 requireSubcommand(profileCommand, "profile", ["create", "list", "select", "update"])
-requireSubcommand(residentCommand, "resident", ["status"])
+requireSubcommand(residentCommand, "resident", ["status", "stop"])
 
 const commandDescription = (group: LocalCommandMetadata, name: string): string => {
   const command = group.subcommands.flatMap((entry) => entry.commands).find((candidate) => candidate.name === name)
@@ -71,6 +71,12 @@ does not start a backend or change records. Its snapshot proves neither
 readiness nor retirement; never infer permission to kill a PID, delete state or
 replay an operation from this output.
 
+Use \`huly resident stop --generation <uuid> --json\` to request graceful stop of
+one exact managed generation. Exit zero means admission was fenced, with
+retirement still unconfirmed. A lost acknowledgment is a nonretryable conflict;
+preserve unresolved state. The command never resets ownership, starts a backend
+or replays Huly operations. Manual and foreground lifetimes refuse this control.
+
 ## Discover before acting
 
 1. Run \`huly --help\` to discover groups.
@@ -101,6 +107,12 @@ For scripts, read [references/automation.md](references/automation.md) before ha
 `
 
 const requiredLocalSurface = [
+  {
+    documentedSurface: localCommandSkillSurfaces.residentStop,
+    descriptionSource: commandDescription(residentCommand, "stop"),
+    command: "resident stop",
+    description: "retirement remains unconfirmed"
+  },
   {
     documentedSurface: localCommandSkillSurfaces.residentStatus,
     descriptionSource: commandDescription(residentCommand, "status"),

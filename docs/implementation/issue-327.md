@@ -36,11 +36,41 @@ failure or resolve launch/process timing qualification.
 
 ## Managed stop server checkpoint (2026-10-17)
 
+The subsequent client/CLI increment implements protected read-only target
+selection, stable wire negotiation independent of CLI package version and one
+POST. Its invocation knowledge is one discriminated state, replacing two flags
+after Standards review identified an impossible combination. Spec review found
+no actionable divergence; Standards recheck accepted the fix. No new persistent
+state or lifecycle owner is introduced.
+
+The 11 client tests pass, including real TLS acknowledgment loss, malformed and
+wrong-generation acknowledgment, explicit refusal after capability negotiation,
+authentication/wire refusal, different recorded implementation version and source
+CLI acceptance/uncertainty (`/tmp/resident-stop-client-faults-verified.log`, SHA-256
+`7104f0fd97c4880baaf9f81b6385f9553d107721c5da470724b415fbbdd4e9af`).
+Each possible-submission case checks one POST and unchanged protected metadata;
+pre-submission refusals check zero POSTs. The version fixture rewrites both
+protected fixture payloads consistently; it is not a released-package upgrade.
+
+The source CLI plus packaged status/stop-refusal run passes 15 tests in three
+files (`/tmp/resident-stop-client-cli-verified.log`, SHA-256
+`f6eaa834b027ddfcab9d1e0ddbc51ad31ac5ca3729c4589007d599363c10559c`).
+The packaged stop refuses an absent exact target with NOT_FOUND/exit 5, empty
+stdout and no namespace creation. It does not exercise successful packaged stop
+or error-path retirement. Lint/format/duplication (0.91%), circular and complexity
+checks pass in `/tmp/resident-stop-client-{lint,circular,complexity}.log`.
+TypeScript/Effect diagnostics and generated CLI skill checks pass. Intermediate
+TypeScript inference and destructuring-order errors were fixed without casts.
+No full final gate, native-platform or live-Huly qualification is claimed.
+
+### Earlier server-only checkpoint
+
 The [selected design](resident-stop-design.md) reuses the existing admissions
 fence and managed shutdown owner. A private authenticated exact-generation route
 returns acceptance with retirement explicitly unconfirmed. Manual/foreground
 lifetimes refuse. No separate stop fiber, completion witness, journal, PID signal
-or ownership reset is introduced. The operator client and CLI remain pending.
+or ownership reset is introduced. The operator client and CLI were pending at
+this earlier checkpoint and are implemented in the increment above.
 
 Five focused suites pass 19 tests, including actual TLS authorization, malformed
 and oversized input, wrong generation, duplicate acceptance and held real server

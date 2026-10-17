@@ -21,6 +21,7 @@ Use `huly profile create|list|select|update` for named URL, workspace, and defau
 Key local command surfaces:
 
 `huly resident status [--state-directory <path>] [--json]`
+`huly resident stop --generation <uuid> [--state-directory <path>] [--json]`
 `huly auth login [--profile <name>] [--json]`
 `huly auth status [--profile <name>] [--json]`
 `huly auth logout [--profile <name>] [--json]`
@@ -34,6 +35,12 @@ Add `--state-directory <path>` to inspect an explicit namespace. This command
 does not start a backend or change records. Its snapshot proves neither
 readiness nor retirement; never infer permission to kill a PID, delete state or
 replay an operation from this output.
+
+Use `huly resident stop --generation <uuid> --json` to request graceful stop of
+one exact managed generation. Exit zero means admission was fenced, with
+retirement still unconfirmed. A lost acknowledgment is a nonretryable conflict;
+preserve unresolved state. The command never resets ownership, starts a backend
+or replays Huly operations. Manual and foreground lifetimes refuse this control.
 
 ## Discover before acting
 

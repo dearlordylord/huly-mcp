@@ -80,3 +80,11 @@ it("returns a useful typed failure for unsafe state and invalid directory input"
       "could not select a protected state directory"
     )
   }))
+
+it("requires an exact generation before submitting a stop", async () =>
+  withRegistryDirectory(async (directory) => {
+    await expect(
+      Effect.runPromise(runCommand(["stop", "--generation", "invalid", "--state-directory", directory, "--json"]))
+    ).rejects.toThrow("exact generation UUID")
+    expect(await fs.readdir(directory)).toEqual([])
+  }))

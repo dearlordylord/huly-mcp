@@ -27,7 +27,7 @@ import {
   type ProfileName
 } from "./profile-store.js"
 import { CliRuntimeError } from "./render.js"
-import { residentCommand, residentStatusSkillSurface } from "./resident-commands.js"
+import { residentCommand, residentStatusSkillSurface, residentStopSkillSurface } from "./resident-commands.js"
 
 const JSON_INDENT_SPACES = 2
 
@@ -218,6 +218,7 @@ const stripOuterBrackets = (syntax: string): string => syntax.slice("[".length, 
 
 export const localCommandSkillSurfaces = {
   residentStatus: residentStatusSkillSurface,
+  residentStop: residentStopSkillSurface,
   authLogin: `huly auth login ${profileFlag.syntax} ${jsonFlag.syntax}`,
   authStatus: `huly auth status ${profileFlag.syntax} ${jsonFlag.syntax}`,
   authLogout: `huly auth logout ${profileFlag.syntax} ${jsonFlag.syntax}`,

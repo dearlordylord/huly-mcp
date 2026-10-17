@@ -22,6 +22,11 @@ const FailedCommand = Schema.Struct({
   stdout: Schema.Literal(""),
   stderr: Schema.NonEmptyString
 })
+const RefusedStopCommand = Schema.Struct({
+  code: Schema.Literal(5),
+  stdout: Schema.Literal(""),
+  stderr: Schema.NonEmptyString
+})
 
 it.skipIf(process.platform !== "linux")(
   "runs the packaged resident status CLI without credentials, startup, repair or private output",
@@ -50,6 +55,31 @@ it.skipIf(process.platform !== "linux")(
       expect(await fs.readdir(directory)).toEqual([])
 
       const attachment = registryAttachment()
+      const refusedStop = await runFile(
+        process.execPath,
+        [
+          executable,
+          "resident",
+          "stop",
+          "--generation",
+          attachment.identity.generation,
+          "--state-directory",
+          missing,
+          "--json"
+        ],
+        { env: testStdioEnvironment(), timeout: RESPONSE_BOUND }
+      ).then(
+        () => {
+          throw new Error("Absent resident stop unexpectedly succeeded")
+        },
+        (error: unknown) => Schema.decodeUnknownSync(RefusedStopCommand)(error)
+      )
+      expect(Schema.decodeUnknownSync(Schema.fromJsonString(CliFailureSchema))(refusedStop.stderr)).toMatchObject({
+        code: "NOT_FOUND",
+        retryable: false
+      })
+      expect(refusedStop.stderr).toContain("not retirement evidence")
+      expect(await fs.readdir(directory)).toEqual([])
       await Effect.runPromise(
         withPublishedResidentAttachment(directory, attachment, () =>
           Effect.gen(function* () {
