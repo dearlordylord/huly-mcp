@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Прототип жизненного цикла Huly MCP</title>
+<style>
+body{font:16px/1.5 system-ui,sans-serif;margin:32px auto;padding:0 20px;max-width:1100px;color:#172633;background:#f6f8fa}h1{font-size:28px}h2{font-size:20px;margin-top:28px}.notice{border-left:4px solid #176eaa;padding:12px 18px;background:#eaf3fa}button{font:inherit;background:white;color:#174d72;border:1px solid #b9cbd7;border-radius:6px;padding:8px 12px;margin:4px;cursor:pointer}button:hover,button[aria-selected=true]{background:#dceefa}button:disabled{opacity:.5;cursor:default}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}.card{padding:16px;background:white;border:1px solid #dce3e8;border-radius:8px}.label{color:#526573;font-size:14px}.value{font-weight:650}table{border-collapse:collapse;width:100%;background:white}td,th{text-align:left;border-bottom:1px solid #dde5ea;padding:8px}#note{padding:12px;background:#eaf3fa}#checks{color:#236a3b}#log{max-height:220px;overflow:auto;background:white;padding:16px 36px}.muted{color:#526573}a{color:#176eaa}
+</style>
+<h1>Кому принадлежит общий Huly MCP?</h1>
+<p class="notice"><strong>Одноразовый прототип логики, не production.</strong> Вопрос: могут ли два адаптера разделять один backend, сохраняя независимые запросы, отмену и остановку? Все события моделируются в памяти. Здесь нет настоящих процессов, блокировок, сети, credentials или обращений к Huly.</p>
+<p>Допущение этого варианта: неизвестный исход записи блокирует автоматическую остановку до выяснения. Это открытый выбор политики, а не принятое решение. «Восстановление подтверждено» и «исход выяснен» — внешние доказательства, которые прототип только изображает.</p>
+<h2>Текущее состояние</h2><div class="grid" id="state"></div>
+<h2>Адаптеры</h2><table><thead><tr><th>Адаптер</th><th>Подключение</th><th>Поколение</th></tr></thead><tbody id="adapters"></tbody></table>
+<h2>Запросы</h2><table><thead><tr><th>Владелец / ID</th><th>Операция</th><th>Поколение</th><th>Исход</th></tr></thead><tbody id="requests"></tbody></table>
+<p id="note" role="status"></p><p id="checks"></p>
+<h2>Свободные действия</h2><div id="controls"></div><button id="reset">Сбросить</button>
+<h2>Пошаговые сценарии</h2><div id="tabs" role="tablist" aria-label="Сценарии"></div><p id="description"></p><div id="steps"></div>
+<h2>Что произошло</h2><ol id="log"></ol>
+<p class="muted">Модель проверяет только свои переходы. Сериализованный reducer не доказывает межпроцессную эксклюзивность. Для реального решения отдельно нужны блокировка, доказательство владения, защита локального HTTP и проверки на каждой ОС.</p>
+<script id="logic">
+const LifecycleDemo = (() => {
+  const initial = () => ({phase:'absent',generation:0,owner:null,model:'cold',adapters:{A:{phase:'released',generation:null},B:{phase:'released',generation:null}},requests:[],next:1,note:'Backend отсутствует.'});
+  const labels={absent:'Отсутствует',starting:'Запускается',accepting:'Принимает запросы',draining:'Завершается',blocked:'Владение / восстановление не подтверждено',cold:'Не загружена',loading:'Загружается',ready:'Готова',failed:'Ошибка',waiting:'Ожидает',attached:'Подключён',released:'Закрыт',lost:'Связь потеряна',queued:'Ждёт модель',dispatched:'Передан обработчику',completed:'Завершён',unknown:'Исход неизвестен',canceled:'Отменён',write:'Запись',read:'Чтение'};
+  const active = r => r.phase==='queued'||r.phase==='dispatched';
+  const unresolved = s => s.requests.some(r=>r.phase==='unknown');
+  const attached = s => Object.values(s.adapters).filter(a=>a.phase==='attached');
+  const valid = s => {
+    const errors=[];
+    if(s.phase==='absent'&&s.owner!==null)errors.push('У отсутствующего backend не может быть владельца.');
+    if(['starting','accepting','draining'].includes(s.phase)&&s.owner===null)errors.push('Живому backend нужен владелец.');
+    for(const r of s.requests.filter(active))if(s.phase!=='accepting'||r.generation!==s.generation||s.adapters[r.client].phase!=='attached'||s.adapters[r.client].generation!==s.generation)errors.push('Активный запрос потерял своё подключение/поколение.');
+    if(s.phase==='draining'&&(attached(s).length||s.requests.some(active)||unresolved(s)))errors.push('Этот вариант модели запрещает idle drain при активном или неизвестном исходе.');
+    return errors;
+  };
+  function transition(previous,event){
+    const s=structuredClone(previous);const [kind,client]=event.split(':');
+    const deny=message=>{s.note='Отклонено: '+message;return s};
+    if(kind==='connect'){
+      if(s.adapters[client].phase==='attached')return deny('адаптер уже подключён.');
+      if(s.phase==='blocked')return deny('сначала подтвердить восстановление; чужой PID не трогаем.');
+      if(s.phase==='absent'){s.generation++;s.owner='backend g'+s.generation+' (инициатор '+client+')';s.phase='starting';s.model='cold';}
+      s.adapters[client]={phase:s.phase==='accepting'?'attached':'waiting',generation:s.phase==='accepting'?s.generation:null};
+      s.note=s.phase==='starting'?'Один владелец запускает backend; остальные ждут.':s.phase==='draining'?'Admission закрыт: клиент ждёт остановки и нового явного подключения.':'Адаптер подключён к текущему поколению.';
+    }else if(kind==='ready'){
+      if(s.phase!=='starting')return deny('нет запускающегося backend.');
+      s.phase='accepting';s.model='loading';for(const a of Object.values(s.adapters))if(a.phase==='waiting'){a.phase='attached';a.generation=s.generation;}
+      s.note='Каталог доступен; модель ещё загружается. Все ожидающие используют одно поколение.';
+    }else if(kind==='modelReady'){
+      if(s.phase!=='accepting'||s.model!=='loading')return deny('нет ожидаемой загрузки модели.');
+      s.model='ready';for(const r of s.requests)if(r.phase==='queued')r.phase='dispatched';s.note='Модель готова: ожидающие операции допущены. Отменённые не отправляются.';
+    }else if(kind==='write'||kind==='read'){
+      if(s.phase!=='accepting'||s.adapters[client].phase!=='attached')return deny('нужен принимающий backend и подключённый адаптер.');
+      s.requests.push({id:s.next++,client,kind,generation:s.generation,phase:s.model==='ready'?'dispatched':'queued'});s.note='Запрос принадлежит только адаптеру '+client+'.';
+    }else if(kind==='complete'){
+      const r=s.requests.find(r=>r.client===client&&r.phase==='dispatched');if(!r)return deny('нет переданного запроса для подтверждённого ответа.');
+      r.phase='completed';s.note='Получен подтверждённый финальный ответ '+client+'.';
+    }else if(kind==='cancel'||kind==='close'){
+      const a=s.adapters[client];if(a.phase==='released')return deny('адаптер уже закрыт.');
+      for(const r of s.requests.filter(r=>r.client===client&&active(r)))r.phase=r.phase==='dispatched'&&r.kind==='write'?'unknown':'canceled';
+      if(kind==='close')s.adapters[client]={phase:'released',generation:null};
+      s.note='Затронуты только запросы '+client+'. Переданная запись может иметь неизвестный исход; работа второго клиента продолжается.';
+    }else if(kind==='idle'){
+      if(s.phase!=='accepting')return deny('backend не принимает работу.');
+      if(attached(s).length||s.requests.some(active)||unresolved(s))return deny('есть подключённые клиенты, работа или неизвестный исход.');
+      s.phase='draining';s.note='Idle разрешён: admission закрыт, начинается освобождение своих ресурсов.';
+    }else if(kind==='stopped'){
+      if(s.phase!=='draining')return deny('сначала закрыть admission и подтвердить drain.');
+      s.phase='absent';s.owner=null;s.model='cold';s.note='Закрытие собственных ресурсов подтверждено. Ожидающие клиенты могут повторить только подключение.';
+    }else if(kind==='crash'){
+      if(!['starting','accepting','draining'].includes(s.phase))return deny('нет живого backend.');
+      for(const r of s.requests.filter(active))r.phase=r.phase==='dispatched'&&r.kind==='write'?'unknown':r.phase==='queued'?'canceled':'failed';
+      for(const a of Object.values(s.adapters))if(a.phase==='attached')a.phase='lost';
+      s.phase='blocked';s.model='cold';s.note='Поколение потеряно. Сохраняем неизвестные исходы; не запускаем дубликат без доказательства освобождения.';
+    }else if(kind==='reconcile'){
+      const r=s.requests.find(r=>r.client===client&&r.phase==='unknown');if(!r)return deny('нет неизвестного исхода.');
+      r.phase='completed';s.note='Внешняя проверка подтвердила результат записи. Это не повтор операции.';
+    }else if(kind==='retired'){
+      if(s.phase!=='blocked')return deny('нет заблокированного восстановления.');
+      s.phase='absent';s.owner=null;s.note='Внешнее доказательство подтвердило освобождение владельца. Неизвестные записи автоматически не повторяются.';
+    }else return deny('неизвестное событие.');
+    return s;
+  }
+  const actions=[['connect:A','Подключить A'],['connect:B','Подключить B'],['ready','Backend готов'],['modelReady','Модель готова'],['write:A','Запись A'],['read:B','Чтение B'],['complete:A','Ответ A'],['complete:B','Ответ B'],['cancel:A','Отменить A'],['close:A','Закрыть A'],['close:B','Закрыть B'],['idle','Истёк простой'],['stopped','Ресурсы закрыты'],['crash','Backend упал'],['retired','Освобождение подтверждено'],['reconcile:A','Исход записи A выяснен']];
+  const scenarios=[
+    {name:'Общий запуск',description:'Два адаптера приходят до готовности. Один владелец; модель не задерживает каталог.',events:['connect:A','connect:B','ready','write:A','read:B','modelReady','complete:A','complete:B']},
+    {name:'Отмена при загрузке',description:'A отменяет запрос до dispatch. Общая загрузка и запрос B продолжаются.',events:['connect:A','connect:B','ready','write:A','read:B','cancel:A','modelReady','complete:B']},
+    {name:'Неизвестная запись',description:'После dispatch отмена не доказывает отсутствие записи. Этот вариант запрещает idle до явного выяснения исхода.',events:['connect:A','connect:B','ready','modelReady','write:A','cancel:A','close:A','close:B','idle','reconcile:A','idle','stopped']},
+    {name:'Падение и новое поколение',description:'Неизвестный результат старой записи сохраняется после восстановления. Переподключение её не повторяет.',events:['connect:A','ready','modelReady','write:A','crash','connect:B','retired','connect:B','ready','modelReady','read:B','complete:B']},
+    {name:'Подключение во время drain',description:'Во время остановки новый клиент ждёт. Нельзя принять его вызов в завершающийся backend.',events:['connect:A','ready','close:A','idle','connect:B','read:B','stopped','connect:B','ready','modelReady','read:B','complete:B']}
+  ];
+  return {initial,transition,valid,labels,actions,scenarios};
+})();
+</script>
+<script id="ui">
+let state=LifecycleDemo.initial(),history=[],scenario=0,step=0;
+const byId=id=>document.getElementById(id),label=x=>LifecycleDemo.labels[x]??x;
+function cell(row,text){const td=document.createElement('td');td.textContent=text;row.append(td)}
+function dispatch(event){state=LifecycleDemo.transition(state,event);history.push(state.note);render()}
+function reset(){state=LifecycleDemo.initial();history=[];step=0;render()}
+function button(title,fn){const b=document.createElement('button');b.textContent=title;b.onclick=fn;return b}
+function render(){
+ const fields=[['Backend',label(state.phase)],['Владелец',state.owner??'Нет'],['Поколение',state.generation],['Модель',label(state.model)],['Неизвестные исходы',state.requests.filter(r=>r.phase==='unknown').length]];
+ byId('state').replaceChildren(...fields.map(([k,v])=>{const d=document.createElement('div');d.className='card';const t=document.createElement('div');t.className='label';t.textContent=k;const b=document.createElement('div');b.className='value';b.textContent=v;d.append(t,b);return d}));
+ byId('adapters').replaceChildren(...Object.entries(state.adapters).map(([k,a])=>{const tr=document.createElement('tr');[k,label(a.phase),a.generation??'—'].forEach(v=>cell(tr,v));return tr}));
+ byId('requests').replaceChildren(...state.requests.map(r=>{const tr=document.createElement('tr');[r.client+' / '+r.id,label(r.kind),r.generation,label(r.phase)].forEach(v=>cell(tr,v));return tr}));
+ byId('note').textContent=state.note;const errors=LifecycleDemo.valid(state);byId('checks').textContent=errors.length?'Нарушение модели: '+errors.join(' '):'Проверки текущей модели выполнены: владелец, поколение, принадлежность запросов и drain.';
+ byId('log').replaceChildren(...history.map(t=>{const li=document.createElement('li');li.textContent=t;return li}));
+ byId('description').textContent=LifecycleDemo.scenarios[scenario].description;
+ byId('steps').replaceChildren(...LifecycleDemo.scenarios[scenario].events.map((e,i)=>{const title=LifecycleDemo.actions.find(a=>a[0]===e)[1];const b=button((i+1)+'. '+title,()=>{dispatch(e);step++;render()});b.disabled=i!==step;return b}));
+ [...byId('tabs').children].forEach((b,i)=>b.setAttribute('aria-selected',String(i===scenario)));
+}
+for(const [e,t]of LifecycleDemo.actions)byId('controls').append(button(t,()=>dispatch(e)));
+LifecycleDemo.scenarios.forEach((s,i)=>{const b=button(s.name,()=>{scenario=i;reset()});b.setAttribute('role','tab');byId('tabs').append(b)});
+byId('reset').onclick=reset;render();
+</script>
+</html>
