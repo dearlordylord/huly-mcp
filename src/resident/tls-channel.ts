@@ -183,12 +183,14 @@ class ResidentListener extends Server {
   }
 }
 
+export const makeResidentHttpsListener = (identity: ResidentTlsIdentity): Server => new ResidentListener(identity)
+
 export const makeResidentHttpServerFactory = (identity: ResidentTlsIdentity): HttpServerFactory => ({
   protocol: "https",
   make: (port, host, gracefulShutdownTimeout) => {
     if (host !== "127.0.0.1" && host !== "::1")
       return Effect.fail(new HttpTransportError({ message: "Resident listener requires a literal loopback binding" }))
-    return NodeHttpServer.make(() => new ResidentListener(identity), {
+    return NodeHttpServer.make(() => makeResidentHttpsListener(identity), {
       port,
       host,
       ...(gracefulShutdownTimeout === undefined ? {} : { gracefulShutdownTimeout })

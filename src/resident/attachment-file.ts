@@ -25,15 +25,15 @@ const FILE_FORMAT = 1
 export const ResidentAttachment = Schema.Struct({
   version: Schema.Literal(FILE_FORMAT),
   transport: Schema.Literal("tls13-external-psk-v1"),
-  implementation: Schema.Struct({
-    name: Schema.Literal("@firfi/huly-mcp"),
-    version: Schema.String.check(Schema.makeFilter((version) => version === VERSION))
-  }),
+  implementation: Schema.Struct({ name: Schema.Literal("@firfi/huly-mcp"), version: Schema.NonEmptyString }),
   endpoint: ResidentEndpoint,
   identity: ResidentTlsIdentity,
   authorization: Schema.RedactedFromValue(Schema.NonEmptyString)
 })
 export type ResidentAttachment = Schema.Schema.Type<typeof ResidentAttachment>
+const CompatibleResidentAttachment = ResidentAttachment.check(
+  Schema.makeFilter((attachment) => attachment.implementation.version === VERSION)
+)
 
 const invalidAttachment = () =>
   new ProtectedFileError({ kind: "input", message: "Resident attachment is invalid or incompatible with this package" })
@@ -71,7 +71,7 @@ export const readResidentAttachment = (selection: ResidentFilePath) =>
         Effect.gen(function* () {
           yield* inspectPrivateFile(handle, owner)
           const text = yield* readBounded(handle)
-          return yield* Schema.decodeUnknownEffect(Schema.fromJsonString(ResidentAttachment))(text).pipe(
+          return yield* Schema.decodeUnknownEffect(Schema.fromJsonString(CompatibleResidentAttachment))(text).pipe(
             Effect.mapError(invalidAttachment)
           )
         }),
@@ -93,7 +93,7 @@ export const withPublishedResidentAttachment = <A, E, R>(
       catch: fileFailure
     })
     const directory = yield* inspectPrivateDirectory(requestedDirectory, owner)
-    const encoded = yield* Schema.encodeEffect(Schema.fromJsonString(ResidentAttachment))(descriptor).pipe(
+    const encoded = yield* Schema.encodeEffect(Schema.fromJsonString(CompatibleResidentAttachment))(descriptor).pipe(
       Effect.mapError(invalidAttachment)
     )
     if (Buffer.byteLength(encoded, "utf8") > MAX_ATTACHMENT_BYTES) return yield* invalidAttachment()

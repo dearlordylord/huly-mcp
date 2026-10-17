@@ -1,15 +1,18 @@
 import { spawn } from "node:child_process"
 import { once } from "node:events"
-import { createServer } from "node:http"
 import { createInterface } from "node:readline"
 import { resolve } from "node:path"
-import { Effect, Schema } from "effect"
+import { createServer, type Socket } from "node:net"
+import * as fs from "node:fs/promises"
+import { Effect, Redacted, Schema } from "effect"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
 import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { replayResidentResponses } from "../helpers/resident-response-replay.js"
 import { ResidentResponseObservation } from "../../src/resident/response-observations.js"
+import { fixturePackageVersion, startResidentFixture } from "../helpers/resident-fixture.js"
+import { ResidentAttachment } from "../../src/resident/attachment-file.js"
 
 const PROCESS_BOUND = 30_000
 const RESPONSE_BOUND = 5_000
@@ -53,6 +56,59 @@ afterAll(async () => {
 })
 
 describe("packaged manual adapter", { timeout: PROCESS_BOUND }, () => {
+  it("refuses a same-port plaintext replacement before disclosing authorization or an operation", async () => {
+    const fixture = await startResidentFixture(
+      (_request, response) => response.end(),
+      AUTHORIZATION,
+      await fixturePackageVersion()
+    )
+    const descriptor = Schema.decodeUnknownSync(Schema.fromJsonString(ResidentAttachment))(
+      await fs.readFile(fixture.file, "utf8")
+    )
+    const sockets = new Set<Socket>()
+    let leaked = false
+    const replacement = createServer((socket) => {
+      sockets.add(socket)
+      socket.once("close", () => sockets.delete(socket))
+      socket.on("data", (bytes: Buffer) => {
+        leaked ||=
+          bytes.includes(Buffer.from(AUTHORIZATION)) ||
+          bytes.includes(Buffer.from("server/discover")) ||
+          bytes.includes(Buffer.from(Redacted.value(descriptor.identity.key), "hex"))
+        socket.end("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}")
+      })
+    })
+    try {
+      await new Promise<void>((resolve, reject) =>
+        fixture.backend.close((error) => (error ? reject(error) : resolve()))
+      )
+      replacement.listen(Number(descriptor.endpoint.port), "127.0.0.1")
+      await once(replacement, "listening")
+      const child = spawn(process.execPath, [bundle.path], {
+        env: { ...testStdioEnvironment(), MCP_TRANSPORT: "stdio-http", MCP_RESIDENT_ATTACHMENT_FILE: fixture.file }
+      })
+      const closed = once(child, "close", { signal: AbortSignal.timeout(RESPONSE_BOUND) })
+      const output: Array<Buffer> = []
+      child.stdout.on("data", (bytes: Buffer) => output.push(bytes))
+      child.stdin.write(requestFor("first"))
+      try {
+        expect(await closed).toEqual([1, null])
+        expect(leaked).toBe(false)
+        expect(Buffer.concat(output).length).toBe(0)
+      } finally {
+        if (child.exitCode === null && child.signalCode === null) {
+          child.kill("SIGKILL")
+          await once(child, "close", { signal: AbortSignal.timeout(RESPONSE_BOUND) })
+        }
+      }
+    } finally {
+      for (const socket of sockets) socket.destroy()
+      if (replacement.listening)
+        await new Promise<void>((resolve, reject) => replacement.close((error) => (error ? reject(error) : resolve())))
+      await fixture.cleanup()
+    }
+  })
+
   it.each([
     { contentType: "application/json", release: "none" },
     { contentType: "text/event-stream", release: "none" },
@@ -62,51 +118,47 @@ describe("packaged manual adapter", { timeout: PROCESS_BOUND }, () => {
     { contentType: "text/event-stream", release: "missing-terminal" }
   ])("isolates colliding IDs through $contentType (release=$release)", async ({ contentType, release }) => {
     const holdFirst = release !== "none"
-    const backend = createServer((request, response) => {
-      void (async () => {
-        expect(request.headers.authorization).toBe(`Bearer ${AUTHORIZATION}`)
-        request.setEncoding("utf8")
-        const chunks: Array<string> = []
-        for await (const chunk of request) chunks.push(Schema.decodeUnknownSync(Schema.String)(chunk))
-        const message = Schema.decodeUnknownSync(Schema.fromJsonString(HostRequest))(chunks.join(""))
-        const host = message.params._meta["io.modelcontextprotocol/clientInfo"].name
-        if (holdFirst && host === "first" && message.method === "server/discover") {
-          response.once("close", () => backend.emit("first-stream-closed"))
+    const fixture = await startResidentFixture(
+      (request, response) => {
+        void (async () => {
+          expect(request.headers.authorization).toBe(`Bearer ${AUTHORIZATION}`)
+          request.setEncoding("utf8")
+          const chunks: Array<string> = []
+          for await (const chunk of request) chunks.push(Schema.decodeUnknownSync(Schema.String)(chunk))
+          const message = Schema.decodeUnknownSync(Schema.fromJsonString(HostRequest))(chunks.join(""))
+          const host = message.params._meta["io.modelcontextprotocol/clientInfo"].name
+          if (holdFirst && host === "first" && message.method === "server/discover") {
+            response.once("close", () => backend.emit("first-stream-closed"))
+            response.writeHead(200, { "content-type": contentType })
+            response.write(
+              `data: ${JSON.stringify({
+                jsonrpc: "2.0",
+                method: "notifications/progress",
+                params: { progressToken: host, progress: 1 }
+              })}\n\n`
+            )
+            if (release === "missing-terminal") backend.once("truncate-first", () => response.end())
+            return
+          }
+          const reply = JSON.stringify({ jsonrpc: "2.0", id: message.id, result: { host } })
           response.writeHead(200, { "content-type": contentType })
-          response.write(
-            `data: ${JSON.stringify({
-              jsonrpc: "2.0",
-              method: "notifications/progress",
-              params: { progressToken: host, progress: 1 }
-            })}\n\n`
-          )
-          if (release === "missing-terminal") backend.once("truncate-first", () => response.end())
-          return
-        }
-        const reply = JSON.stringify({ jsonrpc: "2.0", id: message.id, result: { host } })
-        response.writeHead(200, { "content-type": contentType })
-        response.end(contentType === "text/event-stream" ? `: keepalive\n\ndata: ${reply}\n\n` : reply)
-      })().catch(() => {
-        response.writeHead(500)
-        response.end()
-      })
-    })
-    backend.listen(0, "127.0.0.1")
-    await once(backend, "listening")
-    const address = backend.address()
-    if (address === null || typeof address === "string") throw new Error("Expected owned loopback port")
+          response.end(contentType === "text/event-stream" ? `: keepalive\n\ndata: ${reply}\n\n` : reply)
+        })().catch(() => {
+          response.writeHead(500)
+          response.end()
+        })
+      },
+      AUTHORIZATION,
+      await fixturePackageVersion()
+    )
+    const { backend } = fixture
     const adapters = ["first", "second"].map((host) => {
       const child = spawn(
         process.execPath,
         ["--import", resolve("test/resident/fixtures/observe-responses.mjs"), bundle.path],
         {
           stdio: ["pipe", "pipe", "pipe", "ipc"],
-          env: {
-            ...testStdioEnvironment(),
-            MCP_TRANSPORT: "stdio-http",
-            MCP_STDIO_BACKEND_URL: `http://127.0.0.1:${address.port}/mcp`,
-            MCP_AUTH_TOKEN: AUTHORIZATION
-          }
+          env: { ...testStdioEnvironment(), MCP_TRANSPORT: "stdio-http", MCP_RESIDENT_ATTACHMENT_FILE: fixture.file }
         }
       )
       const { stdin, stdout } = child
@@ -176,8 +228,7 @@ describe("packaged manual adapter", { timeout: PROCESS_BOUND }, () => {
       }
       await Promise.all(adapters.map((adapter) => adapter.exit))
       await Promise.all(adapters.map((adapter) => adapter.closed))
-      backend.closeAllConnections()
-      await new Promise<void>((resolve, reject) => backend.close((error) => (error ? reject(error) : resolve())))
+      await fixture.cleanup()
     }
     expect(adapters.flatMap((adapter) => adapter.observationErrors)).toEqual([])
     if (release === "missing-terminal")

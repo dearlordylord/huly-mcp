@@ -350,3 +350,59 @@ Validation for this increment:
 Shared start ownership, authenticated stdio attachment, session release, live
 Huly and full qualification remain pending. This increment does not satisfy the
 complete manual-backend slice or promote an existing default.
+
+## Authenticated manual adapter migration
+
+The `stdio-http` adapter now requires `MCP_RESIDENT_ATTACHMENT_FILE`. It reads
+one protected descriptor and uses its generation capability on every actual TLS
+exchange. The plain endpoint and adapter bearer environment settings have been
+removed from source and fixtures. `docs/resident-manual.md` documents the two
+explicit package launch paths.
+
+`src/resident/attachment-exchange.ts` uses the installed Node HTTP client with
+the generation-authenticating HTTPS agent. It schema-encodes the MCP body,
+retains native routing headers and streams the response within the agent's
+scope. Closing that scope closes owned sockets even when a response body is
+unconsumed. No redirect or retry combinator is applied. The adapter retains
+per-host response ownership, cancellation and bounded input/output behavior.
+
+The wire descriptor schema describes package versions independently from the
+current package. Its derived compatibility schema pins this package's exact
+version for both readback and production publication. This lets process fixtures
+serialize descriptors for the actual built package without weakening admission
+or substituting the test source's development-version fallback.
+
+All old plain fixture callers now use the production TLS listener. The native
+process suite starts the actual `resident-http` package entrypoint and reads its
+published path. Separate modern and legacy SDK parents launch their own adapters
+without receiving Huly credentials or separate bearer environment settings.
+The suite verifies the private descriptor disappears after normal owned backend
+shutdown. The fixture backend's Huly endpoint is deliberately unavailable; these
+catalog/context checks are not real Huly read evidence.
+
+Validation:
+
+- `/tmp/resident-attachment-adapter-red.log`: the first attachment-selected
+  response fixture failed before migration because the old adapter did not
+  connect using the file; its disconnect observation timed out. This establishes
+  the missing selection path, not an existing TLS cleanup defect.
+- `/tmp/resident-attachment-adapter-first-tests.log`: all three migrated response
+  cleanup and overlapping-initialization checks pass.
+- `/tmp/resident-authenticated-adapter-process-tests.log`: 15 tests in four files
+  pass, including colliding IDs, cancellation, EOF, abrupt adapter death,
+  truncated responses, closed or unread stdout, and independent native parents.
+- `/tmp/resident-packaged-replacement-test.log`: the actual packaged adapter
+  refuses a plaintext replacement on the exact retired TLS port. The replacement
+  receives no bearer, channel-key bytes or operation name, and no reply reaches
+  stdio.
+- `/tmp/resident-authenticated-coherent-tests.log`: all 69 tests in ten affected
+  files pass, including the packaged replacement check and default-launch/HTTP
+  regressions. Existing response observation replays now exercise TLS fixtures.
+- `/tmp/resident-authenticated-coherent-typecheck.log`: 1,211 files checked with
+  zero TypeScript or Effect errors or warnings. Focused lint and complexity pass.
+- Fresh independent Standards and Spec reviews found no actionable defect in
+  this migrated attachment boundary.
+
+Private per-adapter admission, legacy-session ownership/release, shared-model
+waiter cancellation, actual Huly reads, full quality gate and platform
+qualification remain required. The six-issue goal remains incomplete.

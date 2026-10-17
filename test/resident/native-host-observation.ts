@@ -1,13 +1,13 @@
 import { Schema } from "effect"
+import { ResidentFilePath } from "../../src/resident/protected-path.js"
 
 export const HostName = Schema.Literals(["claude-code", "codex-mcp-client"])
 export const HostMode = Schema.Literals(["modern", "legacy"])
 export const NativeHostInput = Schema.Struct({
   bundle: Schema.NonEmptyString,
-  endpoint: Schema.URLFromString,
+  attachment: ResidentFilePath,
   host: HostName,
-  mode: HostMode,
-  authorization: Schema.RedactedFromValue(Schema.NonEmptyString)
+  mode: HostMode
 })
 export const NativeHostObservation = Schema.Struct({
   host: HostName,

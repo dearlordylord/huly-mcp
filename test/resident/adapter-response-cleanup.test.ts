@@ -1,24 +1,19 @@
-import { once } from "node:events"
-import { createServer } from "node:http"
 import { Cause, ConfigProvider, Deferred, Effect, Exit, Fiber, Layer, Stdio, Stream } from "effect"
 import { expect, it } from "vitest"
 
 import { runManualAdapter } from "../../src/resident/manual-adapter.js"
+import { startResidentFixture } from "../helpers/resident-fixture.js"
 
 const RESPONSE_BOUND = 5_000
 
 it("closes an unsupported live response before returning from the adapter scope", { timeout: 15_000 }, async () => {
   const disconnected = await Effect.runPromise(Deferred.make<void>())
-  const backend = createServer((_request, response) => {
+  const fixture = await startResidentFixture((_request, response) => {
     response.once("close", () => Effect.runSync(Deferred.succeed(disconnected, undefined)))
     response.writeHead(200, { "content-type": "text/html" })
     response.write("private backend payload")
-  })
-  backend.listen(0, "127.0.0.1")
-  await once(backend, "listening")
+  }, "private-fixture-auth")
   try {
-    const address = backend.address()
-    if (address === null || typeof address === "string") throw new Error("Expected an owned loopback listener")
     const request = new TextEncoder().encode(
       `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "server/discover" })}\n`
     )
@@ -27,12 +22,7 @@ it("closes an unsupported live response before returning from the adapter scope"
         Effect.provide(
           Layer.merge(
             Stdio.layerTest({ stdin: Stream.concat(Stream.make(request), Stream.never) }),
-            ConfigProvider.layer(
-              ConfigProvider.fromUnknown({
-                MCP_STDIO_BACKEND_URL: `http://127.0.0.1:${address.port}/mcp`,
-                MCP_AUTH_TOKEN: "private-fixture-auth"
-              })
-            )
+            ConfigProvider.layer(ConfigProvider.fromUnknown({ MCP_RESIDENT_ATTACHMENT_FILE: fixture.file }))
           )
         )
       )
@@ -40,34 +30,24 @@ it("closes an unsupported live response before returning from the adapter scope"
     expect(Exit.isFailure(exit)).toBe(true)
     await Effect.runPromise(Deferred.await(disconnected).pipe(Effect.timeout(RESPONSE_BOUND)))
   } finally {
-    backend.closeAllConnections()
-    await new Promise<void>((resolve, reject) => backend.close((error) => (error ? reject(error) : resolve())))
+    await fixture.cleanup()
   }
 })
 
 it("aborts an owned request interrupted before response headers arrive", { timeout: 15_000 }, async () => {
   const arrived = await Effect.runPromise(Deferred.make<void>())
   const disconnected = await Effect.runPromise(Deferred.make<void>())
-  const backend = createServer((_request, response) => {
+  const fixture = await startResidentFixture((_request, response) => {
     response.once("close", () => Effect.runSync(Deferred.succeed(disconnected, undefined)))
     Effect.runSync(Deferred.succeed(arrived, undefined))
-  })
-  backend.listen(0, "127.0.0.1")
-  await once(backend, "listening")
-  const address = backend.address()
-  if (address === null || typeof address === "string") throw new Error("Expected an owned loopback listener")
+  }, "private-fixture-auth")
   const request = new TextEncoder().encode('{"jsonrpc":"2.0","id":1,"method":"server/discover"}\n')
   const fiber = Effect.runFork(
     runManualAdapter.pipe(
       Effect.provide(
         Layer.merge(
           Stdio.layerTest({ stdin: Stream.concat(Stream.make(request), Stream.never) }),
-          ConfigProvider.layer(
-            ConfigProvider.fromUnknown({
-              MCP_STDIO_BACKEND_URL: `http://127.0.0.1:${address.port}/mcp`,
-              MCP_AUTH_TOKEN: "private-fixture-auth"
-            })
-          )
+          ConfigProvider.layer(ConfigProvider.fromUnknown({ MCP_RESIDENT_ATTACHMENT_FILE: fixture.file }))
         )
       )
     )
@@ -77,24 +57,19 @@ it("aborts an owned request interrupted before response headers arrive", { timeo
     await Effect.runPromise(Fiber.interrupt(fiber).pipe(Effect.timeout(RESPONSE_BOUND)))
     await Effect.runPromise(Deferred.await(disconnected).pipe(Effect.timeout(RESPONSE_BOUND)))
   } finally {
-    backend.closeAllConnections()
     await Effect.runPromise(Fiber.interrupt(fiber))
-    await new Promise<void>((resolve, reject) => backend.close((error) => (error ? reject(error) : resolve())))
+    await fixture.cleanup()
   }
 })
 
 it("rejects overlapping initialization before opening a second backend session", { timeout: 15_000 }, async () => {
   const arrived = await Effect.runPromise(Deferred.make<void>())
   let requests = 0
-  const backend = createServer(() => {
+  const fixture = await startResidentFixture(() => {
     requests += 1
     Effect.runSync(Deferred.succeed(arrived, undefined))
-  })
-  backend.listen(0, "127.0.0.1")
-  await once(backend, "listening")
+  }, "private-fixture-auth")
   try {
-    const address = backend.address()
-    if (address === null || typeof address === "string") throw new Error("Expected an owned loopback listener")
     const encode = (id: number) =>
       new TextEncoder().encode(`${JSON.stringify({ jsonrpc: "2.0", id, method: "initialize" })}\n`)
     const stdin = Stream.concat(
@@ -106,12 +81,7 @@ it("rejects overlapping initialization before opening a second backend session",
         Effect.provide(
           Layer.merge(
             Stdio.layerTest({ stdin }),
-            ConfigProvider.layer(
-              ConfigProvider.fromUnknown({
-                MCP_STDIO_BACKEND_URL: `http://127.0.0.1:${address.port}/mcp`,
-                MCP_AUTH_TOKEN: "private-fixture-auth"
-              })
-            )
+            ConfigProvider.layer(ConfigProvider.fromUnknown({ MCP_RESIDENT_ATTACHMENT_FILE: fixture.file }))
           )
         ),
         Effect.timeout(RESPONSE_BOUND)
@@ -120,7 +90,6 @@ it("rejects overlapping initialization before opening a second backend session",
     expect(Exit.isFailure(exit) && Cause.pretty(exit.cause)).toContain("initialization already started")
     expect(requests).toBe(1)
   } finally {
-    backend.closeAllConnections()
-    await new Promise<void>((resolve, reject) => backend.close((error) => (error ? reject(error) : resolve())))
+    await fixture.cleanup()
   }
 })

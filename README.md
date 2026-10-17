@@ -220,6 +220,12 @@ Use this exact command even when a newer Node.js version is active on the host. 
 exact Node.js versions certified by CI; this is intentionally narrower than the package's runtime requirement. See
 the [production release guide](docs/NPM_PRODUCTION_RELEASE.md) for preflight checks, rerun behavior, and verification.
 
+## Manual resident backend
+
+The experimental [manual resident backend path](docs/resident-manual.md) lets
+independent stdio hosts select one explicitly started local backend through a
+private attachment file. Full qualification remains pending.
+
 ## HTTP Transport
 
 By default, the server uses stdio transport. For HTTP transport:

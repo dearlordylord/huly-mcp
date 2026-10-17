@@ -11,7 +11,8 @@ NodeRuntime.runMain(
       error instanceof BackendResponseError
         ? error
         : new BackendResponseError({
-            message: "Adapter failed; check endpoint and local authorization. No request was replayed."
+            message:
+              "Adapter failed; check the private attachment file and backend generation. No request was replayed."
           })
     ),
     Effect.tapError((error) => Effect.sync(() => process.stderr.write(`Huly MCP manual adapter: ${error.message}\n`)))

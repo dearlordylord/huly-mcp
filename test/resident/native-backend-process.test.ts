@@ -3,6 +3,8 @@ import { once } from "node:events"
 import { dirname, join } from "node:path"
 import { createInterface } from "node:readline"
 import { promisify } from "node:util"
+import * as fs from "node:fs/promises"
+import { tmpdir } from "node:os"
 import { Client } from "@modelcontextprotocol/client"
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"
 import { Effect, Schema } from "effect"
@@ -14,16 +16,17 @@ import { NativeHostObservation } from "./native-host-observation.js"
 
 const PROCESS_BOUND = 30_000
 const RESPONSE_BOUND = 5_000
-const READY_PREFIX = "MCP HTTP server listening on "
-const AUTHORIZATION = "private-native-backend-fixture"
+const READY_PREFIX = "Resident attachment: "
 const PROTOCOL = "2026-07-28"
 const runFile = promisify(execFile)
 let bundle: Awaited<ReturnType<typeof buildIsolatedStdioServer>>
 let backend: ChildProcessWithoutNullStreams
-let endpoint: string
+let attachmentFile: string
+let stateDirectory: string
 
 beforeAll(async () => {
   bundle = await buildIsolatedStdioServer(PROCESS_BOUND)
+  stateDirectory = await fs.mkdtemp(join(await fs.realpath(tmpdir()), "resident-native-process-"))
   await runFile(
     "pnpm",
     [
@@ -40,10 +43,8 @@ beforeAll(async () => {
   backend = spawn(process.execPath, [bundle.path], {
     env: {
       ...testStdioEnvironment(),
-      MCP_TRANSPORT: "http",
-      MCP_HTTP_HOST: "127.0.0.1",
-      MCP_HTTP_PORT: "0",
-      MCP_AUTH_TOKEN: AUTHORIZATION,
+      MCP_TRANSPORT: "resident-http",
+      MCP_RESIDENT_STATE_DIRECTORY: stateDirectory,
       HULY_TOOL_MODE: "auto",
       HULY_URL: "http://127.0.0.1:1",
       HULY_WORKSPACE: "fixture",
@@ -54,11 +55,11 @@ beforeAll(async () => {
   const readiness = (async () => {
     for await (const line of lines) {
       if (line.startsWith(READY_PREFIX))
-        return Schema.decodeUnknownSync(Schema.URLFromString)(line.slice(READY_PREFIX.length)).href
+        return Schema.decodeUnknownSync(Schema.NonEmptyString)(line.slice(READY_PREFIX.length))
     }
     throw new Error("Owned native backend exited before announcing its listener")
   })()
-  endpoint = await Effect.runPromise(Effect.promise(() => readiness).pipe(Effect.timeout(RESPONSE_BOUND)))
+  attachmentFile = await Effect.runPromise(Effect.promise(() => readiness).pipe(Effect.timeout(RESPONSE_BOUND)))
 }, PROCESS_BOUND)
 
 afterAll(async () => {
@@ -76,6 +77,11 @@ afterAll(async () => {
     }
   }
   await bundle?.cleanup()
+  if (stateDirectory !== undefined) {
+    const remaining = await fs.readdir(stateDirectory)
+    await fs.rm(stateDirectory, { recursive: true, force: true })
+    expect(remaining).toEqual([])
+  }
 })
 
 describe("manual adapters against the packaged native HTTP backend", { timeout: PROCESS_BOUND }, () => {
@@ -84,8 +90,8 @@ describe("manual adapters against the packaged native HTTP backend", { timeout: 
       ["claude-code", "codex-mcp-client"].map(async (host) => {
         const { stdout } = await runFile(
           process.execPath,
-          [join(dirname(bundle.path), "native-host.cjs"), bundle.path, endpoint, host, mode],
-          { timeout: PROCESS_BOUND, env: { ...testStdioEnvironment(), MCP_AUTH_TOKEN: AUTHORIZATION } }
+          [join(dirname(bundle.path), "native-host.cjs"), bundle.path, attachmentFile, host, mode],
+          { timeout: PROCESS_BOUND, env: testStdioEnvironment() }
         )
         return Schema.decodeUnknownSync(Schema.fromJsonString(NativeHostObservation))(stdout)
       })
@@ -108,12 +114,7 @@ describe("manual adapters against the packaged native HTTP backend", { timeout: 
         command: process.execPath,
         args: [bundle.path],
         stderr: "pipe",
-        env: {
-          ...testStdioEnvironment(),
-          MCP_TRANSPORT: "stdio-http",
-          MCP_STDIO_BACKEND_URL: endpoint,
-          MCP_AUTH_TOKEN: AUTHORIZATION
-        }
+        env: { ...testStdioEnvironment(), MCP_TRANSPORT: "stdio-http", MCP_RESIDENT_ATTACHMENT_FILE: attachmentFile }
       })
       const client = new Client(
         { name, version: "1.0" },

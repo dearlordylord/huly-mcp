@@ -1,12 +1,12 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process"
 import { once } from "node:events"
-import { createServer } from "node:http"
 import { createInterface } from "node:readline"
 import { Schema } from "effect"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
 import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
+import { fixturePackageVersion, startResidentFixture } from "../helpers/resident-fixture.js"
 
 const PROCESS_BOUND = 30_000
 const EXIT_BOUND = 15_000
@@ -50,35 +50,34 @@ const stop = async (child: ChildProcessWithoutNullStreams) => {
 
 describe("manual adapter output ownership", { timeout: PROCESS_BOUND }, () => {
   it.each(["closed", "unread"])("bounds %s stdout while another host continues", async (mode) => {
-    const backend = createServer((request, response) => {
-      void (async () => {
-        expect(request.headers.authorization).toBe(`Bearer ${AUTHORIZATION}`)
-        request.setEncoding("utf8")
-        const chunks: Array<string> = []
-        for await (const chunk of request) chunks.push(Schema.decodeUnknownSync(Schema.String)(chunk))
-        const message = Schema.decodeUnknownSync(Schema.fromJsonString(Request))(chunks.join(""))
-        response.writeHead(200, { "content-type": "application/json" })
-        response.end(
-          JSON.stringify({
-            jsonrpc: "2.0",
-            id: message.id,
-            result: { text: message.params.uri === "blocked" ? "x".repeat(BODY_SIZE) : "survivor" }
-          })
-        )
-      })().catch(() => {
-        response.writeHead(500)
-        response.end()
-      })
-    })
-    backend.listen(0, "127.0.0.1")
-    await once(backend, "listening")
-    const address = backend.address()
-    if (address === null || typeof address === "string") throw new Error("Expected owned loopback listener")
+    const fixture = await startResidentFixture(
+      (request, response) => {
+        void (async () => {
+          expect(request.headers.authorization).toBe(`Bearer ${AUTHORIZATION}`)
+          request.setEncoding("utf8")
+          const chunks: Array<string> = []
+          for await (const chunk of request) chunks.push(Schema.decodeUnknownSync(Schema.String)(chunk))
+          const message = Schema.decodeUnknownSync(Schema.fromJsonString(Request))(chunks.join(""))
+          response.writeHead(200, { "content-type": "application/json" })
+          response.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: message.id,
+              result: { text: message.params.uri === "blocked" ? "x".repeat(BODY_SIZE) : "survivor" }
+            })
+          )
+        })().catch(() => {
+          response.writeHead(500)
+          response.end()
+        })
+      },
+      AUTHORIZATION,
+      await fixturePackageVersion()
+    )
     const environment = {
       ...testStdioEnvironment(),
       MCP_TRANSPORT: "stdio-http",
-      MCP_STDIO_BACKEND_URL: `http://127.0.0.1:${address.port}/mcp`,
-      MCP_AUTH_TOKEN: AUTHORIZATION
+      MCP_RESIDENT_ATTACHMENT_FILE: fixture.file
     }
     const blocked = spawn(process.execPath, [bundle.path], { env: environment })
     const survivor = spawn(process.execPath, [bundle.path], { env: environment })
@@ -109,8 +108,7 @@ describe("manual adapter output ownership", { timeout: PROCESS_BOUND }, () => {
     } finally {
       await Promise.all([stop(blocked), stop(survivor)])
       lines.close()
-      backend.closeAllConnections()
-      await new Promise<void>((resolve, reject) => backend.close((error) => (error ? reject(error) : resolve())))
+      await fixture.cleanup()
     }
   })
 })

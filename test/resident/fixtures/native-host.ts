@@ -1,6 +1,6 @@
 import { Client } from "@modelcontextprotocol/client"
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"
-import { Deferred, Effect, Redacted, Schema } from "effect"
+import { Deferred, Effect, Schema } from "effect"
 
 import { testStdioEnvironment } from "../../helpers/stdio-environment.js"
 import { NativeHostInput, NativeHostObservation } from "../native-host-observation.js"
@@ -10,21 +10,15 @@ const RESPONSE_BOUND = 5_000
 const main = async () => {
   const input = Schema.decodeUnknownSync(NativeHostInput)({
     bundle: process.argv[2],
-    endpoint: process.argv[3],
+    attachment: process.argv[3],
     host: process.argv[4],
-    mode: process.argv[5],
-    authorization: process.env["MCP_AUTH_TOKEN"]
+    mode: process.argv[5]
   })
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [input.bundle],
     stderr: "pipe",
-    env: {
-      ...testStdioEnvironment(),
-      MCP_TRANSPORT: "stdio-http",
-      MCP_STDIO_BACKEND_URL: input.endpoint.href,
-      MCP_AUTH_TOKEN: Redacted.value(input.authorization)
-    }
+    env: { ...testStdioEnvironment(), MCP_TRANSPORT: "stdio-http", MCP_RESIDENT_ATTACHMENT_FILE: input.attachment }
   })
   const client = new Client(
     { name: input.host, version: "1.0" },

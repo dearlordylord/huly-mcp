@@ -221,3 +221,14 @@ must enforce one writer for each immutable generation. No concurrent replacement
 of that generation's path is supported. A non-cooperating same-user writer can
 race the check, so the current helper does not prove unconditional replacement
 preservation. Managed locator replacement requires its own ownership protocol.
+
+## Authenticated adapter wiring
+
+The selected attachment path now connects the production `stdio-http` adapter
+to the production `resident-http` backend. `attachment-exchange.ts` owns one
+native Node HTTP exchange inside the authenticated TLS agent's scope. The old
+plain endpoint/token adapter path has been removed. Readback and publication
+still enforce exact package compatibility through a derived descriptor schema.
+The [manual launch guide](../resident-manual.md) documents explicit selection.
+This connection does not yet implement per-adapter admission or native session
+release, managed coordination, or full resident qualification.
