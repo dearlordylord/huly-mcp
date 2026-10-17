@@ -3,14 +3,39 @@ import { mkdtemp, readFile, readdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { promisify } from "node:util"
+import { fileURLToPath, pathToFileURL } from "node:url"
 
-import { expect, test } from "vitest"
+import { build } from "esbuild"
+import { afterAll, beforeAll, expect, test } from "vitest"
 
 import { Milliseconds, runBoundedCommand, processGroupCleanupFailure } from "../../scripts/run-bounded-command.js"
 
 const execFileAsync = promisify(execFile)
 const COMMAND_TIMEOUT = Milliseconds.make(2_000)
 const PROCESS_TEST_TIMEOUT_MS = 30_000
+
+let runnerBundleUrl: string
+let runnerBundleDirectory: string | undefined
+
+beforeAll(async () => {
+  runnerBundleDirectory = await mkdtemp(join(tmpdir(), "hulymcp-bounded-runner-"))
+  const outfile = join(runnerBundleDirectory, "runner.mjs")
+  // This test bounds process custody, not cold tsx/Effect module loading.
+  // Compile the real runner before the unchanged five-second test budget.
+  await build({
+    entryPoints: [fileURLToPath(new URL("../../scripts/run-bounded-command.ts", import.meta.url))],
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    outfile,
+    logLevel: "silent"
+  })
+  runnerBundleUrl = pathToFileURL(outfile).href
+})
+
+afterAll(async () => {
+  if (runnerBundleDirectory !== undefined) await rm(runnerBundleDirectory, { recursive: true, force: true })
+})
 
 test("keeps permission-denied cleanup unconfirmed without hiding other failures", () => {
   const permission = Object.assign(new Error("kill EPERM"), { code: "EPERM" })
@@ -127,16 +152,21 @@ test.skipIf(process.platform === "win32")(
   async () => {
     const directory = await mkdtemp(join(tmpdir(), "hulymcp-bounded-command-"))
     const pidFile = join(directory, "descendant.pid")
-    const resistantDescendant = "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)"
+    const readyFile = join(directory, "descendant.ready")
+    const resistantDescendant = "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000); process.send('ready')"
     const leader = `
       const { spawn } = require("node:child_process")
       const { writeFileSync } = require("node:fs")
       const descendant = spawn(
         process.execPath,
         ["-e", ${JSON.stringify(resistantDescendant)}],
-        { stdio: "ignore" }
+        { stdio: ["ignore", "ignore", "ignore", "ipc"] }
       )
       writeFileSync(${JSON.stringify(pidFile)}, String(descendant.pid))
+      descendant.once('message', () => {
+        writeFileSync(${JSON.stringify(readyFile)}, 'ready')
+        descendant.disconnect()
+      })
       process.on("SIGTERM", () => process.exit(0))
       setInterval(() => {}, 1000)
     `
@@ -144,14 +174,15 @@ test.skipIf(process.platform === "win32")(
     try {
       const custodyDirectory = join(directory, "custody")
       const program = `
-      const {runBoundedCommand,Milliseconds}=await import('./scripts/run-bounded-command.ts');
+      const {runBoundedCommand,Milliseconds}=await import(${JSON.stringify(runnerBundleUrl)});
       try { await runBoundedCommand({executable:process.execPath,args:['-e',${JSON.stringify(leader)}],name:'resistant descendant fixture',timeoutMilliseconds:Milliseconds.make(${COMMAND_TIMEOUT}),terminationGraceMilliseconds:Milliseconds.make(100)}); }
       catch(error) { console.log(error.message); }
     `
-      const { stdout } = await execFileAsync(process.execPath, ["--import", "tsx", "--eval", program], {
+      const { stdout } = await execFileAsync(process.execPath, ["--input-type=module", "--eval", program], {
         env: { ...process.env, MOVEMENT_CUSTODY_DIR: custodyDirectory }
       })
       expect(stdout).toContain("resistant descendant fixture exceeded 2 seconds")
+      expect(await readFile(readyFile, "utf8")).toBe("ready")
       expect(await readdir(custodyDirectory)).toEqual([])
 
       const descendantPid = Number(await readFile(pidFile, "utf8"))
