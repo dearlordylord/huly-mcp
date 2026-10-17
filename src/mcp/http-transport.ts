@@ -86,6 +86,7 @@ export class HttpTransportError extends Schema.TaggedError<HttpTransportError>()
  * of the application protocol.
  */
 export interface HttpServerFactory {
+  readonly protocol?: "http" | "https"
   readonly make: (
     port: HttpPort,
     host: HttpHost,
@@ -207,8 +208,8 @@ export const httpPolicyMiddleware =
       )(httpEffect)
     })
 
-const formatHttpAddress = (address: HttpServer.HttpServer["Service"]["address"]): string =>
-  `${HttpServer.formatAddress(address)}/mcp`
+const formatHttpAddress = (address: HttpServer.HttpServer["Service"]["address"], protocol: "http" | "https"): string =>
+  `${HttpServer.formatAddress(address).replace(/^http:/u, `${protocol}:`)}/mcp`
 
 const errorMessage = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause))
 
@@ -288,7 +289,9 @@ export const startHttpTransport = <A, E>(
               yield* server.serve(app, transportMiddleware(config))
               if (config.onReady !== undefined) yield* config.onReady()
               yield* Effect.sync(() =>
-                writeError(`MCP HTTP server listening on ${formatHttpAddress(server.address)}\n`)
+                writeError(
+                  `MCP HTTP server listening on ${formatHttpAddress(server.address, factory.protocol ?? "http")}\n`
+                )
               )
               yield* config.shutdown ?? Effect.never
             })

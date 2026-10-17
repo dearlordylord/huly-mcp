@@ -251,3 +251,22 @@ Independent Standards and Spec reviews reported no new actionable findings for
 this increment. The backend still uses an unavailable fixture Huly endpoint,
 so live Huly reads and shared acquisition remain pending. The separate-parent
 metadata evidence does not certify the full #323 criterion or later tickets.
+
+## Authenticated listener primitive
+
+The [attachment design](resident-attachment-design.md) records the selected
+generation-authenticated channel, alternatives, failed probes and remaining
+qualification. A scoped TLS agent and native HTTPS listener factory now serve
+actual native MCP context calls, reject wrong keys/generations and close pending
+handshakes on interruption. A plaintext listener replacing the retired native
+listener on the same port receives no reusable authorization, channel key or
+operation bytes. Ordinary direct HTTP and Unix-socket reporting remain covered.
+
+The production manual launcher is not wired to the primitive yet. Protected
+attachment selection/publication, attachment/session ownership and the remaining
+full issue requirements remain unfinished. Current transport evidence is in
+`/tmp/resident-tls-coherent-tests.log` (59 affected tests) and
+`/tmp/resident-tls-same-port-replacement.log` (the additional same-port check).
+`/tmp/resident-tls-coherent-typecheck.log` reports 1,204 files and zero errors or
+warnings. Full quality gate, live Huly and native platform certification remain
+pending.
