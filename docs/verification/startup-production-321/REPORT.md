@@ -34,9 +34,11 @@ The default MCP SDK client compiles every cached output schema on its first `cal
 
 ## Validation status
 
+Current version bump, exact-artifact comparison, actual Codex checks and all full-suite outcomes are recorded in [release qualification](RELEASE-QUALIFICATION.md). Full release qualification retains failures; the earlier measurements below do not supersede them.
+
 Focused lifecycle, metadata, projects, recovery and lazy-handler checks pass. The complete quality gate and final build measurements are recorded below. No quality threshold, timeout, expected catalog, or external dependency inventory has been relaxed.
 
-The local-Huly comparison is read-only. Whole-server/CLI mutation campaigns are now authorized and their release-candidate results will be recorded separately. Actual Codex desktop invocation remains a separate host qualification. An earlier native integration run reached 102 passing checks before being stopped on an older candidate; it is not final integration evidence.
+The local-Huly comparison is read-only. Whole-server/CLI mutation campaigns and actual Codex host qualification are completed with outcomes recorded in the linked release report. An earlier native integration run reached 102 passing checks before being stopped on an older candidate; it is not final integration evidence.
 
 ## Review
 

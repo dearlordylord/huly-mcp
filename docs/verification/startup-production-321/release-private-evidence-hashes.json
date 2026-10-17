@@ -1,0 +1,107 @@
+[
+  {
+    "artifact": "huly321-release-current-movement-runner-2.log",
+    "sha256": "60848ea606462502d18d7c362816f0dd53c661bab9696845a62c5a4470d339e1",
+    "bytes": 644
+  },
+  {
+    "artifact": "huly321-release-current-tree-runner.log",
+    "sha256": "0f2d2bf836325ae5e64c0580edb20ee68bd249ab86ffe7473ef873f659a67505",
+    "bytes": 60
+  },
+  {
+    "artifact": "huly321-release-current-movement-fixture-runner.log",
+    "sha256": "0f2d2bf836325ae5e64c0580edb20ee68bd249ab86ffe7473ef873f659a67505",
+    "bytes": 60
+  },
+  {
+    "artifact": "huly321-release-current-attributes.log",
+    "sha256": "fd1fe1052235f7e0a06719faf9ef969973114161da822b05b74dc75046244f18",
+    "bytes": 38736
+  },
+  {
+    "artifact": "huly321-release-current-attributes-runner.log",
+    "sha256": "0f2d2bf836325ae5e64c0580edb20ee68bd249ab86ffe7473ef873f659a67505",
+    "bytes": 60
+  },
+  {
+    "artifact": "huly321-release-current-movement-fixture.log",
+    "sha256": "092749647436e3845ab9348d396227b87215082e836b47cfdc92abb863dcdb60",
+    "bytes": 11180
+  },
+  {
+    "artifact": "huly321-release-current-transfer-runner.log",
+    "sha256": "0f2d2bf836325ae5e64c0580edb20ee68bd249ab86ffe7473ef873f659a67505",
+    "bytes": 60
+  },
+  {
+    "artifact": "huly321-release-current-movement-runner.log",
+    "sha256": "2ded31a72d251238ba267358a814a319c62b8a0a0fd3b31429286f4c78d479b1",
+    "bytes": 528
+  },
+  {
+    "artifact": "huly321-release-current-transfer.log",
+    "sha256": "27ec35113d867d422c7eb5d4bba2c7352ef10cfb0b3f4f13d3704852b404a41c",
+    "bytes": 38309
+  },
+  {
+    "artifact": "huly321-release-current-tree.log",
+    "sha256": "e25a9fa4281f5b31737705fd302fd81026993f4f5701dfbab42140700f7a3195",
+    "bytes": 56642
+  },
+  {
+    "artifact": "huly321-release-current-movement-plan.log",
+    "sha256": "d9f445ed70a69a935b1340a11a5f0c340c042c7083a3937e8e4f4aaf96e932e1",
+    "bytes": 569
+  },
+  {
+    "artifact": "huly321-release-native-recovered-full.log",
+    "sha256": "df6286a3aa0b50138913a2cf7f6b8558e1631c64820bd12975a209f13ab76b9d",
+    "bytes": 81686
+  },
+  {
+    "artifact": "huly321-release-http-env-full.log",
+    "sha256": "6f07b7968f8b9bb8800258aa0f91f16970d9bd4dacc72ffb7c8275e29692a970",
+    "bytes": 107015
+  },
+  {
+    "artifact": "huly321-release-http-headers-full.log",
+    "sha256": "9febb1c8fad8cc6ef8b9ba4da0448b417068c9bc8f4a908144dafe39c5b9a0ae",
+    "bytes": 107694
+  },
+  {
+    "artifact": "huly321-release-cli-full.log",
+    "sha256": "b22a8716003695f095fd9688a14e248c502ed19bc9b5a8ecf53a44eee1f8ea0e",
+    "bytes": 81611
+  },
+  {
+    "artifact": "huly321-release-cli-focused.log",
+    "sha256": "63884d65a4e11a66c30f4a4e6c1e056336fd04400e20b338a0834da7fd9be368",
+    "bytes": 11493
+  },
+  {
+    "artifact": "huly321-release-tool-scope.log",
+    "sha256": "0cf10a547fb87908461aeb40daeafe13a2eb8f06432f02636e85c2ceaddc024d",
+    "bytes": 902
+  },
+  {
+    "artifact": "huly321-release-profiles-file-isolated.log",
+    "sha256": "4cf75770f90b2f757e4eed45cc7ba11e3998bcdde971d4ee89944baed0f07ab3",
+    "bytes": 501
+  },
+  {
+    "artifact": "huly321-release-profiles-file-relative.log",
+    "sha256": "fe8d39db272ba4b86950fd4ef595f0d04f40dbc87ced0afdd1e9bbc296940b48",
+    "bytes": 375
+  },
+  {
+    "artifact": "issue_movement_concurrency-1792205452065.log",
+    "sha256": "7114bc11e355fdeee8305a2b40273ceb80b79edf208e252d92395d4b5e5edfb6",
+    "bytes": 35335
+  },
+  {
+    "artifact": "comparison-attempt-1.json",
+    "sha256": "c840e6355cc3230fe7c49ca82f21a4a1f5e27f1de8f4f03f2696e3f94077cabc",
+    "bytes": 6266
+  }
+]

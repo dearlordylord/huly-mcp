@@ -1,0 +1,18 @@
+{
+  "threadStartMilliseconds": 683.5922499999999,
+  "statusMilliseconds": 1122.188583,
+  "toolCount": 6,
+  "runtimeStatus": "connected",
+  "serverInfo": {
+    "name": "huly-mcp",
+    "title": null,
+    "version": "0.54.0",
+    "description": null,
+    "icons": null,
+    "websiteUrl": null
+  },
+  "firstReadMilliseconds": 391.3717919999999,
+  "projectCount": 8,
+  "businessReadPassed": true,
+  "method": "Actual running Codex app-server; thread-scoped ephemeral configuration; toolsAndAuthOnly status, one read; no global reload/config edit or model turn; uncontrolled single compatibility observation"
+}

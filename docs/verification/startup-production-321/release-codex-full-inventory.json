@@ -1,0 +1,18 @@
+{
+  "instrumented": true,
+  "method": "Actual running Codex, separate full-inventory diagnostic, isolated ephemeral thread, no model turn/global reload. V8 evaluation coverage; phase timings are instrumented compatibility observations, not latency benchmarks.",
+  "serverVersion": "0.54.0",
+  "toolCount": 6,
+  "resourceCount": 8,
+  "resourceTemplateCount": 3,
+  "providerCount": 5,
+  "passed": true,
+  "subscription": "unsubscribed",
+  "ownedMcpStopped": true,
+  "registeredGroupCount": 59,
+  "evaluatedToolGroups": [
+    "src/mcp/tools/notifications.ts",
+    "src/mcp/tools/projects.ts"
+  ],
+  "ownedThreadUnloaded": true
+}
