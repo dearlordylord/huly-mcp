@@ -8,6 +8,8 @@ const portTestFiles = [
   'test/utils/**/*.test.ts',
 ]
 
+const residentLaunchTestFiles = ['test/resident/managed-backend-process.test.ts']
+
 export default defineConfig({
   test: {
     globals: true,
@@ -22,8 +24,18 @@ export default defineConfig({
     projects: [
       {
         test: {
+          name: 'resident-launch',
+          include: residentLaunchTestFiles,
+          isolate: true,
+          // Ten independent parents already compete inside this fixture; keep unrelated suites out of its deadline.
+          sequence: { groupOrder: 0 },
+        },
+      },
+      {
+        test: {
           name: 'ports',
           include: portTestFiles,
+          sequence: { groupOrder: 1 },
           // The oracle adapter registers its guard at import, so it needs a fresh module graph per file.
           isolate: Boolean(process.env.QUINT_ORACLE_URL?.trim()),
         },
@@ -32,8 +44,9 @@ export default defineConfig({
         test: {
           name: 'boundaries',
           include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
-          exclude: portTestFiles,
+          exclude: [...portTestFiles, ...residentLaunchTestFiles],
           isolate: true,
+          sequence: { groupOrder: 1 },
         },
       },
     ],

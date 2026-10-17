@@ -153,6 +153,88 @@ their local failed flag probe remain in
 Node >=22.19.0; stale Node20 framing in the initial design prompt is corrected in
 the maintained decision.
 
+## Restricted packaged SDK experiment
+
+The test-only `restricted-native-process` fixture runs the actual packaged
+`resident-http` backend under Node permissions, with native addons disabled.
+An awaited import preload exercises child-process creation, Worker creation,
+addon loading, WASI construction and inspector opening. All five must be denied
+before the application entrypoint runs. No production launch policy changes.
+
+A real SDK stdio adapter then calls `list_projects` twice through the native MCP
+backend. A disposable loopback HTTP server implements the installed SDK's config,
+workspace selection, account, full-model and project-query protocol. Schemas own
+the fixture payloads. The actual pinned Huly SDK requests `full=true` and constructs
+its model once; both project reads return the expected empty result. This uses an
+empty synthetic model, not a real workspace or representative large model.
+
+The fixture observes every backend kernel task's child list, kills only its own
+backend handle, joins closure, requires the old port to refuse TCP connection and
+checks retained registry bytes. The existing Linux subreaper independently joins
+descendants. The probe creates and aborts only its own socket. No metadata PID or
+foreign listener is signalled.
+
+The unrestricted control removes the permission policy while retaining
+`--no-addons`. Actual child, Worker, WASI and inspector probes then succeed, and
+the preload refuses application startup. The test requires a normal failure exit,
+empty stdout and no publication, excluding timeout/signal termination. This checks
+that the denial probe is capable of falsifying the proposed policy.
+
+The initial control incorrectly kept filesystem grant flags without enabling
+permissions; Node rejects that CLI before running the probe. That failed attempt
+is preserved in `/tmp/resident-restricted-native-controlled.log`, with its bundle
+and root retained. The corrected control removes the dependent grant flags too.
+Initial typechecking also catches an unparsed SDK structured-content access;
+the result envelope is now parsed before use.
+
+Both cases pass on Linux arm64 with Node 24.20.0, 22.22.2 and the declared minimum
+22.19.0. Receipts are respectively
+`/tmp/resident-restricted-native-5RKJe5.receipt.json`,
+`/tmp/resident-restricted-native-lcBAMm.receipt.json`, and
+`/tmp/resident-restricted-native-oNRu2M.receipt.json`. Logs are
+`/tmp/resident-restricted-native-closure-node24.log`,
+`/tmp/resident-restricted-native-closure-node22.log`, and
+`/tmp/resident-restricted-native-minimum-node22.log`.
+The isolated Node 22.19.0 archive matches its
+[official checksum](https://nodejs.org/dist/v22.19.0/SHASUMS256.txt):
+`0b2d9f564b6594222a62c82e1df2efe119dd4a4aff29644f4dd325bf360b6bcc`.
+Dependencies and host configuration are unchanged.
+
+Both scoped reviews find no actionable defect. TypeScript and Effect diagnostics
+pass in `/tmp/resident-restricted-native-closure-typecheck.log`. The full gate
+passes at the checkpoint recorded below. This experiment does not qualify inherited
+IPC handle transfer, guardian control, ownership-file write isolation, durable
+uncertainty, verified replacement, live Huly or native macOS/Windows behavior.
+Filesystem reads and writes are unrestricted in this experiment. The recovery
+design remains conditional on the remaining premises.
+
+## Checkpoint before pause, 2026-10-17
+
+The first full gate for the restricted experiment fails in the existing ten-parent
+launch race. The new restricted cases pass. The preserved log is
+`/tmp/resident-restricted-native-frozen-check-all.log`, SHA-256
+`585f7305067808cd1d0a56a51933e9f96f34b29cbfea2f773de40094263e44b8`.
+Nine parents reach their five-second SDK connection deadline. The remaining parent
+connects after 5,029 ms. These observations do not establish the cause.
+
+The harness now runs the same ten-parent file in a dedicated `resident-launch`
+project before unrelated suites. Vitest's installed `sequence.groupOrder` API
+orders the projects. All ten parents, deadlines, assertions, retries and coverage
+settings are unchanged. Before and after `vitest list --filesOnly --json=...`
+inventories contain the same 458 files exactly once; only that project's assignment
+changes. This arrangement controls competing suite work but does not prove that
+contention caused the earlier failure or provide performance qualification.
+
+`GOMAXPROCS=2 pnpm check-all` passes on the frozen executable candidate:
+458 files, 5,647 tests; statements 99.45%, branches 99%, functions 99%, lines 99.56%.
+The log is `/tmp/resident-scheduled-launch-check-all.log`, SHA-256
+`30c4c9b210f77b432b95bdd0ee3f1f5f3db7b41a93e09d6e7a4e5b9821a78281`.
+The packaged MCP bundle SHA-256 is
+`a6c463c658dc49c20d59b62a9ec4fa1da812f8a0317b68914faf79ed4072fb59`.
+Fresh Standards and Spec reviews find no actionable issue in the experiment or
+scheduling change. This checkpoint completes neither #327 nor the six-ticket goal.
+The [pause handoff](HANDOFF-resident-mcp-323-328.md) records the resume boundary.
+
 ## Remaining qualification
 
 Complete crash timing schedules, verified replacement with concurrent callers,
