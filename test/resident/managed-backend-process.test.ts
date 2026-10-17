@@ -12,6 +12,7 @@ import { ManagedParentObservation } from "./managed-observation.js"
 
 const PROCESS_BOUND = 30_000
 const runFile = promisify(execFile)
+const ProcessFailure = Schema.Struct({ stderr: Schema.String })
 
 describe.skipIf(process.platform !== "linux")("managed native backend", () => {
   let bundle: Awaited<ReturnType<typeof buildIsolatedStdioServer>>
@@ -63,7 +64,13 @@ describe.skipIf(process.platform !== "linux")("managed native backend", () => {
         "python3",
         ["test/resident/fixtures/reap-descendants.py", process.execPath, race, bundle.path, host, root],
         { timeout: PROCESS_BOUND, env: testStdioEnvironment() }
-      )
+      ).catch(async (error: unknown) => {
+        if (Schema.is(ProcessFailure)(error))
+          await fs.writeFile(`${root}.phases.log`, error.stderr, { mode: 0o600, flag: "wx" }).catch(() => {
+            process.stderr.write("Managed launch failure phases could not be saved\n")
+          })
+        throw error
+      })
       await fs.writeFile(`${root}.phases.log`, stderr, { mode: 0o600, flag: "wx" })
       const observation = Schema.decodeUnknownSync(Schema.fromJsonString(ManagedParentObservation))(stdout)
       expect(observation.parents).toHaveLength(10)

@@ -40,3 +40,31 @@ as instructed by the user. No publishing, default promotion, OS service, global
 host configuration change or prototype deletion is authorized by these receipts.
 The current recovery policy has no durable operation journal or automatic replay;
 unresolved owner loss remains bounded refusal until verified local retirement.
+
+## Ten-parent launch diagnosis (2026-10-17, continued)
+
+At production checkpoint `39c2339b`, the unchanged ten-parent process suite
+failed again before any parent completed connection. All ten parent phase logs
+reached their existing five-second connection limit. The preserved run is
+`/tmp/resident-ten-parent-current-diagnosis.log`, SHA-256
+`3fd5b9c76e1ebf8e0f4fd8cfc9d4aaafd330a79555792fe8bab589d17931c46d`;
+its isolated bundle remains `dist/stdio-suite-ddJSdZ`.
+
+A separate scratch copy added file markers before and after bundle evaluation,
+without changing deadlines or callers. That run completed, with evidence under
+`/tmp/resident-ten-parent-stages-etcvx1ug`. It changes the artifact and therefore
+is diagnostic evidence only, not production qualification. Its success does not
+explain the preceding failure or establish that bundle evaluation is the cause.
+The SDK disposable version-probe process suppresses stderr, so existing parent
+logs do not identify the internal connection stage responsible for the failure.
+
+The process test now also saves its private phases log on subprocess failure,
+instead of saving it only on success. Publication failure emits a static warning
+and preserves the original subprocess exception. The subsequent focused run
+passed with the unchanged deadlines and all ten callers; log
+`/tmp/resident-ten-parent-retained-diagnostics.log`, SHA-256
+`2fe60c45ed5b8d3e64229a6251b7d633460751740d7b99985520c92984e46ba2`,
+and receipt `/tmp/resident-managed-parents-91VfaN.receipt.json`.
+This passing run did not exercise the new failure-publication branch. The launch
+reliability issue remains unresolved; no deadline, caller count, production path
+or acceptance requirement was relaxed.

@@ -187,3 +187,11 @@ The focused run passed 17 tests; successful cleanup permits a fresh generation,
 while failed cleanup preserves ownership and refuses replacement. These are
 embedded-backend DI fixtures, not real Huly mutation/cleanup certification.
 All six tickets and their remaining qualification stay open.
+
+## Latest ten-parent diagnostic checkpoint
+
+The original production launch failed again, then a scratch instrumented run and
+a subsequent production run passed. See the [qualification report](issue-328.md#ten-parent-launch-diagnosis-2026-10-17-continued)
+for retained artifacts. Do not interpret either pass as a reliability fix. The
+only test change preserves a private phases log on subprocess failure and keeps
+the original exception if publication fails. All deadlines/callers are unchanged.
