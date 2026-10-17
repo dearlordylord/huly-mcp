@@ -15,6 +15,7 @@ import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { residentSelectionEnvironment } from "../helpers/resident-selection-environment.js"
 import { NativeHostObservation } from "./native-host-observation.js"
+import { exercisePackagedProfileLifecycle } from "./profile-lifecycle-fixture.js"
 
 const PROCESS_BOUND = 30_000
 const RESPONSE_BOUND = 5_000
@@ -89,6 +90,15 @@ afterAll(async () => {
 })
 
 describe("manual adapters against the packaged native HTTP backend", { timeout: PROCESS_BOUND }, () => {
+  it.skipIf(process.platform !== "linux")(
+    "keeps admitted profile authority through saved-profile changes",
+    async () => {
+      await exercisePackagedProfileLifecycle(bundle.path, attachmentFile)
+      expect(backend.exitCode).toBeNull()
+      expect(backend.signalCode).toBeNull()
+    }
+  )
+
   it("refuses another identity, policy, or missing selection before admitting an MCP session", async () => {
     const base = residentSelectionEnvironment()
     for (const selected of [

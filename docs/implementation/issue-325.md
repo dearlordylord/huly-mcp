@@ -168,6 +168,62 @@ the earlier formatting failure is preserved in
 `/tmp/resident-selection-wiring-check-all-corrected.log`. No production source
 changed after the final gate. No threshold, diagnostic or timeout was weakened.
 
+## Saved-profile lifecycle through packaged adapters
+
+The Linux packaged fixture now uses an isolated default XDG profile store and an
+actual explicit resident backend. An admitted SDK adapter retains its catalog and
+context response while saved credentials rotate, logout removes credentials,
+URL/workspace changes replace the destination, and the profile is deleted.
+Fresh adapters exit with failure after each change. Selecting another valid
+profile or a missing profile also fails. Restoring the original profile permits
+another attachment alongside the existing adapter.
+
+This defines the current capture policy: changes affect future attachments;
+already-admitted adapters retain their captured authority until their own
+retirement. They do not acquire replacement credentials from later file changes.
+The fixture exercises metadata/context calls without acquiring a Huly model. Live
+Huly operations and reconciliation remain pending.
+
+Review found that SDK connection errors could let a timeout count as refusal and
+that SDK `close()` alone did not confirm child closure. Refused adapters now use
+owned subprocess callbacks and schema-parsed failure exits, empty protocol stdout,
+specific diagnostics and credential-disclosure checks. SDK clients join an
+installed close barrier before fixture cleanup.
+
+The stronger diagnostic check exposes a production defect: manual adapter startup
+erases the profile's no-credentials error. The corrected failing run is
+`/tmp/resident-profile-diagnostics-corrected-red.log`. The entrypoint now preserves
+typed `CliProfileStoreError` diagnostics, matching the managed entrypoint, while
+unexpected failures retain the static fallback. The focused packaged case passes
+in `/tmp/resident-profile-diagnostics-green.log`. The earlier initial diagnostic
+run expected the wrong incompatibility wording and is retained separately in
+`/tmp/resident-profile-diagnostics-red.log`.
+
+The first frozen full gate passes 457 files and 5,637 tests at all unchanged
+coverage thresholds (`/tmp/resident-profile-lifecycle-frozen-check-all.log`).
+Review then strengthens refusal evidence to require `killed: false` and
+`signal: null`, excluding timeout-driven termination that exits with code 1.
+The fresh full gate fails the existing ten-parent race's five-second coordinator
+wait (`/tmp/resident-profile-lifecycle-final-check-all.log`); the profile lifecycle
+case passes. This failure is retained and is not replaced by the earlier pass.
+
+Parent phase logs now include process IDs and Effect monotonic timestamps, with
+a matching coordinator wait timestamp. No deadline or case changes. The focused
+correlated race passes (`/tmp/resident-managed-race-correlated-focused.log`), but
+this does not resolve the intermittent full-gate failure. Both reviews find no
+remaining scoped defect in the final diagnostics and fixture changes.
+
+The final frozen full gate passes 457 files and 5,637 tests: statements 99.45%,
+branches 99%, functions 99%, lines 99.56%, duplication 0.91%. All existing
+diagnostics and limits remain enabled. Its receipt is
+`/tmp/resident-profile-correlated-check-all.log`, SHA-256
+`fa6e15c82d61cfc8d2c10160f799f5b98a2243bd7171260877427d6e42fe2886`.
+The packaged `dist/index.cjs` SHA-256 is
+`850fc38557c6b433344b764a0701230395a3f1b31d9c2a0c0f7c6e06eea0bc63`.
+The ten-parent process receipt is
+`/tmp/resident-managed-parents-oeICRP.receipt.json`.
+This pass does not establish that the intermittent launch-race failure is fixed.
+
 These are explicit startup and comparison checks. Automatic ownership/startup,
 complete profile lifecycle qualification, live Huly sharing and final native OS
 and resource certification remain pending. No issue is complete.

@@ -13,9 +13,11 @@ const RESPONSE_BOUND = 5_000
 const Input = Schema.Struct({ bundle: ResidentPackagePath, directory: ResidentDirectory, host: HostName })
 const Command = Schema.Literals(["read", "close"])
 const Phase = Schema.Struct({
+  parentPid: ManagedParentConnected.fields.parentPid,
   host: HostName,
   phase: Schema.Literals(["connecting", "connected", "observing", "observed", "closing", "closed", "failed"]),
-  elapsedMillis: Schema.Number
+  elapsedMillis: Schema.Number,
+  monotonicMillis: Schema.Number
 })
 const NANOS_PER_MILLISECOND = 1_000_000n
 
@@ -30,9 +32,11 @@ const main = async () => {
     const now = await Effect.runPromise(Clock.monotonicTimeNanos)
     process.stderr.write(
       `${Schema.encodeSync(Schema.fromJsonString(Phase))({
+        parentPid: process.pid,
         host: input.host,
         phase: state,
-        elapsedMillis: Number((now - started) / NANOS_PER_MILLISECOND)
+        elapsedMillis: Number((now - started) / NANOS_PER_MILLISECOND),
+        monotonicMillis: Number(now / NANOS_PER_MILLISECOND)
       })}\n`
     )
   }

@@ -4,7 +4,7 @@ import { once } from "node:events"
 import * as fs from "node:fs/promises"
 import { join } from "node:path"
 import { createInterface } from "node:readline"
-import { Effect, Schedule, Schema } from "effect"
+import { Clock, Effect, Schedule, Schema } from "effect"
 
 import { ResidentPackagePath, ResidentRegistryEnvelope } from "../../../src/resident/managed-contract.js"
 import { ResidentDirectory } from "../../../src/resident/protected-path.js"
@@ -20,6 +20,13 @@ const EXIT_POLL_MILLIS = 25
 const SESSION_HOLD_MILLIS = 11_000
 const Input = Schema.Struct({ bundle: ResidentPackagePath, fixture: ResidentPackagePath, directory: ResidentDirectory })
 const MissingProcess = Schema.Struct({ code: Schema.Literal("ESRCH") })
+const ConnectionWait = Schema.Struct({
+  phase: Schema.Literal("await-connections"),
+  coordinatorPid: ManagedParentConnected.fields.parentPid,
+  parentPids: Schema.Array(ManagedParentConnected.fields.parentPid),
+  monotonicMillis: Schema.Number
+})
+const NANOS_PER_MILLISECOND = 1_000_000n
 const absent = (pid: number) => {
   try {
     process.kill(pid, 0)
@@ -66,6 +73,14 @@ const main = async () => {
   let report: Schema.Schema.Type<typeof ManagedParentObservation> | undefined
   try {
     process.stderr.write("Managed race: waiting for ten connections\n")
+    process.stderr.write(
+      `${Schema.encodeSync(Schema.fromJsonString(ConnectionWait))({
+        phase: "await-connections",
+        coordinatorPid: process.pid,
+        parentPids: parents.flatMap(({ child }) => (child.pid === undefined ? [] : [child.pid])),
+        monotonicMillis: Number((await Effect.runPromise(Clock.monotonicTimeNanos)) / NANOS_PER_MILLISECOND)
+      })}\n`
+    )
     await Promise.all(parents.map((parent) => parent.connected()))
     process.stderr.write("Managed race: waiting for ten observations\n")
     const observations = await Promise.all(

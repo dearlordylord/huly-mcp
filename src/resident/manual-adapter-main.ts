@@ -1,6 +1,7 @@
 import { NodeRuntime, NodeStdio } from "@effect/platform-node"
 import { Effect } from "effect"
 
+import { CliProfileStoreError } from "../profiles/model.js"
 import { runManualAdapter } from "./manual-adapter.js"
 import { captureManualResidentSelection } from "./selection-config.js"
 import { BackendResponseError } from "./response-stream.js"
@@ -13,7 +14,7 @@ NodeRuntime.runMain(
   }).pipe(
     Effect.provide(NodeStdio.layer),
     Effect.mapError((error) =>
-      error instanceof BackendResponseError
+      error instanceof BackendResponseError || error instanceof CliProfileStoreError
         ? error
         : new BackendResponseError({
             message:
