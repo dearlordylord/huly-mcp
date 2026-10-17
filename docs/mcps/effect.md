@@ -22,13 +22,18 @@ The installed target cohort is:
 
 The installed `effect` package includes the tracked
 `patches/effect@4.0.0.patch` extension. The pnpm lockfile records patch
-hash `583f1592041bd3cbff9dfc3f99b63c6f3a33410e4b22579e7d774074645a5755`.
+hash `8f77f9bbb337b5fb1f625e1a77aea5eb46cc094c1adb5fe9e657a6b053ec9e7b`.
 The extension keeps the native 4.0.0 transports and protocol codecs while
 adding the application hooks required to preserve this server's established
 MCP behavior:
 
 - request-local legacy stateless HTTP sessions selected through
   `legacyStatelessProtocolVersion` and released when the request disconnects;
+- optional `McpSchema.McpHttpSessionOwner` adoption of initialized HTTP UUID
+  resources before exposing session headers. Failed, declined or interrupted
+  adoption rolls registration back; successful adoption transfers an idempotent
+  release capability fenced to the exact native session object. This hook does
+  not implement adapter admission or automatic expiry;
 - effectful resource listing in the active MCP request context;
 - a tool call-eligibility predicate independent from list visibility, with
   call eligibility defaulting to the visibility predicate;

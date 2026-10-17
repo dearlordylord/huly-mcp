@@ -1,8 +1,21 @@
 diff --git a/dist/ai/McpSchema.d.ts b/dist/ai/McpSchema.d.ts
-index 641e635..5fadf5a 100644
+index 641e635cf0719b59bc513af7dacfba3aa90d5eee..29eb378ea5a78ad7bdb602972dc865d3e1aa1e59 100644
 --- a/dist/ai/McpSchema.d.ts
 +++ b/dist/ai/McpSchema.d.ts
-@@ -3720,7 +3720,7 @@ declare const McpServerClient_base: Context.ServiceClass<McpServerClient, "effec
+@@ -3716,11 +3716,20 @@ declare const McpRequestContext_base: Context.ServiceClass<McpRequestContext, "e
+  */
+ export declare class McpRequestContext extends McpRequestContext_base {
+ }
++/** Local extension: request-scoped ownership of initialized HTTP session resources. */
++declare const McpHttpSessionOwner_base: Context.ServiceClass<McpHttpSessionOwner, "effect/ai/McpSchema/McpHttpSessionOwner", {
++    readonly adopt: (session: {
++        readonly id: string;
++        readonly release: Effect.Effect<boolean>;
++    }) => Effect.Effect<boolean>;
++}>;
++export declare class McpHttpSessionOwner extends McpHttpSessionOwner_base {
++}
+ declare const McpServerClient_base: Context.ServiceClass<McpServerClient, "effect/ai/McpSchema/McpServerClient", {
      readonly clientId: number;
      readonly protocolVersion: StatefulProtocolVersion;
      readonly clientCapabilities: ClientCapabilities;
@@ -11,8 +24,29 @@ index 641e635..5fadf5a 100644
      readonly initializePayload: typeof Initialize.payloadSchema["Type"];
      readonly requestMetadata?: Schema.JsonObject | undefined;
      readonly getClient: Effect.Effect<McpReverseClient, never, Scope.Scope>;
+diff --git a/dist/ai/McpSchema.js b/dist/ai/McpSchema.js
+index 8b6e47a10a6a194c1971e57b5d09b3756a6361ed..7f3e53d91fdc603a9922cd08f9a52fd1298e7762 100644
+--- a/dist/ai/McpSchema.js
++++ b/dist/ai/McpSchema.js
+@@ -2456,11 +2456,14 @@ export class McpReverseOperationError extends /*#__PURE__*/Data.TaggedError("Mcp
+  * @since 4.0.0
+  */
+ export class McpRequestContext extends /*#__PURE__*/Context.Service()("effect/ai/McpSchema/McpRequestContext") {}
++/**
++ * Local extension: request-scoped ownership of initialized HTTP session resources.
++ * A declined or interrupted adoption rolls back native registration.
++ */
++export class McpHttpSessionOwner extends /*#__PURE__*/Context.Service()("effect/ai/McpSchema/McpHttpSessionOwner") {}
+ /**
+  * Service available while handling an MCP client request.
+  *
+- * **Details**
+- *
+  * It exposes the current client id, normalized initialization data, and a
+  * scoped version-neutral facade for server-initiated requests.
+  *
 diff --git a/dist/ai/McpServer.d.ts b/dist/ai/McpServer.d.ts
-index 63727e7..7a1eee3 100644
+index 63727e74ecd75e3536307c97f30b1b8578f3794c..7a1eee37364a819017785af510c4b37dc552d334 100644
 --- a/dist/ai/McpServer.d.ts
 +++ b/dist/ai/McpServer.d.ts
 @@ -45,8 +45,10 @@ declare const McpServer_base: Context.ServiceClass<McpServer, "effect/ai/McpServ
@@ -68,7 +102,7 @@ index 63727e7..7a1eee3 100644
      readonly allowedOrigins?: ReadonlyArray<string> | undefined;
  }) => Layer.Layer<McpServer | McpServerClient, Cause.IllegalArgumentError, HttpRouter.HttpRouter>;
 diff --git a/dist/ai/McpServer.js b/dist/ai/McpServer.js
-index b57d043..4726be8 100644
+index b57d043799b2d08c1cc3908ccc4ef46cad6d9810..4726be8dc0aad49ab273f256cf792dbca79f991d 100644
 --- a/dist/ai/McpServer.js
 +++ b/dist/ai/McpServer.js
 @@ -209,6 +209,7 @@ export class McpServer extends /*#__PURE__*/Context.Service()("effect/ai/McpServ
@@ -243,7 +277,7 @@ index b57d043..4726be8 100644
    });
  };
 diff --git a/dist/ai/internal/mcpCore.js b/dist/ai/internal/mcpCore.js
-index 063320c..2ba54f6 100644
+index 063320cb3482b7b931d3076cc5f9b540b86c3c02..2ba54f6aea023565828eed4ff71a30123ec65bfa 100644
 --- a/dist/ai/internal/mcpCore.js
 +++ b/dist/ai/internal/mcpCore.js
 @@ -65,14 +65,19 @@ export const ServerNotification = /*#__PURE__*/Data.taggedEnum();
@@ -314,7 +348,7 @@ index 063320c..2ba54f6 100644
    }));
    return {
 diff --git a/dist/ai/internal/mcpRuntime.js b/dist/ai/internal/mcpRuntime.js
-index 06370fd..401ef0b 100644
+index 06370fd1341ae7a6b681c513a3a3c2866a414b7b..f3710b0bc31fab26e3a5e6f5bdc8902d78cfdb3a 100644
 --- a/dist/ai/internal/mcpRuntime.js
 +++ b/dist/ai/internal/mcpRuntime.js
 @@ -72,10 +72,15 @@ export const selectStatefulProtocol = (protocols, offeredVersion) => protocols.f
@@ -429,16 +463,71 @@ index 06370fd..401ef0b 100644
        const contextMap = new Map();
        const installationContext = {
          subscribeServerNotifications: options.subscribeServerNotifications,
-@@ -449,5 +485,5 @@ export const make = /*#__PURE__*/Effect.fnUntraced(function* (protocols) {
+@@ -408,17 +444,7 @@ export const make = /*#__PURE__*/Effect.fnUntraced(function* (protocols) {
+                 supportsResourceSubscriptions: httpRequest === undefined && capabilities.resources?.subscribe === true,
+                 logLevel: options.defaultLogLevel
+               };
+-              if (httpRequest !== undefined) {
+-                const sessionId = crypto.randomUUID();
+-                stateful.registerHttp(sessionId, registration);
+-                appendPreResponseHandlerUnsafe(httpRequest, (_request, response) => Effect.succeed(HttpServerResponse.setHeaders(response, {
+-                  [MCP_SESSION_ID_HEADER]: sessionId,
+-                  [MCP_PROTOCOL_VERSION_HEADER]: protocol.protocolVersion
+-                })));
+-              } else {
+-                stateful.registerConnection(clientId, registration);
+-              }
+-              return Effect.succeed({
++              const initialized = {
+                 capabilities,
+                 instructions: options.serverInfo.instructions,
+                 serverInfo: PublicMcpSchema.Implementation.make({
+@@ -428,7 +454,23 @@ export const make = /*#__PURE__*/Effect.fnUntraced(function* (protocols) {
+                   websiteUrl: options.serverInfo.websiteUrl,
+                   icons: options.serverInfo.icons
+                 })
+-              });
++              };
++              if (httpRequest === undefined) {
++                stateful.registerConnection(clientId, registration);
++                return Effect.succeed(initialized);
++              }
++              const owner = Context.getOrUndefined(fiber.context, PublicMcpSchema.McpHttpSessionOwner);
++              return Effect.acquireUseRelease(Effect.sync(() => {
++                const id = crypto.randomUUID();
++                const binding = stateful.registerHttp(id, registration);
++                return { id, release: Effect.sync(() => stateful.releaseHttp(id, binding)) };
++              }), session => (owner === undefined ? Effect.succeed(true) : owner.adopt(session)).pipe(Effect.flatMap(adopted => {
++                if (!adopted) return Effect.interrupt;
++                return Effect.sync(() => appendPreResponseHandlerUnsafe(httpRequest, (_request, response) => Effect.succeed(HttpServerResponse.setHeaders(response, {
++                  [MCP_SESSION_ID_HEADER]: session.id,
++                  [MCP_PROTOCOL_VERSION_HEADER]: protocol.protocolVersion
++                })))).pipe(Effect.as(initialized));
++              })), (session, exit) => exit._tag === "Success" ? Effect.void : session.release);
+             });
+           }),
+           setLogLevel: stateful.setLogLevel,
+@@ -449,5 +491,5 @@ export const make = /*#__PURE__*/Effect.fnUntraced(function* (protocols) {
  /**
   * @internal
   */
 -export const layer = protocols => Layer.effect(ServerRuntime)(make(protocols));
 +export const layer = (protocols, legacyStatelessProtocolVersion) => Layer.effect(ServerRuntime)(make(protocols, legacyStatelessProtocolVersion));
  //# sourceMappingURL=mcpRuntime.js.map
-\ No newline at end of file
+diff --git a/dist/ai/internal/mcpStatefulRuntime.js b/dist/ai/internal/mcpStatefulRuntime.js
+index 9471bdfbcff0643b44df3a08c3701f743a299638..3634bd70e68f77a2bb746986c87c01140234c7dd 100644
+--- a/dist/ai/internal/mcpStatefulRuntime.js
++++ b/dist/ai/internal/mcpStatefulRuntime.js
+@@ -46,6 +46,7 @@ export const make = () => {
+     },
+     resolve: resolveSession,
+     resolveSessionId: sessionId => bySessionId.get(sessionId),
++    releaseHttp: (sessionId, binding) => bySessionId.get(sessionId) === binding && bySessionId.delete(sessionId),
+     setLogLevel: (level, clientId, headers) => Effect.sync(() => {
+       const session = resolveSession(clientId, headers);
+       if (session !== undefined) {
 diff --git a/dist/rpc/RpcServer.d.ts b/dist/rpc/RpcServer.d.ts
-index a8fba15..eb078fd 100644
+index a8fba15e54eabd8274134fd81c6a24c711437061..eb078fd22f09d0230aa18fb5420f7d1452fc816a 100644
 --- a/dist/rpc/RpcServer.d.ts
 +++ b/dist/rpc/RpcServer.d.ts
 @@ -47,6 +47,7 @@ export declare const makeNoSerialization: <Rpcs extends Rpc.Any>(group: RpcGroup
@@ -466,7 +555,7 @@ index a8fba15..eb078fd 100644
  /**
   * Creates a RPC server that registers a HTTP route with a `HttpRouter`.
 diff --git a/dist/rpc/RpcServer.js b/dist/rpc/RpcServer.js
-index 37c9eed..f586636 100644
+index 37c9eedce1caaf025e5a8e892b9cc5c4d52f85da..f586636f0eafd713da6a095bc5fbfa7c166e67a3 100644
 --- a/dist/rpc/RpcServer.js
 +++ b/dist/rpc/RpcServer.js
 @@ -49,6 +49,7 @@ export const makeNoSerialization = /*#__PURE__*/Effect.fnUntraced(function* (gro
@@ -525,10 +614,33 @@ index 37c9eed..f586636 100644
        disconnects: yield* Queue.make(),
        send(_clientId, response) {
 diff --git a/src/ai/McpSchema.ts b/src/ai/McpSchema.ts
-index bd6934b..df746ea 100644
+index bd6934b9c3c3525edab9237e3079e63669297bee..16f60b95c4b566e23dc60061a9ae795f82c7a93b 100644
 --- a/src/ai/McpSchema.ts
 +++ b/src/ai/McpSchema.ts
-@@ -2992,7 +2992,7 @@ export class McpServerClient extends Context.Service<McpServerClient, {
+@@ -2976,11 +2976,20 @@ export class McpRequestContext extends Context.Service<McpRequestContext, {
+   readonly requestState?: string | undefined
+ }>()("effect/ai/McpSchema/McpRequestContext") {}
+
++/**
++ * Local extension: request-scoped ownership of initialized HTTP session resources.
++ * A declined or interrupted adoption rolls back native registration.
++ */
++export class McpHttpSessionOwner extends Context.Service<McpHttpSessionOwner, {
++  readonly adopt: (session: {
++    readonly id: string
++    readonly release: Effect.Effect<boolean>
++  }) => Effect.Effect<boolean>
++}>()("effect/ai/McpSchema/McpHttpSessionOwner") {}
++
+ /**
+  * Service available while handling an MCP client request.
+  *
+- * **Details**
+- *
+  * It exposes the current client id, normalized initialization data, and a
+  * scoped version-neutral facade for server-initiated requests.
+  *
+@@ -2992,7 +3001,7 @@ export class McpServerClient extends Context.Service<McpServerClient, {
    readonly clientId: number
    readonly protocolVersion: StatefulProtocolVersion
    readonly clientCapabilities: ClientCapabilities
@@ -538,7 +650,7 @@ index bd6934b..df746ea 100644
    readonly requestMetadata?: Schema.JsonObject | undefined
    readonly getClient: Effect.Effect<
 diff --git a/src/ai/McpServer.ts b/src/ai/McpServer.ts
-index a2de78b..f66e2e0 100644
+index a2de78b32c5d68609e6ba3984e97d541d79610ce..f66e2e01688a867ffca3fc4dfc1b30de886719cc 100644
 --- a/src/ai/McpServer.ts
 +++ b/src/ai/McpServer.ts
 @@ -213,6 +213,7 @@ export class McpServer extends Context.Service<McpServer, {
@@ -788,7 +900,7 @@ index a2de78b..f66e2e0 100644
            ),
            Effect.provideContext(services)
 diff --git a/src/ai/internal/mcpCore.ts b/src/ai/internal/mcpCore.ts
-index a7d200d..ce5d6e9 100644
+index a7d200d33b05c3056cc6941ae72ed4e1d54ff06b..ce5d6e9e7fbb10ce7a41084d3c0feb8eea1c18c7 100644
 --- a/src/ai/internal/mcpCore.ts
 +++ b/src/ai/internal/mcpCore.ts
 @@ -52,8 +52,7 @@ export interface NegotiatedProtocolProfile<out Version extends string = McpProto
@@ -933,7 +1045,7 @@ index a7d200d..ce5d6e9 100644
    }))
  
 diff --git a/src/ai/internal/mcpProtocol.ts b/src/ai/internal/mcpProtocol.ts
-index 1426562..a2ff50f 100644
+index 142656297bd8a0e991f7967eab000212eb44aea4..a2ff50fb9a49e5a0c4f50636a493e9277903cbeb 100644
 --- a/src/ai/internal/mcpProtocol.ts
 +++ b/src/ai/internal/mcpProtocol.ts
 @@ -68,7 +68,7 @@ export const decodeRoutingHeader = (value: string): string | undefined => {
@@ -946,7 +1058,7 @@ index 1426562..a2ff50f 100644
    clientCapabilities: request.clientCapabilities,
    clientInfo: request.clientInfo,
 diff --git a/src/ai/internal/mcpRuntime.ts b/src/ai/internal/mcpRuntime.ts
-index b388d17..bc6d01f 100644
+index b388d178053fefa1ad84279ec5ed939ad0098e74..a355a9570ba2122d2fc9991c463c1cabd803a63d 100644
 --- a/src/ai/internal/mcpRuntime.ts
 +++ b/src/ai/internal/mcpRuntime.ts
 @@ -73,7 +73,7 @@ const PingRpcs = RpcGroup.make(PublicMcpSchema.Ping)
@@ -1090,7 +1202,64 @@ index b388d17..bc6d01f 100644
        const contextMap = new Map<string, unknown>()
        const installationContext: McpProtocol.HandlerInstallationContext = {
          subscribeServerNotifications: options.subscribeServerNotifications,
-@@ -568,5 +623,7 @@ export const make = Effect.fnUntraced(function*(
+@@ -521,21 +576,7 @@ export const make = Effect.fnUntraced(function*(
+                   capabilities.resources?.subscribe === true,
+                 logLevel: options.defaultLogLevel
+               }
+-              if (httpRequest !== undefined) {
+-                const sessionId = crypto.randomUUID()
+-                stateful.registerHttp(sessionId, registration)
+-                appendPreResponseHandlerUnsafe(
+-                  httpRequest,
+-                  (_request, response) =>
+-                    Effect.succeed(HttpServerResponse.setHeaders(response, {
+-                      [MCP_SESSION_ID_HEADER]: sessionId,
+-                      [MCP_PROTOCOL_VERSION_HEADER]: protocol.protocolVersion
+-                    }))
+-                )
+-              } else {
+-                stateful.registerConnection(clientId, registration)
+-              }
+-              return Effect.succeed({
++              const initialized = {
+                 capabilities,
+                 instructions: options.serverInfo.instructions,
+                 serverInfo: PublicMcpSchema.Implementation.make({
+@@ -545,7 +586,32 @@ export const make = Effect.fnUntraced(function*(
+                   websiteUrl: options.serverInfo.websiteUrl,
+                   icons: options.serverInfo.icons
+                 })
+-              })
++              }
++              if (httpRequest === undefined) {
++                stateful.registerConnection(clientId, registration)
++                return Effect.succeed(initialized)
++              }
++              const owner = Context.getOrUndefined(fiber.context, PublicMcpSchema.McpHttpSessionOwner)
++              return Effect.acquireUseRelease(
++                Effect.sync(() => {
++                  const id = crypto.randomUUID()
++                  const binding = stateful.registerHttp(id, registration)
++                  return { id, release: Effect.sync(() => stateful.releaseHttp(id, binding)) }
++                }),
++                (session) => (owner === undefined ? Effect.succeed(true) : owner.adopt(session)).pipe(
++                  Effect.flatMap((adopted) => {
++                    if (!adopted) return Effect.interrupt
++                    return Effect.sync(() => appendPreResponseHandlerUnsafe(
++                      httpRequest,
++                      (_request, response) => Effect.succeed(HttpServerResponse.setHeaders(response, {
++                        [MCP_SESSION_ID_HEADER]: session.id,
++                        [MCP_PROTOCOL_VERSION_HEADER]: protocol.protocolVersion
++                      }))
++                    )).pipe(Effect.as(initialized))
++                  })
++                ),
++                (session, exit) => exit._tag === "Success" ? Effect.void : session.release
++              )
+             })
+           }),
+           setLogLevel: stateful.setLogLevel,
+@@ -568,5 +634,7 @@ export const make = Effect.fnUntraced(function*(
   * @internal
   */
  export const layer = (
@@ -1101,7 +1270,7 @@ index b388d17..bc6d01f 100644
 +): Layer.Layer<ServerRuntime, Cause.IllegalArgumentError> =>
 +  Layer.effect(ServerRuntime)(make(protocols, legacyStatelessProtocolVersion))
 diff --git a/src/ai/internal/mcpStatefulRuntime.ts b/src/ai/internal/mcpStatefulRuntime.ts
-index 19c41ab..e458032 100644
+index 19c41ab07b14eadca7d29d44a52b5bc075a35a2b..f1321e754a400fa74fb94a00558a00801b2c1214 100644
 --- a/src/ai/internal/mcpStatefulRuntime.ts
 +++ b/src/ai/internal/mcpStatefulRuntime.ts
 @@ -22,7 +22,7 @@ type SessionLogLevel =
@@ -1113,8 +1282,25 @@ index 19c41ab..e458032 100644
    readonly protocol: PublicMcpProtocol.ProtocolAdapter
  }
  
+@@ -47,6 +47,7 @@ export interface StatefulRuntime {
+   readonly registerConnection: (clientId: number, registration: Registration) => Binding
+   readonly resolve: (clientId: number, headers: Headers.Headers) => Binding | undefined
+   readonly resolveSessionId: (sessionId: string) => Binding | undefined
++  readonly releaseHttp: (sessionId: string, binding: Binding) => boolean
+   readonly setLogLevel: (
+     level: PublicMcpSchema.LoggingLevel,
+     clientId: number,
+@@ -123,6 +124,8 @@ export const make = (): StatefulRuntime => {
+     },
+     resolve: resolveSession,
+     resolveSessionId: (sessionId) => bySessionId.get(sessionId),
++    releaseHttp: (sessionId, binding) =>
++      bySessionId.get(sessionId) === binding && bySessionId.delete(sessionId),
+     setLogLevel: (level, clientId, headers) =>
+       Effect.sync(() => {
+         const session = resolveSession(clientId, headers)
 diff --git a/src/rpc/RpcServer.ts b/src/rpc/RpcServer.ts
-index 3f1987a..d30ded2 100644
+index 3f1987a508b29b57539ad550efe1623c51f03238..d30ded23a7e0c2de58b0bcf583b513cf1485a5be 100644
 --- a/src/rpc/RpcServer.ts
 +++ b/src/rpc/RpcServer.ts
 @@ -96,6 +96,7 @@ export const makeNoSerialization: <Rpcs extends Rpc.Any>(

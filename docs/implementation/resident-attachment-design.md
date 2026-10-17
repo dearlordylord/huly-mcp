@@ -1,7 +1,7 @@
 # Resident attachment design
 
-Status: selected design; native TLS primitive implemented, attachment wiring and
-qualification pending. Applies to #323–#328.
+Status: authenticated manual attachment is implemented; per-adapter ownership,
+session release and qualification remain pending. Applies to #323–#328.
 
 ## Problem
 
@@ -31,9 +31,10 @@ const selection = yield* selectOrStartCompatibleResident(resolvedConfiguration)
 const managedAttachment = yield* ResidentAttachment.connect(selection)
 ```
 
-These names describe the target interface. They are not implemented commands.
-The current endpoint/token manual form remains an unfinished experimental path
-until replacement with the authenticated attachment boundary is complete.
+These names describe the target owning interface. The current explicit commands
+use protected attachment selection as documented in the
+[manual launch guide](../resident-manual.md). Per-adapter admission and session
+ownership still need integration.
 
 ## Shape
 

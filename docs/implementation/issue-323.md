@@ -406,3 +406,63 @@ Validation:
 Private per-adapter admission, legacy-session ownership/release, shared-model
 waiter cancellation, actual Huly reads, full quality gate and platform
 qualification remain required. The six-issue goal remains incomplete.
+
+## Native session ownership capability experiment
+
+The selected per-adapter design is in `resident-session-design.md`. Grounding
+confirmed that initialized native HTTP UUIDs survive request disconnect, unlike
+request-local legacy compatibility bindings. Two independent candidates compared
+explicit controls and per-session adoption with a persistent duplex control
+stream and runtime controller. The parent and independent judge selected explicit
+controls with native capability adoption, retaining separate work accounting,
+unknown-outcome retention and paused/resumed caller checks.
+
+The reviewed Effect extension now exports optional
+`McpSchema.McpHttpSessionOwner`. In the real initialization request context, it
+receives the new UUID and a release effect bound to that exact native session
+object. Registration uses uninterruptible acquisition with installed cleanup;
+adoption is interruptible. Decline, defect or interruption rolls back the actual
+native map entry. Headers expose the UUID only after successful adoption. The
+existing native initialize error channel is `never`, so a declined adoption
+cancels that request rather than widening every initialize RPC error contract.
+
+This is a native capability experiment, not the adapter registry. The application
+owner still needs to reserve admitted work, fence release and await actual target
+cleanup before invoking its capabilities. The optional hook does not introduce
+an HTTP DELETE endpoint, automatic expiry or a modern MCP session.
+
+Evidence:
+
+- `/tmp/resident-native-session-rollback-tests.log`: four actual native tests
+  pass. Releasing one UUID makes native lookup return 404 while another remains
+  usable; repeated release reports no remaining entry. Absent-owner behavior
+  remains usable, and modern/headerless compatibility traffic adopts no UUID.
+  Declined, defective and interrupted adoption leave native lookup at 404.
+- `/tmp/resident-native-session-removal-mutant.log`: withholding map deletion
+  makes the first test fail with HTTP 200 instead of expected 404. This proves
+  the check observes native storage, rather than only a release receipt or
+  project bookkeeping. The mutation was restored.
+- `/tmp/resident-native-session-coherent-tests.log`: 106 tests in 14 affected
+  files pass, covering resident, HTTP/context and protocol boundaries.
+- `/tmp/resident-native-session-restored-stdio-tests.log`: 29 tests in six files
+  pass after restoration, including all four ownership cases and five selected
+  default stdio server/transport/process/output suites.
+- `/tmp/resident-native-session-final-tests.log`: the final installed patch's
+  four ownership cases pass. The patch was normalized at one empty context line
+  to satisfy whitespace checking; installation accepts it. Comparison with the
+  edit tree found only final-newline differences in four built files, with
+  otherwise identical contents. Source files match.
+- `/tmp/resident-native-session-coherent-typecheck.log`: 1,212 files checked with
+  zero TypeScript or Effect errors or warnings. The initial fixture-only map-key
+  inference error was corrected before this passing run. Focused lint passes.
+- `/tmp/resident-native-session-cohort.log` and
+  `/tmp/resident-native-session-reference-check.log`: exact installed cohort and
+  pinned reference corpus checks pass. The lockfile and Effect reference document
+  record the final patch hash. All dependency operations used Linux-local files.
+- Fresh Standards and Spec reviews found no actionable native-boundary defect.
+
+Next is the admitted-work owner and cleanup barrier, followed by private adapter
+controls and crash-expiring eligibility. Native session adoption alone does not
+prove release ordering while a target is held in cleanup, ownership of legacy
+UUID use, live Huly reads or any complete issue's acceptance criteria. All six
+issues remain required.
