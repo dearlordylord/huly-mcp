@@ -2,11 +2,13 @@ import * as fs from "node:fs/promises"
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 import { createConnection } from "node:net"
-import { ConfigProvider, Deferred, Effect, Fiber, Layer, Redacted, Result, Schema } from "effect"
+import { ConfigProvider, Deferred, Effect, Fiber, Layer, Option, Redacted, Result, Schema } from "effect"
 import { TestClock } from "effect/testing"
 import { expect, it } from "vitest"
 
 import { McpServerError, McpServerService } from "../../src/mcp/server.js"
+import { withAdapterAttachment } from "../../src/resident/adapter-attachment.js"
+import { HostMessage } from "../../src/resident/request-headers.js"
 import { readResidentAttachment } from "../../src/resident/attachment-file.js"
 import { makeManualResidentBackend } from "../../src/resident/manual-backend.js"
 import type { ResidentFilePath } from "../../src/resident/protected-path.js"
@@ -60,6 +62,12 @@ it.each(["stop", "interrupt"])("publishes after native application readiness and
           expect(yield* Effect.promise(() => fs.readdir(directory))).toEqual([])
           yield* Deferred.succeed(releaseReady, undefined)
           const descriptor = yield* readResidentAttachment(yield* Deferred.await(published))
+          const status = yield* withAdapterAttachment(descriptor, (exchange) =>
+            exchange(HostMessage.make({ jsonrpc: "2.0", id: 1, method: "ping" }), Option.none(), (response) =>
+              response.text.pipe(Effect.as(response.status))
+            )
+          )
+          expect(status).toBe(200)
           expect(Number(descriptor.endpoint.port)).toBeGreaterThan(0)
           expect(descriptor.endpoint.hostname).toBe("127.0.0.1")
           expect(Redacted.value(descriptor.authorization) === Redacted.value(backend.authorization)).toBe(true)
@@ -78,6 +86,7 @@ it.each(["stop", "interrupt"])("publishes after native application readiness and
               httpHost: "127.0.0.1",
               httpPort: 0,
               mcpAuthToken: backend.authorization,
+              httpMiddleware: backend.middleware,
               resolveClients: () => Promise.reject(new Error("Application readiness must not acquire Huly"))
             }).pipe(Layer.provide(TelemetryService.testLayer({})))
           )
@@ -143,6 +152,7 @@ it.each(["publication", "readiness", "timeout"])("closes the bound listener afte
               httpHost: "127.0.0.1",
               httpPort: 0,
               mcpAuthToken: backend.authorization,
+              httpMiddleware: backend.middleware,
               resolveClients: () => Promise.reject(new Error("Failed startup must not acquire Huly")),
               writeError: (line) => {
                 if (line.startsWith(READY_PREFIX))

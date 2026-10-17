@@ -16,6 +16,7 @@ import { HostMessage, requestHeaders } from "../../src/resident/request-headers.
 import { BackendMessage, BackendResponseError, decodeBackendMessages } from "../../src/resident/response-stream.js"
 import {
   makeResidentHttpServerFactory,
+  makeResidentHttpsListener,
   ResidentEndpoint,
   ResidentTlsIdentity,
   withResidentHttpsAgent
@@ -312,5 +313,63 @@ it("lets an authenticated response finish after listener retirement begins", { t
     await Effect.runPromise(Deferred.succeed(complete, undefined))
     await Effect.runPromise(Fiber.interrupt(response))
     await Effect.runPromise(Fiber.interrupt(listener))
+  }
+})
+
+it("refuses non-loopback binding and a port already owned by another listener", async () => {
+  const occupied = createServer()
+  occupied.listen(0, "127.0.0.1")
+  await once(occupied, "listening")
+  const address = occupied.address()
+  if (address === null || typeof address === "string") throw new Error("Expected owned TCP listener")
+  try {
+    const factory = makeResidentHttpServerFactory(identity())
+    await expect(Effect.runPromise(Effect.scoped(factory.make(0, "0.0.0.0")))).rejects.toThrow("literal loopback")
+    await expect(Effect.runPromise(Effect.scoped(factory.make(address.port, "127.0.0.1")))).rejects.toThrow(
+      "could not start"
+    )
+  } finally {
+    await new Promise<void>((resolve, reject) => occupied.close((error) => (error ? reject(error) : resolve())))
+  }
+})
+
+it("requires asynchronous handoff and refuses sockets created after the agent scope closes", async () => {
+  const endpoint = Schema.decodeUnknownSync(ResidentEndpoint)("https://127.0.0.1/mcp")
+  const agent = await Effect.runPromise(
+    withResidentHttpsAgent(endpoint, identity(), (owned) =>
+      Effect.sync(() => {
+        expect(() => owned.createConnection({})).toThrow("asynchronous socket handoff")
+        return owned
+      })
+    )
+  )
+  const error = await new Promise<Error | null>((resolve) => {
+    agent.createConnection({}, (failure, socket) => {
+      socket.destroy()
+      resolve(failure)
+    })
+  })
+  expect(error?.message).toContain("could not authenticate")
+})
+
+it("authenticates the same private channel over IPv6 loopback", async () => {
+  const owner = identity()
+  const listener = makeResidentHttpsListener(owner)
+  listener.on("request", (_incoming, response) =>
+    response.writeHead(200, { "content-type": "application/json" }).end('{"jsonrpc":"2.0","id":1,"result":{}}')
+  )
+  listener.listen(0, "::1")
+  await once(listener, "listening")
+  const address = listener.address()
+  if (address === null || typeof address === "string") throw new Error("Expected owned IPv6 listener")
+  try {
+    const endpoint = Schema.decodeUnknownSync(ResidentEndpoint)(`https://[::1]:${address.port}/mcp`)
+    const replies = await Effect.runPromise(
+      exchange(endpoint, owner, HostMessage.make({ jsonrpc: "2.0", id: 1, method: "ping" }))
+    )
+    expect(replies).toEqual([{ jsonrpc: "2.0", id: 1, result: {} }])
+  } finally {
+    listener.closeAllConnections()
+    await new Promise<void>((resolve, reject) => listener.close((error) => (error ? reject(error) : resolve())))
   }
 })

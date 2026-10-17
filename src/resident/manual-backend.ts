@@ -7,9 +7,20 @@ import { VERSION } from "../version.js"
 import { ResidentAttachment, withPublishedResidentAttachment } from "./attachment-file.js"
 import { currentPosixOwner, ProtectedFileError, ResidentDirectory, type ResidentFilePath } from "./protected-path.js"
 import { makeResidentHttpServerFactory, ResidentEndpoint, ResidentTlsIdentity } from "./tls-channel.js"
+import { AdmissionPolicy, DEFAULT_LEASE_POLICY } from "./admission-contract.js"
+import { makeResidentAdmissions } from "./admissions.js"
+import { residentAdmissionMiddleware } from "./admission-http.js"
+import { withResidentHeaderRedaction } from "./private-http.js"
 
 const SECRET_BYTES = 32
 const STARTUP_ALLOWANCE = "5 seconds"
+const DEFAULT_ATTACHMENT_CAPACITY = 32
+const CLOSE_ALLOWANCE_MILLIS = 5_000
+const defaultAdmissionPolicy = Schema.decodeUnknownSync(AdmissionPolicy)({
+  capacity: DEFAULT_ATTACHMENT_CAPACITY,
+  closeAllowanceMillis: CLOSE_ALLOWANCE_MILLIS,
+  lease: DEFAULT_LEASE_POLICY
+})
 const startupFailure = () => new ProtectedFileError({ kind: "input", message: "Resident backend startup failed" })
 
 export const makeManualResidentBackend = Effect.gen(function* () {
@@ -20,6 +31,10 @@ export const makeManualResidentBackend = Effect.gen(function* () {
     key: randomBytes(SECRET_BYTES).toString("hex")
   }).pipe(Effect.mapError(startupFailure))
   const authorization = Redacted.make(randomBytes(SECRET_BYTES).toString("hex"))
+  const capacity = yield* Config.schema(AdmissionPolicy.fields.capacity, "MCP_RESIDENT_ATTACHMENT_CAPACITY").pipe(
+    Config.withDefault(defaultAdmissionPolicy.capacity)
+  )
+  const admissions = yield* makeResidentAdmissions({ ...defaultAdmissionPolicy, capacity })
   const claimed = yield* Ref.make(false)
   const bound = yield* Deferred.make<ResidentEndpoint>()
   const nativeFactory = makeResidentHttpServerFactory(identity)
@@ -47,7 +62,7 @@ export const makeManualResidentBackend = Effect.gen(function* () {
         })
       const serving = yield* server
         .run()
-        .pipe(Effect.provideService(HttpServerFactoryService, factory), Effect.forkScoped)
+        .pipe(withResidentHeaderRedaction, Effect.provideService(HttpServerFactoryService, factory), Effect.forkScoped)
       const publish = Effect.gen(function* () {
         const endpoint = yield* Effect.gen(function* () {
           const endpoint = yield* Deferred.await(bound)
@@ -80,5 +95,5 @@ export const makeManualResidentBackend = Effect.gen(function* () {
       yield* Effect.raceFirst(publish, Fiber.join(serving))
     }).pipe(Effect.scoped)
 
-  return { authorization, run }
+  return { authorization, middleware: residentAdmissionMiddleware(admissions), run }
 })

@@ -6,6 +6,9 @@ import { EventEmitter } from "node:events"
 import { ConfigValidationError, sanitizeHulyRuntimeConfigFromEnv } from "../../src/config/config.js"
 import { requestContextMiddleware } from "../../src/mcp/http-request-context.js"
 import { McpRequestContextService } from "../../src/mcp/request-context.js"
+import { attachmentRequestOwner } from "../../src/resident/attachment-http-context.js"
+import { makeAttachmentOwner } from "../../src/resident/attachment-owner.js"
+import { RequestWorkOwner } from "../../src/runtime/request-work.js"
 
 const runRequest = (
   request: HttpServerRequest.HttpServerRequest,
@@ -33,6 +36,40 @@ class AbortableWebRequest extends Request {
 }
 
 describe("HTTP MCP request context", () => {
+  it.each([false, true])("reports lease cleanup failure without exposing its payload (owned=%s)", async (owned) => {
+    const secret = "fixture-private-cleanup-details"
+    const response = await Effect.runPromise(
+      Effect.gen(function* () {
+        const owner = yield* makeAttachmentOwner(Effect.succeed(true))
+        const request = HttpServerRequest.fromWeb(new Request("http://localhost/cleanup"))
+        const middleware = requestContextMiddleware({
+          resolveClients: async () => Exit.fail(new ConfigValidationError({ message: "No fixture Huly connection" })),
+          resolveClientLeaseForHttpRequest: async () => ({
+            bundle: Exit.fail(new ConfigValidationError({ message: "No fixture Huly connection" })),
+            close: () => Promise.reject(new Error(secret))
+          })
+        })
+        const requestEffect = middleware(
+          Effect.gen(function* () {
+            const context = yield* McpRequestContextService
+            yield* Effect.promise(context.resolveClients)
+            return HttpServerResponse.empty()
+          })
+        )
+        const handled = owned
+          ? Effect.provideService(requestEffect, RequestWorkOwner, attachmentRequestOwner(owner))
+          : requestEffect
+        const result = yield* Effect.provideService(handled, HttpServerRequest.HttpServerRequest, request)
+        if (owned) expect((yield* Effect.result(owner.close))._tag).toBe("Failure")
+        return result
+      }).pipe(Effect.scoped)
+    )
+    expect(response.status).toBe(503)
+    const text = await HttpServerResponse.toWeb(response).text()
+    expect(text).toContain("cleanup was not confirmed")
+    expect(text).not.toContain(secret)
+  })
+
   it.each([
     { socket: undefined, response: undefined },
     { socket: null, response: null },

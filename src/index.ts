@@ -49,6 +49,7 @@ import { TelemetryService } from "./telemetry/telemetry.js"
 import { writeStderrLine } from "./utils/stderr.js"
 import { makeManualResidentBackend } from "./resident/manual-backend.js"
 import type { ProtectedFileError } from "./resident/protected-path.js"
+import type { HttpMiddleware } from "effect/http/HttpMiddleware"
 
 type AppError =
   | MovementObserverError
@@ -141,7 +142,8 @@ export const buildAppLayer = (
   httpServerFactoryLayer: Layer.Layer<HttpServerFactoryService> = HttpServerFactoryService.defaultLayer,
   closeClients?: () => Promise<void>,
   runtimeConfigContext = () => sanitizeHulyRuntimeConfigFromEnv(process.env),
-  observeMovement?: MovementStageObserver
+  observeMovement?: MovementStageObserver,
+  httpMiddleware?: HttpMiddleware
 ): Layer.Layer<McpServerService | HttpServerFactoryService, McpServerError, never> => {
   const mcpServerConfig = {
     transport,
@@ -151,6 +153,7 @@ export const buildAppLayer = (
     authMethod,
     resolveClients,
     ...(observeMovement === undefined ? {} : { observeMovement }),
+    ...(httpMiddleware === undefined ? {} : { httpMiddleware }),
     ...(closeClients === undefined ? {} : { closeClients }),
     resolveClientLeaseForHttpRequest,
     getRuntimeConfigContext: runtimeConfigContext,
@@ -240,7 +243,8 @@ const runConfiguredServer = (
               profile === undefined
                 ? sanitizeHulyRuntimeConfigFromEnv(environment)
                 : profileRuntimeContext(profile, environment),
-            observeMovement
+            observeMovement,
+            resident?.middleware
           )
 
           yield* Effect.gen(function* () {
@@ -261,7 +265,7 @@ export const main: Effect.Effect<void, AppError> = Effect.gen(function* () {
   const consoleRedirect = yield* Effect.sync(() => (transport === "stdio" ? redirectConsoleToStderr() : undefined))
 
   yield* runConfiguredServer(transport, resident).pipe(Effect.ensuring(restoreConsoleRedirect(consoleRedirect)))
-})
+}).pipe(Effect.scoped)
 
 // Run with NodeRuntime.runMain - handles errors, exit codes, and interrupts automatically
 // Only run when executed directly (not when imported for testing)

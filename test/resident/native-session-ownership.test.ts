@@ -1,127 +1,28 @@
-import { randomBytes, randomUUID } from "node:crypto"
-import { NodeHttpClient } from "@effect/platform-node"
-import { Deferred, Effect, Exit, Fiber, Layer, Option, Redacted, Ref, Schedule, Schema, Stream } from "effect"
-import { McpProtocol, McpSchema, McpServer } from "effect/ai"
-import { HttpClientRequest, HttpServerRequest } from "effect/http"
+import { Deferred, Effect, Exit, Fiber, Option, Ref, Schedule, Schema } from "effect"
 import { expect, it } from "vitest"
 
-import { HttpHost, HttpPort, HttpServerFactoryService, startHttpTransport } from "../../src/mcp/http-transport.js"
 import { createRequestClientLifecycle } from "../../src/mcp/request-client-lifecycle.js"
 import { makeAttachmentOwner } from "../../src/resident/attachment-owner.js"
-import { parseLegacyHttpSession, LegacyHttpSession } from "../../src/resident/protocol-session.js"
-import { HostMessage, requestHeaders } from "../../src/resident/request-headers.js"
+import { LegacyHttpSession } from "../../src/resident/protocol-session.js"
+import { HostMessage } from "../../src/resident/request-headers.js"
 import {
-  makeResidentHttpServerFactory,
-  ResidentEndpoint,
-  ResidentTlsIdentity,
-  withResidentHttpsAgent
-} from "../../src/resident/tls-channel.js"
+  exchange,
+  initialize,
+  ping,
+  withNativeServer,
+  type Owner,
+  type OwnerName,
+  type SessionResource
+} from "../helpers/resident-native-fixture.js"
 
 const RESPONSE_BOUND = 5_000
-const SECRET_BYTES = 32
 const HTTP_OK = 200
 const HTTP_NOT_FOUND = 404
-const AUTHORIZATION = Redacted.make("native-session-owner-fixture")
-const OwnerName = Schema.Literals(["first", "second", "none"])
-type OwnerName = Schema.Schema.Type<typeof OwnerName>
-// These are native resource capabilities, not serialized payloads.
-type Owner = McpSchema.McpHttpSessionOwner["Service"]
-type SessionResource = Parameters<Owner["adopt"]>[0]
-
-const withNativeServer = <A, E, R>(
-  owners: ReadonlyMap<OwnerName, Owner>,
-  use: (endpoint: ResidentEndpoint, identity: ResidentTlsIdentity) => Effect.Effect<A, E, R>
-) =>
-  Effect.gen(function* () {
-    const identity = Schema.decodeUnknownSync(ResidentTlsIdentity)({
-      generation: randomUUID(),
-      key: randomBytes(SECRET_BYTES).toString("hex")
-    })
-    const bound = yield* Deferred.make<ResidentEndpoint>()
-    const ready = yield* Deferred.make<void>()
-    const shutdown = yield* Deferred.make<void>()
-    const factory = makeResidentHttpServerFactory(identity)
-    const serving = yield* startHttpTransport(
-      {
-        port: HttpPort.make(0),
-        host: HttpHost.make("127.0.0.1"),
-        authToken: AUTHORIZATION,
-        onBound: (address) => {
-          if (address._tag === "UnixPathAddress") return Effect.die("Expected native TCP listener")
-          return Deferred.succeed(
-            bound,
-            Schema.decodeUnknownSync(ResidentEndpoint)(`https://127.0.0.1:${address.port}/mcp`)
-          )
-        },
-        onReady: () => Deferred.succeed(ready, undefined),
-        shutdown: Deferred.await(shutdown),
-        middleware: (httpEffect) =>
-          Effect.gen(function* () {
-            const request = yield* HttpServerRequest.HttpServerRequest
-            const selected = Schema.decodeUnknownSync(OwnerName)(request.headers["x-fixture-owner"] ?? "none")
-            const owner = owners.get(selected)
-            return yield* owner === undefined
-              ? httpEffect
-              : Effect.provideService(httpEffect, McpSchema.McpHttpSessionOwner, owner)
-          })
-      },
-      McpServer.layerHttp({
-        name: "native-session-fixture",
-        version: "1.0",
-        path: "/mcp",
-        protocols: [McpProtocol.v2026_07_28, McpProtocol.v2025_06_18],
-        legacyStatelessProtocolVersion: McpProtocol.v2025_06_18.protocolVersion
-      }).pipe(Layer.orDie),
-      () => {}
-    ).pipe(Effect.provideService(HttpServerFactoryService, factory), Effect.forkScoped)
-    yield* Deferred.await(ready)
-    try {
-      return yield* use(yield* Deferred.await(bound), identity)
-    } finally {
-      yield* Deferred.succeed(shutdown, undefined)
-      yield* Fiber.join(serving)
-    }
-  }).pipe(Effect.scoped)
-
-const exchange = (
-  endpoint: ResidentEndpoint,
-  identity: ResidentTlsIdentity,
-  owner: OwnerName,
-  message: HostMessage,
-  session: Option.Option<LegacyHttpSession> = Option.none()
-) =>
-  withResidentHttpsAgent(endpoint, identity, (agent) =>
-    Effect.gen(function* () {
-      const client = yield* NodeHttpClient.makeNodeHttp.pipe(
-        Effect.provideService(NodeHttpClient.HttpAgent, { http: agent, https: agent })
-      )
-      const headers = requestHeaders(message, AUTHORIZATION, session)
-      headers.set("x-fixture-owner", owner)
-      const body = yield* Schema.encodeEffect(Schema.fromJsonString(HostMessage))(message)
-      const response = yield* client.execute(
-        HttpClientRequest.post(endpoint.href).pipe(
-          HttpClientRequest.setHeaders(headers),
-          HttpClientRequest.bodyText(body, "application/json")
-        )
-      )
-      yield* Stream.runDrain(response.stream)
-      return { status: response.status, session: yield* parseLegacyHttpSession(new Headers(response.headers)) }
-    })
-  )
-
-const initialize = (owner: OwnerName) =>
-  HostMessage.make({
-    jsonrpc: "2.0",
-    id: 1,
-    method: "initialize",
-    params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: owner, version: "1.0" } }
-  })
-const ping = HostMessage.make({ jsonrpc: "2.0", id: 1, method: "ping" })
 
 it("retains the native session until owned request client cleanup completes", async () => {
   await Effect.runPromise(
     Effect.gen(function* () {
-      const attachment = yield* makeAttachmentOwner
+      const attachment = yield* makeAttachmentOwner(Effect.succeed(true))
       const adopted = yield* Deferred.make<SessionResource>()
       const owner: Owner = {
         adopt: (resource) =>

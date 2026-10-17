@@ -23,6 +23,7 @@ import {
 import * as Stdio from "effect/Stdio"
 import * as Stream from "effect/Stream"
 import { McpProtocol, McpServer } from "effect/ai"
+import type { HttpMiddleware } from "effect/http/HttpMiddleware"
 
 import { type SanitizedHulyRuntimeConfigContext, sanitizeHulyRuntimeConfigFromEnv } from "../config/config.js"
 import type { ClientBundle, ClientResolver, HulyClientBundleError } from "../runtime/client-resolver.js"
@@ -71,6 +72,7 @@ interface McpServerConfigData {
 }
 
 interface McpServerConfigCallbacks {
+  readonly httpMiddleware?: HttpMiddleware
   readonly observeMovement?: MovementStageObserver
   readonly resolveClients: ClientResolver
   readonly resolveClientLeaseForHttpRequest?: (
@@ -298,11 +300,13 @@ const runHttpTransport = (
   const host = config.httpHost ?? DEFAULT_HTTP_HOST
   const port = config.httpPort ?? DEFAULT_HTTP_PORT
   const appLayer = buildHttpLayer(registry.layer)
+  const requestMiddleware = requestContextMiddleware(config)
+  const outerMiddleware = config.httpMiddleware
   const httpConfig: HttpTransportConfig = {
     host,
     port,
     ...(config.mcpAuthToken === undefined ? {} : { authToken: config.mcpAuthToken }),
-    middleware: requestContextMiddleware(config),
+    middleware: outerMiddleware === undefined ? requestMiddleware : (app) => outerMiddleware(requestMiddleware(app)),
     shutdown: Deferred.await(control.shutdown),
     onBound: (address) =>
       address._tag !== "UnixPathAddress"

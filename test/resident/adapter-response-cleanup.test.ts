@@ -62,34 +62,55 @@ it("aborts an owned request interrupted before response headers arrive", { timeo
   }
 })
 
-it("rejects overlapping initialization before opening a second backend session", { timeout: 15_000 }, async () => {
-  const arrived = await Effect.runPromise(Deferred.make<void>())
-  let requests = 0
-  const fixture = await startResidentFixture(() => {
-    requests += 1
-    Effect.runSync(Deferred.succeed(arrived, undefined))
-  }, "private-fixture-auth")
-  try {
-    const encode = (id: number) =>
-      new TextEncoder().encode(`${JSON.stringify({ jsonrpc: "2.0", id, method: "initialize" })}\n`)
-    const stdin = Stream.concat(
-      Stream.make(encode(1)),
-      Stream.concat(Stream.fromEffect(Deferred.await(arrived).pipe(Effect.as(encode(2)))), Stream.never)
-    )
-    const exit = await Effect.runPromiseExit(
-      runManualAdapter.pipe(
-        Effect.provide(
-          Layer.merge(
-            Stdio.layerTest({ stdin }),
-            ConfigProvider.layer(ConfigProvider.fromUnknown({ MCP_RESIDENT_ATTACHMENT_FILE: fixture.file }))
-          )
-        ),
-        Effect.timeout(RESPONSE_BOUND)
+it.each(["initialize", "duplicate", "capacity"])(
+  "rejects overlapping %s admission before opening excess backend requests",
+  { timeout: 15_000 },
+  async (mode) => {
+    const arrived = await Effect.runPromise(Deferred.make<void>())
+    let requests = 0
+    const fixture = await startResidentFixture(() => {
+      requests += 1
+      Effect.runSync(Deferred.succeed(arrived, undefined))
+    }, "private-fixture-auth")
+    try {
+      const encode = (id: number) =>
+        new TextEncoder().encode(
+          `${JSON.stringify({ jsonrpc: "2.0", id, method: mode === "initialize" ? "initialize" : "ping" })}\n`
+        )
+      const stdin = Stream.concat(
+        Stream.make(encode(1)),
+        Stream.concat(
+          Stream.fromEffect(
+            Deferred.await(arrived).pipe(
+              Effect.as(
+                mode === "capacity"
+                  ? new TextEncoder().encode(
+                      Array.from({ length: 8 }, (_, index) => new TextDecoder().decode(encode(index + 2))).join("")
+                    )
+                  : encode(mode === "duplicate" ? 1 : 2)
+              )
+            )
+          ),
+          Stream.never
+        )
       )
-    )
-    expect(Exit.isFailure(exit) && Cause.pretty(exit.cause)).toContain("initialization already started")
-    expect(requests).toBe(1)
-  } finally {
-    await fixture.cleanup()
+      const exit = await Effect.runPromiseExit(
+        runManualAdapter.pipe(
+          Effect.provide(
+            Layer.merge(
+              Stdio.layerTest({ stdin }),
+              ConfigProvider.layer(ConfigProvider.fromUnknown({ MCP_RESIDENT_ATTACHMENT_FILE: fixture.file }))
+            )
+          ),
+          Effect.timeout(RESPONSE_BOUND)
+        )
+      )
+      expect(Exit.isFailure(exit) && Cause.pretty(exit.cause)).toContain(
+        mode === "initialize" ? "initialization already started" : "admission limit"
+      )
+      expect(requests).toBeLessThanOrEqual(mode === "capacity" ? 8 : 1)
+    } finally {
+      await fixture.cleanup()
+    }
   }
-})
+)

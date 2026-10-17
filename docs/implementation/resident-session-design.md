@@ -16,15 +16,15 @@ Private adapter identity remains distinct from legacy UUIDs and modern metadata.
 
 ```ts
 // Package adapter: one scoped capability hides control traffic and renewal.
-const attachment = yield* AdapterAttachment.open(selectedGeneration)
-yield* runStdioBridge(attachment.exchange)
+yield* withAdapterAttachment(selectedGeneration, (exchange) => runStdioBridge(exchange))
 
 // Resident only: one owner supplies private controls and native request context.
-const owner = yield* ResidentAdmissions.make(generation, policy)
-yield* serveNativeMcp(owner.boundary)
+const admissions = yield* makeResidentAdmissions(policy)
+yield* serveNativeMcp(residentAdmissionMiddleware(admissions))
 ```
 
-These are target interfaces. Admission and renewal are not yet implemented.
+These show the implemented scoped ownership shape. The server composition also
+includes its request context and outer native transport policy.
 Ordinary stdio and direct HTTP omit the private owner and retain their behavior.
 
 The resource core now exists as `makeAttachmentOwner`. Its scoped `withWork`
@@ -32,8 +32,8 @@ accepts explicit `use` and `cleanup` effects. Only successful cleanup certifies
 ticket completion; typed cleanup failures and defects retain a blocked ticket
 and native capabilities. A generation-scoped drain fences admission and signals
 owned cancellation. Close callers interruptibly join that same drain, so a
-caller deadline leaves cleanup ownership alive. Production admission must supply
-the bounded close policy and wire the actual HTTP target-retention lifecycle.
+caller deadline leaves cleanup ownership alive. Production admission supplies the bounded close policy and wraps the actual
+HTTP target-retention lifecycle.
 
 ## Shape
 
@@ -52,8 +52,8 @@ no durable MCP session. The native runtime retains all negotiated protocol data.
 Release closes admission, interrupts only owned work, waits for its cleanup, then
 runs owned native release capabilities. Repeated release joins the same outcome.
 Failed cleanup retains blocked ownership and cannot authorize replacement or
-ordinary idle retirement. Unknown dispatched outcomes survive membership disposal
-under the recovery policy; release never establishes non-dispatch or permits replay.
+ordinary idle retirement. Release never establishes non-dispatch or permits replay. Retaining unknown
+dispatched outcomes under a durable recovery policy remains required by #327.
 
 ## Native adoption transaction
 
@@ -102,9 +102,17 @@ adoption rollback, repeated release and unchanged absent-hook direct HTTP.
 Then hold actual target cleanup while releasing an attachment and prove that
 session removal waits. HTTP response completion alone is insufficient evidence.
 
-Explicit controls still need measured lease and capacity policies, bounded
-non-resurrecting registry growth, lost control responses and crash-expiry checks.
-Pause/resume after expiry must not renew the old identity or replay pending work.
-No numerical heartbeat or expiry policy is qualified by this design. Existing
-request, cleanup and stdout bounds remain unchanged. Quint and packaged process
-checks must cover the resulting ownership transitions and their limits.
+Explicit controls now use the measured policy recorded in
+[resident-lease-policy.md](resident-lease-policy.md). Server-issued random
+capabilities expire without client acknowledgment, including when admission's
+successful reply is lost. Registry capacity is bounded; cleanup failure retains
+its slot. Monotonic eligibility is checked at reservation and renewal, so a
+paused adapter cannot revive an expired identity. The adapter stops on heartbeat
+failure without readmission or replay.
+
+Real TLS tests cover lost replies and actual target cleanup. Packaged process
+tests cover death and pause/resume with an independent survivor. The attachment
+Quint model covers bounded lease transitions, but implementation observation
+alignment, managed idle retirement and durable unknown-outcome recovery remain
+pending. Calibration is limited to Linux metadata traffic without live Huly;
+it does not qualify final platform support or real Huly performance.

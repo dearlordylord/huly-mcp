@@ -5,13 +5,58 @@ import type { McpSchema } from "effect/ai"
 import { expect } from "vitest"
 
 import { makeAttachmentOwner } from "../../src/resident/attachment-owner.js"
+import { MAX_ADAPTER_REQUESTS } from "../../src/resident/adapter-limits.js"
 
 // Native in-memory capability, not a boundary payload.
 type Owner = McpSchema.McpHttpSessionOwner["Service"]
 
+it.effect("bounds retained work and cancels only its attachment's requests", () =>
+  Effect.gen(function* () {
+    const attachment = yield* makeAttachmentOwner(Effect.succeed(true))
+    const survivor = yield* makeAttachmentOwner(Effect.succeed(true))
+    const cleaned = yield* Ref.make(0)
+    for (let index = 0; index < MAX_ADAPTER_REQUESTS; index++) {
+      const started = yield* Deferred.make<void>()
+      yield* attachment
+        .withWork({
+          use: () => Deferred.succeed(started, undefined).pipe(Effect.andThen(Effect.never)),
+          cleanup: () => Ref.update(cleaned, (count) => count + 1)
+        })
+        .pipe(Effect.exit, Effect.forkScoped)
+      yield* Deferred.await(started)
+    }
+    expect(
+      Exit.isFailure(
+        yield* Effect.exit(
+          attachment.withWork({
+            use: () => Effect.die("Excess work must not dispatch"),
+            cleanup: () => Effect.die("Unadmitted work owns no cleanup")
+          })
+        )
+      )
+    ).toBe(true)
+    const survivorStarted = yield* Deferred.make<void>()
+    const survivorFinish = yield* Deferred.make<void>()
+    const survivorDone = yield* Deferred.make<void>()
+    const request = yield* survivor
+      .withWork({
+        use: () => Deferred.succeed(survivorStarted, undefined).pipe(Effect.andThen(Deferred.await(survivorFinish))),
+        cleanup: () => Deferred.succeed(survivorDone, undefined).pipe(Effect.asVoid)
+      })
+      .pipe(Effect.forkScoped)
+    yield* Deferred.await(survivorStarted)
+    yield* attachment.close
+    expect(yield* Ref.get(cleaned)).toBe(MAX_ADAPTER_REQUESTS)
+    expect(yield* Deferred.isDone(survivorDone)).toBe(false)
+    yield* Deferred.succeed(survivorFinish, undefined)
+    yield* Fiber.join(request)
+    yield* survivor.close
+  }).pipe(Effect.scoped)
+)
+
 it.effect("declines adoption after a reservation ends and rejects duplicate ownership", () =>
   Effect.gen(function* () {
-    const attachment = yield* makeAttachmentOwner
+    const attachment = yield* makeAttachmentOwner(Effect.succeed(true))
     const captured = yield* Deferred.make<Owner>()
     const releases = yield* Ref.make(0)
     const session = { id: "session", release: Ref.update(releases, (count) => count + 1).pipe(Effect.as(true)) }
@@ -21,6 +66,7 @@ it.effect("declines adoption after a reservation ends and rejects duplicate owne
           yield* Deferred.succeed(captured, owner)
           expect(yield* owner.adopt(session)).toBe(true)
           expect(yield* owner.adopt(session)).toBe(false)
+          expect(yield* owner.adopt({ ...session, id: "another-initialization" })).toBe(false)
         }),
       cleanup: () => Effect.void
     })
@@ -34,7 +80,7 @@ it.effect("declines adoption after a reservation ends and rejects duplicate owne
 
 it.effect("allows an already retained initialization to adopt during its cancellation cleanup", () =>
   Effect.gen(function* () {
-    const attachment = yield* makeAttachmentOwner
+    const attachment = yield* makeAttachmentOwner(Effect.succeed(true))
     const started = yield* Deferred.make<void>()
     const adopted = yield* Ref.make(false)
     const released = yield* Ref.make(false)
@@ -59,7 +105,7 @@ class CleanupUnavailable extends Schema.TaggedError<CleanupUnavailable>()("Clean
 
 it.effect.each(["typed", "defect"])("keeps sessions and fences admission after %s cleanup failure", (mode) =>
   Effect.gen(function* () {
-    const attachment = yield* makeAttachmentOwner
+    const attachment = yield* makeAttachmentOwner(Effect.succeed(true))
     const released = yield* Ref.make(false)
     const failed = yield* Effect.exit(
       attachment.withWork({
@@ -83,7 +129,7 @@ it.effect.each(["typed", "defect"])("keeps sessions and fences admission after %
 
 it.effect("bounds a close waiter without cancelling retained cleanup or reopening admission", () =>
   Effect.gen(function* () {
-    const attachment = yield* makeAttachmentOwner
+    const attachment = yield* makeAttachmentOwner(Effect.succeed(true))
     const started = yield* Deferred.make<void>()
     const cleaning = yield* Deferred.make<void>()
     const complete = yield* Deferred.make<void>()

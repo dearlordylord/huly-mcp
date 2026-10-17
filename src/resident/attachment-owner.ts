@@ -1,9 +1,8 @@
 import { Deferred, Effect, Exit, Fiber, Schema } from "effect"
 import type { McpSchema } from "effect/ai"
 
-export class AttachmentClosed extends Schema.TaggedError<AttachmentClosed>()("AttachmentClosed", {
-  message: Schema.String
-}) {}
+import { RequestWorkRejected } from "../runtime/request-work.js"
+import { MAX_ADAPTER_REQUESTS } from "./adapter-limits.js"
 
 export class AttachmentCleanupFailed extends Schema.TaggedError<AttachmentCleanupFailed>()("AttachmentCleanupFailed", {
   message: Schema.String
@@ -19,7 +18,7 @@ interface Work {
 }
 
 /** One admitted adapter. The caller must put the entire request cleanup inside withWork. */
-export const makeAttachmentOwner = Effect.gen(function* () {
+export const makeAttachmentOwner = Effect.fn("makeAttachmentOwner")(function* (eligible: Effect.Effect<boolean>) {
   const work = new Set<Work>()
   const sessions = new Map<string, Session>()
   let accepting = true
@@ -30,7 +29,11 @@ export const makeAttachmentOwner = Effect.gen(function* () {
       done: yield* Deferred.make<void, AttachmentCleanupFailed>(),
       status: "running"
     }
-    if (!accepting) return yield* new AttachmentClosed({ message: "Resident attachment no longer accepts work" })
+    const eligibility = yield* eligible
+    if (!accepting || !eligibility)
+      return yield* new RequestWorkRejected({ message: "Resident attachment no longer accepts work" })
+    if (work.size >= MAX_ADAPTER_REQUESTS)
+      return yield* new RequestWorkRejected({ message: "Resident attachment reached its retained work limit" })
     work.add(ticket)
     return ticket
   })
@@ -54,7 +57,7 @@ export const makeAttachmentOwner = Effect.gen(function* () {
   const sessionOwner = (ticket: Work): SessionOwner => ({
     adopt: (session) =>
       Effect.sync(() => {
-        if (!work.has(ticket) || ticket.status !== "running" || sessions.has(session.id)) return false
+        if (!work.has(ticket) || ticket.status !== "running" || sessions.size > 0) return false
         sessions.set(session.id, session)
         return true
       })
@@ -96,5 +99,11 @@ export const makeAttachmentOwner = Effect.gen(function* () {
     Effect.andThen(Fiber.join(drain))
   )
 
-  return { withWork, close, ownsSession: (id: string) => Effect.sync(() => sessions.has(id)) }
+  return {
+    withWork,
+    close,
+    closed: Fiber.join(drain),
+    accepting: Effect.sync(() => accepting),
+    ownsSession: (id: string) => Effect.sync(() => sessions.has(id))
+  }
 })

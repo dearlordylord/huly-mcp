@@ -165,3 +165,17 @@ it("removes its published descriptor and temporary file when the owner is interr
     )
     expect(await fs.readdir(root)).toEqual([])
   }))
+
+it("refuses oversized publication before creating generation state", async () =>
+  withDirectory(async (directory) => {
+    const descriptor = ResidentAttachment.make({ ...attachment(), authorization: Redacted.make("x".repeat(TOO_LARGE)) })
+    const outcome = await Effect.runPromise(
+      Effect.result(
+        withPublishedResidentAttachment(directory, descriptor, () =>
+          Effect.die("Oversized descriptor must not be published")
+        )
+      )
+    )
+    expect(Result.isFailure(outcome) && outcome.failure.kind).toBe("input")
+    expect(await fs.readdir(directory)).toEqual([])
+  }))

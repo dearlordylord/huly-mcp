@@ -1,7 +1,12 @@
-import { Effect, Stream } from "effect"
+import { Effect, Result, Schema, Stream } from "effect"
 import { describe, expect, it } from "vitest"
 
-import { decodeBackendMessages } from "../../src/resident/response-stream.js"
+import {
+  advanceBackendResponse,
+  BackendMessage,
+  decodeBackendMessages,
+  finishBackendResponse
+} from "../../src/resident/response-stream.js"
 
 const encode = (text: string) => new TextEncoder().encode(text)
 const result = { jsonrpc: "2.0", id: 1, result: { name: "first host" } }
@@ -51,4 +56,16 @@ describe("resident backend response stream", () => {
       ])
     ).rejects.toThrow("Invalid backend protocol response")
   })
+})
+
+it("enforces response ownership and one terminal reply per request", () => {
+  const notification = { jsonrpc: "2.0", method: "notifications/progress" }
+  const parse = Schema.decodeUnknownSync(BackendMessage)
+  expect(advanceBackendResponse("awaiting", 1, parse(notification))).toEqual(Result.succeed("awaiting"))
+  expect(advanceBackendResponse("awaiting", 1, parse(result))).toEqual(Result.succeed("answered"))
+  expect(Result.isFailure(advanceBackendResponse("awaiting", 2, parse(result)))).toBe(true)
+  expect(Result.isFailure(advanceBackendResponse("answered", 1, parse(result)))).toBe(true)
+  expect(Result.isFailure(finishBackendResponse("awaiting", 1))).toBe(true)
+  expect(Result.isSuccess(finishBackendResponse("answered", 1))).toBe(true)
+  expect(Result.isSuccess(finishBackendResponse("awaiting", undefined))).toBe(true)
 })

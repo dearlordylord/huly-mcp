@@ -1,10 +1,11 @@
 /** Request-local configuration, Huly lease, and client-disconnect ownership for MCP HTTP. */
-import { Deferred, Effect, type Exit } from "effect"
-import type * as HttpMiddlewareModule from "effect/http/HttpMiddleware"
+import { Deferred, Effect, type Exit, Option } from "effect"
 import * as HttpServerRequest from "effect/http/HttpServerRequest"
+import * as HttpServerResponse from "effect/http/HttpServerResponse"
 
 import { type SanitizedHulyRuntimeConfigContext, sanitizeHulyRuntimeConfigFromEnv } from "../config/config.js"
 import type { ClientBundle, ClientResolver, HulyClientBundleError } from "../runtime/client-resolver.js"
+import { RequestWorkCleanupFailed, RequestWorkOwner, RequestWorkRejected } from "../runtime/request-work.js"
 import { createRequestClientLifecycle, type RequestClientLease } from "./request-client-lifecycle.js"
 import { McpRequestContextService } from "./request-context.js"
 
@@ -75,8 +76,8 @@ const interruptWhenRequestAborts = <A, E, R>(
 }
 
 export const requestContextMiddleware =
-  (options: HttpRequestContextOptions): HttpMiddlewareModule.HttpMiddleware =>
-  (httpEffect) =>
+  (options: HttpRequestContextOptions) =>
+  <E, R>(httpEffect: Effect.Effect<HttpServerResponse.HttpServerResponse, E, R>) =>
     Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest
       const webRequest = toWebRequest(request)
@@ -96,13 +97,31 @@ export const requestContextMiddleware =
         retainClients: lifecycle.retain,
         cancellation: Deferred.await(cancellation).pipe(Effect.andThen(Effect.interrupt))
       })
-      return yield* Effect.acquireUseRelease(
-        Effect.succeed(context),
-        (requestContext) =>
-          interruptWhenRequestAborts(
-            request,
-            Effect.provideService(httpEffect, McpRequestContextService, requestContext)
-          ).pipe(Effect.onInterrupt(() => Deferred.succeed(cancellation, undefined))),
-        () => Effect.promise(lifecycle.close).pipe(Effect.ignore)
+      const use = interruptWhenRequestAborts(
+        request,
+        Effect.provideService(httpEffect, McpRequestContextService, context)
+      ).pipe(Effect.onInterrupt(() => Deferred.succeed(cancellation, undefined)))
+      const cleanup = Effect.tryPromise({
+        try: lifecycle.close,
+        catch: () => new RequestWorkCleanupFailed({ message: "HTTP request client cleanup was not confirmed" })
+      })
+      const owner = yield* Effect.serviceOption(RequestWorkOwner)
+      const owned = Option.isSome(owner)
+        ? owner.value.withWork({ use, cleanup }).pipe(
+            Effect.catchIf(
+              (error): error is RequestWorkRejected => error instanceof RequestWorkRejected,
+              (error) => Effect.succeed(HttpServerResponse.text(error.message, { status: 409 }))
+            )
+          )
+        : Effect.acquireUseRelease(
+            Effect.void,
+            () => use,
+            () => cleanup
+          )
+      return yield* owned.pipe(
+        Effect.catchIf(
+          (error): error is RequestWorkCleanupFailed => error instanceof RequestWorkCleanupFailed,
+          (error) => Effect.succeed(HttpServerResponse.text(error.message, { status: 503 }))
+        )
       )
     })

@@ -510,3 +510,131 @@ Private controls, adapter identity/membership authorization, the actual HTTP
 retention boundary and final qualification remain pending. No full quality gate,
 live Huly run or platform qualification is claimed for this increment. All six
 issues remain incomplete.
+
+## Private attachment admission and expiring eligibility
+
+The manually started resident now issues a private attachment capability before
+accepting MCP work. POST `/resident/attachments` admits one adapter; PUT renews
+its lease and DELETE fences admission and joins cleanup. The generation's TLS,
+bearer, Host and Origin checks wrap these controls. MCP requests require the
+capability, and a legacy UUID must belong to that same attachment. No Huly
+client is acquired before attachment authorization. A rejected or expired
+attachment cannot dispatch a queued request or revive its former membership.
+
+The adapter owns admission, heartbeat and release around its existing stdio
+bridge. Renewal failure stops the adapter without readmission or operation
+replay. Acquisition remains interruptible even inside `acquireUseRelease`.
+A lost successful admission reply leaves a server-owned lease which expires
+without acknowledgment. Generation-owned cleanup continues after a DELETE
+waiter times out. Capacity is reclaimed only after successful cleanup;
+unverified cleanup retains ownership and its slot.
+
+The policy is recorded in [resident-lease-policy.md](resident-lease-policy.md),
+including the monotonic calibration collected before lifecycle wiring. Defaults
+are 32 attachments, eight requests per attachment, a 30-second lease, five-second
+renewals and five-second control or close waits. Managed startup and idle
+retirement are not implemented. The proposed idle policy in that document is
+not active behavior. Attachment and native-session headers extend Effect's
+existing redacted header set on both client and server paths.
+
+Evidence for this increment:
+
+- `/tmp/resident-lease-death-pause-process-tests.log`: six packaged process tests
+  pass. A killed adapter's slot expires while another adapter keeps the same
+  backend. A paused adapter resumes after expiry, stops with exit 1, and emits
+  no reply to its queued ping. A fresh adapter can use the reclaimed slot.
+- Actual HTTP target retention is now exercised by a real native MCP tool through
+  `requestContextMiddleware`, the production request-client lifecycle and the
+  attachment owner. Native release follows both target cleanup and client close;
+  an independent adapter survives. Fixture ports provide client behavior.
+- `/tmp/resident-admission-lost-reply-test.log`: the real TLS lost-reply test
+  cancels admission acquisition, retains capacity until TestClock expiry, then
+  admits a fresh adapter. The expired token cannot renew.
+- `/tmp/resident-renewal-failure-tests.log`: rejected and stalled renewals stop
+  without readmission or replay. Static failures do not expose response payloads.
+- `/tmp/resident-admission-coverage.log`: 30 focused tests pass. The initial
+  focused coverage report misses 99% and is diagnostic evidence only. Additional
+  admission rejection and successful renewal cases pass in
+  `/tmp/resident-control-final-tests.log`. Final coverage remains unconfirmed.
+- `/tmp/resident-admission-final-typecheck.log`: 1,232 files checked, zero errors
+  or warnings. The latest lint and full gate are tracked separately.
+- The updated attachment model passes four scenarios and 1,000 sampled traces
+  with all nine witnesses. See its model report for bounds and reproduction.
+- Fresh Standards and Spec reviews found no remaining scoped defect after the
+  lost-admission-reply correction. Their review does not certify live Huly,
+  managed idle, platform behavior or the complete six-issue specification.
+
+The latest process rerun strengthens the initialization assertion to parse the
+native successful initialize result. Its receipt and the full quality gate must
+be checked before committing this increment. Live Huly, complete lifecycle
+observation alignment, automatic ownership, profile isolation, recovery and
+final platform qualification remain outstanding. No issue is accepted complete.
+
+### Source-level coverage and failure boundaries
+
+The first full gate passed all 5,461 tests but failed coverage. Bundled adapter
+processes do not contribute source coverage, so direct source-level tests now use
+the same real TLS fixture with Effect's Stdio service. They cover JSON and SSE
+output, clean EOF, cancellation, negotiated legacy reuse, duplicate and foreign
+responses, partial streams, notifications, capacity and duplicate-ID rejection,
+oversized input, and a TestClock-controlled stdout write timeout.
+
+Additional cases cover invalid session headers, unencodable outgoing data,
+connection loss without replay, successful renewal across two heartbeats,
+capability collision, cleanup refusal over HTTP, oversized descriptor publication,
+unsafe filesystem ancestors, IPv6 loopback, and use of an agent after scope close.
+The alias test checks its actual OS prerequisite and retains controlled fixture
+coverage when the OS alias is unavailable. The entropy port returns a parsed
+capability through an Effect; production still uses cryptographic random bytes.
+No module mocks, coverage exclusions or threshold changes were introduced.
+
+Subsequent full runs passed 5,484 and 5,497 tests but still missed branch coverage.
+Their retained receipts are `/tmp/resident-admission-coverage-expanded.log` and
+`/tmp/resident-admission-check-all-final.log`. The latter met all other coverage
+thresholds. Tests now additionally exercise the manual backend's actual admission
+middleware and reject invalid listener addresses before readiness, with owned TCP
+listener cleanup. Those seven focused tests pass in
+`/tmp/resident-native-server-boundary-tests.log`.
+
+Fresh Standards review found the Linux alias assumption, confirmed its correction,
+and found no further actionable finding in the new boundary tests. Spec review
+found no scoped defect in the token-source port or retained lease behavior.
+The completed full gate receipt is `/tmp/resident-admission-check-all-green.log`;
+it exits zero.
+
+
+The next full run passed 5,499 tests but still missed branch coverage at 98.99%
+(`/tmp/resident-admission-check-all-complete.log`). A real native resource-list
+request after quiescing admission now proves refusal before Huly acquisition.
+The final boundary cohort passes eight tests in
+`/tmp/resident-final-native-boundary-tests.log`; 1,239 files pass TypeScript and
+Effect diagnostics in `/tmp/resident-resource-listener-typecheck.log`.
+
+The listener fixture initially used an obsolete handwritten socket-address shape;
+the installed `NetAddress` constructors corrected that diagnostic failure. A
+status-only ping exposed a test shutdown timeout. An attempted string replacement
+missed its formatted callback, which the reviewer caught. The exact correction
+now consumes the full response before release and was read back by the reviewer.
+The resource-list fixture's map is explicitly typed. The intervening diagnostic
+and timeout receipts remain in `/tmp/resident-admission-check-all-certified.log`,
+`/tmp/resident-admission-check-all-verified.log`, and
+`/tmp/resident-native-server-boundary-corrected-tests.log`. No deadline changed.
+
+
+### Verified increment
+
+`pnpm check-all` passes on the coherent Linux candidate. All 429 test files and
+5,500 tests pass. Coverage is 99.46% statements, 99.00% branches, 99.03% functions
+and 99.55% lines, with the original 99% thresholds. Build, TypeScript and Effect
+diagnostics, dependency cycles, complexity, lint, format, duplication and the
+remaining project gate checks pass. Duplication remains 0.92%.
+
+The stronger packaged process rerun passes all six cases in
+`/tmp/resident-lease-death-pause-process-final.log`. Standards confirmed the actual
+response-consumption and map-type corrections and has no remaining finding;
+Spec has no remaining scoped defect. No code changed after the passing full gate.
+
+This verifies the manual attachment admission and lease increment. It does not
+accept any complete issue. Live Huly, automatic ownership, profile isolation,
+managed idle, durable recovery, complete lifecycle observation alignment and
+final native platform qualification remain outstanding.
