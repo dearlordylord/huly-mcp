@@ -1,5 +1,5 @@
 import * as fs from "node:fs/promises"
-import { ConfigProvider, Deferred, Effect, Exit, Fiber, Redacted, Schema } from "effect"
+import { ConfigProvider, Deferred, Effect, Exit, Fiber, Layer, Redacted, Result, Schema } from "effect"
 import { expect, it } from "vitest"
 
 import { withPublishedResidentAttachment } from "../../src/resident/attachment-file.js"
@@ -15,6 +15,9 @@ import { acquireSelectionClaim, SelectionClaimError } from "../../src/resident/s
 import { ResidentFilePath } from "../../src/resident/protected-path.js"
 import { MAX_REGISTRY_RECORDS, ResidentRegistryEnvelope } from "../../src/resident/managed-contract.js"
 import { registryAttachment, withRegistryDirectory } from "../helpers/resident-registry-fixture.js"
+import { makeManualResidentBackend } from "../../src/resident/manual-backend.js"
+import { McpServerService } from "../../src/mcp/server.js"
+import { TelemetryService } from "../../src/telemetry/telemetry.js"
 
 const OWNER_PROCESS_BOUND = 30_000
 const NON_PRIVATE_DIRECTORY = 0o755
@@ -45,6 +48,54 @@ const withOwner = <A, E>(
       })
     )
   })
+
+it("retains its registry after native transport drain fails", async () =>
+  withOwner((ownership, capture) =>
+    Effect.gen(function* () {
+      const backend = yield* makeManualResidentBackend({
+        mode: "configured",
+        selection: capture.selection,
+        lifetime: "foreground",
+        startup: yield* makeStartupBudget
+      })
+      const outcome = yield* Effect.gen(function* () {
+        const server = yield* McpServerService
+        return yield* runOwnedGeneration(ownership, (ready) =>
+          backend.run(server, (file) => ready(file).pipe(Effect.andThen(server.stop())))
+        )
+      }).pipe(
+        Effect.provide(
+          McpServerService.layer({
+            transport: "http",
+            httpHost: "127.0.0.1",
+            httpPort: 0,
+            mcpAuthToken: backend.authorization,
+            ...backend.httpPolicy,
+            resolveClients: () => Promise.reject(new Error("Retirement fixture must not acquire Huly")),
+            closeClients: () => Promise.reject(new Error("private client close cause"))
+          }).pipe(Layer.provide(TelemetryService.testLayer({})))
+        ),
+        Effect.result
+      )
+      expect(Result.isFailure(outcome)).toBe(true)
+      if (Result.isFailure(outcome)) expect(outcome.failure.message).toContain("retirement remains unconfirmed")
+      expect(yield* Effect.promise(() => fs.readdir(`${ownership.directory}/generations`))).toHaveLength(1)
+      const refused = yield* withResidentSelection({
+        directory: ownership.directory,
+        capture,
+        startup: yield* makeStartupBudget,
+        existing: () => Effect.die("Unconfirmed transport reattached"),
+        absent: () => Effect.die("Unconfirmed transport was replaced")
+      }).pipe(Effect.result)
+      expect(Result.isFailure(refused)).toBe(true)
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(
+        ConfigProvider.layer(ConfigProvider.fromUnknown({ MCP_RESIDENT_STATE_DIRECTORY: ownership.directory }))
+      ),
+      Effect.timeout("5 seconds")
+    )
+  ))
 
 it("bounds claim contention without removing the still-owned claim", { timeout: OWNER_PROCESS_BOUND }, async () =>
   withOwner((ownership, capture) =>

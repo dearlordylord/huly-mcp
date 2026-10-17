@@ -187,6 +187,7 @@ export const makeResidentHttpsListener = (identity: ResidentTlsIdentity): Server
 
 export const makeResidentHttpServerFactory = (identity: ResidentTlsIdentity): HttpServerFactory => ({
   protocol: "https",
+  shutdownPolicy: "confirmed",
   make: (port, host, gracefulShutdownTimeout) => {
     if (host !== "127.0.0.1" && host !== "::1")
       return Effect.fail(new HttpTransportError({ message: "Resident listener requires a literal loopback binding" }))

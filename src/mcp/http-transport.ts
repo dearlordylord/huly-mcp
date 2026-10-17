@@ -9,7 +9,7 @@
 import { NodeHttpServer } from "@effect/platform-node"
 import { timingSafeEqual } from "node:crypto"
 import { createServer as createNodeServer } from "node:http"
-import { Cause, Context, Effect, Exit, Layer, Redacted, Schema, Scope, type Duration } from "effect"
+import { Cause, Context, Effect, Exit, Fiber, Layer, Redacted, Schema, Scope, type Duration } from "effect"
 import { HttpRouter, HttpServer } from "effect/http"
 import type * as HttpMiddlewareModule from "effect/http/HttpMiddleware"
 import * as HttpHeaders from "effect/http/Headers"
@@ -87,6 +87,7 @@ export class HttpTransportError extends Schema.TaggedError<HttpTransportError>()
  */
 export interface HttpServerFactory {
   readonly protocol?: "http" | "https"
+  readonly shutdownPolicy?: "best-effort" | "confirmed"
   readonly make: (
     port: HttpPort,
     host: HttpHost,
@@ -218,40 +219,74 @@ const boundedShutdownStep = (
   gracePeriod: Duration.Input,
   timeoutMessage: string,
   failurePrefix: string,
-  writeError: (message: string) => void
-): Effect.Effect<void> =>
-  effect.pipe(
-    Effect.timeoutOrElse({ duration: gracePeriod, orElse: () => Effect.sync(() => writeError(`${timeoutMessage}\n`)) }),
-    Effect.catchCause((cause) =>
-      Effect.sync(() => writeError(`${failurePrefix}: ${errorMessage(Cause.squash(cause))}\n`))
+  writeError: (message: string) => void,
+  policy: NonNullable<HttpServerFactory["shutdownPolicy"]>,
+  operation: "drain" | "listener"
+): Effect.Effect<void, HttpTransportError> => {
+  const report = (message: string) =>
+    Effect.try({
+      try: () => writeError(`${message}\n`),
+      catch: () =>
+        new HttpTransportError({
+          message: "MCP HTTP shutdown diagnostic could not be delivered; retirement remains unconfirmed"
+        })
+    }).pipe(Effect.andThen(policy === "confirmed" ? Effect.fail(new HttpTransportError({ message })) : Effect.void))
+  return Effect.gen(function* () {
+    // The detached operation retains its scope until cleanup settles; only its waiter is bounded.
+    const closing = yield* effect.pipe(Effect.exit, Effect.forkDetach({ startImmediately: true }))
+    return yield* Fiber.join(closing).pipe(
+      Effect.flatMap((exit) =>
+        Exit.isSuccess(exit)
+          ? Effect.void
+          : report(
+              policy === "confirmed"
+                ? `${failurePrefix}; retirement remains unconfirmed`
+                : `${failurePrefix}: ${errorMessage(Cause.squash(exit.cause))}`
+            )
+      ),
+      Effect.timeoutOrElse({
+        duration: gracePeriod,
+        orElse: () =>
+          Effect.sync(() => {
+            if (operation === "drain") closing.interruptUnsafe()
+          }).pipe(
+            Effect.andThen(
+              report(policy === "confirmed" ? `${timeoutMessage}; retirement remains unconfirmed` : timeoutMessage)
+            )
+          )
+      })
     )
-  )
+  })
+}
 
 const closeTransportScope = (
   scope: Scope.Closeable,
   gracePeriod: Duration.Input,
   writeError: (message: string) => void,
-  onShutdown: (() => Effect.Effect<void, unknown>) | undefined
-): Effect.Effect<void> =>
-  boundedShutdownStep(
-    onShutdown?.() ?? Effect.void,
-    gracePeriod,
-    "MCP HTTP server drain timed out",
-    "MCP HTTP server drain failed",
-    writeError
-  ).pipe(
-    // Always close the listener scope, even when application-level draining
-    // reaches its deadline.
-    Effect.andThen(
-      boundedShutdownStep(
-        Scope.close(scope, Exit.void),
-        gracePeriod,
-        "MCP HTTP server shutdown timed out",
-        "MCP HTTP server shutdown failed",
-        writeError
-      )
+  onShutdown: (() => Effect.Effect<void, unknown>) | undefined,
+  policy: NonNullable<HttpServerFactory["shutdownPolicy"]>
+): Effect.Effect<void, HttpTransportError> =>
+  Effect.gen(function* () {
+    const drain = yield* boundedShutdownStep(
+      Effect.suspend(() => onShutdown?.() ?? Effect.void),
+      gracePeriod,
+      "MCP HTTP server drain timed out",
+      "MCP HTTP server drain failed",
+      writeError,
+      policy,
+      "drain"
+    ).pipe(Effect.exit)
+    yield* boundedShutdownStep(
+      Scope.close(scope, Exit.void),
+      gracePeriod,
+      "MCP HTTP server shutdown timed out",
+      "MCP HTTP server shutdown failed",
+      writeError,
+      policy,
+      "listener"
     )
-  )
+    if (Exit.isFailure(drain)) return yield* Effect.failCause(drain.cause)
+  })
 
 const transportMiddleware = (config: HttpTransportConfig): HttpMiddlewareModule.HttpMiddleware => {
   const policy = httpPolicyMiddleware(config)
@@ -296,7 +331,14 @@ export const startHttpTransport = <A, E>(
               yield* config.shutdown ?? Effect.never
             })
           ),
-        (scope) => closeTransportScope(scope, gracePeriod, writeError, config.onShutdown)
+        (scope) =>
+          closeTransportScope(
+            scope,
+            gracePeriod,
+            writeError,
+            config.onShutdown,
+            factory.shutdownPolicy ?? "best-effort"
+          )
       )
     })
   )

@@ -90,6 +90,69 @@ Its process receipt is `/tmp/resident-crash-refusal-vwGFuv.receipt.json`.
 Fresh Standards and Spec reviews identify no remaining finding after the two
 evidence corrections. No production source changes belong to this test increment.
 
+## Native shutdown confirmation
+
+Ownership tracing finds that native HTTP shutdown logs and absorbs drain or
+listener-close failure and timeout. A resident owner could therefore complete
+successfully and retire its registry after incomplete cleanup. The corrected
+transport regression fails against committed source in
+`/tmp/resident-confirmed-shutdown-corrected-red.log`. A separate actual TLS
+server/registry regression also fails against committed source in
+`/tmp/resident-native-retirement-registry-red.log`.
+
+Resident TLS factories now require confirmed shutdown. The default direct-HTTP
+factory retains best-effort reporting. A confirmed failure produces a static
+typed `HttpTransportError`; listener cleanup is still attempted after drain
+failure. The resident registry remains published after the failed owner exits,
+and a fresh selection refuses attachment and replacement. This fixes retirement
+proof propagation, not crash replacement.
+
+Review finds two additional failure schedules. An uninterruptible scope finalizer
+can outlast an Effect timeout, and a throwing diagnostic sink can skip listener
+closure. Shutdown now separately owns each cleanup operation and bounds its join
+waiter. A listener close keeps its scope until cleanup settles; timeout reports
+unconfirmed retirement. A timed-out drain receives a nonjoining interruption
+request, retaining any pending cleanup. Diagnostic delivery failures become
+static typed failures. The held-finalizer fixture observes refusal before
+releasing cleanup, then joins its finalizer and actual listener closure.
+
+The corrected observed failure is
+`/tmp/resident-held-retirement-observed-red.log`; the two-case passing run is
+`/tmp/resident-held-retirement-green.log`. Earlier held-finalizer fixtures assumed
+serial finalizer execution and subscribed to listener closure too late; those
+attempts are retained separately and are not the final proof. The initial drain
+fixture also applied its policy to the wrong helper; that wiring error is
+recorded in `/tmp/resident-confirmed-shutdown-green.log` and corrected before
+reproducing the production failure.
+
+The four affected suites pass 40 tests in
+`/tmp/resident-confirmed-retirement-bounded-focused.log`. Explicit drain-finalizer
+joins and held-close/sink cases pass in
+`/tmp/resident-confirmed-retirement-owned-finalizers.log`. TypeScript and Effect
+diagnostics pass for 1,303 files with zero errors or warnings in
+`/tmp/resident-confirmed-retirement-bounded-typecheck.log`. Both scoped reviews
+report no remaining finding after the corrections.
+
+The frozen full gate passes 457 files and 5,645 tests, with statements 99.45%,
+branches 99%, functions 99% and lines 99.56%. All existing diagnostics and limits
+remain enabled. Receipt:
+`/tmp/resident-confirmed-retirement-frozen-check-all.log`, SHA-256
+`e06b35eeca70891f71d8ea8ea7e16fa502753668fa7fd7418a10a1d57d9dea46`.
+The packaged `dist/index.cjs` SHA-256 is
+`a6c463c658dc49c20d59b62a9ec4fa1da812f8a0317b68914faf79ed4072fb59`.
+Its ten-parent receipt is `/tmp/resident-managed-parents-5Q8R15.receipt.json`.
+This pass does not erase the earlier intermittent launch-race failure.
+
+The [recovery design decision](resident-recovery-design.md) records the conditional
+next architecture: a surviving guardian retaining original child and publication
+capabilities. Two independent-role sketches and a cross-review converge on that
+shape, subject to packaged containment falsifiers. No guardian/restricted-worker
+implementation or recovery claim is introduced by this fix. Design artifacts and
+their local failed flag probe remain in
+`/tmp/resident-recovery-design-2d9acdd6/`. The actual current engine contract is
+Node >=22.19.0; stale Node20 framing in the initial design prompt is corrected in
+the maintained decision.
+
 ## Remaining qualification
 
 Complete crash timing schedules, verified replacement with concurrent callers,

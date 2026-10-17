@@ -1,6 +1,7 @@
 import * as http from "node:http"
+import { once } from "node:events"
 
-import { Context, Deferred, Effect, Fiber, Layer, Redacted, type Duration } from "effect"
+import { Context, Deferred, Effect, Fiber, Layer, Redacted, Result, type Duration } from "effect"
 import { HttpRouter, HttpServer, HttpServerResponse } from "effect/http"
 import * as NetAddress from "effect/net/NetAddress"
 import { describe, expect, it } from "vitest"
@@ -31,14 +32,15 @@ const start = async (options?: {
   readonly gracePeriod?: Duration.Input
   readonly onShutdown?: () => Effect.Effect<void, unknown>
   readonly writeError?: (message: string) => void
+  readonly shutdownPolicy?: NonNullable<HttpServerFactory["shutdownPolicy"]>
 }): Promise<RunningTransport> => {
   const listening = await Effect.runPromise(Deferred.make<http.Server>())
   const ready = await Effect.runPromise(Deferred.make<void>())
   const shutdown = await Effect.runPromise(Deferred.make<void>())
-  const factory = makeTestHttpServerFactory(
-    (server) => Effect.runSync(Deferred.succeed(listening, server)),
-    options?.writeError
-  )
+  const factory: HttpServerFactory = {
+    ...makeTestHttpServerFactory((server) => Effect.runSync(Deferred.succeed(listening, server)), options?.writeError),
+    ...(options?.shutdownPolicy === undefined ? {} : { shutdownPolicy: options.shutdownPolicy })
+  }
   const config = {
     host: HttpHost.make(options?.host ?? DEFAULT_HTTP_HOST),
     port: HttpPort.make(0),
@@ -252,6 +254,134 @@ describe("Effect HTTP transport policy", () => {
 
     expect(transport.server.listening).toBe(false)
     expect(diagnostics).toContain("MCP HTTP server drain failed: plain drain failure\n")
+  })
+
+  it.each(["failure", "timeout", "throw"])(
+    "requires confirmed drain after %s while still closing its listener",
+    async (mode) => {
+      const diagnostics: Array<string> = []
+      const drained = Effect.runSync(Deferred.make<void>())
+      const transport = await start({
+        shutdownPolicy: "confirmed",
+        gracePeriod: "20 millis",
+        onShutdown: () => {
+          if (mode === "throw") throw new Error("private drain cause")
+          return (mode === "failure" ? Effect.fail("private drain cause") : Effect.never).pipe(
+            Effect.ensuring(Deferred.succeed(drained, undefined))
+          )
+        },
+        writeError: (message) => diagnostics.push(message)
+      })
+      await expect(transport.stop()).rejects.toThrow("retirement remains unconfirmed")
+      expect(transport.server.listening).toBe(false)
+      expect(diagnostics.some((message) => message.includes("private drain cause"))).toBe(false)
+      if (mode !== "throw") await Effect.runPromise(Deferred.await(drained).pipe(Effect.timeout("1 second")))
+    }
+  )
+
+  it.each(["best-effort", "confirmed"] satisfies ReadonlyArray<NonNullable<HttpServerFactory["shutdownPolicy"]>>)(
+    "closes its listener and preserves the %s policy after a scope finalizer fails",
+    async (shutdownPolicy) => {
+      const diagnostics: Array<string> = []
+      const listening = Effect.runSync(Deferred.make<http.Server>())
+      const native = makeTestHttpServerFactory((server) => Effect.runSync(Deferred.succeed(listening, server)))
+      const factory: HttpServerFactory = {
+        ...native,
+        shutdownPolicy,
+        make: (port, host, grace) =>
+          native
+            .make(port, host, grace)
+            .pipe(Effect.tap(() => Effect.addFinalizer(() => Effect.die("private listener close cause"))))
+      }
+      const outcome = await Effect.runPromise(
+        startHttpTransport(
+          { host: DEFAULT_HTTP_HOST, port: HttpPort.make(0), shutdown: Effect.void },
+          routeLayer,
+          (message) => diagnostics.push(message)
+        ).pipe(Effect.provideService(HttpServerFactoryService, factory), Effect.result)
+      )
+      expect(Result.isFailure(outcome)).toBe(shutdownPolicy === "confirmed")
+      expect((await Effect.runPromise(Deferred.await(listening))).listening).toBe(false)
+      expect(diagnostics.some((message) => message.includes("private listener close cause"))).toBe(
+        shutdownPolicy === "best-effort"
+      )
+    }
+  )
+
+  it("returns unconfirmed retirement while an owned listener finalizer remains held", async () => {
+    const held = Effect.runSync(Deferred.make<void>())
+    const release = Effect.runSync(Deferred.make<void>())
+    const finalizerDone = Effect.runSync(Deferred.make<void>())
+    const closed = Effect.runSync(Deferred.make<void>())
+    const listening = Effect.runSync(Deferred.make<http.Server>())
+    const native = makeTestHttpServerFactory((server) => {
+      server.once("close", () => Effect.runSync(Deferred.succeed(closed, undefined)))
+      Effect.runSync(Deferred.succeed(listening, server))
+    })
+    const factory: HttpServerFactory = {
+      ...native,
+      shutdownPolicy: "confirmed",
+      make: (port, host, grace) =>
+        native
+          .make(port, host, grace)
+          .pipe(
+            Effect.tap(() =>
+              Effect.addFinalizer(() =>
+                Deferred.succeed(held, undefined).pipe(
+                  Effect.andThen(Deferred.await(release)),
+                  Effect.ensuring(Deferred.succeed(finalizerDone, undefined))
+                )
+              )
+            )
+          )
+    }
+    const running = Effect.runFork(
+      startHttpTransport(
+        { host: DEFAULT_HTTP_HOST, port: HttpPort.make(0), shutdown: Effect.void, shutdownGracePeriod: "20 millis" },
+        routeLayer,
+        () => {}
+      ).pipe(Effect.provideService(HttpServerFactoryService, factory))
+    )
+    const server = await Effect.runPromise(Deferred.await(listening))
+    try {
+      await Effect.runPromise(Deferred.await(held))
+      const outcome = await Effect.runPromise(Fiber.join(running).pipe(Effect.result, Effect.timeout("1 second")))
+      expect(Result.isFailure(outcome)).toBe(true)
+      if (Result.isFailure(outcome)) expect(outcome.failure.message).toContain("retirement remains unconfirmed")
+      expect(Deferred.isDoneUnsafe(finalizerDone)).toBe(false)
+    } finally {
+      await Effect.runPromise(Deferred.succeed(release, undefined))
+      if (server.listening) {
+        server.closeAllConnections()
+        server.close()
+      }
+      await Effect.runPromise(Deferred.await(closed).pipe(Effect.timeout("1 second")))
+      await Effect.runPromise(Deferred.await(finalizerDone).pipe(Effect.timeout("1 second")))
+      await Effect.runPromise(Fiber.await(running))
+    }
+  })
+
+  it("closes its listener when its diagnostic sink throws during drain failure", async () => {
+    let ready = false
+    const transport = await start({
+      shutdownPolicy: "confirmed",
+      onShutdown: () => Effect.fail("private drain cause"),
+      writeError: () => {
+        if (ready) throw new Error("private sink cause")
+        ready = true
+      }
+    })
+    try {
+      await expect(transport.stop()).rejects.toThrow("retirement remains unconfirmed")
+      expect(transport.server.listening).toBe(false)
+    } finally {
+      if (transport.server.listening) {
+        const closed = once(transport.server, "close", { signal: AbortSignal.timeout(2_000) })
+        transport.server.closeAllConnections()
+        transport.server.close()
+        await closed
+      }
+    }
   })
 
   it("preserves typed listener startup failures", async () => {
