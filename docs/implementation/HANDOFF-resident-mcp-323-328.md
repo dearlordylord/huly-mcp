@@ -8,6 +8,17 @@ state. It does not change the authoritative requirements in GitHub #322–#328.
 
 ## Latest resumed increment
 
+The latest server-only increment adds the authenticated exact-generation managed
+stop-request route. It reuses admissions fencing and the existing cleanup owner;
+202 means acceptance with retirement unconfirmed. Manual/foreground lifetimes
+refuse. See [design and pending work](resident-stop-design.md) and the
+[checkpoint evidence](issue-327.md#managed-stop-server-checkpoint-2026-10-17).
+The bounded one-shot operator client, CLI and process fault schedules are next.
+Nineteen focused tests and TypeScript/Effect, lint, circular and complexity checks
+pass; fresh Standards/Spec reviews found no actionable server-half defect. This
+is not a full gate or six-ticket completion. Status secret assertions were also
+corrected to check actual fixture keys rather than Redacted wrappers.
+
 The restricted packaged SDK experiment now checks schema-owned IPC challenge and
 reply plus synchronous denial of overwrite, rename and removal outside a narrow
 filesystem write grant. The unrestricted control proves each filesystem probe

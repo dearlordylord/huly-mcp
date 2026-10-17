@@ -141,7 +141,13 @@ export const makeManualResidentBackend = Effect.fn("makeManualResidentBackend")(
     authorization,
     beforeClientsClose: admissions.drain,
     httpPolicy: {
-      httpMiddleware: residentAdmissionMiddleware(admissions, authority),
+      httpMiddleware: residentAdmissionMiddleware(
+        admissions,
+        authority,
+        configuration.mode === "configured" && configuration.lifetime === "managed"
+          ? { kind: "managed", generation: identity.generation, fence: admissions.fence }
+          : { kind: "unsupported" }
+      ),
       beforeHttpShutdown: admissions.fence,
       ...(selection === undefined ? {} : { processPolicy: selection.policy })
     },

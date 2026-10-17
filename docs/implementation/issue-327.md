@@ -34,6 +34,38 @@ that invocation outside Vitest; the isolated packaged test passed before and
 after the boolean assertion change. These controls do not explain the earlier
 failure or resolve launch/process timing qualification.
 
+## Managed stop server checkpoint (2026-10-17)
+
+The [selected design](resident-stop-design.md) reuses the existing admissions
+fence and managed shutdown owner. A private authenticated exact-generation route
+returns acceptance with retirement explicitly unconfirmed. Manual/foreground
+lifetimes refuse. No separate stop fiber, completion witness, journal, PID signal
+or ownership reset is introduced. The operator client and CLI remain pending.
+
+Five focused suites pass 19 tests, including actual TLS authorization, malformed
+and oversized input, wrong generation, duplicate acceptance and held real server
+cleanup (`/tmp/resident-stop-server-verified.log`, SHA-256
+`8e769e74654142f73ff76408b195d551e2edb3d593414a2346bb9aa26ba90e4a`).
+TypeScript and Effect diagnostics pass all 1,326 files with zero warnings
+(`/tmp/resident-stop-http-typecheck.log`, SHA-256
+`6373ee7f66d06cb8a444ef447449deeae146694e6e41868a1ababd78656251f6`).
+Full lint/format/duplication (0.9%), circular dependency and complexity checks pass
+in `/tmp/resident-stop-server-{lint,circular,complexity}.log`. Fresh separate
+Standards and Spec reviews of this server-only increment report no actionable
+findings. No final whole-candidate gate is claimed.
+
+The first native route test exposed socket reset for oversized input and empty
+body handling for 405; the test now permits the bounded oversized refusal/reset
+and verifies subsequent valid requests still work. The first backend test used
+the nonexistent `Fiber.poll`; it was corrected to installed `pollUnsafe` before
+the passing run. Initial logs remain at `/tmp/resident-stop-http-first.log` and
+`/tmp/resident-managed-operator-stop-first.log`.
+
+The tests join real backend cleanup but do not prove enclosing registry receipt
+retirement, lost-ACK outcomes, cleanup-failure retention, packaged CLI behavior or
+verified replacement. Those fault fixtures, remaining six-ticket requirements,
+full gate and final native/live-Huly qualification remain pending.
+
 ## Current refusal and uncertainty policy
 
 ### Managed adapter diagnostic regression (2026-10-17)

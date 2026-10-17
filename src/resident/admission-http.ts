@@ -12,6 +12,7 @@ import {
 import type { makeResidentAdmissions } from "./admissions.js"
 import { attachmentRequestOwner } from "./attachment-http-context.js"
 import type { makeCompatibilityAuthority } from "./compatibility-authority.js"
+import { renderResidentStop, RESIDENT_STOP_PATH, type ResidentStopSupport } from "./operator-stop.js"
 import {
   CompatibilityChallenge,
   CompatibilityError,
@@ -106,7 +107,7 @@ const renderAttachmentControl = (
 
 /** Must run inside the generation's TLS/bearer policy, outside request-client acquisition. */
 export const residentAdmissionMiddleware =
-  (admissions: Admissions, authority?: CompatibilityAuthority) =>
+  (admissions: Admissions, authority?: CompatibilityAuthority, stop?: ResidentStopSupport) =>
   <E, R>(httpEffect: Effect.Effect<HttpServerResponse.HttpServerResponse, E, R>) =>
     Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest
@@ -115,6 +116,7 @@ export const residentAdmissionMiddleware =
           "Configured residents do not accept Huly override headers; select a compatible resident instead",
           { status: HTTP_BAD_REQUEST }
         )
+      if (request.url === RESIDENT_STOP_PATH) return yield* renderResidentStop(stop)
       if (request.url === RESIDENT_COMPATIBILITY_PATH && authority !== undefined)
         return yield* renderChallenge(request, authority)
       if (request.url === RESIDENT_ATTACHMENTS_PATH)
