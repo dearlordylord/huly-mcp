@@ -137,3 +137,10 @@ All cases below are **required evidence to plan**, not passing results.
 5. Pure transition module versus a statechart library. Decide from actual complexity; neither is a prerequisite for discussing the model.
 
 Stage A is an isolated interactive logic prototype with visible state and guided failure paths. Stage B, after discussing ownership, uses actual separate processes, loopback HTTP, private scratch state and owned cleanup to test R5–R16. Stage C uses the real packaged MCP read path, all adapters included in memory accounting, and native platform verification. No stage may claim evidence belonging to a later one. Keep executable prototypes on a throwaway branch; the main branch retains this specification and evidence pointers. Retire prototype executables when a production implementation supersedes them.
+
+
+## Stage A prototype evidence
+
+[Throwaway interactive prototype, commit f8ea68a6](https://github.com/dearlordylord/huly-mcp/blob/f8ea68a6/src/runtime/resident-lifecycle.prototype.html) lives on `prototype/resident-lifecycle-321`, outside master. Download/open its single HTML file; no server or install is needed. It exposes all relevant model state, free-play actions and five guided paths: concurrent attachment, cancellation during model load, unknown write outcome, crash/new generation, and attachment racing drain.
+
+Both script blocks parse; all five guided paths preserve the model's ownership/request/drain assertions. A separate scenario check confirms closing A leaves B's dispatched read and the backend alive while A's dispatched write remains unknown. The provisional model can preserve an old unknown write while a new generation serves a read; it does not replay that write. Simulated external reconciliation/retirement events are assumptions, not implemented proofs. No browser was available for visual verification. This validates the model's own examples only: it does not prove distributed singleton correctness, real cancellation, platform cleanup or total memory. No production code was extracted or activated.
