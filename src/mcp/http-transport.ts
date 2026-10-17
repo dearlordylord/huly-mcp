@@ -68,6 +68,9 @@ export interface HttpTransportConfig {
   /** Completes when the owner requests listener shutdown. */
   readonly shutdown?: Effect.Effect<void> | undefined
   readonly onReady?: (() => Effect.Effect<void>) | undefined
+  readonly onBound?:
+    | ((address: HttpServer.HttpServer["Service"]["address"]) => Effect.Effect<void, HttpTransportError>)
+    | undefined
   readonly onShutdown?: (() => Effect.Effect<void, unknown>) | undefined
   readonly shutdownGracePeriod?: Duration.Input | undefined
 }
@@ -278,6 +281,7 @@ export const startHttpTransport = <A, E>(
           Scope.provide(scope)(
             Effect.gen(function* () {
               const server = yield* factory.make(config.port, config.host, gracePeriod)
+              if (config.onBound !== undefined) yield* config.onBound(server.address)
               const app = yield* HttpRouter.toHttpEffect(appLayer).pipe(
                 Effect.mapError((cause) => new HttpTransportError({ message: "HTTP application setup failed", cause }))
               )

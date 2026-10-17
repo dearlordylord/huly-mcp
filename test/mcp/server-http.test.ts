@@ -5,6 +5,7 @@ import { ConfigProvider, Context, Effect, Exit, Fiber, Layer, Redacted, Schema }
 import { describe, expect, it } from "vitest"
 
 import { ConfigValidationError, sanitizeHulyRuntimeConfigFromEnv } from "../../src/config/config.js"
+import { GetHulyContextResultSchema } from "../../src/domain/schemas/index.js"
 import { HulyClient, type HulyClientOperations } from "../../src/huly/client.js"
 import { HulyConnectionError } from "../../src/huly/errors-base.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
@@ -187,6 +188,24 @@ describe("McpServerService Effect HTTP integration", () => {
       const legacyBody = Schema.decodeUnknownSync(JsonRpcResponse)(await legacy.json())
       expect(legacy.status).toBe(200)
       expect(legacyBody.result?.protocolVersion).toBe("2025-06-18")
+    } finally {
+      await server.stop()
+    }
+  })
+
+  it("reports the allocated listener port when configured with port zero", async () => {
+    const server = await startServer()
+    try {
+      const response = await fetch(
+        server.endpoint,
+        modernRequest("tools/call", { name: "get_huly_context", arguments: {} }, "claude-code")
+      )
+      const body = Schema.decodeUnknownSync(
+        Schema.Struct({
+          result: Schema.Struct({ structuredContent: Schema.Struct({ result: GetHulyContextResultSchema }) })
+        })
+      )(await response.json())
+      expect(body.result.structuredContent.result.transport.http?.port).toBe(Number(new URL(server.endpoint).port))
     } finally {
       await server.stop()
     }

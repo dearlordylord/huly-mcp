@@ -141,3 +141,72 @@ records its bounded domain and unmodeled requirements. This adds local replay
 alignment for response decisions. Full adapter lifecycle observation and the
 remaining parent invariants are still pending. No #323 acceptance criterion or
 later ticket is certified by this increment.
+
+## Native backend identity and response ownership increment
+
+Two packaged adapters now retain the actual Claude Code and Codex identities
+against the packaged native HTTP backend in both modern and legacy modes.
+The native host sees each client's own catalog policy, and `get_huly_context`
+passes SDK output validation. This fixture uses a deliberately unavailable Huly
+endpoint and does not establish live Huly read parity.
+
+Legacy initialization records the backend's redacted session ID and negotiated
+protocol version before forwarding the response. The sequential input consumer
+reserves initialization before forking its HTTP request. A second initialization
+fails before opening another backend session, including while the first request
+waits for response headers. Session termination remains unfinished: the installed
+native HTTP implementation does not support client session termination or expiry.
+
+Native HTTP binding to port zero previously exposed port zero in
+`get_huly_context`, violating its output schema. The transport now supplies the
+actual bound address before readiness, and the server parses its positive TCP
+port for the context result. Existing listener readiness remains separate from
+full Huly-model acquisition.
+
+Fetch responses now have explicit ownership as soon as acquisition succeeds.
+The stream releases its reader lock, and the enclosing finalizer cancels the
+body on completion, failure or interruption. Acquisition remains interruptible,
+including before response headers arrive. Requests and replies use Effect
+Schema encoding rather than direct JSON serialization.
+
+Evidence:
+
+- `/tmp/resident-response-cleanup-red.log` reproduces the live unsupported-body
+  leak. The in-process network check passes after explicit response ownership.
+- `/tmp/resident-native-parity-red.log` records modern context validation and
+  legacy identity failures before the fixes.
+- `/tmp/resident-native-port-red.log` reproduces invalid port-zero output;
+  `/tmp/resident-bound-port-green.log` passes the focused regression.
+- `/tmp/resident-native-port-fix.log` is an interrupted failed attempt. An
+  obsolete address tag caused TypeScript errors; the owned test process was
+  terminated and awaited before correcting it against installed declarations.
+- `/tmp/resident-native-coherent-tests.log` passes 54 affected tests in seven
+  files, covering resident behavior and native HTTP server/transport checks.
+- `/tmp/resident-native-coherent-typecheck.log` checks 1,199 files with zero
+  errors and warnings. The later initialization reservation has separate
+  verification below.
+- `/tmp/resident-overlapping-initialize-red.log` reproduces two overlapping
+  initializers waiting until timeout. `/tmp/resident-overlapping-initialize-green.log`
+  passes five checks, including initialization rejection, pre-header cancellation,
+  body cleanup and packaged modern/legacy catalogs.
+- `/tmp/resident-native-session-final-tests.log` passes all 55 affected tests
+  after initialization reservation. `/tmp/resident-native-session-typecheck.log`
+  checks 1,199 files with zero errors and warnings. Focused lint, complexity,
+  formatting and `git diff --check` also pass for this increment.
+
+### Standards review
+
+The independent review found missing ownership for rejected live response bodies
+and schema bypass through direct JSON encoding. Both findings were fixed. A
+follow-up review of response ownership, encoding, bound-port plumbing, legacy
+headers and initialization reservation reported no new actionable findings.
+This is a scoped review, not acceptance of the entire issue.
+
+### Spec review
+
+The independent review identified no additional incorrect implemented behavior
+or scope expansion. It retained four unfinished requirement groups: independent
+parents with live Huly reads; negotiation and supported interactions; attachment
+identity/generation plus shared-acquisition cancellation; and qualified budgets,
+live evidence and the full gate. Legacy session release also remains unfinished.
+No issue is complete, and #324–#328 remain required.

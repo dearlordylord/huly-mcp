@@ -25,7 +25,6 @@ import * as Stream from "effect/Stream"
 import { McpProtocol, McpServer } from "effect/ai"
 
 import { type SanitizedHulyRuntimeConfigContext, sanitizeHulyRuntimeConfigFromEnv } from "../config/config.js"
-import type { GetHulyContextResult } from "../domain/schemas/index.js"
 import type { ClientBundle, ClientResolver, HulyClientBundleError } from "../runtime/client-resolver.js"
 import { VERSION } from "../version.js"
 import { makeEffectMcpRegistry, type EffectMcpRegistry } from "./effect-ai-registry.js"
@@ -36,12 +35,12 @@ import {
   DEFAULT_HTTP_PORT,
   type HttpServerFactoryService,
   type HttpHost,
-  type HttpPort,
+  HttpPort,
   startHttpTransport,
   type HttpTransportConfig,
-  type HttpTransportError
+  HttpTransportError
 } from "./http-transport.js"
-import { buildHulyContext, type ToolExposureContext } from "./huly-context-tool.js"
+import { buildHulyContext } from "./huly-context-tool.js"
 import type { RequestClientLease } from "./request-client-lifecycle.js"
 import {
   executeBoundedStdioShutdown,
@@ -117,6 +116,7 @@ interface McpServerRunControl {
   readonly shutdown: Deferred.Deferred<void>
   readonly done: Deferred.Deferred<void>
   readonly ready: Deferred.Deferred<void>
+  readonly boundHttpPort: Ref.Ref<HttpPort>
 }
 
 const DEFAULT_SHUTDOWN_GRACE_PERIOD = "5 seconds"
@@ -304,6 +304,13 @@ const runHttpTransport = (
     ...(config.mcpAuthToken === undefined ? {} : { authToken: config.mcpAuthToken }),
     middleware: requestContextMiddleware(config),
     shutdown: Deferred.await(control.shutdown),
+    onBound: (address) =>
+      address._tag !== "UnixPathAddress"
+        ? Schema.decodeUnknownEffect(HttpPort.check(Schema.isGreaterThan(0)))(address.port).pipe(
+            Effect.mapError(() => new HttpTransportError({ message: "HTTP listener returned an invalid bound port" })),
+            Effect.flatMap((boundPort) => Ref.set(control.boundHttpPort, boundPort))
+          )
+        : Effect.fail(new HttpTransportError({ message: "MCP HTTP transport requires a TCP listener" })),
     onReady: () => Deferred.succeed(control.ready, undefined),
     onShutdown: () => runHttpShutdownResources(registry, telemetry, config.closeClients),
     shutdownGracePeriod: config.shutdownGracePeriod ?? DEFAULT_SHUTDOWN_GRACE_PERIOD
@@ -348,11 +355,6 @@ export class McpServerService extends Context.Service<McpServerService, McpServe
         const registries = { fullRegistry, scopedNativeRegistry }
         const getRuntimeConfigContext =
           config.getRuntimeConfigContext ?? (() => sanitizeHulyRuntimeConfigFromEnv(process.env))
-        const getHulyContext = (
-          runtimeConfig: SanitizedHulyRuntimeConfigContext,
-          toolExposure: ToolExposureContext
-        ): GetHulyContextResult =>
-          buildHulyContext(config, scopedNativeRegistry, toolScope, runtimeConfig, toolExposure)
         const toolsets = toolScope.filteringActive ? toolScope.enabledToolsets : null
         telemetry.sessionStart({
           transport: config.transport,
@@ -368,7 +370,8 @@ export class McpServerService extends Context.Service<McpServerService, McpServe
               const control: McpServerRunControl = {
                 shutdown: yield* Deferred.make<void>(),
                 done: yield* Deferred.make<void>(),
-                ready: yield* Deferred.make<void>()
+                ready: yield* Deferred.make<void>(),
+                boundHttpPort: yield* Ref.make(config.httpPort ?? DEFAULT_HTTP_PORT)
               }
               const claimed = yield* Ref.modify(runControlRef, (current) =>
                 current === null ? [true, control] : [false, current]
@@ -383,9 +386,17 @@ export class McpServerService extends Context.Service<McpServerService, McpServe
                   telemetry,
                   registry: registries,
                   getHulyContext: (exposure) =>
-                    requestScopedRuntimeConfig(runtimeConfig).pipe(
-                      Effect.map((requestRuntimeConfig) => getHulyContext(requestRuntimeConfig, exposure))
-                    ),
+                    Effect.gen(function* () {
+                      const requestRuntimeConfig = yield* requestScopedRuntimeConfig(runtimeConfig)
+                      const httpPort = yield* Ref.get(control.boundHttpPort)
+                      return buildHulyContext(
+                        { ...config, httpPort },
+                        scopedNativeRegistry,
+                        toolScope,
+                        requestRuntimeConfig,
+                        exposure
+                      )
+                    }),
                   exposureOptions: { exposureConfig, toolScopeFilteringActive: toolScope.filteringActive }
                 })
 

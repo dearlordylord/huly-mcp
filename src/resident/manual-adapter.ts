@@ -19,11 +19,13 @@ import { Ndjson } from "effect/encoding"
 import {
   advanceBackendResponse,
   BackendResponseError,
+  BackendMessage,
   decodeBackendMessages,
   finishBackendResponse,
   type ResponsePhase
 } from "./response-stream.js"
 import { observeResidentResponse } from "./response-observations.js"
+import { type LegacyHttpSession, parseLegacyHttpSession } from "./protocol-session.js"
 
 const MAX_RESPONSE_MIB = 128
 const MAX_RESPONSE_BYTES = MAX_RESPONSE_MIB * 1024 * 1024
@@ -52,6 +54,10 @@ const HostMessage = Schema.Struct({
   params: Schema.optionalKey(Schema.Unknown)
 })
 type HostMessage = Schema.Schema.Type<typeof HostMessage>
+type AdapterProtocolState =
+  | { readonly _tag: "Fresh" }
+  | { readonly _tag: "Initializing" }
+  | { readonly _tag: "Initialized"; readonly legacySession: Option.Option<LegacyHttpSession> }
 const Routing = Schema.Struct({
   name: Schema.optionalKey(Schema.String),
   uri: Schema.optionalKey(Schema.String),
@@ -80,7 +86,11 @@ const boundedInput = <E, R>(input: Stream.Stream<Uint8Array, E, R>) =>
     Stream.pipeThroughChannel(Ndjson.decodeSchema(HostMessage)())
   )
 
-const requestHeaders = (message: HostMessage, authorization: Redacted.Redacted<string>) => {
+const requestHeaders = (
+  message: HostMessage,
+  authorization: Redacted.Redacted<string>,
+  session: Option.Option<LegacyHttpSession>
+) => {
   const headers = new Headers({
     accept: "application/json, text/event-stream",
     authorization: `Bearer ${Redacted.value(authorization)}`,
@@ -94,6 +104,10 @@ const requestHeaders = (message: HostMessage, authorization: Redacted.Redacted<s
     const name = message.method === "resources/read" ? routing.value.uri : routing.value.name
     if (name !== undefined) headers.set("mcp-name", name)
   }
+  if (Option.isSome(session) && message.method !== "initialize") {
+    headers.set("mcp-session-id", Redacted.value(session.value.id))
+    headers.set("mcp-protocol-version", session.value.protocolVersion)
+  }
   return headers
 }
 
@@ -102,61 +116,82 @@ const forward = (
   authorization: Redacted.Redacted<string>,
   message: HostMessage,
   request: number,
+  protocol: Ref.Ref<AdapterProtocolState>,
   output: Queue.Queue<string, Cause.Done>
 ) =>
   Effect.gen(function* () {
-    const response = yield* Effect.tryPromise({
+    const state = yield* Ref.get(protocol)
+    const session = state._tag === "Initialized" ? state.legacySession : Option.none<LegacyHttpSession>()
+    const encodedRequest = yield* Schema.encodeEffect(Schema.fromJsonString(HostMessage))(message).pipe(
+      Effect.mapError(() => fail("Stdio request could not be encoded; it was not dispatched"))
+    )
+    const acquire = Effect.tryPromise({
       try: (signal) =>
         fetch(endpoint, {
           method: "POST",
-          headers: requestHeaders(message, authorization),
-          body: JSON.stringify(message),
+          headers: requestHeaders(message, authorization, session),
+          body: encodedRequest,
           redirect: "error",
           signal
         }),
       catch: () => fail("Backend connection failed; operation outcome may be unknown. No request was replayed.")
     })
-    const discardBody = Effect.tryPromise({
-      try: () => response.body?.cancel() ?? Promise.resolve(),
-      catch: () => fail("Backend response cleanup failed")
-    })
-    if (!response.ok) {
-      yield* discardBody
-      return yield* fail("Backend rejected the request; no request was replayed")
-    }
-    if (response.status === ACCEPTED || response.status === NO_CONTENT) {
-      yield* discardBody
-      return yield* Effect.fromResult(finishBackendResponse("awaiting", message.id))
-    }
-    const body = response.body
-    if (body === null) return yield* fail("Backend response has no body")
-    const phase = yield* Ref.make<ResponsePhase>("awaiting")
-    const observedRequest = message.id === undefined ? undefined : request
-    observeResidentResponse({ request: observedRequest, event: "Started", accepted: true })
-    yield* decodeBackendMessages({
-      body: Stream.fromReadableStream({ evaluate: () => body, onError: () => fail("Backend response disconnected") }),
-      contentType: response.headers.get("content-type") ?? "",
-      maxBytes: MAX_RESPONSE_BYTES
-    }).pipe(
-      Stream.runForEach((reply) =>
+    yield* Effect.acquireUseRelease(
+      Effect.interruptible(acquire),
+      (response) =>
         Effect.gen(function* () {
-          const decision = advanceBackendResponse(yield* Ref.get(phase), message.id, reply)
-          observeResidentResponse({
-            request: observedRequest,
-            event: !("id" in reply) ? "Progress" : reply.id === message.id ? "OwnReply" : "ForeignReply",
-            accepted: Result.isSuccess(decision)
-          })
-          const next = yield* Effect.fromResult(decision)
-          yield* Ref.set(phase, next)
-          yield* Queue.offer(output, `${JSON.stringify(reply)}\n`).pipe(
-            Effect.flatMap((accepted) => (accepted ? Effect.void : Effect.fail(fail("Stdio output is closed"))))
+          if (!response.ok) return yield* fail("Backend rejected the request; no request was replayed")
+          if (message.method === "initialize")
+            yield* Ref.set(protocol, {
+              _tag: "Initialized",
+              legacySession: yield* parseLegacyHttpSession(response.headers)
+            })
+          if (response.status === ACCEPTED || response.status === NO_CONTENT) {
+            return yield* Effect.fromResult(finishBackendResponse("awaiting", message.id))
+          }
+          const body = response.body
+          if (body === null) return yield* fail("Backend response has no body")
+          const phase = yield* Ref.make<ResponsePhase>("awaiting")
+          const observedRequest = message.id === undefined ? undefined : request
+          observeResidentResponse({ request: observedRequest, event: "Started", accepted: true })
+          yield* decodeBackendMessages({
+            body: Stream.fromReadableStream({
+              evaluate: () => body,
+              onError: () => fail("Backend response disconnected"),
+              releaseLockOnEnd: true
+            }),
+            contentType: response.headers.get("content-type") ?? "",
+            maxBytes: MAX_RESPONSE_BYTES
+          }).pipe(
+            Stream.runForEach((reply) =>
+              Effect.gen(function* () {
+                const decision = advanceBackendResponse(yield* Ref.get(phase), message.id, reply)
+                observeResidentResponse({
+                  request: observedRequest,
+                  event: !("id" in reply) ? "Progress" : reply.id === message.id ? "OwnReply" : "ForeignReply",
+                  accepted: Result.isSuccess(decision)
+                })
+                const next = yield* Effect.fromResult(decision)
+                yield* Ref.set(phase, next)
+                const encodedReply = yield* Schema.encodeEffect(Schema.fromJsonString(BackendMessage))(reply).pipe(
+                  Effect.mapError(() => fail("Backend reply could not be encoded for stdio"))
+                )
+                yield* Queue.offer(output, `${encodedReply}\n`).pipe(
+                  Effect.flatMap((accepted) => (accepted ? Effect.void : Effect.fail(fail("Stdio output is closed"))))
+                )
+              })
+            )
           )
+          const completion = finishBackendResponse(yield* Ref.get(phase), message.id)
+          observeResidentResponse({ request: observedRequest, event: "End", accepted: Result.isSuccess(completion) })
+          yield* Effect.fromResult(completion)
+        }),
+      (response) =>
+        Effect.tryPromise({
+          try: () => response.body?.cancel() ?? Promise.resolve(),
+          catch: () => fail("Backend response cleanup failed")
         })
-      )
     )
-    const completion = finishBackendResponse(yield* Ref.get(phase), message.id)
-    observeResidentResponse({ request: observedRequest, event: "End", accepted: Result.isSuccess(completion) })
-    yield* Effect.fromResult(completion)
   })
 
 export const runManualAdapter = Effect.gen(function* () {
@@ -179,6 +214,7 @@ export const runManualAdapter = Effect.gen(function* () {
   )
   const requests = yield* FiberMap.make<string | number | symbol, void, BackendResponseError>()
   const requestOrdinal = yield* Ref.make(0)
+  const protocol = yield* Ref.make<AdapterProtocolState>({ _tag: "Fresh" })
   const input = boundedInput(stdio.stdin).pipe(
     Stream.runForEach((message) =>
       Effect.gen(function* () {
@@ -191,8 +227,13 @@ export const runManualAdapter = Effect.gen(function* () {
         if ((yield* FiberMap.has(requests, key)) || (yield* FiberMap.size(requests)) >= MAX_REQUESTS) {
           return yield* fail("Stdio request admission limit reached or request id already active")
         }
+        if (message.method === "initialize") {
+          if ((yield* Ref.get(protocol))._tag !== "Fresh")
+            return yield* fail("Adapter initialization already started; start a new adapter for another session")
+          yield* Ref.set(protocol, { _tag: "Initializing" })
+        }
         const ordinal = yield* Ref.updateAndGet(requestOrdinal, (value) => value + 1)
-        yield* FiberMap.run(requests, key, forward(endpoint, authorization, message, ordinal, output))
+        yield* FiberMap.run(requests, key, forward(endpoint, authorization, message, ordinal, protocol, output))
       })
     )
   )
