@@ -47,6 +47,8 @@ import type { ClientBundle, ClientResolver, HulyClientBundleError } from "./runt
 import { createHttpClientLeaseResolver } from "./runtime/http-client-leases.js"
 import { TelemetryService } from "./telemetry/telemetry.js"
 import { writeStderrLine } from "./utils/stderr.js"
+import { makeManualResidentBackend } from "./resident/manual-backend.js"
+import type { ProtectedFileError } from "./resident/protected-path.js"
 
 type AppError =
   | MovementObserverError
@@ -56,10 +58,12 @@ type AppError =
   | StorageClientError
   | McpServerError
   | Config.ConfigError
+  | ProtectedFileError
 
 const getTransportType = Config.String("MCP_TRANSPORT").pipe(
   Config.withDefault("stdio"),
-  Effect.map((t): McpTransportType => {
+  Effect.map((t): McpTransportType | "resident-http" => {
+    if (t === "resident-http") return "resident-http"
     if (t === "http") return "http"
     return "stdio"
   })
@@ -175,12 +179,25 @@ const configureMovementObserver = Effect.fn("configureMovementObserver")(functio
     : undefined
 })
 
-const runConfiguredServer = (transport: McpTransportType): Effect.Effect<void, AppError> =>
+const configureListener = (
+  transport: McpTransportType,
+  resident: Effect.Success<typeof makeManualResidentBackend> | undefined
+) =>
+  Effect.gen(function* () {
+    const httpPort = resident === undefined ? yield* getHttpPort : HttpPort.make(0)
+    const httpHost = resident === undefined ? yield* getHttpHost : HttpHost.make("127.0.0.1")
+    const mcpAuthToken =
+      resident?.authorization ?? (transport === "http" ? Option.getOrUndefined(yield* getMcpAuthToken) : undefined)
+    return { httpPort, httpHost, mcpAuthToken }
+  })
+
+const runConfiguredServer = (
+  transport: McpTransportType,
+  resident: Effect.Success<typeof makeManualResidentBackend> | undefined
+): Effect.Effect<void, AppError> =>
   Effect.gen(function* () {
     const environment = { ...process.env }
-    const httpPort = yield* getHttpPort
-    const httpHost = yield* getHttpHost
-    const mcpAuthToken = transport === "http" ? Option.getOrUndefined(yield* getMcpAuthToken) : undefined
+    const { httpHost, httpPort, mcpAuthToken } = yield* configureListener(transport, resident)
     const lazyEnvs = yield* getLazyEnvs
     const observeMovement = yield* configureMovementObserver()
     const profile =
@@ -228,7 +245,8 @@ const runConfiguredServer = (transport: McpTransportType): Effect.Effect<void, A
 
           yield* Effect.gen(function* () {
             const server = yield* McpServerService
-            yield* server.run()
+            if (resident === undefined) yield* server.run()
+            else yield* resident.run(server, (file) => writeStderrLine(`Resident attachment: ${file}`))
           }).pipe(Effect.provide(appLayer), Effect.scoped)
         })
       },
@@ -237,10 +255,12 @@ const runConfiguredServer = (transport: McpTransportType): Effect.Effect<void, A
   })
 
 export const main: Effect.Effect<void, AppError> = Effect.gen(function* () {
-  const transport = yield* getTransportType
+  const launchMode = yield* getTransportType
+  const resident = launchMode === "resident-http" ? yield* makeManualResidentBackend : undefined
+  const transport = launchMode === "resident-http" ? "http" : launchMode
   const consoleRedirect = yield* Effect.sync(() => (transport === "stdio" ? redirectConsoleToStderr() : undefined))
 
-  yield* runConfiguredServer(transport).pipe(Effect.ensuring(restoreConsoleRedirect(consoleRedirect)))
+  yield* runConfiguredServer(transport, resident).pipe(Effect.ensuring(restoreConsoleRedirect(consoleRedirect)))
 })
 
 // Run with NodeRuntime.runMain - handles errors, exit codes, and interrupts automatically

@@ -306,3 +306,47 @@ protocol before claiming replacement-safe cleanup. This module is not wired into
 the launcher. It does not establish application readiness, managed ownership,
 Windows ACL isolation, or completion of any issue. Full qualification remains
 pending.
+
+## Explicit native backend startup increment
+
+`MCP_TRANSPORT=resident-http` now selects a separate experimental native HTTPS
+backend path. It requires `MCP_RESIDENT_STATE_DIRECTORY`, binds literal loopback
+with port zero, and generates a fresh UUID generation with independent 32-byte
+channel and bearer secrets. The existing stdio and direct HTTP paths retain
+their defaults. The stdio adapter still uses its earlier endpoint/token contract;
+attachment-file selection and authenticated exchanges remain the next step.
+
+`src/resident/manual-backend.ts` captures the actual bound endpoint through the
+native listener factory. It waits for application readiness before publishing
+the descriptor and reporting its non-secret path on stderr. Model acquisition
+is outside that readiness barrier. Stop, interruption and startup failure close
+the owned listener and release the descriptor. Readiness has a five-second
+allowance with a distinct static timeout diagnostic.
+
+Standards review found that reusing the runtime retained its previous bound
+address. Each generation runtime now has an atomic one-shot claim; a second run
+returns a typed conflict before starting another listener. The initial regression
+failed with `McpServerError` rather than generation-level refusal in
+`/tmp/resident-manual-backend-reuse-red.log`. That run did not establish an actual
+stale-port publication. The corrected case passes in
+`/tmp/resident-manual-backend-reuse-green.log`.
+
+Validation for this increment:
+
+- `/tmp/resident-manual-backend-final-tests.log`: 45 tests in five affected files
+  pass, including default launch and HTTP transport checks.
+- `/tmp/resident-manual-backend-timeout-tests.log`: all five final startup checks
+  pass. An explicit readiness barrier proves publication waits; real TCP probes
+  establish listener closure after publication refusal, readiness failure and
+  timeout. The timeout case advances Effect TestClock by the existing allowance.
+- `/tmp/resident-manual-backend-final-typecheck.log`: 1,209 files checked with
+  zero TypeScript or Effect errors or warnings before the final timeout fixture.
+  The commit hook checks the final candidate again. Focused lint and complexity
+  pass.
+- Fresh Standards and Spec reviews found no residual issue after the one-shot
+  correction and failure-path checks. The final TestClock case adds direct
+  timeout evidence to those reviewed failure scenarios.
+
+Shared start ownership, authenticated stdio attachment, session release, live
+Huly and full qualification remain pending. This increment does not satisfy the
+complete manual-backend slice or promote an existing default.
