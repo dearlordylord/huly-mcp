@@ -13,6 +13,27 @@ This is an incomplete candidate under #322. No criterion or issue is accepted by
 this report alone. The shared implementation remains in
 `/tmp/hulymcp-resident-linux` on `implement/resident-mcp-linux-323-328`.
 
+## Status secret assertion correction (2026-10-17)
+
+The status tests previously passed a `Redacted` wrapper to `not.toContain`,
+which did not establish absence of the actual channel key. They now unwrap only
+the fixture-owned key and assert a boolean substring result, so assertion failure
+does not print the key. This changes test evidence, not the production payload.
+The final core/CLI unit run passes 13 tests in two files
+(`/tmp/resident-status-actual-key-assertions-final.log`, SHA-256
+`63f143ce3390c6e49abb85afb0948978567adcdc4e428ae735d76d14dbaca3f9`).
+The final packaged CLI test also passes
+(`/tmp/resident-status-actual-key-process-final.log`).
+
+An earlier combined run failed on the first absent-directory CLI invocation,
+before reaching the key assertion. Its bundle remains at
+`dist/resident-status-cli-TzsiMQ/index.cjs`, with state root
+`/tmp/resident-status-process-k31Mvu` and log
+`/tmp/resident-status-actual-channel-key-checks.log`. The same retained CLI passed
+that invocation outside Vitest; the isolated packaged test passed before and
+after the boolean assertion change. These controls do not explain the earlier
+failure or resolve launch/process timing qualification.
+
 ## Current refusal and uncertainty policy
 
 ### Managed adapter diagnostic regression (2026-10-17)

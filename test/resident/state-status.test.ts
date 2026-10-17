@@ -47,13 +47,13 @@ it("reports protected metadata and unresolved claims while omitting every privat
     })
     const encoded = Schema.encodeSync(Schema.fromJsonString(ResidentStateStatus))(status)
     for (const secret of [
-      attachment.identity.key,
+      Redacted.value(attachment.identity.key),
       Redacted.value(attachment.authorization),
       attachment.endpoint.href,
       "authorization",
       "descriptor"
     ])
-      expect(encoded).not.toContain(secret)
+      expect(encoded.includes(secret)).toBe(false)
     expect(await fs.readFile(file, "utf8")).toBe(original)
     expect(await fs.readdir(directory)).toEqual(names)
   }))

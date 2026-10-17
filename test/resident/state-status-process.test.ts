@@ -3,7 +3,7 @@ import * as fs from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { promisify } from "node:util"
-import { Effect, Schema } from "effect"
+import { Effect, Redacted, Schema } from "effect"
 import { expect, it } from "vitest"
 
 import { CliFailureSchema } from "../../packages/huly-cli/src/failures.js"
@@ -66,7 +66,7 @@ it.skipIf(process.platform !== "linux")(
                     generations: [{ generation: attachment.identity.generation, liveness: "unverified" }]
                   })
                   expect(result.stderr).toBe("")
-                  expect(result.stdout).not.toContain(attachment.identity.key)
+                  expect(result.stdout.includes(Redacted.value(attachment.identity.key))).toBe(false)
                   expect(await fs.readFile(record.file, "utf8")).toBe(original)
                 }),
               (record) => record.retire

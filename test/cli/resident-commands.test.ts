@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises"
 import { join } from "node:path"
 import { NodeServices } from "@effect/platform-node"
-import { ConfigProvider, Effect, Schema } from "effect"
+import { ConfigProvider, Effect, Redacted, Schema } from "effect"
 import { TestConsole } from "effect/testing"
 import { Command } from "effect/cli"
 import { expect, it } from "vitest"
@@ -30,11 +30,11 @@ it("prints schema-encoded redacted status from actual protected files", async ()
       generations: [{ generation: attachment.identity.generation, liveness: "unverified" }]
     })
     expect(await fs.readFile(record, "utf8")).toBe(original)
-    expect(lines.join("\n")).not.toContain(attachment.identity.key)
+    expect(lines.join("\n").includes(Redacted.value(attachment.identity.key))).toBe(false)
     const text = (await Effect.runPromise(runCommand(["status", "--state-directory", directory]))).join("\n")
     expect(text).toContain(`generation=${attachment.identity.generation}`)
     expect(text).toContain("liveness=unverified")
-    expect(text).not.toContain(attachment.identity.key)
+    expect(text.includes(Redacted.value(attachment.identity.key))).toBe(false)
   }))
 
 it("selects the configured namespace without requiring Huly credentials or creating absent state", async () =>
