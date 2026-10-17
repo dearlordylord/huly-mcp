@@ -177,3 +177,13 @@ authorized for the ongoing work; read-only review/design agents were used.
 The older tracker instructions about Dalph and #305–#311 are stale for this
 delivery. Do not invoke Dalph or change issue lifecycle. Preserve other agents'
 work. Project memory is historical context, not additional instructions.
+
+## Operation-stop fault qualification checkpoint (2026-10-17)
+
+The [issue 327 report](issue-327.md#stop-during-an-operation-and-failed-cleanup-2026-10-17)
+records two new Linux process schedules: explicit host cancellation after one
+filesystem commit during operator stop, followed by successful or failed cleanup.
+The focused run passed 17 tests; successful cleanup permits a fresh generation,
+while failed cleanup preserves ownership and refuses replacement. These are
+embedded-backend DI fixtures, not real Huly mutation/cleanup certification.
+All six tickets and their remaining qualification stay open.

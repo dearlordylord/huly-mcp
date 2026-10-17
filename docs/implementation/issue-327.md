@@ -718,3 +718,46 @@ The production bundle remains unchanged at SHA-256
 The earlier failed ten-parent run remains preserved above; this pass does not
 identify its cause or claim to fix it. This specification amendment completes no
 feature ticket and supplies no new live-Huly or native-platform certification.
+
+## Stop during an operation and failed cleanup (2026-10-17)
+
+`managed-stop-fault-process.test.ts` runs the packaged MCP adapter and CLI
+against an embedded native backend with an explicitly injected tool registry and
+client-close port. The tool commits one disposable filesystem write, then the
+host explicitly cancels its pending response after authenticated operator stop.
+This exercises host cancellation during stop, not spontaneous response loss or
+a real Huly write. The fixture payload lives outside the protected resident
+namespace; it is test evidence, not a runtime operation journal.
+
+Both schedules retain byte-identical ownership metadata while cleanup is held.
+Successful cleanup joins the owned backend exit with code 0, retires ownership,
+and permits a fresh packaged backend generation. Failed client cleanup joins exit
+code 1, retains the original record, and refuses replacement before dispatch.
+Both receipts assert one dispatch, one committed write and redaction of the
+private failure cause. Replacement shutdown is independently joined through the
+kernel-owned child reaper; no signal targets a PID read from metadata.
+
+The final focused run passed 17 tests in two files, including the existing
+managed-owner suite. Log: `/tmp/resident-stop-fault-final-verified.log`, SHA-256
+`9b912e1c585eeb51dd22ee3f17305bffbfa6e86c8f798750d3eaac1504a4c9ec`.
+Normal receipt: `/tmp/resident-stop-fault-3okrQ0.receipt.json`, SHA-256
+`22c5eb5172482e839d317b71c3b9c744fe0094a909360856513c6e6bc41b2181`.
+Failed-cleanup receipt: `/tmp/resident-stop-fault-LpFyXX.receipt.json`, SHA-256
+`44fb198b117a921963e25242383500b3845306c13fa9ad80b1bf2d978d715623`.
+Each receipt separately hashes the production MCP/CLI artifacts and the embedded
+backend fixture, so the fixture is not presented as a production backend bundle.
+
+Earlier failed diagnostic-observation attempts remain in
+`/tmp/resident-managed-stop-fault-first.log` and
+`/tmp/resident-stop-fault-retention-diagnosis.log`. The pinned MCP client probes
+versions through a disposable sibling transport whose stderr does not belong to
+the original transport. The final fixture therefore observes the actual packaged
+adapter refusal directly, while retaining the SDK connection-refusal check.
+No production behavior, deadline or assertion was weakened to resolve that test
+observation issue. Fresh read-only Standards and Spec reviews reported no
+actionable findings.
+
+This evidence does not qualify actual Huly client cleanup, remote write outcome,
+crash recovery, native macOS/Windows, or the unresolved ten-parent race. The full
+six-ticket delivery, final coherent gate and deferred live-Huly campaign remain
+pending.
