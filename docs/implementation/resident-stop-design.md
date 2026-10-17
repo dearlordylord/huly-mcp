@@ -92,7 +92,13 @@ implementation version. Source CLI acceptance and uncertainty, plus packaged CLI
 absent-target refusal, are covered. These do not constitute qualification of two
 released installations or the full packaged stop process lifecycle.
 
-Add process schedules for lost acknowledgment, active operations,
+The packaged Linux normal-stop schedule now has independent kernel `waitpid`
+retirement evidence, two concurrent callers converging on one replacement and an
+unrelated workspace remaining live with unchanged ownership. It does not acquire
+a real Huly model or exercise failed cleanup. See
+[the process receipt](issue-327.md#linux-packaged-stop-and-concurrent-normal-replacement-2026-10-17).
+
+Add process fault schedules for lost acknowledgment, active operations,
 cleanup failure retaining ownership, unrelated generations, CLI death and
 verified replacement after actual owned retirement. Preserve existing deadlines,
 inventory bounds, no replay and native/Huly qualification. No ticket is complete

@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import { HttpPort } from "../../src/mcp/http-transport.js"
 import { ResidentFilePath } from "../../src/resident/protected-path.js"
 
 export const HostName = Schema.Literals(["claude-code", "codex-mcp-client"])
@@ -17,4 +18,9 @@ export const NativeHostObservation = Schema.Struct({
   tools: Schema.Array(Schema.String),
   resourceTemplates: Schema.Array(Schema.String),
   contextIsError: Schema.Boolean
+})
+export const ManagedNativeHostObservation = Schema.Struct({
+  ...NativeHostObservation.fields,
+  observedWorkspace: Schema.NonEmptyString,
+  observedPort: HttpPort.check(Schema.isGreaterThan(0))
 })

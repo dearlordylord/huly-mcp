@@ -3,14 +3,20 @@ import { Client } from "@modelcontextprotocol/client"
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"
 import { Clock, Deferred, Effect, Schema } from "effect"
 
+import { GetHulyContextResultSchema } from "../../../src/domain/schemas/huly-context.js"
 import { ResidentDirectory } from "../../../src/resident/protected-path.js"
 import { ResidentPackagePath } from "../../../src/resident/managed-contract.js"
 import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
 import { ManagedParentConnected } from "../managed-observation.js"
-import { HostName, NativeHostObservation } from "../native-host-observation.js"
+import { HostName, ManagedNativeHostObservation } from "../native-host-observation.js"
 
 const RESPONSE_BOUND = 5_000
-const Input = Schema.Struct({ bundle: ResidentPackagePath, directory: ResidentDirectory, host: HostName })
+const Input = Schema.Struct({
+  bundle: ResidentPackagePath,
+  directory: ResidentDirectory,
+  host: HostName,
+  workspace: Schema.NonEmptyString
+})
 const Command = Schema.Literals(["read", "close"])
 const Phase = Schema.Struct({
   parentPid: ManagedParentConnected.fields.parentPid,
@@ -25,7 +31,8 @@ const main = async () => {
   const input = Schema.decodeUnknownSync(Input)({
     bundle: process.argv[2],
     directory: process.argv[3],
-    host: process.argv[4]
+    host: process.argv[4],
+    workspace: process.argv[5] ?? "fixture"
   })
   const started = await Effect.runPromise(Clock.monotonicTimeNanos)
   const phase = async (state: Schema.Schema.Type<typeof Phase>["phase"]) => {
@@ -46,6 +53,7 @@ const main = async () => {
     stderr: "pipe",
     env: {
       ...residentSelectionEnvironment(),
+      HULY_WORKSPACE: input.workspace,
       MCP_TRANSPORT: "stdio-resident",
       MCP_RESIDENT_STATE_DIRECTORY: input.directory
     }
@@ -64,16 +72,21 @@ const main = async () => {
     const tools = await client.listTools(undefined, { timeout: RESPONSE_BOUND })
     const resources = await client.listResourceTemplates(undefined, { timeout: RESPONSE_BOUND })
     const context = await client.callTool({ name: "get_huly_context", arguments: {} }, { timeout: RESPONSE_BOUND })
-    const observation = Schema.decodeUnknownSync(NativeHostObservation)({
+    const result = Schema.decodeUnknownSync(Schema.Struct({ result: GetHulyContextResultSchema }))(
+      context.structuredContent
+    ).result
+    const observation = Schema.decodeUnknownSync(ManagedNativeHostObservation)({
       host: input.host,
       mode: "modern",
       parentPid: process.pid,
       adapterPid: transport.pid,
       tools: tools.tools.map((tool) => tool.name),
       resourceTemplates: resources.resourceTemplates.map((template) => template.uriTemplate),
-      contextIsError: context.isError ?? false
+      contextIsError: context.isError ?? false,
+      observedWorkspace: result.huly.workspace.value,
+      observedPort: result.transport.http?.port
     })
-    process.stdout.write(`${Schema.encodeSync(Schema.fromJsonString(NativeHostObservation))(observation)}\n`)
+    process.stdout.write(`${Schema.encodeSync(Schema.fromJsonString(ManagedNativeHostObservation))(observation)}\n`)
     await phase("observed")
   }
   try {

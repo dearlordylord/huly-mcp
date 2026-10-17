@@ -1,5 +1,6 @@
 """Run one Linux fixture under a bounded, kernel-owned child subreaper."""
 import ctypes
+import json
 import os
 import signal
 import subprocess
@@ -12,7 +13,7 @@ CLEANUP_SECONDS = 4
 POLL_SECONDS = 0.02
 
 
-def supervise(arguments, clock, sleep):
+def supervise(arguments, clock, sleep, report_reaped=False):
     libc = ctypes.CDLL(None, use_errno=True)
     if libc.prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) != 0:
         raise OSError(ctypes.get_errno(), "Cannot establish fixture child ownership")
@@ -25,7 +26,19 @@ def supervise(arguments, clock, sleep):
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
     deadline = clock() + RUN_SECONDS
-    child = subprocess.Popen(arguments)
+    events_read, events_write = os.pipe() if report_reaped else (None, None)
+    environment = None
+    if report_reaped:
+        environment = dict(os.environ, HULY_TEST_REAPED_FD=str(events_read))
+    try:
+        child = subprocess.Popen(
+            arguments,
+            env=environment,
+            pass_fds=() if events_read is None else (events_read,),
+        )
+    finally:
+        if events_read is not None:
+            os.close(events_read)
     result = None
     forced = False
 
@@ -34,6 +47,12 @@ def supervise(arguments, clock, sleep):
         if pid == child.pid:
             result = os.waitstatus_to_exitcode(status)
             child.returncode = result
+        if events_write is not None:
+            event = {"processId": pid, "exitCode": os.waitstatus_to_exitcode(status)}
+            try:
+                os.write(events_write, (json.dumps(event) + "\n").encode("ascii"))
+            except BrokenPipeError:
+                pass
 
     while True:
         try:
@@ -61,6 +80,8 @@ def supervise(arguments, clock, sleep):
             if clock() >= deadline + CLEANUP_SECONDS:
                 raise RuntimeError("Owned fixture descendants did not retire")
         sleep(POLL_SECONDS)
+    if events_write is not None:
+        os.close(events_write)
     if forced:
         sys.stderr.write("Fixture supervision deadline exceeded; owned descendants terminated\n")
         return 1
@@ -68,4 +89,6 @@ def supervise(arguments, clock, sleep):
 
 
 if __name__ == "__main__":
-    sys.exit(supervise(sys.argv[1:], time.monotonic, time.sleep))
+    report_reaped = len(sys.argv) > 1 and sys.argv[1] == "--report-reaped"
+    arguments = sys.argv[2:] if report_reaped else sys.argv[1:]
+    sys.exit(supervise(arguments, time.monotonic, time.sleep, report_reaped))

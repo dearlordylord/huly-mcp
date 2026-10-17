@@ -34,6 +34,59 @@ that invocation outside Vitest; the isolated packaged test passed before and
 after the boolean assertion change. These controls do not explain the earlier
 failure or resolve launch/process timing qualification.
 
+## Linux packaged stop and concurrent normal replacement (2026-10-17)
+
+`managed-operator-stop-process.test.ts` now builds the actual MCP and CLI packages
+and runs independent pinned MCP client parents in an isolated namespace. It
+starts a creator and attached peer for one workspace and a separate backend for
+another workspace. After the creator closes, the still-live original backend is
+adopted by the Linux fixture supervisor. The packaged CLI targets that exact
+generation; its acknowledgment still reports retirement unconfirmed.
+
+The supervisor's opt-in private inherited pipe reports actual `waitpid` results
+for its kernel-owned children. The fixture waits for the original backend's exit
+with code zero and checks its registry retirement before launching two replacement
+parents concurrently. Those parents have different adapter/parent IDs but observe
+the same actual backend port and expected workspace through schema-decoded
+`get_huly_context` results. Exactly one new generation exists alongside the
+unrelated backend. That unrelated adapter still answers with its original port,
+workspace and byte-identical record. Remaining parents close, all three backend
+exits are joined through the supervisor, and the namespace becomes empty.
+
+The context-aware operator-stop and existing two-version regression suites pass
+(`/tmp/resident-managed-stop-context-verified.log`, SHA-256
+`7947a28da49d7efbfab260c40f58ab1eebba6098649fc9dd9b6d47cc154d03f4`).
+The redacted receipt and phases are
+`/tmp/resident-managed-stop-wSWcMz.receipt.json` and
+`/tmp/resident-managed-stop-wSWcMz.phases.log`. The receipt includes MCP artifact
+SHA-256 `2a4b2e7573b36df5cf403f70daa5938d5d2a86c3b65c2c9283d0f8bd2c4264da`
+and CLI artifact SHA-256
+`996d4a684ea25ebf536105ae92b493925af94c76149e38d332d1d9bf6f4ae60e`.
+No runtime code changed from `b3a3fc5c` for this qualification increment.
+
+The supervisor retains its existing 25-second run and four-second forced-cleanup
+bounds; a forced termination fails the test. Response waits remain five seconds,
+retirement waits seven seconds and process tests thirty seconds. The default
+supervisor mode remains unchanged and the existing two-version fixture passes
+through it. Initial successful runs without context/caller-pair evidence remain
+in `/tmp/resident-managed-operator-stop-process-first.log`,
+`/tmp/resident-managed-stop-and-version-verified.log` and
+`/tmp/resident-managed-stop-replacement-race-verified.log`. Test-only type-import
+and named-constant lint errors were fixed before final checks.
+
+TypeScript/Effect diagnostics pass 1,332 files with zero warnings. Full
+lint/format/duplication, circular dependency and complexity checks pass in
+`/tmp/resident-managed-stop-process-{lint,circular,complexity}.log`. Fresh
+Standards and Spec reviews, including concurrent replacement and context
+observations, report no actionable findings.
+
+This proves the exercised Linux normal-stop/two-caller replacement schedule.
+Its discovery/context calls do not acquire a real Huly model or mutate Huly.
+It does not qualify active writes, failed finalizers, unresolved crash recovery,
+the ten-parent startup race or native macOS/Windows. CLI acceptance is not the
+source of retirement proof, and no PID-absence inference or runtime journal was
+introduced. All remaining requirements and final whole-candidate gate remain.
+
 ## Managed stop server checkpoint (2026-10-17)
 
 The subsequent client/CLI increment implements protected read-only target

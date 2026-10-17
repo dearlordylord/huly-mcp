@@ -1,7 +1,17 @@
 # Issue 326 implementation evidence
 
-Status: partial foundations in the explicit manual resident. Issue 324's managed
-ownership path is not implemented, and issue 326 is not complete.
+Status: managed ownership and normal retirement are implemented candidates;
+issue 326 remains incomplete. The Linux packaged operator-stop fixture now joins
+actual kernel-owned backend exits, preserves an unrelated configuration and
+converges two concurrent replacement callers after confirmed normal retirement.
+See [the current receipt](issue-327.md#linux-packaged-stop-and-concurrent-normal-replacement-2026-10-17).
+Active-mutation, failed-cleanup, model alignment and complete native/live
+qualification remain pending.
+
+## Early manual checkpoint (historical)
+
+At this checkpoint only manual-resident foundations existed; managed ownership
+was not implemented. Later managed increments below supersede that limitation.
 
 The resource owner and private admission work in issue 323 now distinguish
 eligibility from retained work. Monotonic leases expire without a client receipt,

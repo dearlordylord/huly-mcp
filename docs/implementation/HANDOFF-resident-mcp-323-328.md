@@ -17,7 +17,13 @@ The subsequent bounded one-shot operator client and CLI are implemented, with
 11 native TLS/file client tests and source CLI acceptance/uncertainty checks.
 Packaged CLI absent-target refusal also passes without state creation. A single
 discriminated invocation state preserves submission/acceptance knowledge.
-Full packaged stop process fault schedules are next.
+The packaged Linux normal-stop process schedule now passes: kernel-owned waitpid
+events independently confirm all three backend exits, two concurrent replacement
+parents converge on one fresh generation, and another workspace keeps its
+original adapter/port/record. Actual schema-decoded context proves workspace and
+shared-port observations. See [current process evidence](issue-327.md#linux-packaged-stop-and-concurrent-normal-replacement-2026-10-17).
+Active-operation and failed-finalizer packaged stop fault schedules are next;
+unresolved crash recovery and native/live qualification remain pending.
 Nineteen focused tests and TypeScript/Effect, lint, circular and complexity checks
 pass; fresh Standards/Spec reviews found no actionable server-half defect. This
 is not a full gate or six-ticket completion. Status secret assertions were also
