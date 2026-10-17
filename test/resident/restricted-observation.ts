@@ -7,11 +7,15 @@ const RestrictedPermissions = Schema.Struct({
   worker: Schema.Boolean,
   addon: Schema.Boolean,
   wasi: Schema.Boolean,
-  inspector: Schema.Boolean
+  inspector: Schema.Boolean,
+  ownershipWrite: Schema.Boolean,
+  ownershipRename: Schema.Boolean,
+  ownershipRemove: Schema.Boolean
 })
 export const RestrictedProbeAttempt = Schema.Struct({
   nodeVersion: Schema.NonEmptyString,
   processId: Schema.Int.check(Schema.isGreaterThan(0)),
+  ipcAcknowledged: Schema.Literal(true),
   denied: RestrictedPermissions
 })
 export const RestrictedProbe = RestrictedProbeAttempt.check(
@@ -27,3 +31,6 @@ export const RestrictedObservation = Schema.Struct({
   backendPortClosed: Schema.Literal(true),
   staleRecordRetained: Schema.Literal(true)
 })
+
+export const RestrictedIpcChallenge = Schema.Struct({ kind: Schema.Literal("challenge"), nonce: Schema.NonEmptyString })
+export const RestrictedIpcReply = Schema.Struct({ kind: Schema.Literal("acknowledged"), nonce: Schema.NonEmptyString })

@@ -248,3 +248,70 @@ with 454 files and 5,632 tests at the unchanged thresholds
 (`/tmp/resident-lifecycle-boundaries-frozen-check-all.log`). Fresh combined Standards
 and Spec reviews report no actionable defect in staged tree
 `b5ed29cd8cd11336fa2430a6e835ed327824a3e9`; neither accepts any issue as complete.
+
+
+## Guardian IPC and protected files, 2026-10-17 resume
+
+The user resumed #323 through #328 from the #328 checkpoint comment at
+`be8855e9`. No ticket is complete. This increment extends the existing packaged
+restricted-runtime experiment without changing production source or launch policy.
+
+The owned parent sends a schema-encoded random challenge over its original IPC
+channel. The pre-import worker parses the challenge and returns a schema-encoded
+reply. The parent verifies the reply before accepting native readiness. The IPC
+channel remains connected until the original child is killed and joined. No
+process or socket handle is transferred.
+
+The worker has filesystem write permission only for its disposable backend state
+directory. A separate guardian directory lies outside that grant. Before SDK
+imports, synchronous overwrite, rename and removal probes must each receive
+`ERR_ACCESS_DENIED` with `FileSystemWrite`. The parent independently verifies the
+exact guardian directory inventory and every original file's contents. The
+unrestricted control performs those edits and removals successfully, then refuses
+native startup. Both cases retain the original deadlines and owned cleanup.
+
+Both cases pass on Linux arm64 with Node 24.20.0, 22.22.2 and the minimum 22.19.0.
+Final receipts are `/tmp/resident-restricted-native-hDGAT0.receipt.json`,
+`/tmp/resident-restricted-native-yUZzqU.receipt.json` and
+`/tmp/resident-restricted-native-mfPGPX.receipt.json`, respectively. The final
+22.22.2 focused log is `/tmp/resident-guardian-permissions-final-node22.log`.
+The minimum-version log is
+`/tmp/resident-guardian-permissions-minimum-sync-probes.log`.
+
+Two failures remain preserved. Disconnecting IPC early reaches the reads but
+fails the bounded original-child close wait in
+`/tmp/resident-guardian-permissions-close-diagnosis.log`. The passing case does
+not qualify that disconnect schedule. On Node 22.19.0, promise-based denied rename
+leaves an exception that surfaces during a later permitted write. That failure
+is preserved in `/tmp/resident-guardian-permissions-minimum-diagnosis.log` and
+was reproduced separately using only disposable filesystem operations. The
+passing probe qualifies synchronous filesystem denial only. No Node runtime
+minimum, restriction or deadline was relaxed.
+
+The first exploratory gate fails formatting while diagnosis edits are still in
+progress. Its log is `/tmp/resident-guardian-permissions-check-all.log`. After
+formatting and freezing the executable TypeScript and test files,
+`GOMAXPROCS=2 pnpm check-all` passes all 458 files and 5,647 tests. Coverage remains
+99.45% statements, 99% branches, 99% functions and 99.56% lines. Its log is
+`/tmp/resident-guardian-permissions-frozen-check-all.log`, SHA-256
+`709fff2c152437bc706d5e45a0effbeaed64371335f7c96a7047e2b372cd4908`.
+The unchanged production bundle SHA-256 remains
+`a6c463c658dc49c20d59b62a9ec4fa1da812f8a0317b68914faf79ed4072fb59`.
+Fresh Standards and Spec reviews find no actionable defect in the experiment.
+
+The guardian-aware [type sketch](../../quint-specs/resident-launch.qnt) and
+[scope note](../../quint-specs/resident-launch.md) are proposed separately from
+that frozen executable candidate. `pnpm exec quint typecheck` passes for the
+sketch. No initialization, actions, invariants or simulation result are added.
+The sketch now separates callers, guardians, restricted workers, per-identity
+claims, leases, requests and durable journal entries. Review requests explicit
+journal capacity and separate reservation acknowledgment; both are encoded in
+the proposed types. Logic still awaits explicit approval.
+
+This experiment proves neither production guardian publication and recovery nor
+worker ownership of acquired Huly resources. Read grants remain unrestricted,
+and the worker still publishes its own disposable backend state. Guardian-only
+production publication, filesystem alias behavior, durable uncertainty and
+replacement remain unimplemented. Native macOS and Windows, real Huly behavior,
+actual host discovery and adapter-inclusive measurements remain pending. Raw
+receipts are local evidence, not uploaded certification artifacts.

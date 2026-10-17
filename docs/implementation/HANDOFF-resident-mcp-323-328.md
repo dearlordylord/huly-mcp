@@ -1,9 +1,32 @@
-# Resident MCP #323–#328 pause handoff
+# Resident MCP #323–#328 implementation handoff
 
-The user requested a pause after the current milestone on 2026-10-17. Do not
-resume implementation until asked. All six issues remain incomplete and open.
+The user resumed implementation on 2026-10-17 after the pause checkpoint
+`be8855e9`, following the latest #328 comment. All six issues remain incomplete
+and open.
 This document supersedes the early Darwin checkpoint for current implementation
 state. It does not change the authoritative requirements in GitHub #322–#328.
+
+## Latest resumed increment
+
+The restricted packaged SDK experiment now checks schema-owned IPC challenge and
+reply plus synchronous denial of overwrite, rename and removal outside a narrow
+filesystem write grant. The unrestricted control proves each filesystem probe
+can detect missing restrictions. Both cases pass on Linux arm64 with Node
+24.20.0, 22.22.2 and the minimum 22.19.0. The original IPC channel stays connected
+until the owned backend is killed and joined. Early disconnect and asynchronous
+filesystem denial failures remain preserved in the #327 report.
+
+The executable TypeScript candidate passes `GOMAXPROCS=2 pnpm check-all` with
+458 files, 5,647 tests and the unchanged coverage thresholds. Fresh Standards
+and Spec reviews find no actionable defect. See
+[the resumed increment report](issue-327.md#guardian-ipc-and-protected-files-2026-10-17-resume)
+for scope, logs, hashes and limitations.
+
+The [guardian-aware Quint type sketch](../../quint-specs/resident-launch.qnt) and
+[scope note](../../quint-specs/resident-launch.md) are concrete proposals for the
+pending model approval. The sketch typechecks separately. No logic or simulation
+claim is added. Guardian-only production publication, durable uncertainty,
+verified replacement and complete qualification remain unfinished.
 
 ## Saved milestone
 
