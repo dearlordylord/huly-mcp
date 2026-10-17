@@ -1,6 +1,6 @@
 # Huly MCP
 
-Language for Huly MCP authentication and tracker issue operations.
+Language for Huly MCP authentication, resident requests and tracker issue operations.
 
 ## Language
 
@@ -57,3 +57,6 @@ A task's reference to a project-scoped value, such as a component or milestone, 
 
 **Explicit attribute discard**:
 The caller's deliberate choice to remove a specific project attribute reference as part of a transfer.
+
+**Uncertain Huly operation**:
+An invocation that may have reached Huly but has no confirmed terminal outcome available to its caller. It may have partially or fully changed the workspace; retirement of its local backend does not resolve that uncertainty.

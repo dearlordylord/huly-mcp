@@ -1,5 +1,9 @@
 # Issue 327 implementation evidence
 
+Current design amendment: [ADR 0002](../adr/0002-resident-recovery-without-operation-journal.md)
+removes the mandatory operation journal. Earlier journal proposals below remain
+historical checkpoint descriptions, not current implementation requirements.
+
 This is an incomplete candidate under #322. No criterion or issue is accepted by
 this report alone. The shared implementation remains in
 `/tmp/hulymcp-resident-linux` on `implement/resident-mcp-linux-323-328`.
@@ -315,3 +319,58 @@ production publication, filesystem alias behavior, durable uncertainty and
 replacement remain unimplemented. Native macOS and Windows, real Huly behavior,
 actual host discovery and adapter-inclusive measurements remain pending. Raw
 receipts are local evidence, not uploaded certification artifacts.
+
+
+## Operation journal decision after review with Astra
+
+The user requested an independent decision with Astra and corresponding
+specification changes. Both reviews conclude that the durable operation journal
+is unnecessary for a transport that never replays or restores requests. Opaque
+journal entries cannot reconcile remote Huly effects, deduplicate new-ID calls
+or prove host receipt. ADR 0002 explicitly excludes cross-session operation-status
+lookup while preserving truthful unknown outcomes and protected ownership
+inventory. This changes an ambiguous evidence-retention requirement in #322 and
+clarifies #327; it is not acceptance of the unchanged earlier contract.
+
+The proposed Quint sketch removes journal entries, capacity, reservations and
+durability acknowledgments. Invocation history is explicitly oracle state keyed
+by adapter incarnation and ordinal. Terminal production, adapter receipt,
+queue admission and host observation are separate phases. The sketch still has
+no logic and needs type-sketch approval before transitions. The amended design
+requires the existing fault cases plus heartbeat, output-loss, total caller-loss
+and delayed remote-commit schedules. No runtime behavior or deadline changes in
+this decision, and no recovery, deletion-safety or live-Huly result is claimed.
+
+The reviewed amendment is published in the bodies of
+[#322](https://github.com/dearlordylord/huly-mcp/issues/322),
+[#327](https://github.com/dearlordylord/huly-mcp/issues/327) and
+[#328](https://github.com/dearlordylord/huly-mcp/issues/328). Each body was compared
+with the reviewed source before editing and read back exactly afterward. All
+50 parent stories remain verbatim. All 11 #327 criteria and all 15 #328 criteria
+remain; one #327 criterion is clarified by the explicit evidence-lifetime scope.
+No issue state or historical comment was changed.
+
+Astra's final read-only audit finds no actionable issue after narrowing the
+fresh-read wording to preserve explicit operation-specific reconciliation.
+`pnpm exec quint typecheck quint-specs/resident-launch.qnt`, local specification
+links and `git diff --check` pass. No TypeScript runtime or test source changes.
+The production bundle hash remains
+`a6c463c658dc49c20d59b62a9ec4fa1da812f8a0317b68914faf79ed4072fb59`.
+
+The fresh `GOMAXPROCS=2 pnpm check-all` attempt passes the preceding gates but
+fails the unchanged ten-independent-parent launch fixture: 457 files and 5,646
+tests pass, one file/test fails. The fixture's parents reach their five-second
+connection deadlines. This is a preserved failure, not a successful gate or a
+proven diagnosis of contention. The log is
+`/tmp/resident-no-operation-journal-check-all.log`, SHA-256
+`3fd34e47b137ce0fb30ce1745ec19646d06857922f1c7f0fb91d4483109d0c74`.
+The retained fixture root is `/tmp/resident-managed-parents-0vzqPO` and its bundle
+is `dist/stdio-suite-0FRQT2`. No concurrency case, deadline or assertion is changed.
+
+The single follow-up isolation run of
+`pnpm exec vitest run test/resident/managed-backend-process.test.ts` passes its
+one existing test with the same ten parents, assertions and deadlines. Log:
+`/tmp/resident-no-journal-ten-parent-isolation.log`. This isolated pass neither
+erases the full-gate failure nor identifies its cause. No broad rerun is used
+to replace the failed receipt, and no full-gate success is claimed for this
+specification amendment.

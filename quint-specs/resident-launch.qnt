@@ -5,7 +5,7 @@ module resident_launch {
   type ChildId = int
   type GenerationId = int
   type CapabilityId = int
-  type OperationId = int
+  type InvocationId = { adapter: CallerId, ordinal: int }
   type SelectionKey = { authority: int, policy: int, implementation: int }
   type CallerPhase = Selecting | LocalDiscovery | Prepared(GuardianId)
     | StartAttempted(GuardianId) | Attached(GenerationId) | Refused | CallerClosed
@@ -58,13 +58,11 @@ module resident_launch {
   type Attachment = { caller: CallerId, generation: GenerationId, phase: AttachmentPhase, expires: int }
   type RequestPhase = Queued | WaitingForModel | Running | RequestCancelled | Terminal
   type Request = { caller: CallerId, generation: GenerationId, phase: RequestPhase }
-  type WriteOutcome = NotDispatched | Reserving(GenerationId) | ReservationAcknowledged(GenerationId)
-    | Dispatched(GenerationId) | Uncertain(GenerationId) | Reported(GenerationId) | Reconciled(GenerationId)
-  type Write = { caller: CallerId, request: int, outcome: WriteOutcome, dispatches: int }
-  type JournalPhase = DurableReservation | DurableTerminal | DurableReconciliation
-  type JournalEntry = { generation: GenerationId, phase: JournalPhase }
-  type Journal = IntactJournal({ capacity: int, entries: OperationId -> JournalEntry })
-    | CorruptJournal | LostJournal
+  type WriteOutcome = NotDispatched | DispatchAttempted(GenerationId)
+    | Uncertain(GenerationId) | TerminalObserved(GenerationId) | Reconciled(GenerationId)
+  type TerminalDelivery = NoTerminal | BackendTerminalProduced | AdapterTerminalReceived
+    | AdapterTerminalQueued | HostTerminalObserved
+  type Write = { outcome: WriteOutcome, dispatches: int, delivery: TerminalDelivery }
 
   var callers: CallerId -> Caller
   var guardians: GuardianId -> Guardian
@@ -77,8 +75,8 @@ module resident_launch {
   var workerStarts: Set[WorkerStartMessage]
   var attachments: int -> Attachment
   var requests: int -> Request
-  var writes: OperationId -> Write
-  var journals: GuardianId -> Journal
+  // Specification/oracle history only; this map is not persisted by the application.
+  var writes: InvocationId -> Write
   var round: int
   var seen: Set[str]
 }

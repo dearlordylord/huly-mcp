@@ -25,8 +25,14 @@ for scope, logs, hashes and limitations.
 The [guardian-aware Quint type sketch](../../quint-specs/resident-launch.qnt) and
 [scope note](../../quint-specs/resident-launch.md) are concrete proposals for the
 pending model approval. The sketch typechecks separately. No logic or simulation
-claim is added. Guardian-only production publication, durable uncertainty,
-verified replacement and complete qualification remain unfinished.
+claim is added. Guardian-only production publication, truthful uncertainty
+reporting, verified replacement and complete qualification remain unfinished.
+
+The subsequent [ADR 0002](../adr/0002-resident-recovery-without-operation-journal.md)
+removes the mandatory operation journal after discussion with Astra at the user's
+request. The amended specification retains no replay and truthful unknown
+outcomes, and explicitly excludes cross-session operation-status lookup. This
+supersedes journal requirements in earlier checkpoint summaries.
 
 ## Saved milestone
 
@@ -97,9 +103,12 @@ completion from these checkpoints or synthetic fixtures.
 The conditional next architecture is in
 [resident-recovery-design.md](resident-recovery-design.md). It selects a guardian
 that retains the actual worker handle, with the native MCP backend in a restricted
-worker. The guardian owns publication and retirement. A bounded durable opaque
-reservation journal must preserve uncertain operations before dispatch. There
-must be no replay of ambiguous writes and no PID or port inference of ownership.
+worker. The guardian owns publication and retirement, with protected pending
+ownership evidence before worker creation. There is no durable operation journal
+or replay queue. Requests stay with their original adapter and are never restored
+into a replacement. Missing terminal outcomes remain unconfirmed; a new adapter
+cannot look up the old result. There must be no replay of ambiguous writes and
+no PID or port inference of ownership.
 
 The restricted-runtime experiment only partially tests that design's premises.
 Next qualify IPC handle transfer and guardian ownership, restrictions before SDK

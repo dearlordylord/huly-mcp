@@ -52,8 +52,9 @@ no durable MCP session. The native runtime retains all negotiated protocol data.
 Release closes admission, interrupts only owned work, waits for its cleanup, then
 runs owned native release capabilities. Repeated release joins the same outcome.
 Failed cleanup retains blocked ownership and cannot authorize replacement or
-ordinary idle retirement. Release never establishes non-dispatch or permits replay. Retaining unknown
-dispatched outcomes under a durable recovery policy remains required by #327.
+ordinary idle retirement. Release never establishes non-dispatch or permits replay.
+Unknown dispatched outcomes remain unconfirmed under #327. Their evidence lifetime
+is defined by ADR 0002; no durable per-operation ledger is required.
 
 ## Native adoption transaction
 
@@ -113,6 +114,13 @@ failure without readmission or replay.
 Real TLS tests cover lost replies and actual target cleanup. Packaged process
 tests cover death and pause/resume with an independent survivor. The attachment
 Quint model covers bounded lease transitions, but implementation observation
-alignment, managed idle retirement and durable unknown-outcome recovery remain
+alignment, managed idle retirement and truthful unknown-outcome recovery remain
 pending. Calibration is limited to Linux metadata traffic without live Huly;
 it does not qualify final platform support or real Huly performance.
+
+The later [ADR 0002](../adr/0002-resident-recovery-without-operation-journal.md)
+clarifies the unknown-outcome policy. There is no durable per-operation ledger.
+Unknown outcomes are not replayed or inferred from lease expiry, local process
+retirement or a healthy replacement. A new adapter provides no historical
+operation-status lookup. Existing redacted diagnostics and test receipts remain
+valid evidence; this amendment does not claim recovery implementation is complete.

@@ -1,4 +1,4 @@
-# Verified recovery design decision
+# Resident recovery design decision
 
 Status: conditional design for the next implementation experiment. This is not
 verified recovery, a completed criterion, or approval of the pending Quint logic.
@@ -53,15 +53,33 @@ disconnect, so it is not retirement evidence available to a new caller.
 
 ## Uncertainty and bounds
 
-The guardian owns a bounded durable journal of opaque operation references,
-generation and outcome classification. It stores no arguments, results or
-credentials. Reservation must be durable and acknowledged before target dispatch.
-Lost completion becomes unknown; full/corrupt journal refuses new work before
-dispatch. Healthy replacement does not clear an old operation's uncertainty.
-Operation-specific reads/reconciliation remain distinct from transport recovery.
-The exact reservation/dispatch/terminal-report crash windows, durability semantics
-and retention policy must be implemented and tested; this sketch settles none of
-them by naming a journal.
+Resident recovery does not maintain or consult a durable per-operation ledger,
+expose cross-session operation-status lookup, or persist a replay queue. This
+supersedes the earlier mandatory journal proposal after the user's 2026-10-17
+review with Astra. The rationale, evidence lifetime, failure cases and explicit
+scope amendment are in [ADR 0002](../adr/0002-resident-recovery-without-operation-journal.md).
+
+Each invocation belongs to its original adapter incarnation, request and backend
+generation. It is dispatched at most once and never transferred to a replacement.
+A surviving adapter retains bounded request state until completion or closure.
+Possible dispatch without a host-observed terminal outcome remains unconfirmed.
+Report uncertainty when output remains usable. Abrupt host or adapter death can
+prevent reporting; disconnect never proves that a Huly mutation failed.
+
+Replacement cannot reconstruct prior requests or report their outcomes. Confirmed
+local retirement proves neither settlement nor cancellation of an accepted remote
+Huly operation. An ordinary fresh read without an operation-specific
+reconciliation contract, or healthy replacement alone, does not reconcile an old
+write.
+Independent new requests may proceed after safe replacement; repeating an uncertain
+mutation still needs operation-specific reconciliation or remote idempotency.
+
+Protected pending ownership inventory remains required before worker creation.
+It contains lifecycle evidence, not operation history. Observed corrupt, missing
+expected or incompatible ownership evidence refuses unsafe replacement. Complete
+erasure of all ownership evidence while an owner remains alive is a separate
+coordination proof obligation; an operation journal would not solve it. No
+implementation or platform qualification for that case is claimed here.
 
 Preserve total startup selection 10 seconds and cleanup confirmation 5 seconds.
 A timeout does not create a second allowance or authorize replay. Do not
@@ -78,10 +96,11 @@ roles on the available inherited model; it provides no model-family diversity.
 
 Graft B's explicit joined-child capability and prohibition on transferring
 process/socket handles or exposing a process-creation service. Reject B's
-ambiguous lifetime-long selection claim and optional adapter-only uncertainty
-retention. Keep A's mandatory write-ahead ordering and refusal after inventory
-loss. Neither candidate's Node20 premise is authoritative: current package
-engines require Node >=22.19.0. Preserve that actual contract and qualify its
+ambiguous lifetime-long selection claim. The later ADR 0002 supersedes A's
+mandatory operation journal and its rejection of adapter-lifetime uncertainty
+tracking. Keep protected pending ownership publication before worker creation
+and refusal after unresolved ownership loss. Neither candidate's Node20 premise
+is authoritative: current package engines require Node >=22.19.0. Preserve that actual contract and qualify its
 earliest supported runtime rather than adding stale compatibility branches.
 
 Worker-thread-only ownership and OS process groups were considered and rejected
@@ -98,8 +117,8 @@ compatibility. The final live Huly campaign remains deferred until all six slice
 are implemented and integrated. A standalone permission probe is insufficient.
 
 Only after that premise survives should a guardian/child experiment kill its
-owned backend, join closure, preserve an uncertain disposable mutation and
-serialize concurrent new callers into one fresh generation. A guardian-loss
+owned backend, join closure, report an uncertain disposable mutation without
+replay and serialize concurrent new callers into one fresh generation. A guardian-loss
 schedule must instead refuse and preserve unresolved state. Falsifying the
 containment premise rejects this design; it does not weaken the retirement test.
 
