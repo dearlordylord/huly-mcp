@@ -210,3 +210,44 @@ parents with live Huly reads; negotiation and supported interactions; attachment
 identity/generation plus shared-acquisition cancellation; and qualified budgets,
 live evidence and the full gate. Legacy session release also remains unfinished.
 No issue is complete, and #324–#328 remain required.
+
+## Routing values and independent host processes
+
+The adapter now uses native MCP routing-header encoding for Unicode values,
+leading/trailing whitespace and literal `=?base64?...?=` strings. Previously a
+Unicode resource URI threw during header construction and closed the adapter.
+The packaged native-backend regression now receives a resource-not-found error
+containing each unchanged URI, and the adapter continues serving requests.
+Request envelope schemas and header construction share one module.
+
+The native-backend suite also runs two SDK hosts in independent parent processes.
+Each host launches its own packaged adapter against the suite's single native
+HTTP backend. Schema-parsed observations establish distinct parent/adapter PIDs,
+host-specific native/proxy catalogs, resource-template metadata and successful
+SDK output validation for `get_huly_context`, in both modern and legacy modes.
+Each host closes its adapter in `finally` and waits for the SDK's process-close
+callback before reporting success. This wait matters because the installed SDK
+may return from `transport.close()` immediately after sending `SIGKILL`.
+
+Evidence:
+
+- `/tmp/resident-routing-header-red.log`: the Unicode request received
+  `CONNECTION_CLOSED` before the fix.
+- `/tmp/resident-routing-header-green.log`: both native protocol-mode cases pass
+  after encoding, including Unicode, sentinel and whitespace resource errors.
+- `/tmp/resident-independent-parents.log`: all four native-backend checks pass.
+- `/tmp/resident-independent-parent-suite.log`: all 22 resident tests pass after
+  adding confirmed child-close waiting.
+- `/tmp/resident-independent-parent-typecheck.log`: 1,202 files checked with
+  zero TypeScript/Effect errors or warnings. Focused lint, complexity, formatting
+  and `git diff --check` pass for this increment.
+
+The first extracted helper needed an explicit `Headers` return annotation for
+portable declaration output and a type-only `Redacted` import. The failed checks
+remain in `/tmp/resident-routing-header-typecheck.log` and
+`/tmp/resident-routing-header-lint.log`; they are superseded by the checks above.
+
+Independent Standards and Spec reviews reported no new actionable findings for
+this increment. The backend still uses an unavailable fixture Huly endpoint,
+so live Huly reads and shared acquisition remain pending. The separate-parent
+metadata evidence does not certify the full #323 criterion or later tickets.

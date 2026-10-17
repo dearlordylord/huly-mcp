@@ -6,7 +6,7 @@ import {
   FiberMap,
   Option,
   Queue,
-  Redacted,
+  type Redacted,
   Ref,
   Result,
   Schema,
@@ -26,6 +26,7 @@ import {
 } from "./response-stream.js"
 import { observeResidentResponse } from "./response-observations.js"
 import { type LegacyHttpSession, parseLegacyHttpSession } from "./protocol-session.js"
+import { HostMessage, requestHeaders } from "./request-headers.js"
 
 const MAX_RESPONSE_MIB = 128
 const MAX_RESPONSE_BYTES = MAX_RESPONSE_MIB * 1024 * 1024
@@ -47,24 +48,10 @@ const Endpoint = Schema.URLFromString.check(
       url.hash === ""
   )
 )
-const HostMessage = Schema.Struct({
-  jsonrpc: Schema.Literal("2.0"),
-  id: Schema.optionalKey(McpSchema.RequestId),
-  method: Schema.String,
-  params: Schema.optionalKey(Schema.Unknown)
-})
-type HostMessage = Schema.Schema.Type<typeof HostMessage>
 type AdapterProtocolState =
   | { readonly _tag: "Fresh" }
   | { readonly _tag: "Initializing" }
   | { readonly _tag: "Initialized"; readonly legacySession: Option.Option<LegacyHttpSession> }
-const Routing = Schema.Struct({
-  name: Schema.optionalKey(Schema.String),
-  uri: Schema.optionalKey(Schema.String),
-  _meta: Schema.optionalKey(
-    Schema.Struct({ "io.modelcontextprotocol/protocolVersion": Schema.optionalKey(Schema.String) })
-  )
-})
 const Cancellation = Schema.Struct({ requestId: McpSchema.RequestId })
 const fail = (message: string) => new BackendResponseError({ message })
 
@@ -85,31 +72,6 @@ const boundedInput = <E, R>(input: Stream.Stream<Uint8Array, E, R>) =>
     ),
     Stream.pipeThroughChannel(Ndjson.decodeSchema(HostMessage)())
   )
-
-const requestHeaders = (
-  message: HostMessage,
-  authorization: Redacted.Redacted<string>,
-  session: Option.Option<LegacyHttpSession>
-) => {
-  const headers = new Headers({
-    accept: "application/json, text/event-stream",
-    authorization: `Bearer ${Redacted.value(authorization)}`,
-    "content-type": "application/json",
-    "mcp-method": message.method
-  })
-  const routing = Schema.decodeUnknownOption(Routing)(message.params)
-  if (Option.isSome(routing)) {
-    const version = routing.value._meta?.["io.modelcontextprotocol/protocolVersion"]
-    if (version !== undefined) headers.set("mcp-protocol-version", version)
-    const name = message.method === "resources/read" ? routing.value.uri : routing.value.name
-    if (name !== undefined) headers.set("mcp-name", name)
-  }
-  if (Option.isSome(session) && message.method !== "initialize") {
-    headers.set("mcp-session-id", Redacted.value(session.value.id))
-    headers.set("mcp-protocol-version", session.value.protocolVersion)
-  }
-  return headers
-}
 
 const forward = (
   endpoint: URL,

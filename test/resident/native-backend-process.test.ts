@@ -1,6 +1,8 @@
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process"
+import { execFile, spawn, type ChildProcessWithoutNullStreams } from "node:child_process"
 import { once } from "node:events"
+import { dirname, join } from "node:path"
 import { createInterface } from "node:readline"
+import { promisify } from "node:util"
 import { Client } from "@modelcontextprotocol/client"
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"
 import { Effect, Schema } from "effect"
@@ -8,18 +10,33 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
 import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
+import { NativeHostObservation } from "./native-host-observation.js"
 
 const PROCESS_BOUND = 30_000
 const RESPONSE_BOUND = 5_000
 const READY_PREFIX = "MCP HTTP server listening on "
 const AUTHORIZATION = "private-native-backend-fixture"
 const PROTOCOL = "2026-07-28"
+const runFile = promisify(execFile)
 let bundle: Awaited<ReturnType<typeof buildIsolatedStdioServer>>
 let backend: ChildProcessWithoutNullStreams
 let endpoint: string
 
 beforeAll(async () => {
   bundle = await buildIsolatedStdioServer(PROCESS_BOUND)
+  await runFile(
+    "pnpm",
+    [
+      "exec",
+      "esbuild",
+      "test/resident/fixtures/native-host.ts",
+      "--bundle",
+      "--platform=node",
+      "--format=cjs",
+      `--outfile=${join(dirname(bundle.path), "native-host.cjs")}`
+    ],
+    { timeout: PROCESS_BOUND }
+  )
   backend = spawn(process.execPath, [bundle.path], {
     env: {
       ...testStdioEnvironment(),
@@ -62,6 +79,29 @@ afterAll(async () => {
 })
 
 describe("manual adapters against the packaged native HTTP backend", { timeout: PROCESS_BOUND }, () => {
+  it.each(["modern", "legacy"])("serves %s catalogs to adapters owned by independent parents", async (mode) => {
+    const observations = await Promise.all(
+      ["claude-code", "codex-mcp-client"].map(async (host) => {
+        const { stdout } = await runFile(
+          process.execPath,
+          [join(dirname(bundle.path), "native-host.cjs"), bundle.path, endpoint, host, mode],
+          { timeout: PROCESS_BOUND, env: { ...testStdioEnvironment(), MCP_AUTH_TOKEN: AUTHORIZATION } }
+        )
+        return Schema.decodeUnknownSync(Schema.fromJsonString(NativeHostObservation))(stdout)
+      })
+    )
+    expect(new Set(observations.map((observation) => observation.parentPid)).size).toBe(observations.length)
+    expect(new Set(observations.map((observation) => observation.adapterPid)).size).toBe(observations.length)
+    for (const observation of observations) {
+      expect(observation.parentPid).not.toBe(process.pid)
+      expect(observation.adapterPid).not.toBe(observation.parentPid)
+      expect(observation.contextIsError).toBe(false)
+      expect(observation.resourceTemplates.length).toBeGreaterThan(0)
+      expect(observation.tools.includes("list_projects")).toBe(observation.host === "claude-code")
+      expect(observation.tools.includes("invoke_tool")).toBe(observation.host === "codex-mcp-client")
+    }
+  })
+
   it.each(["modern", "legacy"])("preserves %s host identity and catalog policy", async (mode) => {
     const hosts = ["claude-code", "codex-mcp-client"].map((name) => {
       const transport = new StdioClientTransport({
@@ -91,6 +131,13 @@ describe("manual adapters against the packaged native HTTP backend", { timeout: 
         expect(names.includes("invoke_tool")).toBe(name === "codex-mcp-client")
         const result = await client.callTool({ name: "get_huly_context", arguments: {} }, { timeout: RESPONSE_BOUND })
         expect(result.isError, JSON.stringify(result)).not.toBe(true)
+        if (mode === "modern" && name === "claude-code") {
+          for (const uri of ["fixture://проект", "=?base64?Zml4dHVyZQ==?=", " fixture://space "]) {
+            await expect(client.readResource({ uri }, { timeout: RESPONSE_BOUND })).rejects.toMatchObject({
+              message: expect.stringContaining(`Resource '${uri}' not found`)
+            })
+          }
+        }
       }
     } finally {
       await Promise.all(hosts.map(({ transport }) => transport.close()))
