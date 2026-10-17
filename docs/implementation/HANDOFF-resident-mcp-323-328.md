@@ -203,3 +203,12 @@ now joins a supervisor-owned `waitpid` result and requires exit code 0 before
 reporting backend retirement. Its focused run passed with every original caller
 and deadline retained. This strengthens cleanup evidence; the earlier connection
 timeout remains unexplained and must not be declared fixed.
+
+## Selected-admission continuity correction
+
+The [issue 324 report](issue-324.md#keep-the-selected-admission-through-caller-use-2026-10-17)
+records a failing-before real TLS fixture and the production correction: retain
+the first compatible admission while checking the bounded inventory, then use
+that same admission after proving uniqueness. Ambiguous-owner and interruption
+cleanup pass. Packaged launch attempts still time out and remain preserved; do
+not claim the earlier ten-parent reliability problem is solved by this fix.

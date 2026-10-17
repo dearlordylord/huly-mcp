@@ -2,7 +2,7 @@ import * as fs from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
 import { Cause, Effect, Exit, Fiber, Option, Result, Scope } from "effect"
 
-import { withAdapterAttachment, withAdapterCandidate, type AdapterExchange } from "./adapter-attachment.js"
+import { withAdapterCandidate, type AdapterExchange } from "./adapter-attachment.js"
 import { readResidentAttachment } from "./attachment-file.js"
 import type { ResidentAttachment } from "./attachment-file.js"
 import { decodeCurrentRegistryAttachment, openGenerationRegistry } from "./generation-registry.js"
@@ -23,6 +23,7 @@ import {
   ResidentFilePath
 } from "./protected-path.js"
 import { acquireSelectionClaim, SelectionClaimError } from "./selection-claim.js"
+import type { BackendResponseError } from "./response-stream.js"
 import type { StartupBudget } from "./startup-budget.js"
 import { readManagedDirectoryForOwner } from "./managed-directory-config.js"
 
@@ -71,6 +72,43 @@ type SelectionOwnership = {
   readonly registry: Effect.Success<ReturnType<typeof openGenerationRegistry>>
 }
 
+// Internal capabilities stay inside the admission brackets; no token is serialized here.
+type SelectedCandidate = { readonly descriptor: ResidentAttachment; readonly exchange: AdapterExchange }
+
+const withCompatibleCandidate = <A, E, R>(
+  descriptors: ReadonlyArray<ResidentAttachment>,
+  capture: ResidentStartupCapture,
+  startup: StartupBudget,
+  use: (candidate: SelectedCandidate) => Effect.Effect<A, E, R>
+) => {
+  const visit = (
+    remaining: ReadonlyArray<ResidentAttachment>,
+    selected: SelectedCandidate | undefined
+  ): Effect.Effect<Option.Option<A>, E | BackendResponseError | ManagedLaunchError, R> =>
+    Effect.gen(function* () {
+      const [descriptor, ...rest] = remaining
+      if (descriptor === undefined)
+        return selected === undefined ? Option.none<A>() : yield* use(selected).pipe(Effect.map(Option.some))
+      const matched = yield* withAdapterCandidate(
+        descriptor,
+        capture.selection,
+        (exchange) => {
+          if (selected !== undefined)
+            return Effect.fail(
+              new ManagedLaunchError({
+                reason: "ownership",
+                message: "Multiple compatible resident generations are unresolved; replacement refused"
+              })
+            )
+          return visit(rest, { descriptor, exchange })
+        },
+        startup
+      )
+      return Option.isSome(matched) ? matched.value : yield* visit(rest, selected)
+    })
+  return visit(descriptors, undefined)
+}
+
 export const withResidentSelection = <A, E, R, B, F, S>(options: {
   readonly directory: ResidentDirectory
   readonly capture: ResidentStartupCapture
@@ -86,42 +124,26 @@ export const withResidentSelection = <A, E, R, B, F, S>(options: {
           Effect.gen(function* () {
             const registry = yield* options.startup.within(openGenerationRegistry(options.directory))
             const records = yield* options.startup.within(registry.inventory)
-            let selected: ResidentAttachment | undefined
+            const descriptors: ResidentAttachment[] = []
             for (const record of records) {
               const descriptor = yield* options.startup.within(decodeCurrentRegistryAttachment(record.envelope))
-              if (descriptor === undefined) continue
-              const matched = yield* withAdapterCandidate(
-                descriptor,
-                options.capture.selection,
-                () => Effect.succeed(descriptor),
-                options.startup
-              )
-              if (Option.isSome(matched)) {
-                if (selected !== undefined)
-                  return yield* new ManagedLaunchError({
-                    reason: "ownership",
-                    message: "Multiple compatible resident generations are unresolved; replacement refused"
-                  })
-                selected = matched.value
-              }
+              if (descriptor !== undefined) descriptors.push(descriptor)
             }
-            if (selected !== undefined) {
-              const descriptor = selected
-              return yield* withAdapterAttachment(
-                descriptor,
-                (exchange) =>
-                  claim.release.pipe(
-                    Effect.andThen(
-                      options.existing(
-                        ResidentFilePath.make(join(options.directory, `${descriptor.identity.generation}.json`)),
-                        exchange
-                      )
+            const matched = yield* withCompatibleCandidate(
+              descriptors,
+              options.capture,
+              options.startup,
+              ({ descriptor, exchange }) =>
+                claim.release.pipe(
+                  Effect.andThen(
+                    options.existing(
+                      ResidentFilePath.make(join(options.directory, `${descriptor.identity.generation}.json`)),
+                      exchange
                     )
-                  ),
-                options.capture.selection,
-                options.startup
-              )
-            }
+                  )
+                )
+            )
+            if (Option.isSome(matched)) return matched.value
             if (records.length === MAX_REGISTRY_RECORDS) return yield* registryCapacityFailure()
             return yield* options.absent({ directory: options.directory, registry, release: claim.release })
           }),

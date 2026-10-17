@@ -270,3 +270,64 @@ Complete the remaining profile lifecycle cases. Align implementation
 observations with the lifecycle model. Final live Huly and native-platform
 qualification remain pending. No complete issue criterion is accepted by these
 foundation tests alone.
+
+## Keep the selected admission through caller use (2026-10-17)
+
+Selection previously admitted a compatible candidate, released that admission,
+then acquired a second admission before invoking the caller. A real local TLS
+regression fixture closes admission after release: the former implementation
+loses its already-confirmed owner at that intermediate gap. The failing-before
+run is `/tmp/resident-admission-continuity-red.log`, SHA-256
+`10814655ee581e93e6730d58e6f5f68bee10828fce8567326d174cbc9668e7d4`.
+
+The bounded inventory scan now retains the first matching admission inside its
+original bracket, including heartbeat renewal, while checking the remaining
+records. A second compatible owner still refuses before caller use. Only a unique
+match releases the selection claim and invokes the caller; all normal, failure
+and interruption exits unwind the existing typed admission cleanup. No admission
+is released and reacquired merely to start using the selected owner. Complete
+inventory decoding occurs before contacting any candidate.
+
+The new tests cover continuity across the former gap, refusal and release of
+both capacity-one owners after ambiguity, and release after caller interruption.
+A fourth case selects the unique compatible owner among different configurations.
+Together with compatibility tests, 12 tests passed in
+`/tmp/resident-admission-continuity-final-verified.log`, SHA-256
+`01cea485f8f1f02fd8c193f7d235bead9e713d460936eaf0f9f8c31b55b7a3a2`.
+The nearby owner/idle/compatibility run passed 28 tests before the two additional
+safety cases were added. TypeScript/Effect diagnostics checked 1,337 files with
+zero errors/warnings; lint, circular and complexity passed. Fresh read-only
+Standards and Spec reviews found no actionable issues.
+
+The packaged ten-parent and operator-stop run failed during connection; its
+preserved log is `/tmp/resident-admission-continuity-process.log`, SHA-256
+`0d1e06800848d42e599a8c76932303f8973a6ba8adad941c34bf0146713c957a`.
+A controlled ten-parent run of the same retained candidate also failed; its
+artifacts remain under `/tmp/resident-admission-retained-candidate-cW67vo`.
+These failures do not invalidate the deterministic gap regression, but they keep
+packaged launch reliability unqualified. No timeout, caller count, inventory,
+coverage threshold, recovery guarantee or default transport changed. The packaged
+MCP artifact used by both failed suites has SHA-256
+`7368fa498f2b25eeef9aa6d6fae77425aa7ea0bb31f882ce70fa8d2c363cc53a`.
+
+After the static checks finished, sequential retained-artifact controls passed:
+baseline receipt `/tmp/resident-admission-retained-baseline-14NwUM.receipt.json`
+(SHA-256 `510cb1aaf268ca2c3ae54367945f76e456fdc902937da85797c1d3df16cb0b62`),
+then candidate receipt `/tmp/resident-admission-paired-candidate-00FrTk.receipt.json`
+(SHA-256 `abf90d9ec6bfd5cb9dcb527729ca98d5189aee9adbb6d8e291a8bc3d34106ba9`).
+The candidate receipt includes actual kernel-owned backend exit code 0. These
+are successful retained-artifact schedules, not a reliability or performance
+measurement; previous connection failures remain qualification gaps.
+
+Review strengthened the configuration test to assert the selected descriptor's
+exact generation path, since both native fixtures answer ping successfully.
+The final 12-test run includes that assertion; both review findings were resolved
+and rechecked without residual actionable findings.
+
+The same retained packaged candidate then passed the complete operator-stop
+schedule. Receipt `/tmp/resident-admission-retained-stop-knNlOs.receipt.json`,
+SHA-256 `feefcd09f29231f40550915072d1df6b6da1b1f7c98b8eab6c5332a3450cd6e4`,
+records three kernel-owned backend exits with code 0, two replacement callers,
+an unchanged unrelated generation record, and complete private-state removal.
+This remains scoped Linux process evidence; it is not a final six-ticket gate or
+live-Huly certification.
