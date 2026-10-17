@@ -62,3 +62,55 @@ crash recovery and idle shutdown are not implemented in this manual path.
 The earlier experimental `MCP_STDIO_BACKEND_URL` and adapter `MCP_AUTH_TOKEN`
 settings no longer select a backend. Ordinary stdio and direct HTTP retain
 their existing launch paths.
+
+## Managed state location
+
+The experimental `MCP_TRANSPORT=stdio-resident` path selects and starts a
+compatible backend. Without `MCP_RESIDENT_STATE_DIRECTORY`, its ownership state
+uses `$XDG_STATE_HOME/huly-mcp/resident` on Linux, falling back to
+`$HOME/.local/state/huly-mcp/resident` when the XDG value is absent, empty or
+relative. This follows the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir/latest/).
+On macOS the location is `$HOME/Library/Application Support/huly-mcp/resident`.
+Windows ownership protection remains unqualified and is refused.
+
+The selected directory must pass the existing current-user ownership and private
+permission checks. An explicit `MCP_RESIDENT_STATE_DIRECTORY` still selects a
+separate namespace, including a disposable test directory. It must be shared by
+all launchers that are meant to share that backend.
+
+Earlier experimental builds defaulted to the OS temporary directory's
+`huly-mcp-<uid>` child. Before upgrading those builds, stop their launchers and
+verify retirement of their actual owned backend processes and resources. The
+new default refuses an occupied legacy directory rather than starting a second
+backend or deleting old evidence. It also refuses when that directory cannot
+be inspected. An empty or absent legacy directory permits the new location.
+This check does not coordinate with an older executable concurrently launching
+into its old namespace; keep those launchers stopped during migration. No
+records are migrated or reset automatically.
+
+Ownership records contain discovery and authorization state, not an operation
+journal. Do not delete live state or infer retirement from a missing PID.
+Unexpected owner loss retains evidence and requires verified local retirement
+before replacement. Native platform and final local-Huly qualification of the
+combined managed path remain pending.
+
+## Managed package versions
+
+Automatic attachment requires an exact implementation-version match as well as
+matching Huly authority and tool policy. Two installed versions may use the same
+protected state directory: each selects its own backend generation. Stopping one
+version's callers lets that backend retire after its idle period; callers of the
+other version retain their backend and captured context.
+
+Use separate installation paths during an upgrade. Do not rewrite a running
+package's executable or edit a generation record to claim a different version.
+An upgrade does not migrate sessions, queued requests or uncertain operation
+results. Close old callers normally, let confirmed cleanup remove their own
+records, and launch new callers from the selected installation. If old ownership
+is unresolved, preserve it and verify retirement before any explicit recovery.
+
+The Linux coexistence fixture builds two package layouts from this candidate
+with distinct implementation versions. It checks separate-parent attachment,
+generation isolation and independent retirement. This is compatibility evidence
+for that version boundary, not certification of arbitrary released-version
+upgrades, package-manager installation or native macOS/Windows behavior.

@@ -102,7 +102,9 @@ export type AdapterExchange = ReturnType<typeof adapterExchange>
 const admissionFailure = (error: unknown) =>
   error instanceof ResidentSelectionMismatch
     ? error
-    : new BackendResponseError({ message: "Resident admission failed; no Huly request was dispatched or replayed" })
+    : new BackendResponseError({
+        message: "Resident admission failed; no Huly request was dispatched. No request was replayed."
+      })
 
 const acquireAdmission = (attachment: ResidentAttachment, selection: ResidentSelection | undefined) =>
   requestAdmission(attachment, selection).pipe(

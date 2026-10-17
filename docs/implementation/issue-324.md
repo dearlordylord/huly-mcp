@@ -3,6 +3,39 @@
 Status: incomplete. The selected design is recorded in
 [Managed resident ownership](resident-managed-design.md).
 
+## Persistent ownership namespace (2026-10-17)
+
+Managed startup now selects protected application state instead of an automatic
+temporary root. Linux uses the absolute XDG state base or `~/.local/state`;
+macOS uses `~/Library/Application Support`. Both append `huly-mcp/resident`.
+An explicit resident state directory retains its prior behavior. Windows still
+refuses unsupported ownership protection; this change supplies no native macOS
+or Windows qualification.
+
+Before selecting the new default, startup checks the former temporary
+`huly-mcp-<uid>` namespace. Any entry or inspection failure refuses startup with
+a verified-retirement diagnostic. The bounded inspection reads one entry and
+closes its directory handle; it neither loads credentials nor deletes evidence.
+An absent or empty old namespace permits selection. This is an upgrade guard,
+not coordination with concurrently running old executables. Old launchers must
+remain stopped during migration. No automatic metadata migration is claimed.
+
+Seven focused tests cover Linux defaults, absolute/empty/relative XDG values,
+macOS selection, absent HOME fallback, explicit namespace isolation, occupied or
+unreadable legacy state and invalid supplied paths. They pass in
+`/tmp/resident-persistent-directory-verified-tests.log`. The existing 15 owner
+tests passed in `/tmp/resident-persistent-directory-tests.log`; that same initial
+run exposed an incorrect Config API spelling in the new tests, fixed before the
+focused pass. Three packaged lazy-NoConfig/profile diagnostic cases pass in
+`/tmp/resident-persistent-directory-no-config.log`. TypeScript and Effect
+diagnostics pass in `/tmp/resident-persistent-directory-typecheck.log`; focused
+Oxlint passes in `/tmp/resident-persistent-directory-lint.log`.
+
+These checks do not prove the entire managed process contract. Combined gate,
+fresh reviews, launch/fault schedules and final live/native qualification remain
+pending. [Launch documentation](../resident-manual.md#managed-state-location)
+records the selected paths and migration limitation.
+
 ## Implemented foundation
 
 `selection-claim.ts` creates an exclusive protected-directory claim. Only its

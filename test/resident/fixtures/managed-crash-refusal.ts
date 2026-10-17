@@ -103,6 +103,7 @@ const main = async () => {
         assert.equal(stdoutBytes, 0)
         process.stderr.write("Crash refusal: no adapter reply confirmed\n")
         assert.ok(Buffer.concat(diagnostics).toString("utf8").includes("No request was replayed"))
+        assert.ok(Buffer.concat(diagnostics).toString("utf8").includes("no Huly request was dispatched"))
         process.stderr.write("Crash refusal: no-replay diagnostic confirmed\n")
         assert.equal(await fs.readFile(registryFile, "utf8"), original)
         process.stderr.write("Crash refusal: original record confirmed\n")

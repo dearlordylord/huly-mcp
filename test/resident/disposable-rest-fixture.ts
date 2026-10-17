@@ -37,7 +37,7 @@ const Select = Schema.Struct({
 const MAX_REQUEST_BYTES = 8_192
 const HTTP_BAD_REQUEST = 400
 
-export const startDisposableRestFixture = async () => {
+export const startDisposableRestFixture = async (options: { readonly onProjectRead?: () => Promise<void> } = {}) => {
   const observed = { modelRequests: 0, projectReads: 0, fullModelRequested: true, invalidRequests: 0 }
   const server = createServer((request, response) => {
     const handle = async () => {
@@ -92,6 +92,7 @@ export const startDisposableRestFixture = async () => {
         url.searchParams.get("class") === "tracker:class:Project"
       ) {
         observed.projectReads++
+        await options.onProjectRead?.()
         response.end(
           Schema.encodeSync(Schema.fromJsonString(FindResult))({ dataType: "TotalArray", value: [], total: 0 })
         )

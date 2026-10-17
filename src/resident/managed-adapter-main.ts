@@ -11,6 +11,7 @@ import { launchManagedChild } from "./managed-process.js"
 import { prepareManagedDirectory, withResidentSelection } from "./managed-selection.js"
 import { resolveManagedStartup } from "./startup-selection.js"
 import { makeStartupBudget } from "./startup-budget.js"
+import { BackendResponseError } from "./response-stream.js"
 
 const main = Effect.gen(function* () {
   const environment = { ...process.env }
@@ -48,7 +49,9 @@ const main = Effect.gen(function* () {
 }).pipe(
   Effect.provide(NodeStdio.layer),
   Effect.mapError((error) =>
-    error instanceof ManagedLaunchError || error instanceof CliProfileStoreError
+    error instanceof ManagedLaunchError ||
+    error instanceof CliProfileStoreError ||
+    error instanceof BackendResponseError
       ? error
       : new ManagedLaunchError({
           reason: "unavailable",

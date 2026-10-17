@@ -15,6 +15,41 @@ this report alone. The shared implementation remains in
 
 ## Current refusal and uncertainty policy
 
+### Managed adapter diagnostic regression (2026-10-17)
+
+The managed entrypoint now preserves `BackendResponseError` instead of replacing
+it with a generic attachment-startup error. This keeps the existing
+unknown-outcome/no-replay diagnostic when an admitted request loses its backend.
+Admission refusal separately states that no Huly request was dispatched.
+
+`test/resident/managed-request-loss-process.test.ts` builds the package and runs a
+native backend plus the managed stdio adapter through the pinned MCP client.
+The disposable REST fixture kills its owned backend only after receiving the
+project query. The receipt confirms one dispatch, backend and adapter closure,
+the unknown-outcome diagnostic, and byte-identical retained generation metadata.
+This read schedule checks error translation; the committed-write fixtures below
+remain the evidence for mutation uncertainty.
+
+The test first failed on `unknownOutcome: false` against the old entrypoint
+(`/tmp/resident-managed-request-loss-red.log`, SHA-256
+`2656864a1729e11a67bfbc76f7cfad0a03e28ab7a61e8232e2becc441f51c8cd`).
+The corrected test passed with its original five-second request bound and
+30-second process bound (`/tmp/resident-managed-loss-verified.log`, SHA-256
+`4a806f36956f4ac8918a2276822fc9e12e8efaba0523f9d41502ebcfbd1f6534`).
+The existing crash-refusal fixture also passed with an added assertion for the
+before-dispatch diagnostic (`/tmp/resident-managed-crash-diagnostic-verified.log`,
+SHA-256 `4ea3c7c483e2e71cdfa6046376b437886c314e07993f3eb4ac0c770b258b4e10`).
+TypeScript and Effect diagnostics and focused Oxlint passed.
+
+Intermediate executions failed before backend publication, including an existing
+crash-refusal fixture. Both the unchanged baseline and corrected retained bundles
+subsequently published successfully, and the corrected retained bundle completed
+the fault schedule in 4.49 seconds. The startup failures remain unexplained;
+these focused passes do not establish launch-race reliability or final
+qualification. Failed bundles, roots and logs remain available locally. Full
+gate, reviews, remaining fault schedules and final live-Huly certification remain
+pending for the combined candidate.
+
 Startup does not signal a PID from registry metadata. A parent can terminate its
 own prepared `ChildProcess` before attempting Start. It consumes that authority
 before attempting the private Start send and never restores it after a failed
@@ -39,6 +74,57 @@ versions remain opaque and can coexist within the bounded inventory. Unknown
 registry formats block selection. Registry coexistence tests do not establish
 native coexistence of two separately installed package versions or a migration
 protocol; those remain pending.
+
+## Separate-parent implementation-version coexistence
+
+`test/resident/managed-version-process.test.ts` builds two isolated package
+layouts, each with its own `package.json` and executable, under separate
+`node_modules/@firfi/huly-mcp` installation paths. Both use the current source;
+their implementation versions are the checked-out package version and that
+version with a `-coexistence.1` suffix. This deliberately exercises version
+identity without claiming compatibility with a different released source tree.
+
+Two real parent processes run the packaged managed adapters against one private
+registry. The fixture confirms two exact implementation versions, distinct
+generation IDs and host-specific tool discovery. It closes the first parent,
+waits for that backend's actual exit and record retirement, checks the second
+record remains byte-identical, and reads through the same surviving adapter.
+After the second parent closes, both backend PIDs are observed absent and the
+private state root is empty. A Linux kernel child subreaper independently owns
+and joins fixture descendants. No PID from a record is signalled by the fixture.
+The receipt pairs each package identity with its executable's SHA-256 hash.
+
+The fixture retains the existing five-second response, seven-second retirement,
+30-second process and subreaper bounds. Earlier passes are in
+`/tmp/resident-version-coexistence-tests.log` and
+`/tmp/resident-installed-version-coexistence-tests.log`. Final receipt-shape
+verification is recorded in `/tmp/resident-version-artifact-receipt-tests.log`.
+The final process test passed in 21.21 seconds. Its receipt is
+`/tmp/resident-version-coexistence-XPtEFY.receipt.json`, SHA-256
+`393f2eb67aa5f3d822455e3304d95931c4f39b9293d09d0b24ff000eefe2795f`.
+The final process log has SHA-256
+`4ba8e9eae3d5699e9f4feaee8e1ab553dfb4da6c975d3565b23c0d1620f54769`.
+TypeScript and Effect diagnostics passed after that refinement in
+`/tmp/resident-version-artifact-typecheck.log`; focused lint and formatting also
+passed on the final source.
+
+This is Linux version-boundary and retirement evidence. It does not certify
+package-manager installation, arbitrary released-version upgrades, other native
+platforms, corrupt-state recovery, the full gate or final live-Huly behavior.
+Those requirements remain pending. The supported intentional-coexistence policy
+and upgrade limitations are documented in
+[launch choices](../resident-manual.md#managed-package-versions).
+
+### Increment review
+
+Fresh read-only Standards and Spec reviews compared all tracked and untracked
+increment files against `1e3e863d8fb867b07e1ba3606b0b63550ea798a3`. The Spec
+review reported no actionable findings. Standards reported one P2: the new
+coexistence helper signatures discarded existing PID, package-path and host-name
+domain types. Their parameters now derive from the owning schemas, and the
+Standards reviewer confirmed the fix with no residual finding. Runtime logic
+did not change after the final process pass. This review does not accept the
+remaining criteria or replace the combined final gate.
 
 ## Committed-write response loss
 
