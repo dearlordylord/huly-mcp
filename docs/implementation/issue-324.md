@@ -199,6 +199,37 @@ profile lookup and late TLS/registry retirement tests pass, 20 tests
 (`/tmp/resident-lifecycle-xdg-boundaries-tests.log`). The XDG case makes no native
 macOS or Windows claim.
 
+## Parent loss before Start
+
+The packaged Linux fixture holds the detached child before its application
+entrypoint, confirms its kernel parentage, and kills only the owned parent
+process. The child observes IPC disconnect with zero private frames, then exits
+naturally. No generation is published. The unresolved selection claim remains.
+This covers parent loss before Start, not recovery after authorization.
+
+The focused test passes in `/tmp/resident-parent-loss-minimal-preload-tests.log`.
+Its schema receipt is `/tmp/resident-parent-loss-DKdAnX.receipt.json`.
+TypeScript and Effect diagnostics and lint pass in
+`/tmp/resident-parent-loss-final-typecheck.log` and
+`/tmp/resident-parent-loss-final-lint.log`. Fresh Standards and Spec reviews find
+no actionable defect in this four-file test increment.
+
+The frozen increment passes `pnpm check-all`: 457 files and 5,636 tests, with
+statements 99.45%, branches 99%, functions 99%, and lines 99.56%. All existing
+limits and diagnostic checks remain enabled. The full-gate receipt is
+`/tmp/resident-parent-loss-frozen-check-all.log`, SHA-256
+`a5d870d4ca44a415396a80dd6c071091aba0025255bdb29e6c3972c52e4e6853`.
+The process receipt from that run is
+`/tmp/resident-parent-loss-HMOfXw.receipt.json`.
+
+The gate uses Node's awaited import preloads before the application entrypoint,
+as implemented in [Node 24 run_main.js](https://github.com/nodejs/node/blob/v24.20.0/lib/internal/modules/run_main.js#L82-L94).
+An earlier fixture failed because its preload imported an SDK-bearing CommonJS
+dependency into the ESM bundle. That attempt remains recorded in
+`/tmp/resident-managed-parent-loss-tests.log`. The passing preload uses a local
+bounded wait and avoids that dependency. No production module is replaced.
+The fixture makes no live Huly, macOS, or Windows qualification claim.
+
 ## Remaining work
 
 Complete source failure coverage and the remaining packaged fault schedules.
