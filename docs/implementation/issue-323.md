@@ -466,3 +466,47 @@ controls and crash-expiring eligibility. Native session adoption alone does not
 prove release ordering while a target is held in cleanup, ownership of legacy
 UUID use, live Huly reads or any complete issue's acceptance criteria. All six
 issues remain required.
+
+## Attachment resource owner and cleanup barrier
+
+`attachment-owner.ts` implements the scoped resource core, without private wire
+admission yet. Each owner reserves work before use, exposes native adoption only
+while that reservation remains retained, and fences new reservations on close.
+Closing cancels only that owner's tickets, waits for explicit successful cleanup,
+then invokes native release capabilities. Duplicate or completed reservations
+cannot adopt another session. Typed cleanup failures and defects retain blocked
+ownership. Repeated close callers join one generation-scoped drain; cancelling
+or timing out a waiter does not cancel cleanup or reopen admission.
+
+Reviews caught and corrected two initial gaps: cleanup certification must cover
+typed failures as well as defects, and close waiters must be interruptible while
+the drain keeps ownership. The revised API separates operation and cleanup
+effects. Fresh Standards and Spec follow-up reviews found no remaining scoped
+finding.
+
+Evidence:
+
+- `/tmp/resident-attachment-owner-coverage.log`: ten tests in two files pass;
+  focused owner-module statements, branches, functions and lines are all 100%.
+  The native test holds both production lifecycle target retention and client
+  close. Native lookup remains usable until both finish, then returns 404;
+  another native legacy session stays usable throughout. This composes real
+  native MCP and the production lifecycle using explicit fixture ports, rather
+  than exercising an actual MCP tool's target-retention middleware or live Huly.
+- `/tmp/resident-attachment-owner-premature-release-mutant.log`: removing the
+  cleanup wait makes that native test fail. The mutation is restored.
+- Owner tests cover duplicate and late adoption, adoption during closing,
+  repeated close, typed and defective cleanup failures, and a TestClock-bounded
+  waiter whose retained cleanup later completes.
+- `/tmp/resident-attachment-owner-typecheck.log`: 1,214 files checked, zero
+  TypeScript or Effect errors or warnings. Focused lint, complexity and format
+  checks pass.
+- `quint-specs/resident-attachment-owner.md`: three model scenarios pass and
+  1,000 sampled traces at depth 30 find no safety violation, with all six action
+  witnesses reached. This bounded resource model has no implementation observation
+  alignment yet and is separate from the existing response framing model.
+
+Private controls, adapter identity/membership authorization, the actual HTTP
+retention boundary and final qualification remain pending. No full quality gate,
+live Huly run or platform qualification is claimed for this increment. All six
+issues remain incomplete.

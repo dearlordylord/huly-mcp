@@ -27,6 +27,14 @@ yield* serveNativeMcp(owner.boundary)
 These are target interfaces. Admission and renewal are not yet implemented.
 Ordinary stdio and direct HTTP omit the private owner and retain their behavior.
 
+The resource core now exists as `makeAttachmentOwner`. Its scoped `withWork`
+accepts explicit `use` and `cleanup` effects. Only successful cleanup certifies
+ticket completion; typed cleanup failures and defects retain a blocked ticket
+and native capabilities. A generation-scoped drain fences admission and signals
+owned cancellation. Close callers interruptibly join that same drain, so a
+caller deadline leaves cleanup ownership alive. Production admission must supply
+the bounded close policy and wire the actual HTTP target-retention lifecycle.
+
 ## Shape
 
 One generation-owned registry tracks accepting, closing and blocked attachments,

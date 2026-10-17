@@ -6,6 +6,8 @@ import { HttpClientRequest, HttpServerRequest } from "effect/http"
 import { expect, it } from "vitest"
 
 import { HttpHost, HttpPort, HttpServerFactoryService, startHttpTransport } from "../../src/mcp/http-transport.js"
+import { createRequestClientLifecycle } from "../../src/mcp/request-client-lifecycle.js"
+import { makeAttachmentOwner } from "../../src/resident/attachment-owner.js"
 import { parseLegacyHttpSession, LegacyHttpSession } from "../../src/resident/protocol-session.js"
 import { HostMessage, requestHeaders } from "../../src/resident/request-headers.js"
 import {
@@ -115,6 +117,87 @@ const initialize = (owner: OwnerName) =>
     params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: owner, version: "1.0" } }
   })
 const ping = HostMessage.make({ jsonrpc: "2.0", id: 1, method: "ping" })
+
+it("retains the native session until owned request client cleanup completes", async () => {
+  await Effect.runPromise(
+    Effect.gen(function* () {
+      const attachment = yield* makeAttachmentOwner
+      const adopted = yield* Deferred.make<SessionResource>()
+      const owner: Owner = {
+        adopt: (resource) =>
+          attachment
+            .withWork({
+              use: (nativeOwner) =>
+                nativeOwner.adopt(resource).pipe(Effect.tap(() => Deferred.succeed(adopted, resource))),
+              cleanup: () => Effect.void
+            })
+            .pipe(Effect.orDie)
+      }
+      yield* withNativeServer(new Map<OwnerName, Owner>([["first", owner]]), (endpoint, identity) =>
+        Effect.gen(function* () {
+          const initialized = yield* exchange(endpoint, identity, "first", initialize("first"))
+          const survivor = yield* exchange(endpoint, identity, "second", initialize("second"))
+          const resource = yield* Deferred.await(adopted)
+          const started = yield* Deferred.make<void>()
+          const cleaning = yield* Deferred.make<void>()
+          const draining = yield* Deferred.make<void>()
+          const finishCleanup = yield* Deferred.make<void>()
+          const cleanup = Deferred.succeed(cleaning, undefined).pipe(Effect.andThen(Deferred.await(finishCleanup)))
+          const lifecycle = createRequestClientLifecycle(async () => ({
+            bundle: "fixture-client",
+            close: () => Effect.runPromise(cleanup)
+          }))
+          const releaseTarget = lifecycle.retain()
+          const request = yield* attachment
+            .withWork({
+              use: () =>
+                Effect.promise(lifecycle.resolve).pipe(
+                  Effect.andThen(Deferred.succeed(started, undefined)),
+                  Effect.andThen(Effect.never)
+                ),
+              cleanup: () => Deferred.succeed(draining, undefined).pipe(Effect.andThen(Effect.promise(lifecycle.close)))
+            })
+            .pipe(Effect.exit, Effect.forkScoped)
+          yield* Deferred.await(started)
+          const closed = yield* Deferred.make<void>()
+          const closing = yield* attachment.close.pipe(
+            Effect.andThen(Deferred.succeed(closed, undefined)),
+            Effect.forkScoped
+          )
+          yield* Deferred.await(draining)
+          try {
+            expect(yield* Deferred.isDone(closed)).toBe(false)
+            expect(yield* attachment.ownsSession(resource.id)).toBe(true)
+            expect(
+              Exit.isFailure(
+                yield* Effect.exit(attachment.withWork({ use: () => Effect.void, cleanup: () => Effect.void }))
+              )
+            ).toBe(true)
+            expect((yield* exchange(endpoint, identity, "none", ping, initialized.session)).status).toBe(HTTP_OK)
+            expect(yield* Deferred.isDone(cleaning)).toBe(false)
+            expect((yield* exchange(endpoint, identity, "second", ping, survivor.session)).status).toBe(HTTP_OK)
+          } finally {
+            releaseTarget()
+            yield* Deferred.await(cleaning)
+            try {
+              expect(yield* attachment.ownsSession(resource.id)).toBe(true)
+              expect(yield* Deferred.isDone(closed)).toBe(false)
+            } finally {
+              yield* Deferred.succeed(finishCleanup, undefined)
+            }
+          }
+          yield* Fiber.join(closing)
+          expect(Exit.isFailure(yield* Fiber.join(request))).toBe(true)
+          expect(yield* attachment.ownsSession(resource.id)).toBe(false)
+          expect((yield* exchange(endpoint, identity, "none", ping, initialized.session)).status).toBe(HTTP_NOT_FOUND)
+          expect((yield* exchange(endpoint, identity, "second", ping, survivor.session)).status).toBe(HTTP_OK)
+          yield* attachment.close
+          expect(yield* resource.release).toBe(false)
+        })
+      )
+    }).pipe(Effect.scoped, Effect.timeout(RESPONSE_BOUND))
+  )
+})
 
 it("adopts actual native UUIDs and releases only the captured session", async () => {
   await Effect.runPromise(
