@@ -22,11 +22,15 @@ and Spec reviews find no actionable defect. See
 [the resumed increment report](issue-327.md#guardian-ipc-and-protected-files-2026-10-17-resume)
 for scope, logs, hashes and limitations.
 
-The [guardian-aware Quint type sketch](../../quint-specs/resident-launch.qnt) and
-[scope note](../../quint-specs/resident-launch.md) are concrete proposals for the
-pending model approval. The sketch typechecks separately. No logic or simulation
-claim is added. Guardian-only production publication, truthful uncertainty
-reporting, verified replacement and complete qualification remain unfinished.
+The latest [ADR 0003](../adr/0003-adopt-mcporter-resident-lifecycle.md) adopts
+MCPorter's researched coordinated-start/authenticated-owner/generation/drain
+practices. It supersedes the mandatory guardian/restricted-worker proposal.
+Backend crashes may interrupt every caller; no stronger Huly durability or
+transparent crash failover is required. Unresolved owner loss causes bounded
+refusal until verified local retirement. The caller/backend
+[type sketch](../../quint-specs/resident-launch.qnt) and
+[scope note](../../quint-specs/resident-launch.md) typecheck but contain no logic
+or simulation claim. Recovery and complete qualification remain unfinished.
 
 The subsequent [ADR 0002](../adr/0002-resident-recovery-without-operation-journal.md)
 removes the mandatory operation journal after discussion with Astra at the user's
@@ -100,21 +104,22 @@ completion from these checkpoints or synthetic fixtures.
 
 ## Resume boundary
 
-The conditional next architecture is in
-[resident-recovery-design.md](resident-recovery-design.md). It selects a guardian
-that retains the actual worker handle, with the native MCP backend in a restricted
-worker. The guardian owns publication and retirement, with protected pending
-ownership evidence before worker creation. There is no durable operation journal
-or replay queue. Requests stay with their original adapter and are never restored
-into a replacement. Missing terminal outcomes remain unconfirmed; a new adapter
-cannot look up the old result. There must be no replay of ambiguous writes and
-no PID or port inference of ownership.
+The selected architecture is in
+[resident-recovery-design.md](resident-recovery-design.md) and ADR 0003. Use the
+native shared backend as its resource owner, a transient launcher, coordinated
+selection, authenticated readiness and generation-owned publication/cleanup.
+There is no mandatory guardian, restricted worker or durable operation journal.
+The earlier restricted-runtime experiments remain historical evidence, not
+prerequisites for implementing a new supervisor.
 
-The restricted-runtime experiment only partially tests that design's premises.
-Next qualify IPC handle transfer and guardian ownership, restrictions before SDK
-imports, ownership-file write protection, and worker exit/descendant accounting.
-Then implement the coherent recovery path and test failure timing, uncertainty,
-concurrent replacement and version coexistence. Add no unused API stubs.
+Implement bounded stale-owner status, verified local cleanup and serialized
+replacement. Normal retirement permits automatic later startup. Unexpected owner
+loss with unconfirmed resources refuses automatic replacement; no PID/port guess
+or record deletion establishes retirement. Same-user manual destruction of live
+ownership state is not supported automatic recovery. Keep detectable corrupt or
+missing expected state as refusal cases and use protected production lifecycle
+state. Existing separate-parent concurrency cases and healthy-backend isolation
+remain required. A shared backend crash may interrupt all callers.
 
 The new Quint lifecycle model remains a type-only sketch awaiting explicit user
 approval. Do not write init/actions/step until that approval. Native macOS and
@@ -124,7 +129,7 @@ for native evidence. Do not repeatedly ask the same pending questions.
 Remaining qualification includes actual shared Huly model/read/write behavior,
 uncertain-write reconciliation, supported profile/env/token/password and policy
 paths, actual host discovery, operational instructions, and total backend plus
-all adapter/guardian RSS and CPU measurements. Preserve every concurrency case,
+every actual adapter/backend/launcher RSS and CPU measurement. Preserve every concurrency case,
 deadline, diagnostic and coverage threshold. GOMAXPROCS=2 is a compiler-concurrency
 experiment, not permission to remove checks or claim a measured speedup.
 

@@ -1,6 +1,11 @@
 # Issue 327 implementation evidence
 
-Current design amendment: [ADR 0002](../adr/0002-resident-recovery-without-operation-journal.md)
+Current lifecycle amendment: [ADR 0003](../adr/0003-adopt-mcporter-resident-lifecycle.md)
+adopts MCPorter practices, permits interruption of all callers on backend crash
+and supersedes the mandatory guardian/restricted-worker proposal. Earlier guardian
+experiments and proposals below remain historical evidence.
+
+Current uncertainty amendment: [ADR 0002](../adr/0002-resident-recovery-without-operation-journal.md)
 removes the mandatory operation journal. Earlier journal proposals below remain
 historical checkpoint descriptions, not current implementation requirements.
 
@@ -374,3 +379,53 @@ one existing test with the same ten parents, assertions and deadlines. Log:
 erases the full-gate failure nor identifies its cause. No broad rerun is used
 to replace the failed receipt, and no full-gate success is claimed for this
 specification amendment.
+
+
+## Adopted lifecycle practice and crash boundary
+
+The user directed us to put the already researched practice into the
+specification and rejected stronger operation-durability or multi-client crash
+continuity as a feature requirement. [ADR 0003](../adr/0003-adopt-mcporter-resident-lifecycle.md)
+adopts MCPorter's coordinated startup, authenticated ownership, generation fences,
+graceful drain and bounded refusal after unresolved owner loss. It explicitly
+supersedes the conditional guardian/restricted-worker baseline. A backend crash
+may interrupt every client, with ordinary stdio's existing remote-write
+uncertainty and no automatic replay.
+
+The exact reference `docs/daemon.md` at MCPorter commit
+`1e3fa8a893e3245a0843f714f81bfdf3b0ad5dbc` was fetched again through GitHub's
+contents API. The local source receipt is
+`/tmp/resident-mcporter-pinned-daemon.md`, SHA-256
+`a9ec3fe4a503e3944a159f099399228ae4b7cc79130bad821f6e2aac6ed0e6d4`.
+The application retains native HTTP/TLS and per-compatible-configuration
+backends. It does not copy a universal broker, foreign timeout/lease budgets,
+unknown-outcome idle pinning or a third-party runtime dependency.
+
+The amended bodies of #322, #324, #326, #327 and #328 were checked against their
+source before editing and read back exactly after publication. All 50 parent
+stories and every affected acceptance checklist remain verbatim. The explicit
+new scope permits crash interruption and stale-owner refusal until verified
+local retirement; it does not silently claim the stronger previous recovery
+contract. Healthy-backend cancellation/EOF/idle isolation, credential boundaries,
+all concurrency cases and native qualification remain required. Same-user
+manual destruction of live ownership state is not supported automatic recovery;
+detectable corrupt or missing expected state still refuses unsafe selection.
+
+The model sketch now contains callers and native backends, with unverified,
+owned-closure and operator-verified retirement evidence. Guardian, restricted
+worker and operation-journal types are removed. Invocation history remains
+oracle-only state. `pnpm exec quint typecheck quint-specs/resident-launch.qnt`,
+local specification links, checklist preservation and `git diff --check` pass.
+No initialization, transitions, simulation or runtime implementation result is
+claimed. No TypeScript runtime/test code, concurrency case, deadline, coverage
+threshold or platform requirement changes in this amendment.
+
+The fresh `GOMAXPROCS=2 pnpm check-all` run passes 458 files and 5,647 tests.
+Coverage is 99.45% statements, 99% branches, 99% functions and 99.56% lines.
+The receipt is `/tmp/resident-adopt-practices-check-all.log`, SHA-256
+`bc37a91a0977d7a39c7d9d79713d04bc6c3e5942de2030339e3e18888a73327d`.
+The production bundle remains unchanged at SHA-256
+`a6c463c658dc49c20d59b62a9ec4fa1da812f8a0317b68914faf79ed4072fb59`.
+The earlier failed ten-parent run remains preserved above; this pass does not
+identify its cause or claim to fix it. This specification amendment completes no
+feature ticket and supplies no new live-Huly or native-platform certification.

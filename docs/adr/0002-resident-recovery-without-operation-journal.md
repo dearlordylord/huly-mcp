@@ -9,6 +9,11 @@ inventory remains a separate requirement. This decision supersedes the journal
 proposal in `resident-recovery-design.md` and the initial guardian model sketch.
 It does not qualify the unfinished recovery implementation.
 
+The later [ADR 0003](0003-adopt-mcporter-resident-lifecycle.md) selects the
+MCPorter lifecycle contract and supersedes the earlier guardian requirement and
+arbitrary same-user namespace-erasure proof obligation. The no-journal and
+truthful-uncertainty decision here remains unchanged.
+
 ## Reason and trade-off
 
 The adapter sends each invocation at most once and does not move pending requests

@@ -2,9 +2,14 @@
 
 The maintained [type sketch](../../quint-specs/resident-launch.qnt) and
 [scope note](../../quint-specs/resident-launch.md) supersede this document's
-initial caller/child proposal. They distinguish adapters, guardians, restricted
-workers, ownership claims, leases and requests. Types and state declarations
+initial caller/child and guardian proposals. They distinguish adapters, native
+backends, ownership claims, retirement evidence, leases and requests. Types and state declarations
 only are proposed; no safety or liveness result is established.
+
+[ADR 0003](../adr/0003-adopt-mcporter-resident-lifecycle.md) adopts the researched
+MCPorter lifecycle practices and removes a mandatory guardian/restricted-worker
+layer. Backend crashes may interrupt all callers; unresolved owner loss may
+produce bounded refusal until verified local cleanup.
 
 [ADR 0002](../adr/0002-resident-recovery-without-operation-journal.md) removes the
 mandatory operation journal. Invocation history used to check no replay is

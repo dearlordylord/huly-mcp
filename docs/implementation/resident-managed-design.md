@@ -5,6 +5,12 @@ not evidence that managed startup works. The manual attachment and lease code
 at `5e69e7ed` supplies the starting point. The foundation's verification and
 remaining qualification are recorded in the issue 324 and 325 reports.
 
+The later [ADR 0003](../adr/0003-adopt-mcporter-resident-lifecycle.md) selects
+MCPorter lifecycle practices for recovery: no mandatory guardian, no stronger
+remote-operation durability and bounded refusal after unresolved backend-owner
+loss. Normal resource retirement and healthy-backend client isolation below
+remain required. Crash continuity across a failed backend is not promised.
+
 ## Selection uses an exclusive filesystem claim
 
 Each protected resident root has one `selection.claim` directory. Creating that

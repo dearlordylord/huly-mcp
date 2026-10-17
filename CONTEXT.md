@@ -60,3 +60,6 @@ The caller's deliberate choice to remove a specific project attribute reference 
 
 **Uncertain Huly operation**:
 An invocation that may have reached Huly but has no confirmed terminal outcome available to its caller. It may have partially or fully changed the workspace; retirement of its local backend does not resolve that uncertainty.
+
+**Resident Huly backend**:
+The local Huly MCP process whose connection and model resources are shared by compatible callers. It is distinct from the remote Huly server, and replacing it does not transfer or roll back workspace data.
