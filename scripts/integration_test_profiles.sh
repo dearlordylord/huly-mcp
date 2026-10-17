@@ -7,6 +7,26 @@ node_modules/.bin/esbuild --version >/dev/null
 for name in HULY_URL HULY_WORKSPACE HULY_EMAIL HULY_PASSWORD; do
   if [[ -z "${!name:-}" ]]; then echo "Missing $name for live profile login." >&2; exit 1; fi
 done
+if [[ "$(uname -s)" == Darwin && -z "${HULY_TEST_PROFILE_HOME:-}" ]]; then
+  # Darwin ignores XDG_CONFIG_HOME. Isolate every child, including PTY login,
+  # before allowing it to create profiles in Application Support.
+  python3 - scripts/integration_test_profiles.sh <<'PYHOME'
+import hashlib, os, pathlib, subprocess, sys, tempfile
+
+real_root = pathlib.Path.home() / 'Library' / 'Application Support' / 'huly'
+def snapshot():
+    return {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in real_root.glob('*.json') if path.is_file()}
+
+before = snapshot()
+with tempfile.TemporaryDirectory(prefix='huly-profile-home-') as directory:
+    environment = dict(os.environ, HOME=directory, HULY_TEST_PROFILE_HOME=directory)
+    result = subprocess.run(['bash', sys.argv[1]], env=environment)
+assert snapshot() == before, 'Profile qualification changed the real macOS profile store.'
+sys.exit(result.returncode)
+PYHOME
+  exit $?
+fi
 TEST_TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TEST_TMPDIR"' EXIT
 source scripts/packed-cli-test-helpers.sh
@@ -14,6 +34,11 @@ echo "Preparing packed CLI"
 prepare_packed_cli "$TEST_TMPDIR"
 echo "Creating isolated profile"
 export XDG_CONFIG_HOME="$TEST_TMPDIR/config"
+if [[ "$(uname -s)" == Darwin ]]; then
+  export HULY_TEST_PROFILE_DIRECTORY="$HULY_TEST_PROFILE_HOME/Library/Application Support/huly"
+else
+  export HULY_TEST_PROFILE_DIRECTORY="$XDG_CONFIG_HOME/huly"
+fi
 export HULY_PROFILE=shared-live
 "$HULY_PREPARED_CLI" profile create shared-live --url "$HULY_URL" --workspace "$HULY_WORKSPACE"
 # Answer the real CLI prompts only when emitted; never print or pass secrets in argv.
@@ -53,7 +78,7 @@ python3 - <<'PY'
 import json, os, pathlib, sys
 sys.path.insert(0, 'scripts')
 from profile_test_credentials import saved_token
-root = pathlib.Path(os.environ['XDG_CONFIG_HOME']) / 'huly'
+root = pathlib.Path(os.environ['HULY_TEST_PROFILE_DIRECTORY'])
 credentials = json.loads((root / 'credentials.json').read_text())
 metadata = (root / 'profiles.json').read_text()
 password = os.environ['HULY_PASSWORD']
@@ -68,7 +93,7 @@ import json, os, pathlib, pty, select, subprocess, time, sys
 sys.path.insert(0, 'scripts')
 from profile_test_credentials import saved_token
 cli = os.environ['HULY_PREPARED_CLI']
-root = pathlib.Path(os.environ['XDG_CONFIG_HOME']) / 'huly'
+root = pathlib.Path(os.environ['HULY_TEST_PROFILE_DIRECTORY'])
 original = (root / 'credentials.json').read_bytes()
 token = saved_token(root)
 master, slave = pty.openpty()
@@ -161,7 +186,7 @@ python3 - "$TEST_TMPDIR" <<'PY'
 import json, os, pathlib, sys
 sys.path.insert(0, 'scripts')
 from profile_test_credentials import saved_token
-root = pathlib.Path(os.environ['XDG_CONFIG_HOME']) / 'huly'
+root = pathlib.Path(os.environ['HULY_TEST_PROFILE_DIRECTORY'])
 token = saved_token(root)
 for name in ['cli.json', 'stdio.jsonl', 'stdio.err', 'error.out', 'error.err', 'status.json', 'check.json']:
     assert token not in (pathlib.Path(sys.argv[1]) / name).read_text(), 'Diagnostic exposed a saved token.'
@@ -172,9 +197,9 @@ if os.environ.get('HULY_TEST_CREDENTIAL_STORAGE') == 'os':
 PY
 
 echo "Testing missing credential"
-cp "$XDG_CONFIG_HOME/huly/profiles.json" "$TEST_TMPDIR/metadata-before-logout.json"
+cp "$HULY_TEST_PROFILE_DIRECTORY/profiles.json" "$TEST_TMPDIR/metadata-before-logout.json"
 "$HULY_PREPARED_CLI" auth logout --profile shared-live >/dev/null
-cmp "$XDG_CONFIG_HOME/huly/profiles.json" "$TEST_TMPDIR/metadata-before-logout.json"
+cmp "$HULY_TEST_PROFILE_DIRECTORY/profiles.json" "$TEST_TMPDIR/metadata-before-logout.json"
 assert_profile_startup_refused "no usable credentials"
 grep -q 'no usable credentials' "$TEST_TMPDIR/error.out" "$TEST_TMPDIR/stdio.err"
 
