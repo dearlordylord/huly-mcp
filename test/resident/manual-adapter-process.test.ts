@@ -7,6 +7,7 @@ import * as fs from "node:fs/promises"
 import { Effect, Redacted, Schema } from "effect"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
+import { makeByteDisclosureDetector } from "../helpers/byte-disclosure.js"
 import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { replayResidentResponses } from "../helpers/resident-response-replay.js"
@@ -68,14 +69,16 @@ describe("packaged manual adapter", { timeout: PROCESS_BOUND }, () => {
     const sockets = new Set<Socket>()
     let leaked = false
     const replacement = createServer((socket) => {
+      const detectsDisclosure = makeByteDisclosureDetector([
+        Buffer.from(AUTHORIZATION),
+        Buffer.from("server/discover"),
+        Buffer.from(Redacted.value(descriptor.identity.key), "hex")
+      ])
       sockets.add(socket)
       socket.once("close", () => sockets.delete(socket))
       socket.on("data", (bytes: Buffer) => {
-        leaked ||=
-          bytes.includes(Buffer.from(AUTHORIZATION)) ||
-          bytes.includes(Buffer.from("server/discover")) ||
-          bytes.includes(Buffer.from(Redacted.value(descriptor.identity.key), "hex"))
-        socket.end("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}")
+        leaked = detectsDisclosure(bytes) || leaked
+        if (!socket.writableEnded) socket.end("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}")
       })
     })
     try {

@@ -50,6 +50,46 @@ The fixed two-schedule fixture and nearby adapter boundary tests pass, 16 tests
 response loss after a disposable mutation; it does not
 simulate backend process death or establish live Huly reconciliation.
 
+## Published-backend crash and stale-locator refusal
+
+`test/resident/managed-crash-process.test.ts` runs the actual packaged backend and
+managed adapters under the Linux kernel subreaper. After the backend announces
+application-ready publication, the fixture records its actual private directory
+and registry inventory and checks the child lists of every kernel task. It then
+kills only its own backend `ChildProcess` handle and joins that handle. Recovering
+adapters refuse the unavailable owner and a foreign plaintext listener bound to
+the old port. They emit no stdout, retain the original record bytes and complete
+root/registry entry inventory, and leave the foreign listener running.
+
+The fixture initially assumes the root contains only a locator and `generations`
+(`/tmp/resident-managed-crash-refusal-tests.log`). Actual forced-crash evidence also
+retains the owner's `.attachment-*` staging directory. The fixture now compares the
+observed pre-kill inventory instead of guessing which uncertain state may remain.
+Failed bundles and private roots are retained. Successful teardown removes only
+its own root after the subreaper joins all descendants.
+
+Review identified chunk-local credential scanning as inadequate evidence. The
+shared `makeByteDisclosureDetector` now retains a copied, bounded per-socket
+overlap, and both foreign-listener fixtures use it. Properties compare arbitrary
+TCP chunks to a whole-stream oracle and force an inserted secret through one-byte
+fragments. Review also required comparing nested registry entries, not only root
+entry names. Both findings are corrected. The refined three-suite run passes ten
+tests (`/tmp/resident-crash-disclosure-refinement-tests.log`).
+
+This is Linux safe-refusal evidence with no Huly model acquisition. It does not
+prove replacement after a crash, cleanup of acquired Huly resources, mutation
+reconciliation, or native behavior on another platform. The pre-kill task inventory
+is a recorded observation; descendant retirement is separately joined by the
+kernel-owned subreaper.
+
+The frozen increment passes `pnpm check-all`: 456 files, 5,635 tests, statements
+99.45%, branches 99%, functions 99%, lines 99.56%, with all diagnostics and existing
+limits retained. Receipt: `/tmp/resident-crash-refusal-frozen-check-all.log`, SHA-256
+`7617283189a8d30e50a7af119f8f88b0c0ca5d3a7c319b1292d1c7aa7654ea63`.
+Its process receipt is `/tmp/resident-crash-refusal-vwGFuv.receipt.json`.
+Fresh Standards and Spec reviews identify no remaining finding after the two
+evidence corrections. No production source changes belong to this test increment.
+
 ## Remaining qualification
 
 Complete crash timing schedules, verified replacement with concurrent callers,
