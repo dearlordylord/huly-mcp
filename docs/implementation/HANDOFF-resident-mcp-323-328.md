@@ -195,3 +195,11 @@ a subsequent production run passed. See the [qualification report](issue-328.md#
 for retained artifacts. Do not interpret either pass as a reliability fix. The
 only test change preserves a private phases log on subprocess failure and keeps
 the original exception if publication fails. All deadlines/callers are unchanged.
+
+## Kernel-owned exit evidence for the ten-parent fixture
+
+The [latest ten-parent receipt](issue-328.md#kernel-owned-ten-parent-retirement-evidence-2026-10-17)
+now joins a supervisor-owned `waitpid` result and requires exit code 0 before
+reporting backend retirement. Its focused run passed with every original caller
+and deadline retained. This strengthens cleanup evidence; the earlier connection
+timeout remains unexplained and must not be declared fixed.

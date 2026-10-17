@@ -8,17 +8,22 @@ import { Clock, Effect, Schedule, Schema } from "effect"
 
 import { ResidentPackagePath, ResidentRegistryEnvelope } from "../../../src/resident/managed-contract.js"
 import { ResidentDirectory } from "../../../src/resident/protected-path.js"
+import { openKernelReapedEvents, ReapedEventsFd } from "../../helpers/kernel-reaped-events.js"
 import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
 import { ManagedParentConnected, ManagedParentObservation } from "../managed-observation.js"
 import { NativeHostObservation } from "../native-host-observation.js"
 
 const RESPONSE_BOUND = 5_000
-const RETIREMENT_BOUND = 7_000
 const PARENTS = 10
 const ALTERNATION = 2
 const EXIT_POLL_MILLIS = 25
 const SESSION_HOLD_MILLIS = 11_000
-const Input = Schema.Struct({ bundle: ResidentPackagePath, fixture: ResidentPackagePath, directory: ResidentDirectory })
+const Input = Schema.Struct({
+  bundle: ResidentPackagePath,
+  fixture: ResidentPackagePath,
+  directory: ResidentDirectory,
+  reapedFd: ReapedEventsFd
+})
 const MissingProcess = Schema.Struct({ code: Schema.Literal("ESRCH") })
 const ConnectionWait = Schema.Struct({
   phase: Schema.Literal("await-connections"),
@@ -44,12 +49,7 @@ const awaitAbsent = (pid: number, allowance: number) =>
     )
   )
 
-const main = async () => {
-  const input = Schema.decodeUnknownSync(Input)({
-    bundle: process.argv[2],
-    fixture: process.argv[3],
-    directory: process.argv[4]
-  })
+const run = async (input: Schema.Schema.Type<typeof Input>, kernel: ReturnType<typeof openKernelReapedEvents>) => {
   const parents = Array.from({ length: PARENTS }, (_, index) => {
     const host = index % ALTERNATION === 0 ? "claude-code" : "codex-mcp-client"
     const child = spawn(process.execPath, [input.fixture, input.bundle, input.directory, host], {
@@ -70,7 +70,7 @@ const main = async () => {
     const read = async () => Schema.decodeUnknownSync(Schema.fromJsonString(NativeHostObservation))(await nextLine())
     return { child, exited, lines, connected, read }
   })
-  let report: Schema.Schema.Type<typeof ManagedParentObservation> | undefined
+  let report: Omit<Schema.Schema.Type<typeof ManagedParentObservation>, "backendExit"> | undefined
   try {
     process.stderr.write("Managed race: waiting for ten connections\n")
     process.stderr.write(
@@ -125,7 +125,7 @@ const main = async () => {
     assert.equal(second.adapterPid, survivor.observation.adapterPid)
     assert.equal(second.contextIsError, false)
     assert.deepEqual(await fs.readdir(join(input.directory, "generations")), records)
-    report = Schema.decodeUnknownSync(ManagedParentObservation)({
+    report = {
       parents: observations.map(({ observation }) => observation),
       survivor: second,
       generation: record.generation,
@@ -137,7 +137,7 @@ const main = async () => {
       creatorExited: true,
       backendExited: true,
       privateStateRemoved: true
-    })
+    }
   } finally {
     process.stderr.write("Managed race: closing remaining parents\n")
     for (const parent of parents)
@@ -154,9 +154,25 @@ const main = async () => {
   }
   if (report === undefined) throw new Error("No managed observation")
   process.stderr.write("Managed race: waiting for idle backend exit\n")
-  await awaitAbsent(report.ownerProcessId, RETIREMENT_BOUND)
+  const backendExit = await kernel.wait(report.ownerProcessId)
+  assert.equal(backendExit.exitCode, 0)
   assert.deepEqual(await fs.readdir(input.directory), [])
-  process.stdout.write(Schema.encodeSync(Schema.fromJsonString(ManagedParentObservation))(report))
+  process.stdout.write(Schema.encodeSync(Schema.fromJsonString(ManagedParentObservation))({ ...report, backendExit }))
+}
+
+const main = async () => {
+  const input = Schema.decodeUnknownSync(Input)({
+    bundle: process.argv[2],
+    fixture: process.argv[3],
+    directory: process.argv[4],
+    reapedFd: process.env.HULY_TEST_REAPED_FD
+  })
+  const kernel = openKernelReapedEvents(input.reapedFd)
+  try {
+    await run(input, kernel)
+  } finally {
+    kernel.close()
+  }
 }
 
 void main().catch((error: unknown) => {

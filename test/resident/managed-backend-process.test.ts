@@ -62,7 +62,15 @@ describe.skipIf(process.platform !== "linux")("managed native backend", () => {
     async () => {
       const { stderr, stdout } = await runFile(
         "python3",
-        ["test/resident/fixtures/reap-descendants.py", process.execPath, race, bundle.path, host, root],
+        [
+          "test/resident/fixtures/reap-descendants.py",
+          "--report-reaped",
+          process.execPath,
+          race,
+          bundle.path,
+          host,
+          root
+        ],
         { timeout: PROCESS_BOUND, env: testStdioEnvironment() }
       ).catch(async (error: unknown) => {
         if (Schema.is(ProcessFailure)(error))
@@ -75,6 +83,7 @@ describe.skipIf(process.platform !== "linux")("managed native backend", () => {
       const observation = Schema.decodeUnknownSync(Schema.fromJsonString(ManagedParentObservation))(stdout)
       expect(observation.parents).toHaveLength(10)
       expect(observation.backendExited).toBe(true)
+      expect(observation.backendExit).toEqual({ processId: observation.ownerProcessId, exitCode: 0 })
       expect(observation.creatorExited).toBe(true)
       expect(observation.privateStateRemoved).toBe(true)
       expect(observation.stoppedAdapterExited).toBe(true)

@@ -68,3 +68,28 @@ and receipt `/tmp/resident-managed-parents-91VfaN.receipt.json`.
 This passing run did not exercise the new failure-publication branch. The launch
 reliability issue remains unresolved; no deadline, caller count, production path
 or acceptance requirement was relaxed.
+
+## Kernel-owned ten-parent retirement evidence (2026-10-17)
+
+The ten-parent fixture now receives the existing supervisor's private reaped-event
+pipe and joins the actual kernel-owned backend `waitpid` result. The receipt
+includes `backendExit`; the test requires exit code 0 and identity equal to the
+selected registry owner. PID absence is no longer the final backend-retirement
+proof. Parent-loss, survivor read, ten independent clients, eleven-second hold,
+and all existing response/retirement/supervision deadlines remain intact.
+The observer closes in an outer finalizer, including failed runs.
+
+The focused suite passed: `/tmp/resident-ten-parent-kernel-exit.log`, SHA-256
+`bd95ef8b68d25f1cd0fd16c8c7c91695ae943c77ba1c21a501389a7a72093f53`.
+Receipt `/tmp/resident-managed-parents-wq4aov.receipt.json`, SHA-256
+`dcc7cd5ec8dc2825d73f4003258c3598d5c888af41a161be599fe70a7d568e34`,
+records the matching owned exit with code 0 and complete private-state removal.
+TypeScript/Effect diagnostics and focused lint passed. Read-only Spec review
+reported no actionable findings.
+
+A scratch shell wrapper also captured disposable probe stderr under
+`/tmp/resident-probe-stderr-4isluebc`; that diagnostic run passed and its twenty
+probe/session stderr files were empty. It does not identify the cause of the
+earlier connection timeout. This change strengthens retirement evidence only;
+launch reliability, complete platform qualification and final integration remain
+pending. No production code or recovery policy changed.

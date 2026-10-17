@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 
 import { ResidentTlsIdentity } from "../../src/resident/tls-channel.js"
+import { KernelOwnedExit } from "../helpers/kernel-reaped-events.js"
 import { NativeHostObservation } from "./native-host-observation.js"
 
 export const ManagedParentObservation = Schema.Struct({
@@ -14,6 +15,7 @@ export const ManagedParentObservation = Schema.Struct({
   stoppedAdapterPid: Schema.Int.check(Schema.isGreaterThan(0)),
   stoppedAdapterExited: Schema.Literal(true),
   backendExited: Schema.Literal(true),
+  backendExit: KernelOwnedExit,
   privateStateRemoved: Schema.Literal(true)
 })
 
