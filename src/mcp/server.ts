@@ -6,20 +6,7 @@
  */
 import type { MovementStageObserver } from "./movement-stage-observer.js"
 import { NodeStdio } from "@effect/platform-node"
-import {
-  Config,
-  Context,
-  Deferred,
-  type Duration,
-  Effect,
-  Exit,
-  Fiber,
-  Layer,
-  type Redacted,
-  Ref,
-  Schema,
-  Scope
-} from "effect"
+import { Context, Deferred, type Duration, Effect, Exit, Fiber, Layer, type Redacted, Ref, Schema, Scope } from "effect"
 import * as Stdio from "effect/Stdio"
 import * as Stream from "effect/Stream"
 import { McpProtocol, McpServer } from "effect/ai"
@@ -54,7 +41,7 @@ import {
 } from "./stdio-shutdown.js"
 import { TelemetryService, type TelemetryOperations } from "../telemetry/telemetry.js"
 import { writeStderrLine } from "../utils/stderr.js"
-import { parseToolExposureConfig, type ToolExposureConfig } from "./tool-mode.js"
+import { loadMcpProcessPolicy, type McpProcessPolicy } from "./process-policy.js"
 import { resolveToolScope } from "./tool-scope.js"
 import { createScopedRegistryFrom, toolRegistry, type ToolRegistry } from "./tools/index.js"
 
@@ -64,6 +51,7 @@ export type McpTransportType = "stdio" | "http"
 
 interface McpServerConfigData {
   readonly transport: McpTransportType
+  readonly processPolicy?: McpProcessPolicy
   readonly httpPort?: HttpPort
   readonly httpHost?: HttpHost
   readonly mcpAuthToken?: Redacted.Redacted<string>
@@ -97,15 +85,6 @@ export class McpServerError extends Schema.TaggedError<McpServerError>()("McpSer
 
 const defaultWriteError = (message: string): void => {
   writeStderrLine(message)
-}
-
-const parseToolExposureConfigEffect = (
-  env: Parameters<typeof parseToolExposureConfig>[0]
-): Effect.Effect<ToolExposureConfig, McpServerError> => {
-  const parsed = parseToolExposureConfig(env)
-  return parsed._tag === "Success"
-    ? Effect.succeed(parsed.value)
-    : Effect.fail(new McpServerError({ message: parsed.message }))
 }
 
 export interface McpServerOperations {
@@ -331,26 +310,12 @@ export class McpServerService extends Context.Service<McpServerService, McpServe
       Effect.gen(function* () {
         const telemetry = yield* TelemetryService
         const writeError = config.writeError ?? defaultWriteError
-        const toolsetsRaw = yield* Effect.orElseSucceed(Config.String("TOOLSETS"), () => "")
-        const toolsRaw = yield* Effect.orElseSucceed(Config.String("TOOLS"), () => "")
-        const hulyToolModeRaw = yield* Effect.orElseSucceed(
-          Config.String("HULY_TOOL_MODE"),
-          (): string | undefined => undefined
-        )
-        const proxyOutputStrictRaw = yield* Effect.orElseSucceed(
-          Config.String("PROXY_OUTPUT_STRICT"),
-          (): string | undefined => undefined
-        )
-        const exposureConfig = yield* parseToolExposureConfigEffect({
-          ...(hulyToolModeRaw === undefined ? {} : { hulyToolMode: hulyToolModeRaw }),
-          ...(proxyOutputStrictRaw === undefined ? {} : { proxyOutputStrict: proxyOutputStrictRaw })
-        })
+        const policy =
+          config.processPolicy ??
+          (yield* loadMcpProcessPolicy.pipe(Effect.mapError((error) => new McpServerError({ message: error.message }))))
+        const exposureConfig = policy.exposure
         const fullRegistry = config.registry ?? toolRegistry
-        const toolScope = resolveToolScope(
-          { toolsets: toolsetsRaw, tools: toolsRaw },
-          fullRegistry.definitions,
-          writeError
-        )
+        const toolScope = resolveToolScope(policy, fullRegistry.definitions, writeError)
         const scopedNativeRegistry = createScopedRegistryFrom(fullRegistry, {
           filteringActive: toolScope.filteringActive,
           categories: toolScope.enabledCategories,

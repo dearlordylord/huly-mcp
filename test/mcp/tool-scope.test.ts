@@ -5,7 +5,7 @@ import { sanitizeHulyRuntimeConfigFromEnv } from "../../src/config/config.js"
 import { GetHulyContextResultSchema } from "../../src/domain/schemas/index.js"
 import { buildHulyContext } from "../../src/mcp/huly-context-tool.js"
 import { resolveProtocolExposure } from "../../src/mcp/protocol-tool-exposure.js"
-import { resolveToolScope } from "../../src/mcp/tool-scope.js"
+import { parseToolScopeSelection, resolveToolScope } from "../../src/mcp/tool-scope.js"
 import { createScopedRegistry, toolRegistry } from "../../src/mcp/tools/index.js"
 
 interface PartialScopeEnv {
@@ -16,7 +16,7 @@ interface PartialScopeEnv {
 const resolveScoped = (env: PartialScopeEnv) => {
   const warnings: Array<string> = []
   const scope = resolveToolScope(
-    { toolsets: env.toolsets ?? "", tools: env.tools ?? "" },
+    parseToolScopeSelection({ toolsets: env.toolsets ?? "", tools: env.tools ?? "" }),
     toolRegistry.definitions,
     (message) => {
       warnings.push(message)

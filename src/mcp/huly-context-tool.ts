@@ -6,7 +6,7 @@ import { VERSION } from "../version.js"
 import { DEFAULT_HTTP_HOST_VALUE, DEFAULT_HTTP_PORT_NUMBER } from "./http-defaults.js"
 import type { ClientKind, ToolExposureMode, ToolModeConfig } from "./tool-mode.js"
 import { createToolOutputSchema, hulyContextToolOutputSchema } from "./tool-output-schema.js"
-import { resolveToolScope, type ToolScopeSummary } from "./tool-scope.js"
+import { parseToolScopeSelection, resolveToolScope, type ToolScopeSummary } from "./tool-scope.js"
 import { type ToolRegistry, toolRegistry } from "./tools/index.js"
 import { makeToolDescription, makeToolName, type ToolName } from "./tools/registry.js"
 
@@ -59,7 +59,7 @@ export const getHulyContextToolDefinition = {
 }
 
 export const parseToolsets = (raw: string | undefined, writeError: (message: string) => void): ToolScopeSummary =>
-  resolveToolScope({ toolsets: raw ?? "", tools: "" }, toolRegistry.definitions, writeError)
+  resolveToolScope(parseToolScopeSelection({ toolsets: raw ?? "", tools: "" }), toolRegistry.definitions, writeError)
 
 const builtinToolNames: ReadonlyArray<BuiltinToolName> = BUILTIN_TOOL_NAME_LITERALS
 

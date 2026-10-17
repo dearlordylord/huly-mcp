@@ -1,3 +1,4 @@
+import { Schema } from "effect"
 import type { ToolCategory } from "./tools/registry.js"
 
 interface ToolScopeToolDefinition {
@@ -10,6 +11,15 @@ interface ToolScopeRawEnv {
   readonly toolsets: string
   readonly tools: string
 }
+
+const ToolScopeName = Schema.NonEmptyString.check(
+  Schema.makeFilter((name) => name === name.trim().toLowerCase() && !name.includes(","))
+)
+const ToolScopeNames = Schema.Array(ToolScopeName).check(
+  Schema.makeFilter((names) => new Set(names).size === names.length)
+)
+export const ToolScopeSelection = Schema.Struct({ toolsets: ToolScopeNames, tools: ToolScopeNames })
+export type ToolScopeSelection = Schema.Schema.Type<typeof ToolScopeSelection>
 
 export interface ToolScopeSummary {
   readonly filteringActive: boolean
@@ -33,6 +43,11 @@ const normalizeCsv = (raw: string): ReadonlyArray<string> => {
     .filter((part) => part !== "")
   return [...new Set(normalized)]
 }
+
+export const parseToolScopeSelection = (raw: ToolScopeRawEnv): ToolScopeSelection => ({
+  toolsets: normalizeCsv(raw.toolsets),
+  tools: normalizeCsv(raw.tools)
+})
 
 const orderedCategories = (definitions: ReadonlyArray<ToolScopeToolDefinition>): ReadonlyArray<ToolCategory> => [
   ...new Set(definitions.map((definition) => definition.category))
@@ -61,12 +76,12 @@ const resolveRequested = <T extends string>(
   )
 
 export const resolveToolScope = (
-  rawEnv: ToolScopeRawEnv,
+  selection: ToolScopeSelection,
   definitions: ReadonlyArray<ToolScopeToolDefinition>,
   writeError: (message: string) => void
 ): ToolScopeSummary => {
-  const requestedToolsets = normalizeCsv(rawEnv.toolsets)
-  const requestedTools = normalizeCsv(rawEnv.tools)
+  const requestedToolsets = selection.toolsets
+  const requestedTools = selection.tools
   const availableCategories = orderedCategories(definitions)
   const knownCategories = knownValueMap(availableCategories)
   const knownToolNames = knownValueMap(definitions.map((definition) => definition.name))

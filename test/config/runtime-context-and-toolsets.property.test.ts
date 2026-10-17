@@ -4,7 +4,7 @@ import { expect, it } from "vitest"
 
 import { sanitizeHulyRuntimeConfigFromEnv, sanitizeHulyRuntimeConfigFromHeaders } from "../../src/config/config.js"
 import { DEFAULT_HULY_CONNECTION_TIMEOUT } from "../../src/config/huly-config-constants.js"
-import { resolveToolScope } from "../../src/mcp/tool-scope.js"
+import { parseToolScopeSelection, resolveToolScope } from "../../src/mcp/tool-scope.js"
 import { CATEGORY_NAMES, toolRegistry } from "../../src/mcp/tools/index.js"
 import { propertyTestParameters } from "../helpers/property.js"
 
@@ -196,7 +196,10 @@ describe("tool scope parser properties", () => {
         (requestedCategories, requestedTools) => {
           const warnings: Array<string> = []
           const result = resolveToolScope(
-            { toolsets: decoratedCsv(requestedCategories), tools: decoratedCsv(requestedTools) },
+            parseToolScopeSelection({
+              toolsets: decoratedCsv(requestedCategories),
+              tools: decoratedCsv(requestedTools)
+            }),
             toolRegistry.definitions,
             (message) => {
               warnings.push(message)
@@ -226,9 +229,13 @@ describe("tool scope parser properties", () => {
         fc.array(unknownCategoryArbitrary, { minLength: 1, maxLength: 8 }),
         fc.array(unknownToolNameArbitrary, { maxLength: 8 }),
         (unknownCategories, unknownTools) => {
-          const inactive = resolveToolScope({ toolsets: "", tools: "" }, toolRegistry.definitions, () => {})
+          const inactive = resolveToolScope(
+            parseToolScopeSelection({ toolsets: "", tools: "" }),
+            toolRegistry.definitions,
+            () => {}
+          )
           const activeInvalid = resolveToolScope(
-            { toolsets: decoratedCsv(unknownCategories), tools: decoratedCsv(unknownTools) },
+            parseToolScopeSelection({ toolsets: decoratedCsv(unknownCategories), tools: decoratedCsv(unknownTools) }),
             toolRegistry.definitions,
             () => {}
           )

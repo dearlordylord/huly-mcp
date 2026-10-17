@@ -11,7 +11,7 @@ const decodeToolExposureMode = Schema.decodeUnknownSync(ToolExposureModeSchema)
 const NATIVE_TOOL_EXPOSURE_MODE = decodeToolExposureMode("native")
 const PROXY_TOOL_EXPOSURE_MODE = decodeToolExposureMode("proxy")
 
-const ToolExposureConfigSchema = Schema.Struct({
+export const ToolExposureConfigSchema = Schema.Struct({
   configuredMode: ToolModeConfigSchema,
   proxyOutputStrict: Schema.Boolean
 })

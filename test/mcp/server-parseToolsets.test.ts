@@ -5,6 +5,7 @@ import { HulyClient } from "../../src/huly/client.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
 import { HttpServerFactoryService } from "../../src/mcp/http-transport.js"
+import type { McpProcessPolicy } from "../../src/mcp/process-policy.js"
 import { type ClientBundle, McpServerError, McpServerService } from "../../src/mcp/server.js"
 import { createScopedRegistry, toolRegistry } from "../../src/mcp/tools/index.js"
 import { makeToolCategory, makeToolName } from "../../src/mcp/tools/registry.js"
@@ -33,7 +34,13 @@ const resolveClientsFromLayer = (
 }
 
 const buildTestServerLayer = (
-  config: { transport: "stdio" | "http"; httpPort?: number; httpHost?: string; authMethod?: "token" | "password" },
+  config: {
+    transport: "stdio" | "http"
+    httpPort?: number
+    httpHost?: string
+    authMethod?: "token" | "password"
+    processPolicy?: McpProcessPolicy
+  },
   layers: Layer.Layer<HulyClient | HulyStorageClient | WorkspaceClient | TelemetryService>,
   writeError?: (message: string) => void
 ) =>
@@ -182,6 +189,39 @@ describe("McpServerService.layer with TOOLSETS env", () => {
       const serverLayer = buildTestServerLayer({ transport: "stdio" }, baseLayers, writeError)
       yield* buildWithConfig(serverLayer, { TOOLSETS: "nonexistent_category" })
       expect(writeError.mock.calls).toContainEqual([expect.stringContaining("unknown toolset category")])
+    })
+  })
+
+  it.effect("uses a captured process policy without rereading conflicting environment policy", () => {
+    let capturedToolsets: ReadonlyArray<string> | null = null
+    return Effect.gen(function* () {
+      const layers = Layer.mergeAll(
+        HulyClient.testLayer({}),
+        HulyStorageClient.testLayer({}),
+        WorkspaceClient.testLayer({}),
+        TelemetryService.testLayer({
+          sessionStart: (props) => {
+            capturedToolsets = props.toolsets
+          }
+        })
+      )
+      const serverLayer = buildTestServerLayer(
+        {
+          transport: "stdio",
+          processPolicy: {
+            toolsets: ["issues"],
+            tools: [],
+            exposure: { configuredMode: "native", proxyOutputStrict: true }
+          }
+        },
+        layers
+      )
+      yield* buildWithConfig(serverLayer, {
+        TOOLSETS: "documents",
+        HULY_TOOL_MODE: "invalid",
+        PROXY_OUTPUT_STRICT: "invalid"
+      })
+      expect(capturedToolsets).toEqual(["issues"])
     })
   })
 
