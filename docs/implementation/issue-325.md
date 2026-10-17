@@ -98,3 +98,76 @@ changed after that run. Standards and Spec reread the shutdown and acquisition
 corrections and have no remaining scoped findings. No thresholds or timeouts
 changed. This verifies transport comparison and admission fencing, not complete
 profile isolation, managed startup, or generation retirement.
+
+## Configuration capture in progress
+
+`captureResidentSelection` now resolves an explicitly requested stdio profile
+through the existing resolver and credential-store port, or parses environment
+configuration through the existing Huly config layer. It captures policy and
+lazy startup from the same environment snapshot. No Huly client is acquired.
+The internal runtime-context projection reports the parsed authentication method,
+including the existing token-to-password fallback.
+
+Lazy startup parsing now lives in `config/startup.ts`. The entrypoint passes its
+captured environment for the Glama presence default. Capture preserves an empty
+Glama marker as present, while the existing Config parser retains ownership of
+the explicit `LAZY_ENVS` flag. No later ambient Glama read can change that snapshot.
+
+Three capture tests cover token and password configuration, timeout and policy,
+environment mutation after capture, explicit profile selection over CLI active
+profile, token replacement, logout, missing profile, and independent environment
+selection. They use the real profile file store with fixture credentials and
+owned cleanup. Together with entrypoint tests, 22 focused tests pass. TypeScript
+and Effect diagnostics pass for 1,256 files with zero errors or warnings.
+The diagnostic receipt is `/tmp/resident-selection-capture-typecheck-complete.log`.
+
+Those initial checks preceded startup composition. The following increment wires
+the capture into the explicit backend and adapter entrypoints.
+
+## Explicit configured startup
+
+Explicit resident startup now captures the selected Huly configuration before
+creating its backend. The compatibility authority, process-owned Huly config
+layer, process policy and sanitized context use that capture. The stdio adapter
+captures its selection before attempting admission and supplies the comparison
+proof. Missing or incompatible configuration never retries descriptor-only
+admission. With no selected authority or nondefault policy, explicit manual
+attachment retains its descriptor-only behavior. Partial authority or restricted
+policy requires a valid configuration and fails rather than inheriting another
+process's authority.
+
+Configured residents reject Huly override headers before control handling or
+native request middleware; the attachment capability header remains accepted.
+This prevents headers from triggering a separate client acquisition against an
+immutable captured config. Ordinary direct HTTP retains its override behavior.
+A TLS regression observes zero native middleware entries for conflicting and
+unsupported override headers, checks static secret-free rejection, and proves a
+subsequent matching call succeeds.
+
+The first focused composition run passes 54 tests, including the retained real
+adapter death/pause cases. Its receipt is
+`/tmp/resident-selection-wiring-focused.log`. A separate packaged test rejects
+changed credentials, workspace, timeout, tool scope, exposure, strictness and
+missing selection before MCP admission; its receipt is
+`/tmp/resident-selection-wiring-refusals.log`. The corrected focused boundary run
+passes 30 tests in `/tmp/resident-selection-wiring-corrected-focused-2.log`.
+The source entrypoint TLS test also passes in
+`/tmp/resident-configured-startup-focused.log`.
+
+The first full gate stopped at the complexity cap. Startup configuration
+resolution was split along its configuration ownership boundary, and complexity
+now passes without suppressions. Both fresh Standards and Spec reviews found the
+request-override acquisition path; both reread its correction and report no
+remaining scoped findings. The next gate caught one fixture formatting change;
+that file was formatted without changing behavior. The final full gate passes
+438 files and 5,548 tests, with 99.45% statements, 99.01% branches, 99.00%
+functions and 99.55% lines. Duplication is 0.92%. TypeScript and Effect diagnostics
+check 1,258 files with zero errors or warnings. All other gate stages pass.
+The final receipt is `/tmp/resident-selection-wiring-check-all-final.log`;
+the earlier formatting failure is preserved in
+`/tmp/resident-selection-wiring-check-all-corrected.log`. No production source
+changed after the final gate. No threshold, diagnostic or timeout was weakened.
+
+These are explicit startup and comparison checks. Automatic ownership/startup,
+complete profile lifecycle qualification, live Huly sharing and final native OS
+and resource certification remain pending. No issue is complete.

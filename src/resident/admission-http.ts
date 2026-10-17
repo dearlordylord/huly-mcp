@@ -53,6 +53,13 @@ const compatibilityRejection = (error: CompatibilityError) =>
           : HTTP_CAPACITY
   })
 
+const hasHulyOverrides = (
+  request: HttpServerRequest.HttpServerRequest,
+  authority: CompatibilityAuthority | undefined
+) =>
+  authority !== undefined &&
+  Object.keys(request.headers).some((name) => name.startsWith("x-huly-") && name !== RESIDENT_ATTACHMENT_HEADER)
+
 const renderChallenge = (request: HttpServerRequest.HttpServerRequest, authority: CompatibilityAuthority) =>
   Effect.gen(function* () {
     if (request.method !== "POST") return HttpServerResponse.empty({ status: HTTP_METHOD_NOT_ALLOWED })
@@ -98,6 +105,11 @@ export const residentAdmissionMiddleware =
   <E, R>(httpEffect: Effect.Effect<HttpServerResponse.HttpServerResponse, E, R>) =>
     Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest
+      if (hasHulyOverrides(request, authority))
+        return HttpServerResponse.text(
+          "Configured residents do not accept Huly override headers; select a compatible resident instead",
+          { status: HTTP_BAD_REQUEST }
+        )
       if (request.url === RESIDENT_COMPATIBILITY_PATH && authority !== undefined)
         return yield* renderChallenge(request, authority)
       if (request.url === RESIDENT_ATTACHMENTS_PATH)

@@ -9,7 +9,7 @@ import { NodeRuntime } from "@effect/platform-node"
 import { Clock, Config, Effect, Schema } from "effect"
 
 import { buildIsolatedStdioServer } from "../../helpers/stdio-build.js"
-import { testStdioEnvironment } from "../../helpers/stdio-environment.js"
+import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
 import { NativeHostObservation } from "../native-host-observation.js"
 
 const PROCESS_BOUND = 30_000
@@ -88,14 +88,10 @@ const main = Effect.gen(function* () {
           [...(input.profile ? ["--cpu-prof", `--cpu-prof-dir=${input.directory}`] : []), ownedBundle.path],
           {
             env: {
-              ...testStdioEnvironment(),
+              ...residentSelectionEnvironment(),
               MCP_TRANSPORT: "resident-http",
               MCP_RESIDENT_STATE_DIRECTORY: state,
-              MCP_RESIDENT_ATTACHMENT_CAPACITY: String(input.parents),
-              HULY_TOOL_MODE: "auto",
-              HULY_URL: "http://127.0.0.1:1",
-              HULY_WORKSPACE: "fixture",
-              HULY_TOKEN: "fixture-calibration-token"
+              MCP_RESIDENT_ATTACHMENT_CAPACITY: String(input.parents)
             }
           }
         )
@@ -128,7 +124,7 @@ const main = Effect.gen(function* () {
                         runFile(process.execPath, [hostBundle, ownedBundle.path, file, host, mode], {
                           timeout: PROCESS_BOUND,
                           signal,
-                          env: testStdioEnvironment()
+                          env: residentSelectionEnvironment()
                         })
                       )
                       const elapsedMillis = Number((yield* Clock.monotonicTimeNanos) - started) / NANOS_PER_MILLISECOND

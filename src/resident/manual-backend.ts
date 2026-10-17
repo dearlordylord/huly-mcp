@@ -10,6 +10,8 @@ import { makeResidentHttpServerFactory, ResidentEndpoint, ResidentTlsIdentity } 
 import { AdmissionPolicy, DEFAULT_LEASE_POLICY } from "./admission-contract.js"
 import { makeResidentAdmissions } from "./admissions.js"
 import { residentAdmissionMiddleware } from "./admission-http.js"
+import { makeCompatibilityAuthority } from "./compatibility-authority.js"
+import type { ResidentSelection } from "./compatibility-contract.js"
 import { withResidentHeaderRedaction } from "./private-http.js"
 
 const SECRET_BYTES = 32
@@ -23,7 +25,9 @@ const defaultAdmissionPolicy = Schema.decodeUnknownSync(AdmissionPolicy)({
 })
 const startupFailure = () => new ProtectedFileError({ kind: "input", message: "Resident backend startup failed" })
 
-export const makeManualResidentBackend = Effect.gen(function* () {
+export const makeManualResidentBackend = Effect.fn("makeManualResidentBackend")(function* (
+  selection?: ResidentSelection
+) {
   yield* currentPosixOwner
   const directory = yield* Config.schema(ResidentDirectory, "MCP_RESIDENT_STATE_DIRECTORY")
   const identity = yield* Schema.decodeUnknownEffect(ResidentTlsIdentity)({
@@ -35,6 +39,10 @@ export const makeManualResidentBackend = Effect.gen(function* () {
     Config.withDefault(defaultAdmissionPolicy.capacity)
   )
   const admissions = yield* makeResidentAdmissions({ ...defaultAdmissionPolicy, capacity })
+  const authority =
+    selection === undefined
+      ? undefined
+      : yield* makeCompatibilityAuthority(selection, identity.generation, authorization)
   const claimed = yield* Ref.make(false)
   const bound = yield* Deferred.make<ResidentEndpoint>()
   const nativeFactory = makeResidentHttpServerFactory(identity)
@@ -97,7 +105,11 @@ export const makeManualResidentBackend = Effect.gen(function* () {
 
   return {
     authorization,
-    httpPolicy: { httpMiddleware: residentAdmissionMiddleware(admissions), beforeHttpShutdown: admissions.fence },
+    httpPolicy: {
+      httpMiddleware: residentAdmissionMiddleware(admissions, authority),
+      beforeHttpShutdown: admissions.fence,
+      ...(selection === undefined ? {} : { processPolicy: selection.policy })
+    },
     run
   }
 })

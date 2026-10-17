@@ -50,8 +50,16 @@ import { writeStderrLine } from "./utils/stderr.js"
 import { makeManualResidentBackend } from "./resident/manual-backend.js"
 import type { ProtectedFileError } from "./resident/protected-path.js"
 import type { HttpMiddleware } from "effect/http/HttpMiddleware"
+import { captureManualResidentSelection } from "./resident/selection-config.js"
+import type { CompatibilityError } from "./resident/compatibility-contract.js"
+import type { McpProcessPolicy, McpProcessPolicyError } from "./mcp/process-policy.js"
+import { getLazyEnvs } from "./config/startup.js"
+
+export { getLazyEnvs } from "./config/startup.js"
 
 type AppError =
+  | CompatibilityError
+  | McpProcessPolicyError
   | MovementObserverError
   | CliProfileStoreError
   | ConfigValidationError
@@ -112,15 +120,6 @@ export const closeProcessClients = (
     Effect.catch(() => Effect.sync(() => writeError("Process-scoped Huly client cleanup failed")))
   )
 
-const isGlamaRegistryInspection = (): boolean => process.env["GLAMA_VERSION"] !== undefined
-
-const parseBooleanEnvFlag = (value: string): boolean => value.toLowerCase() === "true"
-
-export const getLazyEnvs = Config.String("LAZY_ENVS").pipe(
-  Config.option,
-  Effect.map((value) => Option.match(value, { onNone: isGlamaRegistryInspection, onSome: parseBooleanEnvFlag }))
-)
-
 const restoreConsoleRedirect = (redirect: ConsoleRedirectHandle | undefined): Effect.Effect<void> =>
   Effect.sync(() => {
     redirect?.restore()
@@ -143,7 +142,11 @@ export const buildAppLayer = (
   closeClients?: () => Promise<void>,
   runtimeConfigContext = () => sanitizeHulyRuntimeConfigFromEnv(process.env),
   observeMovement?: MovementStageObserver,
-  httpPolicy?: { readonly httpMiddleware: HttpMiddleware; readonly beforeHttpShutdown: Effect.Effect<void> }
+  httpPolicy?: {
+    readonly httpMiddleware: HttpMiddleware
+    readonly beforeHttpShutdown: Effect.Effect<void>
+    readonly processPolicy?: McpProcessPolicy
+  }
 ): Layer.Layer<McpServerService | HttpServerFactoryService, McpServerError, never> => {
   const mcpServerConfig = {
     transport,
@@ -158,7 +161,9 @@ export const buildAppLayer = (
     resolveClientLeaseForHttpRequest,
     getRuntimeConfigContext: runtimeConfigContext,
     getRuntimeConfigContextForHttpRequest: (req: Request) =>
-      sanitizeHulyRuntimeConfigFromHeaders(webHeadersRecord(req.headers), process.env)
+      httpPolicy?.processPolicy === undefined
+        ? sanitizeHulyRuntimeConfigFromHeaders(webHeadersRecord(req.headers), process.env)
+        : runtimeConfigContext()
   }
   const mcpServerLayer = McpServerService.layer(mcpServerConfig).pipe(Layer.provide(TelemetryService.layer))
 
@@ -184,7 +189,7 @@ const configureMovementObserver = Effect.fn("configureMovementObserver")(functio
 
 const configureListener = (
   transport: McpTransportType,
-  resident: Effect.Success<typeof makeManualResidentBackend> | undefined
+  resident: Effect.Success<ReturnType<typeof makeManualResidentBackend>> | undefined
 ) =>
   Effect.gen(function* () {
     const httpPort = resident === undefined ? yield* getHttpPort : HttpPort.make(0)
@@ -194,25 +199,54 @@ const configureListener = (
     return { httpPort, httpHost, mcpAuthToken }
   })
 
+const resolveProcessConfiguration = Effect.fn("resolveProcessConfiguration")(function* (
+  transport: McpTransportType,
+  environment: NodeJS.ProcessEnv,
+  captured: Effect.Success<ReturnType<typeof captureManualResidentSelection>>
+) {
+  if (captured !== undefined)
+    return {
+      lazyEnvs: captured.selection.lazyEnvs,
+      authMethod: captured.selection.huly.auth._tag,
+      configLayer: Layer.succeed(HulyConfigService, captured.selection.huly),
+      runtimeConfigContext: () => captured.runtimeContext
+    }
+  const lazyEnvs = yield* getLazyEnvs(environment)
+  const profile =
+    transport === "stdio" && environment["HULY_PROFILE"] !== undefined
+      ? yield* resolveStdioProfile(environment, yield* defaultProfileStore(environment))
+      : undefined
+  const authMethod: "token" | "password" =
+    profile?.auth.method === "token" || environment["HULY_TOKEN"] ? "token" : "password"
+  const configLayer =
+    profile === undefined
+      ? HulyConfigService.layer
+      : HulyConfigService.layer.pipe(Layer.provide(ConfigProvider.layer(resolvedConfigProvider(profile))))
+  return {
+    lazyEnvs,
+    authMethod,
+    configLayer,
+    runtimeConfigContext: () =>
+      profile === undefined
+        ? sanitizeHulyRuntimeConfigFromEnv(environment)
+        : profileRuntimeContext(profile, environment)
+  }
+})
+
 const runConfiguredServer = (
   transport: McpTransportType,
-  resident: Effect.Success<typeof makeManualResidentBackend> | undefined
+  resident: Effect.Success<ReturnType<typeof makeManualResidentBackend>> | undefined,
+  environment: NodeJS.ProcessEnv,
+  captured: Effect.Success<ReturnType<typeof captureManualResidentSelection>>
 ): Effect.Effect<void, AppError> =>
   Effect.gen(function* () {
-    const environment = { ...process.env }
     const { httpHost, httpPort, mcpAuthToken } = yield* configureListener(transport, resident)
-    const lazyEnvs = yield* getLazyEnvs
+    const { authMethod, configLayer, lazyEnvs, runtimeConfigContext } = yield* resolveProcessConfiguration(
+      transport,
+      environment,
+      captured
+    )
     const observeMovement = yield* configureMovementObserver()
-    const profile =
-      transport === "stdio" && environment["HULY_PROFILE"] !== undefined
-        ? yield* resolveStdioProfile(environment, yield* defaultProfileStore(environment))
-        : undefined
-    const authMethod: "token" | "password" =
-      profile?.auth.method === "token" || environment["HULY_TOKEN"] ? "token" : "password"
-    const configLayer =
-      profile === undefined
-        ? HulyConfigService.layer
-        : HulyConfigService.layer.pipe(Layer.provide(ConfigProvider.layer(resolvedConfigProvider(profile))))
     const combinedClientLayer = buildCombinedClientLayer(configLayer)
     yield* Effect.acquireUseRelease(
       Effect.sync(() => createClientResolver(combinedClientLayer)),
@@ -239,10 +273,7 @@ const runConfiguredServer = (
             resolveHttpClientLease,
             HttpServerFactoryService.defaultLayer,
             closeClients,
-            () =>
-              profile === undefined
-                ? sanitizeHulyRuntimeConfigFromEnv(environment)
-                : profileRuntimeContext(profile, environment),
+            runtimeConfigContext,
             observeMovement,
             resident?.httpPolicy
           )
@@ -259,12 +290,16 @@ const runConfiguredServer = (
   })
 
 export const main: Effect.Effect<void, AppError> = Effect.gen(function* () {
+  const environment = { ...process.env }
   const launchMode = yield* getTransportType
-  const resident = launchMode === "resident-http" ? yield* makeManualResidentBackend : undefined
+  const captured = launchMode === "resident-http" ? yield* captureManualResidentSelection(environment) : undefined
+  const resident = launchMode === "resident-http" ? yield* makeManualResidentBackend(captured?.selection) : undefined
   const transport = launchMode === "resident-http" ? "http" : launchMode
   const consoleRedirect = yield* Effect.sync(() => (transport === "stdio" ? redirectConsoleToStderr() : undefined))
 
-  yield* runConfiguredServer(transport, resident).pipe(Effect.ensuring(restoreConsoleRedirect(consoleRedirect)))
+  yield* runConfiguredServer(transport, resident, environment, captured).pipe(
+    Effect.ensuring(restoreConsoleRedirect(consoleRedirect))
+  )
 }).pipe(Effect.scoped)
 
 // Run with NodeRuntime.runMain - handles errors, exit codes, and interrupts automatically

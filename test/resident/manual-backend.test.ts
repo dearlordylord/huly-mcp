@@ -27,7 +27,7 @@ it("fences attachment admission before held native client cleanup during normal 
   try {
     await Effect.runPromise(
       Effect.gen(function* () {
-        const backend = yield* makeManualResidentBackend
+        const backend = yield* makeManualResidentBackend()
         const cleaning = yield* Deferred.make<void>()
         const finish = yield* Deferred.make<void>()
         yield* Effect.gen(function* () {
@@ -106,7 +106,7 @@ it.each(["stop", "interrupt"])("publishes after native application readiness and
   try {
     await Effect.runPromise(
       Effect.gen(function* () {
-        const backend = yield* makeManualResidentBackend
+        const backend = yield* makeManualResidentBackend()
         yield* Effect.gen(function* () {
           const server = yield* McpServerService
           const reachedReady = yield* Deferred.make<void>()
@@ -177,7 +177,7 @@ it.each(["publication", "readiness", "timeout"])("closes the bound listener afte
     if (failure === "publication") await fs.chmod(directory, NON_PRIVATE_DIRECTORY)
     await Effect.runPromise(
       Effect.gen(function* () {
-        const backend = yield* makeManualResidentBackend
+        const backend = yield* makeManualResidentBackend()
         const bound = yield* Deferred.make<ResidentEndpoint>()
         yield* Effect.gen(function* () {
           const server = yield* McpServerService

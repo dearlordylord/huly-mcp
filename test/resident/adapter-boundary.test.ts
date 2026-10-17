@@ -67,7 +67,7 @@ it.each([
   }, "boundary-fixture")
   try {
     const exit = await Effect.runPromiseExit(
-      runManualAdapter.pipe(
+      runManualAdapter().pipe(
         Effect.provide(
           Layer.merge(
             Stdio.layerTest({ stdin: Stream.concat(Stream.make(input), Stream.never) }),
@@ -98,7 +98,7 @@ it.each(["application/json", "text/event-stream"])("flushes %s replies before cl
   }, "boundary-fixture")
   try {
     await Effect.runPromise(
-      runManualAdapter.pipe(
+      runManualAdapter().pipe(
         Effect.provide(
           Layer.merge(
             Stdio.layerTest({
@@ -131,7 +131,7 @@ it("rejects an unterminated oversized input before dispatch", async () => {
   }, "boundary-fixture")
   try {
     const exit = await Effect.runPromiseExit(
-      runManualAdapter.pipe(
+      runManualAdapter().pipe(
         Effect.provide(
           Layer.merge(
             Stdio.layerTest({ stdin: Stream.make(new Uint8Array(1024 * 1024 + 1).fill(32)) }),
@@ -167,7 +167,7 @@ it("uses its negotiated legacy session for the next request", async () => {
   try {
     Effect.runSync(Queue.offer(stdin, input))
     await Effect.runPromise(
-      runManualAdapter.pipe(
+      runManualAdapter().pipe(
         Effect.provide(
           Layer.merge(
             Stdio.layerTest({
@@ -207,7 +207,7 @@ it("cancels an active request and ends cleanly after the backend socket closes",
   )
   try {
     await Effect.runPromise(
-      runManualAdapter.pipe(
+      runManualAdapter().pipe(
         Effect.provide(
           Layer.merge(
             Stdio.layerTest({
@@ -239,7 +239,7 @@ effectIt.effect("stops when stdout exceeds its write allowance", () =>
       }, "boundary-fixture")
     )
     try {
-      const bridge = yield* runManualAdapter.pipe(
+      const bridge = yield* runManualAdapter().pipe(
         Effect.provide(
           Layer.merge(
             Stdio.layerTest({
@@ -272,7 +272,7 @@ it("reports a stream disconnect after delivering progress without replay", async
   let delivered = 0
   try {
     const exit = await Effect.runPromiseExit(
-      runManualAdapter.pipe(
+      runManualAdapter().pipe(
         Effect.provide(
           Layer.merge(
             Stdio.layerTest({
@@ -306,7 +306,7 @@ it("flushes a notification response before clean EOF", async () => {
   }, "boundary-fixture")
   try {
     await Effect.runPromise(
-      runManualAdapter.pipe(
+      runManualAdapter().pipe(
         Effect.provide(
           Layer.merge(
             Stdio.layerTest({

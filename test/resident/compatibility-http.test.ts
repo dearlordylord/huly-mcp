@@ -53,7 +53,8 @@ type Authority = Effect.Success<ReturnType<typeof makeCompatibilityAuthority>>
 
 const withCompatibleServer = <A, E, R>(
   use: (attachment: ResidentAttachment, admissions: Admissions) => Effect.Effect<A, E, R>,
-  provideAuthority: (authority: Authority) => Authority = (authority) => authority
+  provideAuthority: (authority: Authority) => Authority = (authority) => authority,
+  observeRequest: Effect.Effect<void> = Effect.void
 ) =>
   Effect.gen(function* () {
     const admissions = yield* makeResidentAdmissions(policy)
@@ -82,13 +83,21 @@ const withCompatibleServer = <A, E, R>(
       {
         middleware: (app) =>
           Deferred.await(authority).pipe(
-            Effect.flatMap((owner) => residentAdmissionMiddleware(admissions, owner)(native(app)))
+            Effect.flatMap((owner) =>
+              residentAdmissionMiddleware(admissions, owner)(observeRequest.pipe(Effect.andThen(native(app))))
+            )
           )
       }
     )
   }).pipe(Effect.scoped, Effect.timeout("5 seconds"))
 
-const request = (attachment: ResidentAttachment, method: "POST" | "GET", path: string, body = "") =>
+const request = (
+  attachment: ResidentAttachment,
+  method: "POST" | "GET",
+  path: string,
+  body = "",
+  headers: Record<string, string> = {}
+) =>
   withResidentHttpsAgent(attachment.endpoint, attachment.identity, (agent) =>
     Effect.gen(function* () {
       const client = yield* NodeHttpClient.makeNodeHttp.pipe(
@@ -97,6 +106,7 @@ const request = (attachment: ResidentAttachment, method: "POST" | "GET", path: s
       const response = yield* client.execute(
         HttpClientRequest.make(method)(new URL(path, attachment.endpoint).href).pipe(
           HttpClientRequest.setHeader("authorization", `Bearer ${Redacted.value(attachment.authorization)}`),
+          HttpClientRequest.setHeaders(headers),
           HttpClientRequest.bodyText(body, "application/json")
         )
       )
@@ -232,6 +242,44 @@ it("returns bounded challenge capacity refusal without falling back to unverifie
         expect(refused._tag).toBe("BackendResponseError")
         const capacity = yield* admissions.admit
         yield* admissions.release(capacity.token)
+      })
+    )
+  )
+})
+
+it("rejects configured resident Huly overrides before entering request client middleware", async () => {
+  let entered = 0
+  await Effect.runPromise(
+    withCompatibleServer(
+      (attachment) =>
+        Effect.gen(function* () {
+          for (const headers of [
+            {
+              "x-huly-url": "https://other.invalid",
+              "x-huly-workspace": "other",
+              "x-huly-token": "other-private-token"
+            },
+            { "x-huly-unsupported": "fixture" }
+          ]) {
+            const response = yield* request(attachment, "POST", "/mcp", "{}", headers)
+            expect(response.status).toBe(400)
+            expect(response.body).toContain("do not accept Huly override headers")
+            expect(response.body).not.toContain("other-private-token")
+          }
+          expect(entered).toBe(0)
+          yield* withAdapterAttachment(
+            attachment,
+            (exchange) =>
+              exchange(ping, Option.none(), (response) =>
+                response.text.pipe(Effect.map(() => expect(response.status).toBe(200)))
+              ),
+            selected
+          )
+          expect(entered).toBe(1)
+        }),
+      (authority) => authority,
+      Effect.sync(() => {
+        entered++
       })
     )
   )

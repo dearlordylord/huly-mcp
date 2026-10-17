@@ -2,7 +2,7 @@ import { Client } from "@modelcontextprotocol/client"
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"
 import { Deferred, Effect, Schema } from "effect"
 
-import { testStdioEnvironment } from "../../helpers/stdio-environment.js"
+import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
 import { NativeHostInput, NativeHostObservation } from "../native-host-observation.js"
 
 const RESPONSE_BOUND = 5_000
@@ -18,7 +18,11 @@ const main = async () => {
     command: process.execPath,
     args: [input.bundle],
     stderr: "pipe",
-    env: { ...testStdioEnvironment(), MCP_TRANSPORT: "stdio-http", MCP_RESIDENT_ATTACHMENT_FILE: input.attachment }
+    env: {
+      ...residentSelectionEnvironment(),
+      MCP_TRANSPORT: "stdio-http",
+      MCP_RESIDENT_ATTACHMENT_FILE: input.attachment
+    }
   })
   const client = new Client(
     { name: input.host, version: "1.0" },

@@ -79,8 +79,9 @@ Registry names contain no credential-derived lookup value. Private compatibility
 uses a domain-separated MAC over a canonical selection and a backend-issued
 one-use challenge. It binds package, wire version, generation, and operation.
 The canonical encoder and challenge limits are recorded below. HTTP comparison
-and admission are connected at the transport module boundary. Production profile
-resolution and startup do not yet supply a selection. No transcript is persisted or logged.
+and admission are connected at the transport module boundary. Explicit configured
+backend and adapter startup now supply the captured selection; automatic managed
+selection remains pending. No transcript is persisted or logged.
 
 The comparison wire format is version 1. Its challenge contains the package
 version, expected random generation, and a fresh 32-byte random nonce encoded as

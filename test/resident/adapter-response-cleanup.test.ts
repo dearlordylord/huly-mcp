@@ -18,7 +18,7 @@ it("closes an unsupported live response before returning from the adapter scope"
       `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "server/discover" })}\n`
     )
     const exit = await Effect.runPromiseExit(
-      runManualAdapter.pipe(
+      runManualAdapter().pipe(
         Effect.provide(
           Layer.merge(
             Stdio.layerTest({ stdin: Stream.concat(Stream.make(request), Stream.never) }),
@@ -43,7 +43,7 @@ it("aborts an owned request interrupted before response headers arrive", { timeo
   }, "private-fixture-auth")
   const request = new TextEncoder().encode('{"jsonrpc":"2.0","id":1,"method":"server/discover"}\n')
   const fiber = Effect.runFork(
-    runManualAdapter.pipe(
+    runManualAdapter().pipe(
       Effect.provide(
         Layer.merge(
           Stdio.layerTest({ stdin: Stream.concat(Stream.make(request), Stream.never) }),
@@ -95,7 +95,7 @@ it.each(["initialize", "duplicate", "capacity"])(
         )
       )
       const exit = await Effect.runPromiseExit(
-        runManualAdapter.pipe(
+        runManualAdapter().pipe(
           Effect.provide(
             Layer.merge(
               Stdio.layerTest({ stdin }),

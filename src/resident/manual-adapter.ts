@@ -16,6 +16,7 @@ import { HostMessage } from "./request-headers.js"
 import { readResidentAttachment } from "./attachment-file.js"
 import { type AdapterExchange, withAdapterAttachment } from "./adapter-attachment.js"
 import { ResidentFilePath } from "./protected-path.js"
+import type { ResidentSelection } from "./compatibility-contract.js"
 import { MAX_ADAPTER_REQUESTS } from "./adapter-limits.js"
 
 const MAX_RESPONSE_MIB = 128
@@ -157,9 +158,9 @@ const runBridge = (exchange: AdapterExchange) =>
     yield* Fiber.join(writer)
   }).pipe(Effect.scoped)
 
-export const runManualAdapter = Effect.gen(function* () {
+export const runManualAdapter = Effect.fn("runManualAdapter")(function* (selection?: ResidentSelection) {
   const attachment = yield* readResidentAttachment(
     yield* Config.schema(ResidentFilePath, "MCP_RESIDENT_ATTACHMENT_FILE")
   )
-  yield* withAdapterAttachment(attachment, runBridge)
+  yield* withAdapterAttachment(attachment, runBridge, selection)
 })

@@ -246,7 +246,7 @@ describe("Main Entry Point", () => {
   describe("lazy Huly config startup", () => {
     it.effect("defaults to eager stdio config validation outside registry inspection", () =>
       Effect.gen(function* () {
-        const lazyEnvs = yield* getLazyEnvs
+        const lazyEnvs = yield* getLazyEnvs({})
 
         expect(lazyEnvs).toBe(false)
       })
@@ -254,9 +254,7 @@ describe("Main Entry Point", () => {
 
     it.effect("defaults to lazy config validation during Glama registry inspection", () =>
       Effect.gen(function* () {
-        process.env["GLAMA_VERSION"] = "1.0.0"
-
-        const lazyEnvs = yield* getLazyEnvs
+        const lazyEnvs = yield* getLazyEnvs({ GLAMA_VERSION: "1.0.0" })
 
         expect(lazyEnvs).toBe(true)
       })
@@ -264,8 +262,7 @@ describe("Main Entry Point", () => {
 
     it.effect("lets explicit LAZY_ENVS override Glama registry inspection", () =>
       Effect.gen(function* () {
-        process.env["GLAMA_VERSION"] = "1.0.0"
-        const lazyEnvs = yield* getLazyEnvs.pipe(provideConfig({ LAZY_ENVS: "false" }))
+        const lazyEnvs = yield* getLazyEnvs({ GLAMA_VERSION: "1.0.0" }).pipe(provideConfig({ LAZY_ENVS: "false" }))
 
         expect(lazyEnvs).toBe(false)
       })

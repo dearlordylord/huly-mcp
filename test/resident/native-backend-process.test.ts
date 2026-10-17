@@ -13,6 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
 import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
+import { residentSelectionEnvironment } from "../helpers/resident-selection-environment.js"
 import { NativeHostObservation } from "./native-host-observation.js"
 
 const PROCESS_BOUND = 30_000
@@ -48,14 +49,10 @@ beforeAll(async () => {
   )
   backend = spawn(process.execPath, [bundle.path], {
     env: {
-      ...testStdioEnvironment(),
+      ...residentSelectionEnvironment(),
       MCP_TRANSPORT: "resident-http",
       MCP_RESIDENT_STATE_DIRECTORY: stateDirectory,
-      MCP_RESIDENT_ATTACHMENT_CAPACITY: "2",
-      HULY_TOOL_MODE: "auto",
-      HULY_URL: "http://127.0.0.1:1",
-      HULY_WORKSPACE: "fixture",
-      HULY_TOKEN: "fixture-huly-token"
+      MCP_RESIDENT_ATTACHMENT_CAPACITY: "2"
     }
   })
   const lines = createInterface({ input: backend.stderr })
@@ -92,6 +89,34 @@ afterAll(async () => {
 })
 
 describe("manual adapters against the packaged native HTTP backend", { timeout: PROCESS_BOUND }, () => {
+  it("refuses another identity, policy, or missing selection before admitting an MCP session", async () => {
+    const base = residentSelectionEnvironment()
+    for (const selected of [
+      { ...base, HULY_TOKEN: "other-fixture-token" },
+      { ...base, HULY_WORKSPACE: "other-workspace" },
+      { ...base, HULY_CONNECTION_TIMEOUT: "2500" },
+      { ...base, TOOLS: "get_huly_context" },
+      { ...base, HULY_TOOL_MODE: "native" },
+      { ...base, PROXY_OUTPUT_STRICT: "true" },
+      testStdioEnvironment()
+    ]) {
+      const transport = new StdioClientTransport({
+        command: process.execPath,
+        args: [bundle.path],
+        stderr: "pipe",
+        env: { ...selected, MCP_TRANSPORT: "stdio-http", MCP_RESIDENT_ATTACHMENT_FILE: attachmentFile }
+      })
+      const client = new Client({ name: "refused-host", version: "1.0" })
+      try {
+        await expect(client.connect(transport, { timeout: RESPONSE_BOUND })).rejects.toThrow()
+      } finally {
+        await transport.close()
+      }
+    }
+    expect(backend.exitCode).toBeNull()
+    expect(backend.signalCode).toBeNull()
+  })
+
   it.each(["death", "pause"])(
     "expires an adapter after %s while its survivor keeps the same backend",
     { timeout: LEASE_PROCESS_BOUND },
@@ -100,7 +125,11 @@ describe("manual adapters against the packaged native HTTP backend", { timeout: 
         command: process.execPath,
         args: [bundle.path],
         stderr: "pipe",
-        env: { ...testStdioEnvironment(), MCP_TRANSPORT: "stdio-http", MCP_RESIDENT_ATTACHMENT_FILE: attachmentFile }
+        env: {
+          ...residentSelectionEnvironment(),
+          MCP_TRANSPORT: "stdio-http",
+          MCP_RESIDENT_ATTACHMENT_FILE: attachmentFile
+        }
       })
       const survivor = new Client(
         { name: "claude-code", version: "1.0" },
@@ -109,7 +138,11 @@ describe("manual adapters against the packaged native HTTP backend", { timeout: 
       const survivorClosed = Effect.runSync(Deferred.make<void>())
       survivor.onclose = () => Effect.runSync(Deferred.succeed(survivorClosed, undefined))
       const abandoned = spawn(process.execPath, [bundle.path], {
-        env: { ...testStdioEnvironment(), MCP_TRANSPORT: "stdio-http", MCP_RESIDENT_ATTACHMENT_FILE: attachmentFile }
+        env: {
+          ...residentSelectionEnvironment(),
+          MCP_TRANSPORT: "stdio-http",
+          MCP_RESIDENT_ATTACHMENT_FILE: attachmentFile
+        }
       })
       const output: Array<string> = []
       const firstReply = Effect.runSync(Deferred.make<void>())
@@ -139,7 +172,11 @@ describe("manual adapters against the packaged native HTTP backend", { timeout: 
           command: process.execPath,
           args: [bundle.path],
           stderr: "pipe",
-          env: { ...testStdioEnvironment(), MCP_TRANSPORT: "stdio-http", MCP_RESIDENT_ATTACHMENT_FILE: attachmentFile }
+          env: {
+            ...residentSelectionEnvironment(),
+            MCP_TRANSPORT: "stdio-http",
+            MCP_RESIDENT_ATTACHMENT_FILE: attachmentFile
+          }
         })
         const next = new Client(
           { name: "claude-code", version: "1.0" },
@@ -186,7 +223,7 @@ describe("manual adapters against the packaged native HTTP backend", { timeout: 
         const { stdout } = await runFile(
           process.execPath,
           [join(dirname(bundle.path), "native-host.cjs"), bundle.path, attachmentFile, host, mode],
-          { timeout: PROCESS_BOUND, env: testStdioEnvironment() }
+          { timeout: PROCESS_BOUND, env: residentSelectionEnvironment() }
         )
         return Schema.decodeUnknownSync(Schema.fromJsonString(NativeHostObservation))(stdout)
       })
@@ -209,7 +246,11 @@ describe("manual adapters against the packaged native HTTP backend", { timeout: 
         command: process.execPath,
         args: [bundle.path],
         stderr: "pipe",
-        env: { ...testStdioEnvironment(), MCP_TRANSPORT: "stdio-http", MCP_RESIDENT_ATTACHMENT_FILE: attachmentFile }
+        env: {
+          ...residentSelectionEnvironment(),
+          MCP_TRANSPORT: "stdio-http",
+          MCP_RESIDENT_ATTACHMENT_FILE: attachmentFile
+        }
       })
       const client = new Client(
         { name, version: "1.0" },
