@@ -7,20 +7,14 @@ import { BackendResponseError } from "./response-stream.js"
 NodeRuntime.runMain(
   runManualAdapter.pipe(
     Effect.provide(NodeStdio.layer),
-    Effect.catch((error) =>
-      Effect.gen(function* () {
-        // Configuration and parse diagnostics must not echo private boundary data.
-        yield* Effect.sync(() =>
-          process.stderr.write(
-            error instanceof BackendResponseError
-              ? `Huly MCP manual adapter: ${error.message}\n`
-              : "Huly MCP manual adapter failed; check endpoint and local authorization. No request was replayed.\n"
-          )
-        )
-        yield* Effect.sync(() => {
-          process.exitCode = 1
-        })
-      })
-    )
-  )
+    Effect.mapError((error) =>
+      error instanceof BackendResponseError
+        ? error
+        : new BackendResponseError({
+            message: "Adapter failed; check endpoint and local authorization. No request was replayed."
+          })
+    ),
+    Effect.tapError((error) => Effect.sync(() => process.stderr.write(`Huly MCP manual adapter: ${error.message}\n`)))
+  ),
+  { disableErrorReporting: true }
 )

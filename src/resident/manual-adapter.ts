@@ -1,8 +1,29 @@
-import { type Cause, Config, Effect, Fiber, FiberMap, Option, Queue, Redacted, Schema, Stdio, Stream } from "effect"
+import {
+  type Cause,
+  Config,
+  Effect,
+  Fiber,
+  FiberMap,
+  Option,
+  Queue,
+  Redacted,
+  Ref,
+  Result,
+  Schema,
+  Stdio,
+  Stream
+} from "effect"
 import { McpSchema } from "effect/ai"
 import { Ndjson } from "effect/encoding"
 
-import { BackendResponseError, decodeBackendMessages } from "./response-stream.js"
+import {
+  advanceBackendResponse,
+  BackendResponseError,
+  decodeBackendMessages,
+  finishBackendResponse,
+  type ResponsePhase
+} from "./response-stream.js"
+import { observeResidentResponse } from "./response-observations.js"
 
 const MAX_RESPONSE_MIB = 128
 const MAX_RESPONSE_BYTES = MAX_RESPONSE_MIB * 1024 * 1024
@@ -12,6 +33,7 @@ const OUTPUT_CAPACITY = 16
 const ACCEPTED = 202
 const NO_CONTENT = 204
 const LINE_FEED = 10
+const OUTPUT_WRITE_ALLOWANCE = "10 seconds"
 const Endpoint = Schema.URLFromString.check(
   Schema.makeFilter(
     (url) =>
@@ -79,6 +101,7 @@ const forward = (
   endpoint: URL,
   authorization: Redacted.Redacted<string>,
   message: HostMessage,
+  request: number,
   output: Queue.Queue<string, Cause.Done>
 ) =>
   Effect.gen(function* () {
@@ -93,29 +116,47 @@ const forward = (
         }),
       catch: () => fail("Backend connection failed; operation outcome may be unknown. No request was replayed.")
     })
+    const discardBody = Effect.tryPromise({
+      try: () => response.body?.cancel() ?? Promise.resolve(),
+      catch: () => fail("Backend response cleanup failed")
+    })
     if (!response.ok) {
-      yield* Effect.tryPromise({
-        try: () => response.body?.cancel() ?? Promise.resolve(),
-        catch: () => fail("Backend response cleanup failed")
-      })
+      yield* discardBody
       return yield* fail("Backend rejected the request; no request was replayed")
     }
-    if (response.status === ACCEPTED || response.status === NO_CONTENT) return
+    if (response.status === ACCEPTED || response.status === NO_CONTENT) {
+      yield* discardBody
+      return yield* Effect.fromResult(finishBackendResponse("awaiting", message.id))
+    }
     const body = response.body
     if (body === null) return yield* fail("Backend response has no body")
+    const phase = yield* Ref.make<ResponsePhase>("awaiting")
+    const observedRequest = message.id === undefined ? undefined : request
+    observeResidentResponse({ request: observedRequest, event: "Started", accepted: true })
     yield* decodeBackendMessages({
       body: Stream.fromReadableStream({ evaluate: () => body, onError: () => fail("Backend response disconnected") }),
       contentType: response.headers.get("content-type") ?? "",
       maxBytes: MAX_RESPONSE_BYTES
     }).pipe(
-      Stream.runForEach((reply) => {
-        if ("id" in reply && reply.id !== message.id)
-          return Effect.fail(fail("Backend response belongs to another request"))
-        return Queue.offer(output, `${JSON.stringify(reply)}\n`).pipe(
-          Effect.flatMap((accepted) => (accepted ? Effect.void : Effect.fail(fail("Stdio output is closed"))))
-        )
-      })
+      Stream.runForEach((reply) =>
+        Effect.gen(function* () {
+          const decision = advanceBackendResponse(yield* Ref.get(phase), message.id, reply)
+          observeResidentResponse({
+            request: observedRequest,
+            event: !("id" in reply) ? "Progress" : reply.id === message.id ? "OwnReply" : "ForeignReply",
+            accepted: Result.isSuccess(decision)
+          })
+          const next = yield* Effect.fromResult(decision)
+          yield* Ref.set(phase, next)
+          yield* Queue.offer(output, `${JSON.stringify(reply)}\n`).pipe(
+            Effect.flatMap((accepted) => (accepted ? Effect.void : Effect.fail(fail("Stdio output is closed"))))
+          )
+        })
+      )
     )
+    const completion = finishBackendResponse(yield* Ref.get(phase), message.id)
+    observeResidentResponse({ request: observedRequest, event: "End", accepted: Result.isSuccess(completion) })
+    yield* Effect.fromResult(completion)
   })
 
 export const runManualAdapter = Effect.gen(function* () {
@@ -123,8 +164,21 @@ export const runManualAdapter = Effect.gen(function* () {
   const authorization = yield* Config.schema(Schema.RedactedFromValue(Schema.NonEmptyString), "MCP_AUTH_TOKEN")
   const stdio = yield* Stdio.Stdio
   const output = yield* Queue.bounded<string, Cause.Done>(OUTPUT_CAPACITY)
-  const writer = yield* Stream.fromQueue(output).pipe(Stream.run(stdio.stdout({ endOnDone: false })), Effect.forkScoped)
+  const writer = yield* Stream.fromQueue(output).pipe(
+    Stream.runForEach((line) =>
+      Stream.make(line).pipe(
+        Stream.run(stdio.stdout({ endOnDone: false })),
+        Effect.timeoutOrElse({
+          duration: OUTPUT_WRITE_ALLOWANCE,
+          orElse: () => Effect.fail(fail("Stdio output did not drain within 10 seconds"))
+        }),
+        Effect.mapError(() => fail("Stdio output failed or exceeded its 10 second write allowance"))
+      )
+    ),
+    Effect.forkScoped
+  )
   const requests = yield* FiberMap.make<string | number | symbol, void, BackendResponseError>()
+  const requestOrdinal = yield* Ref.make(0)
   const input = boundedInput(stdio.stdin).pipe(
     Stream.runForEach((message) =>
       Effect.gen(function* () {
@@ -137,7 +191,8 @@ export const runManualAdapter = Effect.gen(function* () {
         if ((yield* FiberMap.has(requests, key)) || (yield* FiberMap.size(requests)) >= MAX_REQUESTS) {
           return yield* fail("Stdio request admission limit reached or request id already active")
         }
-        yield* FiberMap.run(requests, key, forward(endpoint, authorization, message, output))
+        const ordinal = yield* Ref.updateAndGet(requestOrdinal, (value) => value + 1)
+        yield* FiberMap.run(requests, key, forward(endpoint, authorization, message, ordinal, output))
       })
     )
   )

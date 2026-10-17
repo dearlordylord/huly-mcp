@@ -75,10 +75,69 @@ local-Huly demonstration, full quality gate and Standards/Spec review. #324–#3
 remain required under the unchanged parent contract. The superseded prototype
 may be removed only after production integration and qualification.
 
-Next behavioral increments: cancellation/EOF/death with continued use of the
-surviving adapters; stdout-close/slow-consumer limits and failure propagation;
-truthful missing-terminal-response handling; initialization and legacy session
-bridging; supported interactions/continuations. The current adapter is an early
+Remaining behavioral work includes cancellation during shared acquisition,
+measured admission and byte budgets, initialization and legacy session bridging,
+and supported interactions and continuations. The current adapter is an early
 experimental path, not a complete protocol bridge. No full quality gate,
-coverage receipt, fresh review, Quint check, local-Huly demonstration, native
-macOS/Windows evidence or final packaged qualification exists for this candidate.
+coverage receipt, fresh review, local-Huly demonstration, native macOS or Windows
+evidence, or final packaged qualification exists for this candidate.
+
+## Response lifetime and output increment
+
+The adapter now keeps output failures in the typed failure channel. The previous
+entrypoint caught failures and returned success, which prevented NodeRuntime's
+failure teardown from forcing exit. Closed stdout reproduced that hang. The
+entrypoint now prints a redacted diagnostic and lets NodeRuntime exit with code 1.
+An unread stdout also reproduced a hang. Each serialized output write now has a
+10-second allowance, matching the existing ordinary stdio shutdown deadline.
+It uses Effect time and does not change existing transport deadlines.
+
+The process checks confirm that EOF or `SIGKILL` closes the first adapter's HTTP
+stream while the second adapter remains usable. Request cancellation also leaves
+the first adapter usable for another call. The closed and unread stdout checks
+confirm that the affected adapter exits and the surviving adapter can read again.
+
+An SSE response ending without a terminal reply previously left the adapter
+waiting silently. A fault-timing event now ends the fixture response after the
+test receives progress. The regression timed out before the completion check.
+The corrected implementation reports an unknown outcome and performs no replay.
+The response phase and ownership decisions are pure functions. Duplicate and
+foreign terminal replies are rejected before admission to stdout.
+
+Evidence from this increment:
+
+- `/tmp/resident-eof-death.log`: five packaged routing and release scenarios passed.
+- `/tmp/resident-output-red.log`: closed and unread stdout both exceeded the
+  existing fixture's 15-second exit bound. Both cases pass in
+  `/tmp/resident-output-green.log` after the fixes.
+- `/tmp/resident-missing-terminal-red-confirmed.log`: the missing-terminal check
+  timed out after five seconds with the completion check removed. The check was
+  restored before subsequent verification.
+- `/tmp/resident-observed-lifecycle.log`: all 15 resident tests passed, including
+  six packaged scenarios with observed response decisions replayed in Quint.
+- `/tmp/resident-observation-typecheck-2.log`: TypeScript and Effect diagnostics
+  passed for 1,196 files with zero errors or warnings.
+- `/tmp/resident-response-model-script.log`: six deterministic Quint tests and
+  10,000 sampled traces passed. All five witnesses were reached.
+- `/tmp/resident-response-model-mutant.log`: allowing a second terminal reply
+  violated `safety`, with a trace showing `accepted: 2` in one request context.
+- `/tmp/resident-lifecycle-final-increment.log`: all 15 resident tests passed on
+  the final increment, including rejection of a contradicted observation trace
+  and confirmation that the missing-terminal failure itself was observed.
+- `/tmp/resident-lifecycle-final-typecheck.log`: TypeScript and Effect diagnostics
+  passed for 1,196 files. Focused lint and complexity passed in
+  `/tmp/resident-lifecycle-final-lint.log` and
+  `/tmp/resident-lifecycle-final-complexity.log`.
+
+An intermediate replay check failed because the test expected the failed run's
+name in the subprocess Error message. Quint writes that name to stdout, while
+the Error message included stderr's `error: Tests failed`. The assertion now
+checks that actual model-test failure. The original assertion failure is retained
+in `/tmp/resident-model-alignment-checked.log`; it is not a runtime failure or a
+passing check.
+
+The [response model reference](../../quint-specs/resident-response-ownership.md)
+records its bounded domain and unmodeled requirements. This adds local replay
+alignment for response decisions. Full adapter lifecycle observation and the
+remaining parent invariants are still pending. No #323 acceptance criterion or
+later ticket is certified by this increment.

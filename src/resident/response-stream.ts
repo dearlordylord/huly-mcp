@@ -1,4 +1,4 @@
-import { Effect, Schema, Stream } from "effect"
+import { Effect, Result, Schema, Stream } from "effect"
 import { McpSchema } from "effect/ai"
 import { Sse } from "effect/encoding"
 
@@ -24,6 +24,34 @@ export type BackendMessage = Schema.Schema.Type<typeof BackendMessage>
 export class BackendResponseError extends Schema.TaggedError<BackendResponseError>()("BackendResponseError", {
   message: Schema.String
 }) {}
+
+export type ResponsePhase = "awaiting" | "answered"
+
+export const advanceBackendResponse = (
+  phase: ResponsePhase,
+  requestId: McpSchema.RequestId | undefined,
+  message: BackendMessage
+): Result.Result<ResponsePhase, BackendResponseError> => {
+  if (!("id" in message)) return Result.succeed(phase)
+  if (message.id !== requestId)
+    return Result.fail(new BackendResponseError({ message: "Backend response belongs to another request" }))
+  if (phase === "answered")
+    return Result.fail(new BackendResponseError({ message: "Backend sent duplicate terminal responses" }))
+  return Result.succeed("answered")
+}
+
+export const finishBackendResponse = (
+  phase: ResponsePhase,
+  requestId: McpSchema.RequestId | undefined
+): Result.Result<void, BackendResponseError> =>
+  requestId !== undefined && phase !== "answered"
+    ? Result.fail(
+        new BackendResponseError({
+          message:
+            "Backend stream ended without a terminal response; operation outcome may be unknown. No request was replayed."
+        })
+      )
+    : Result.succeed(undefined)
 
 const responseFailure = (error: unknown) =>
   error instanceof BackendResponseError

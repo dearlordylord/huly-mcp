@@ -1,4 +1,8 @@
-# HTTP transport model and test observations
+# Transport models and test observations
+
+The resident adapter has a separate [response ownership model](resident-response-ownership.md).
+Its local replay checks use observed decisions from packaged adapter processes.
+The HTTP admission model below retains its original scope.
 
 The model covers HTTP admission, client ownership, and shutdown. Its domain bounds
 and intentionally omitted SDK details are documented in `http-transport-admission.qnt`.
