@@ -679,3 +679,8 @@ The [admission transition increment](resident-admission-transitions-2026-10-18.m
 ## Actual operation-error routing — 2026-10-18
 
 The [focused error-routing increment](resident-error-routing-2026-10-18.md) adds two independent parents with colliding ID41, a real missing-project domain error and a separately held peer read. The error caller completes FRESH42 while the peer remains held; the peer then receives exact41/42 results. Both protocols, explicit adapter/parent exits, kernel backend retirement and post-retirement counters passed. No production changes or full gate. This closes only the native domain-error subset of the routing gap; progress/continuations/capabilities and overall #323 remain incomplete.
+
+
+### Scoped capability transport boundary — 2026-10-18
+
+[Transport report](resident-capability-boundary-2026-10-18.md): two concurrent in-process adapters over real TLS preserve exact capabilities/metadata and isolate legacy sessions across both supported protocols. Three focused files pass19tests; changed-file lint/format and Standards/Spec reviews accepted after schema correction. Production unchanged; no full gate. Synthetic negotiation replies and no interactive/progress producers mean native negotiation, progress, continuations and wider #323.4/.5 remain open. All six issues remain incomplete.
