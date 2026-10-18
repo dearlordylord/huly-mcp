@@ -452,3 +452,7 @@ The [focused ten-reader increment](resident-ten-readers-2026-10-18.md) adds ten 
 ### Concurrent incompatible configuration launch — 2026-10-18
 
 [Report](resident-concurrent-config-launch-2026-10-18.md): schema-owned launch seq/concurrent; both independentparents spawnedbeforeawaitready innewconcurrent/backend-only cases, same namespace/different effectiveURLs. Existing heldpeer/fault isolation retained. Final6casesPASS50.00s /tmp/resident-config-launch-fault-six-cases.log; local lint/format and reviewsaccepted. Postrunall6roots terminal0/parentlineage/onlyfailedAregistryretained/Brecordremoved independentlychecked. Originaldiscoverreadinessfailure not reproduced; cause remainsunknown, no timeoutrelaxed or productionfix claimed. No fullgate, all6issues incomplete; exactkillboundaries/macOS/model/finalqualification open.
+
+### Configured HTTPS late attachment — 2026-10-18
+
+[Report](resident-late-http-idle-2026-10-18.md): actual configured managed HTTPS server selected at virtual4900ms accepts exact successful ping replies before and after a retained5000ms attachment. Confirmed release starts a full new idle interval; retirement joins, state is empty, and later selection acquires absent ownership. Original no-client retirement test retained. Two focused files/seven tests pass; no production change/full gate. Single-process controlled-clock proof does not certify OS-process races or replacement startup; all six issues remain incomplete.
