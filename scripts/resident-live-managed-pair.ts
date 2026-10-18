@@ -4,6 +4,7 @@ import { Effect, Schema } from "effect"
 import { currentPosixOwner, inspectPrivateDirectory } from "../src/resident/protected-path.js"
 import type { openKernelReapedEvents } from "../test/helpers/kernel-reaped-events.js"
 import {
+  resolveLiveReadProtocol,
   type LiveProbeEnvironment,
   type ManagedLiveReadPairInput,
   ManagedLiveReadHostInput,
@@ -27,6 +28,7 @@ export const observeManagedLiveReadPair = Effect.fn("observeManagedLiveReadPair"
   const reader = (host: ManagedLiveReadHostInput["host"], target: ManagedLiveReadHostInput["target"]) =>
     Schema.encodeEffect(Schema.fromJsonString(ManagedLiveReadHostInput))({
       bundle: input.bundle,
+      protocol: resolveLiveReadProtocol(input.protocol),
       directory: input.directory,
       host,
       target
@@ -65,7 +67,7 @@ export const observeManagedLiveReadPair = Effect.fn("observeManagedLiveReadPair"
     return yield* new LiveReadProbeError({ phase: "retirement" })
   return ManagedLiveReadPairReceipt.make({
     mode: "managed",
-    protocol: "2026-07-28",
+    protocol: resolveLiveReadProtocol(input.protocol),
     readers: [a, b],
     parentExits: [0, 0],
     backendRetirement: "confirmed",

@@ -6,7 +6,7 @@ import { GetProjectParamsSchema, GetProjectResultSchema } from "../src/domain/sc
 import { readResidentAttachmentEnvelope } from "../src/resident/attachment-file.js"
 import { BackendMessage } from "../src/resident/response-stream.js"
 import { HostMessage } from "../src/resident/request-headers.js"
-import { NativeDiscoverySchema, NativeToolListSchema } from "./integration-mcp-prior.js"
+import { NativeToolListSchema } from "./integration-mcp-prior.js"
 import {
   LIVE_PROBE_IO_BOUND,
   LIVE_PROBE_HOST_BOUND,
@@ -20,11 +20,11 @@ import {
   type LiveReadHostReceipt,
   LiveReadProbeError
 } from "./resident-live-read-contract.js"
+import { discoverLiveReadProtocol, liveReadMetadata } from "./resident-live-protocol.js"
 import { captureManagedReadIdentity } from "./resident-live-managed-identity.js"
 import { probeIo, withLiveProbeChild } from "./resident-live-read-process.js"
 
 const MAX_INTERLEAVED_NOTIFICATIONS = 64
-const DISCOVER_ID = 1
 const CATALOG_ID = 2
 const RESOURCE_TEMPLATES_ID = 3
 const ProjectCall = Schema.Struct({
@@ -33,11 +33,6 @@ const ProjectCall = Schema.Struct({
 })
 const Templates = Schema.Struct({ resourceTemplates: Schema.Array(Schema.Struct({ uriTemplate: Schema.String })) })
 const refuse = (phase: LiveReadProbeError["phase"]) => new LiveReadProbeError({ phase })
-const metadata = (input: Pick<LiveReadHostInput, "host">) => ({
-  "io.modelcontextprotocol/protocolVersion": "2026-07-28",
-  "io.modelcontextprotocol/clientCapabilities": {},
-  "io.modelcontextprotocol/clientInfo": { name: `resident-live-${input.host}`, version: "1.0" }
-})
 
 export const observeLiveResidentReads = Effect.fn("observeLiveResidentReads")(function* (
   input: LiveReadHostInput | ManagedLiveReadHostInput,
@@ -68,7 +63,7 @@ export const observeLiveResidentReads = Effect.fn("observeLiveResidentReads")(fu
           const incoming = lines[Symbol.asyncIterator]()
           const request = (
             id: NonNullable<HostMessage["id"]>,
-            method: "server/discover" | "tools/list" | "resources/templates/list" | "tools/call",
+            method: "initialize" | "server/discover" | "tools/list" | "resources/templates/list" | "tools/call",
             params: Readonly<Record<string, Schema.Json>>
           ) =>
             Effect.gen(function* () {
@@ -76,7 +71,7 @@ export const observeLiveResidentReads = Effect.fn("observeLiveResidentReads")(fu
                 jsonrpc: "2.0",
                 id,
                 method,
-                params: { ...params, _meta: metadata(input) }
+                params: { ...params, ...liveReadMetadata(input) }
               })
               yield* probeIo(
                 "send",
@@ -101,9 +96,15 @@ export const observeLiveResidentReads = Effect.fn("observeLiveResidentReads")(fu
               Effect.timeout(LIVE_PROBE_IO_BOUND),
               Effect.mapError((error) => (error instanceof LiveReadProbeError ? error : refuse("response")))
             )
-          yield* Schema.decodeUnknownEffect(NativeDiscoverySchema)(
-            yield* request(DISCOVER_ID, "server/discover", {})
-          ).pipe(Effect.mapError(() => refuse("discover")))
+          yield* discoverLiveReadProtocol(input, request, (frame) =>
+            probeIo(
+              "send",
+              () =>
+                new Promise<void>((resolve, reject) =>
+                  owned.process.stdin.write(`${frame}\n`, (error) => (error ? reject(error) : resolve()))
+                )
+            )
+          )
           const identity:
             | Pick<LiveReadHostReceipt, "mode" | "generation">
             | Pick<ManagedLiveReadHostReceipt, "mode" | "generation" | "backendProcessId"> =

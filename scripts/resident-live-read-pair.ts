@@ -3,6 +3,7 @@ import { Effect, Result, Schema } from "effect"
 
 import { readResidentAttachmentEnvelope } from "../src/resident/attachment-file.js"
 import {
+  resolveLiveReadProtocol,
   type LiveProbeEnvironment,
   type LiveReadPairInput,
   LiveReadHostInput,
@@ -70,6 +71,7 @@ export const observeLiveReadPair = Effect.fn("observeLiveReadPair")(function* (
   const reader = (host: LiveReadHostInput["host"], target: LiveReadHostInput["target"]) =>
     Schema.encodeEffect(Schema.fromJsonString(LiveReadHostInput))({
       bundle: input.bundle,
+      protocol: resolveLiveReadProtocol(input.protocol),
       attachment: input.attachment,
       target,
       host,
@@ -106,7 +108,7 @@ export const observeLiveReadPair = Effect.fn("observeLiveReadPair")(function* (
         }
         return LiveReadPairReceipt.make({
           mode: "manual",
-          protocol: "2026-07-28",
+          protocol: resolveLiveReadProtocol(input.protocol),
           readers: [a, b],
           parentExits: [0, 0],
           backendRetirement: "not-requested"

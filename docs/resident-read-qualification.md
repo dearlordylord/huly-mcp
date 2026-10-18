@@ -5,7 +5,7 @@ resident implementation slices are integrated. Scoped manual and managed runs
 passed against local Huly on Linux; see the [campaign report](implementation/resident-live-linux-2026-10-18.md)
 for the exact candidate, preserved failed attempt and remaining qualification.
 The probe uses two Node reader processes and two packaged stdio adapters. It
-checks modern MCP discovery, the native tool catalog, resource templates, and
+checks modern MCP discovery or legacy initialization, the native tool catalog, resource templates, and
 first and continued `get_project` calls with colliding IDs across readers.
 
 ## Prepare the backend and fixture projects
@@ -35,6 +35,10 @@ pnpm exec esbuild scripts/integration-resident-read-pair.ts \
   --outfile=dist/resident-read-probe.cjs
 ```
 
+Keep the compiled probe under this checkout so its external runtime dependencies
+resolve through the Linux-local node_modules. Copying only the bundle to an
+unrelated temporary directory does not provide those dependencies.
+
 Create a private `read-pair-input.json` file with absolute candidate and
 attachment paths and the selected fixture labels:
 
@@ -48,6 +52,12 @@ attachment paths and the selected fixture labels:
   ]
 }
 ```
+
+The optional input field `"protocol": "2025-06-18"` selects legacy initialization
+and its initialized notification. Omit it or select `"2026-07-28"` for modern
+discovery. Both readers use the selection, and the pair receipt records it.
+Require the receipt protocol to match the requested version. The same selection
+applies to the managed mode below.
 
 Run the compiled probe directly under the existing Linux child subreaper:
 

@@ -67,10 +67,10 @@ describe.skipIf(process.platform !== "linux")("managed live-read campaign probe"
     if (!preserveFailedBundle) await bundle?.cleanup()
   })
 
-  it(
-    "automatically shares one real packaged backend for two parent readers and joins its idle exit",
+  it.each(["2026-07-28", "2025-06-18"])(
+    "shares a packaged backend for two %s parent readers and joins its idle exit",
     { timeout: PROCESS_BOUND },
-    async () =>
+    async (protocol) =>
       withRegistryDirectory(async (directory) => {
         const firstWave = Effect.runSync(Deferred.make<void>())
         let arrivals = 0
@@ -83,7 +83,12 @@ describe.skipIf(process.platform !== "linux")("managed live-read campaign probe"
           }
         })
         try {
-          const input = Schema.decodeUnknownSync(ManagedLiveReadPairInput)({ bundle: bundle.path, directory, targets })
+          const input = Schema.decodeUnknownSync(ManagedLiveReadPairInput)({
+            bundle: bundle.path,
+            directory,
+            targets,
+            protocol
+          })
           const result = await runFile(
             "python3",
             [
@@ -100,6 +105,7 @@ describe.skipIf(process.platform !== "linux")("managed live-read campaign probe"
             }
           )
           const receipt = Schema.decodeUnknownSync(Schema.fromJsonString(ManagedLiveReadPairReceipt))(result.stdout)
+          expect(receipt.protocol).toBe(protocol)
           expect(receipt.readers.map((reader) => reader.target)).toEqual(targets)
           expect(receipt.readers[0].generation).toBe(receipt.readers[1].generation)
           expect(receipt.readers[0].backendProcessId).toBe(receipt.backendExit.processId)

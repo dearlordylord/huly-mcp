@@ -5,6 +5,11 @@ import { ResidentPackagePath, ResidentRegistryEnvelope } from "../src/resident/m
 import { ResidentDirectory, ResidentFilePath } from "../src/resident/protected-path.js"
 import { ResidentTlsIdentity } from "../src/resident/tls-channel.js"
 
+export const LiveReadProtocol = Schema.Literals(["2026-07-28", "2025-06-18"])
+export type LiveReadProtocol = Schema.Schema.Type<typeof LiveReadProtocol>
+export const resolveLiveReadProtocol = (protocol: LiveReadProtocol | undefined): LiveReadProtocol =>
+  protocol ?? "2026-07-28"
+export const LiveReadProtocolInput = Schema.optionalKey(LiveReadProtocol)
 export const LIVE_FIRST_READ_ID = 41
 export const LIVE_CONTINUED_READ_ID = 42
 export const LIVE_PROBE_IO_BOUND = "5 seconds"
@@ -20,11 +25,13 @@ export const LiveReadTargets = Schema.Tuple([LiveProjectTarget, LiveProjectTarge
   )
 )
 export const LiveReadPairInput = Schema.Struct({
+  protocol: LiveReadProtocolInput,
   bundle: ResidentPackagePath,
   attachment: ResidentFilePath,
   targets: LiveReadTargets
 })
 export const ManagedLiveReadPairInput = Schema.Struct({
+  protocol: LiveReadProtocolInput,
   bundle: ResidentPackagePath,
   directory: ResidentDirectory,
   targets: LiveReadTargets
@@ -32,6 +39,7 @@ export const ManagedLiveReadPairInput = Schema.Struct({
 export type ManagedLiveReadPairInput = Schema.Schema.Type<typeof ManagedLiveReadPairInput>
 export type LiveReadPairInput = Schema.Schema.Type<typeof LiveReadPairInput>
 export const LiveReadHostInput = Schema.Struct({
+  protocol: LiveReadProtocolInput,
   bundle: ResidentPackagePath,
   attachment: ResidentFilePath,
   target: LiveProjectTarget,
@@ -40,6 +48,7 @@ export const LiveReadHostInput = Schema.Struct({
 })
 export type LiveReadHostInput = Schema.Schema.Type<typeof LiveReadHostInput>
 export const ManagedLiveReadHostInput = Schema.Struct({
+  protocol: LiveReadProtocolInput,
   bundle: LiveReadHostInput.fields.bundle,
   directory: ResidentDirectory,
   target: LiveProjectTarget,
@@ -68,14 +77,14 @@ export type ManagedLiveReadHostReceipt = Schema.Schema.Type<typeof ManagedLiveRe
 export const AnyLiveReadHostReceipt = Schema.Union([LiveReadHostReceipt, ManagedLiveReadHostReceipt])
 export const LiveReadPairReceipt = Schema.Struct({
   mode: Schema.Literal("manual"),
-  protocol: Schema.Literal("2026-07-28"),
+  protocol: LiveReadProtocol,
   readers: Schema.Tuple([LiveReadHostReceipt, LiveReadHostReceipt]),
   parentExits: Schema.Tuple([Schema.Literal(0), Schema.Literal(0)]),
   backendRetirement: Schema.Literal("not-requested")
 })
 export const ManagedLiveReadPairReceipt = Schema.Struct({
   mode: Schema.Literal("managed"),
-  protocol: Schema.Literal("2026-07-28"),
+  protocol: LiveReadProtocol,
   readers: Schema.Tuple([ManagedLiveReadHostReceipt, ManagedLiveReadHostReceipt]),
   parentExits: LiveReadPairReceipt.fields.parentExits,
   backendRetirement: Schema.Literal("confirmed"),

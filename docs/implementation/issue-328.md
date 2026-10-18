@@ -28,10 +28,10 @@ evidence leaves the criterion pending.
 | 1. Complete contract, coherent final gate and local Huly | Candidate `2f19c614` passes the full 5742-test gate and the [scoped local-Huly read schedules](resident-live-linux-2026-10-18.md). All five stock movement suites and the coordinator pass; see the [campaign report](resident-movement-linux-2026-10-18.md). Complete-contract qualification remains pending. |
 | 2. Native lifecycle/concurrency/platform scenarios | Linux normal stop, two-caller replacement and version coexistence have process receipts. Live Huly now covers two-reader idle retirement and a later fresh managed generation. Earlier ten-parent failures remain preserved. Complete Linux schedules and native macOS remain pending. |
 | 3. Unsupported Windows startup | Native Windows work is excluded by the 2026-10-18 user decision. Unsupported resident startup remains refused. |
-| 4. Auth/profile/policy/protocol behavior | Synthetic fixtures plus live token/password/saved-profile reads now have scoped evidence, including same-reader auth source and launch receipts. A disjoint native live-policy diagnostic passes; its earlier allowed-call timeout remains unexplained. Complete policy/protocol/auth matrices remain pending. |
+| 4. Auth/profile/policy/protocol behavior | Synthetic fixtures plus live token/password/saved-profile reads now have scoped evidence, including same-reader auth source and launch receipts. A disjoint native live-policy diagnostic passes; its earlier allowed-call timeout remains unexplained. The maintained probe and actual local-Huly separate-parent legacy2025-06-18 reads also pass (section below). Complete policy/protocol/auth matrices remain pending. |
 | 5. Actual host discovery and continued reads | Actual Codex discovery/two context reads and actual Claude Code discovery/two context calls are recorded below. The latter use a local deterministic model endpoint. SDK-driven separate parents, actual Claude Code and actual Codex app-server now pass scoped local-Huly project reads; complete catalog/resource/lifecycle qualification remains pending. |
-| 6. Alternating fresh-process comparisons | Pending for standalone, managed and direct HTTP with one/ten clients and declared cache boundaries. The read campaign is not a performance comparison. |
-| 7. Total RSS/CPU/completion rates | Raw whole-tree samples accompany the live read campaign; aggregate analysis and the comparison matrix remain pending. No prior direct-HTTP memory figure is adopted as a managed-stdio budget. Include every actual adapter, launcher and backend. |
+| 6. Alternating fresh-process comparisons | [All30 Linux attempts](resident-comparison-linux-2026-10-18.md) completed:28 verified,2 failed,0unexecuted. Five attempts per mode/client-count cell with explicit cache boundaries. Failed standalone ten-client attempts remain in the denominator; no general winner or complete qualification is claimed. |
+| 7. Total RSS/CPU/completion rates | The [30-attempt report](resident-comparison-linux-2026-10-18.md) publishes medians/ranges and completion/timeout counts, all observed product descendants in simultaneous summed RSS, and kernel/waited-child CPU for28complete attempts. Both failed attempts have incomplete resource attribution. Single stable limiter and portable maintained campaign tooling remain pending; no prior HTTP figure is adopted as a managed budget. |
 | 8. Adversarial routing/backpressure/no replay | Existing scoped routing/request-loss evidence and the [operation-stop fault schedules](issue-327.md#stop-during-an-operation-and-failed-cleanup-2026-10-17) prove scoped local behavior. The latter use an embedded registry and one filesystem write with explicit host cancellation. The [detectable namespace-loss schedules](issue-327.md#refuse-detectable-ownership-state-loss-before-selection-2026-10-17) and [locator-content schedules](issue-327.md#parse-and-compare-current-locator-contents-2026-10-17) cover seven local metadata faults with a live existing caller. A [live held-query response loss](issue-327.md#live-huly-held-query-response-and-exact-backend-death--2026-10-18) now proves scoped uncertainty and fresh refusal after exact owned backend death. A [live rename response-loss case](issue-327.md#live-project-rename-committed-before-lost-response--2026-10-18) additionally checks one mutation, fresh refusal and explicit operation-specific reconciliation. Complete fault qualification remains pending. |
 | 9. Quint and aligned oracle scenarios | The newer lifecycle model is type-only awaiting its recorded sketch checkpoint. Full lifecycle logic, checks and observed scenario alignment remain pending. |
 | 10. Per-platform receipts and cleanup | Linux receipts include source/artifact evidence and owned exit checks. The live read report adds actual Linux backend exits and empty namespaces, preserving the failed first manual expectation. Complete native platform and cleanup suffixes remain pending. |
@@ -1290,3 +1290,55 @@ there is no general performance winner, durable budget, complete comparison
 qualification or complete delivery claim. Portable maintained campaign tooling,
 independent final report review, native macOS, model/oracle alignment and all
 remaining contract matrices are pending. No runtime source changed.
+
+### Legacy managed live read pair — 2026-10-18
+
+The maintained read-pair probe now accepts schema-restricted protocol selection:
+modern2026-07-28 remains the default; legacy2025-06-18 negotiates `initialize`,
+requires that exact reply version and sends `notifications/initialized` before
+catalog/resources/reads. Both distinct reader parents receive the selection.
+The real managed process test runs both protocols with four exact project reads,
+one shared backend, overlapping first reads and joined retirement; all8 focused
+manual/managed probe tests pass. Production runtime behavior is unchanged.
+
+Private live root `/tmp/resident-live-legacy-qualified-k3fdvynd`: first preparation
+failed at probe module loading because its temporary directory lacked external
+Huly dependency resolution. Supervisor terminal1, no product server or read
+receipt; original empty receipt/diagnostic/resource files are preserved. A
+Linux-local node_modules link corrected that environment error for distinct
+attempt-2. Its actual local-Huly legacy run passed: four exact first/continued
+project results through two separate parents/adapters, one generation/backend,
+both parents/adapters exit0, kernel-correlated backend exit0, empty private state,
+supervisor exit0 and empty diagnostics. No Huly writes occur. `verify.mts` parses
+input/receipt with Effect schemas and independently checks exact targets,
+process separation, generation/owner correlation and cleanup. `live-manifest.json`
+freezes20 source/live bindings, excluding the active full gate log.
+
+This is token-authenticated native-tool legacy read evidence on Linux, not a full
+protocol/client-identity/capability/authentication/platform matrix. Full gate and
+final review of the probe increment remain pending; initial Standards review
+requested central protocol defaulting and schema-derived request-ID typing.
+Spec review found no findings. No complete ticket or delivery claim follows.
+
+
+The subsequent gate for direct protocol tests passed all484files/5748tests but
+still missed function coverage at98.99%. Its coverage report identified the
+new helper's unused error mapper for encoding the internally fixed initialized
+notification. Encoding that typed internal constant now treats failure as a
+defect via Effect.orDie; actual transport send failures remain typed. The
+legacy test uses one ordered request/negotiated/notification event trace, closing
+the final sequencing review finding. Five focused tests and lint pass; both
+reviewers report no actionable findings. The new ordered-final full gate remains
+pending. Both failed coverage gates remain preserved without threshold changes.
+An independent terminal-resource parser additionally confirms supervisor exit0
+for the actual live attempt-2; its successful receipt alone is not the proof.
+
+Final corrected-source full gate passed (session34504 terminal0):484files,
+5748tests,1375TypeScript/Effectfiles with0errors/warnings. Coverage is99.45%
+statements,99%branches,99.01%functions,99.55%lines; output200/300. Log
+`check-all-ordered-final.log` SHA-256
+`412c5afb19dad2f98a6f2152aedf5eafaa9eb9a2690edc35982b7a87aa4a3671`.
+`gate-proof.json` binds all7finalhelper/test source hashes and unchanged MCP/CLI
+artifacts; `terminal-manifest.json` freezes49evidence files, preserving the
+preparation failure, both failed coverage gates and exact pre-review/final
+sources. All broader native/platform/model/full-contract limits above remain.
