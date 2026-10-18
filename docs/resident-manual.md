@@ -60,6 +60,11 @@ Close an adapter to interrupt its owned requests. Stop the backend with SIGTERM
 to retire its listener and remove its owned descriptor. After a restart, select
 the new generation's printed path in each adapter launch configuration.
 
+The pinned Effect runtime returns exit code 130 for interruption-only shutdown,
+including SIGTERM. That code differs from a successful managed idle exit (0).
+Confirm the owned exit and descriptor cleanup separately; the code alone is not
+a retirement receipt.
+
 Do not replace or edit a live generation's descriptor. Automatic selection,
 crash recovery and idle shutdown are not implemented in this manual path.
 The earlier experimental `MCP_STDIO_BACKEND_URL` and adapter `MCP_AUTH_TOKEN`

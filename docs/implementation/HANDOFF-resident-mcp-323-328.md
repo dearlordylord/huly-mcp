@@ -48,6 +48,17 @@ live Huly. Native macOS, live, model/oracle and performance qualification remain
 
 ## Latest resumed increment
 
+The unchanged `2f19c614` candidate now has [live local-Huly read evidence](resident-live-linux-2026-10-18.md):
+manual and managed two-reader project calls, confirmed owned cleanup and a fresh
+managed generation after the original one's observed normal retirement. The
+private campaign retains a failed first manual driver expectation; the separate
+passing attempt records the pinned Runtime SIGTERM interruption exit 130 rather
+than assuming exit 0. No Huly mutations or recipient messages were sent. The
+scope is Linux aarch64, Node 24.20.0, complete environment selection and SDK-driven
+parents. Actual-host Huly reads, full auth/policy/protocol coverage, live faults,
+macOS, model alignment, movements and resource comparisons remain pending.
+Raw resource observations supply no performance claim. All six issues remain open.
+
 The [SDK write/drain fault increment](issue-327.md#sdk-mutation-loss-and-death-during-observed-drain--2026-10-18)
 now commits a disposable project rename once through the actual SDK, then kills
 the owned backend before the REST response. Drain additionally requires an
