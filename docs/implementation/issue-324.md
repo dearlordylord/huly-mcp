@@ -1,5 +1,10 @@
 # Issue 324: managed resident startup
 
+## Scope amendment — 2026-10-18
+
+The user excluded Windows resident support because substantial implementation and native qualification remained. Linux and macOS remain in scope. Windows resident startup continues to refuse unsupported execution; the unused native security component and its CI workflow are removed. Historical Windows investigation below is superseded, not pending delivery work. All other requirements remain, and #322–328 remain open.
+
+
 Status: incomplete. The selected design is recorded in
 [Managed resident ownership](resident-managed-design.md).
 

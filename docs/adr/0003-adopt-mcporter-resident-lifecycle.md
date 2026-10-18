@@ -109,7 +109,9 @@ for that schedule. Retain ordinary healthy-backend isolation tests unchanged.
 Quint should represent callers, backends, generation-owned claims/receipts,
 attachments, requests and explicit retirement evidence. It need not model a
 mandatory guardian, restricted worker or operation journal. Oracle invocation
-history remains verification-only state. Native macOS/Linux/Windows and final
-live-Huly evidence remain required; this reference supplies patterns, not those
-results. No deadline, coverage threshold, inventory or platform requirement is
-relaxed by this decision.
+history remains verification-only state. Native macOS/Linux and final live-Huly
+evidence remain required; this reference supplies patterns, not those results.
+No deadline, coverage threshold or concurrency inventory is relaxed by this
+lifecycle decision. The subsequent 2026-10-18 user decision excludes Windows
+resident implementation and qualification because substantial work remained;
+unsupported Windows resident startup stays refused.

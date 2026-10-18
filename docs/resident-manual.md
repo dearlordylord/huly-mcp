@@ -74,7 +74,7 @@ uses `$XDG_STATE_HOME/huly-mcp/resident` on Linux, falling back to
 `$HOME/.local/state/huly-mcp/resident` when the XDG value is absent, empty or
 relative. This follows the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir/latest/).
 On macOS the location is `$HOME/Library/Application Support/huly-mcp/resident`.
-Windows ownership protection remains unqualified and is refused.
+Windows resident support is out of scope and startup is refused.
 
 The selected directory must pass the existing current-user ownership and private
 permission checks. An explicit `MCP_RESIDENT_STATE_DIRECTORY` still selects a
@@ -116,7 +116,7 @@ The Linux coexistence fixture builds two package layouts from this candidate
 with distinct implementation versions. It checks separate-parent attachment,
 generation isolation and independent retirement. This is compatibility evidence
 for that version boundary, not certification of arbitrary released-version
-upgrades, package-manager installation or native macOS/Windows behavior.
+upgrades, package-manager installation or native macOS behavior. Windows resident support is out of scope.
 
 ## Inspect managed ownership state
 
@@ -153,7 +153,7 @@ interpret opaque implementation-specific attachment payloads. It cannot
 authorize killing a PID, deleting ownership state or replaying an unconfirmed
 operation. Verified local retirement and safe recovery remain separate work;
 this command supplies no force-stop or reset action. Linux executable evidence
-exists for this path; native macOS and Windows qualification remains pending.
+exists for this path; native macOS qualification remains pending. Windows resident support is out of scope.
 
 ## Request a managed generation stop
 

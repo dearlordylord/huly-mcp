@@ -71,7 +71,10 @@ const main = async () => {
     await phase("observing")
     const tools = await client.listTools(undefined, { timeout: RESPONSE_BOUND })
     const resources = await client.listResourceTemplates(undefined, { timeout: RESPONSE_BOUND })
-    const context = await client.callTool({ name: "get_huly_context", arguments: {} }, { timeout: RESPONSE_BOUND })
+    const request = { name: "get_huly_context", arguments: {} }
+    const toolDefinition = tools.tools.find((tool) => tool.name === request.name)
+    if (toolDefinition === undefined) throw new Error("Context tool is absent from the actual catalog")
+    const context = await client.callTool(request, { timeout: RESPONSE_BOUND, toolDefinition })
     const result = Schema.decodeUnknownSync(Schema.Struct({ result: GetHulyContextResultSchema }))(
       context.structuredContent
     ).result

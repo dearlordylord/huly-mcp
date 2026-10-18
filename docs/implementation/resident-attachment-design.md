@@ -150,7 +150,8 @@ These scripts report observations; they are not the native MCP qualification.
 
 Packaged native factory qualification, server-side ticket-bypass refusal, post-verification
 cancellation, protected state, attachment/session release, Quint alignment, live
-Huly, supported Node versions and native macOS/Windows behavior remain pending.
+Huly, supported Node versions and native macOS behavior remain pending. Windows
+resident support is excluded by the 2026-10-18 user decision.
 No issue is complete on the strength of these probes or design reviews.
 
 The source primitive now exists in `src/resident/tls-channel.ts`. It uses a

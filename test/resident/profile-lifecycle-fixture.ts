@@ -84,9 +84,13 @@ export const exercisePackagedProfileLifecycle = async (bundle: string, attachmen
     await save(original, base.HULY_TOKEN)
     await existing.client.connect(existing.transport, { timeout: RESPONSE_BOUND })
     const catalog = await existing.client.listTools(undefined, { timeout: RESPONSE_BOUND })
-    const read = () =>
-      existing.client.callTool({ name: "get_huly_context", arguments: {} }, { timeout: RESPONSE_BOUND })
-    const context = await read()
+    const read = (tools: typeof catalog) => {
+      const request = { name: "get_huly_context", arguments: {} }
+      const toolDefinition = tools.tools.find((tool) => tool.name === request.name)
+      if (toolDefinition === undefined) throw new Error("Context tool is absent from the actual catalog")
+      return existing.client.callTool(request, { timeout: RESPONSE_BOUND, toolDefinition })
+    }
+    const context = await read(catalog)
     expect(context.isError ?? false).toBe(false)
     const refused = async (diagnostic = ATTACHMENT_REFUSAL, profile = "selected") => {
       const pending = runFile(process.execPath, [bundle], {
@@ -111,8 +115,9 @@ export const exercisePackagedProfileLifecycle = async (bundle: string, attachmen
       expect(parsed.success.stderr.includes("rotated-private-fixture-token")).toBe(false)
       expect(parsed.success.stderr.includes("other-private-fixture-token")).toBe(false)
       expect(parsed.success.stderr.includes(base.HULY_TOKEN)).toBe(false)
-      expect(await existing.client.listTools(undefined, { timeout: RESPONSE_BOUND })).toEqual(catalog)
-      expect(await read()).toEqual(context)
+      const currentCatalog = await existing.client.listTools(undefined, { timeout: RESPONSE_BOUND })
+      expect(currentCatalog).toEqual(catalog)
+      expect(await read(currentCatalog)).toEqual(context)
     }
     await save(original, "rotated-private-fixture-token")
     await refused()

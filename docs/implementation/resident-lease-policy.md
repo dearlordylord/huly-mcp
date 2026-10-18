@@ -61,6 +61,7 @@ This is a calibration, not a comparative speedup or platform qualification.
 The 30-second lease leaves more than eight times the largest observed whole
 parent lifetime; five-second renewal matches the existing control budget. This
 margin is provisional. The calibration excludes full Huly acquisition, writes,
-stalled target cleanup, suspended processes and native macOS/Windows. TestClock
+stalled target cleanup, suspended processes and native macOS. Windows resident
+support is excluded by the 2026-10-18 user decision. TestClock
 tests, lost-reply/paused/dead process fixtures, local Huly and final platform and
 resource qualification remain required before accepting #326 or #328.

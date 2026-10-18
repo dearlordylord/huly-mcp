@@ -1,5 +1,10 @@
 # Issue 328 qualification evidence
 
+## Scope amendment — 2026-10-18
+
+The user excluded Windows resident support because substantial implementation and native qualification remained. Linux and macOS remain in scope. Windows resident startup continues to refuse unsupported execution; the unused native security component and its CI workflow are removed. Historical Windows investigation below is superseded, not pending delivery work. All other requirements remain, and #322–328 remain open.
+
+
 Status: incomplete. All six issues #323–328 and parent #322 remain open.
 The live #328 body was read on 2026-10-17; its last update was
 2026-10-17T21:46:31Z. This report does not replace its acceptance criteria.
@@ -21,8 +26,8 @@ evidence leaves the criterion pending.
 | Criterion | Current evidence and remaining work |
 | --- | --- |
 | 1. Complete contract, coherent final gate and local Huly | Earlier gates and focused increments are recorded in #323–327 reports. The final coherent candidate gate and deferred live-Huly campaign remain pending. |
-| 2. Native lifecycle/concurrency/platform scenarios | Linux normal stop, two-caller replacement and version coexistence have process receipts. The ten-parent race has preserved inconsistent results. Complete Linux schedules and native macOS/Windows remain pending. |
-| 3. Windows detachment, ACL and cleanup | Pending. Current POSIX ownership protection refuses unsupported native Windows execution; that is not Windows implementation or qualification. |
+| 2. Native lifecycle/concurrency/platform scenarios | Linux normal stop, two-caller replacement and version coexistence have process receipts. The ten-parent race has preserved inconsistent results. Complete Linux schedules and native macOS remain pending. |
+| 3. Windows detachment, ACL and cleanup | Removed from scope by the 2026-10-18 user decision. Unsupported resident startup remains refused. |
 | 4. Auth/profile/policy/protocol behavior | Synthetic environment-token workspaces and actual catalog/context exchange support scoped fixtures. Complete supported profile/env/token/password, policy and modern/legacy qualification remains pending. |
 | 5. Actual host discovery and continued reads | Actual Codex discovery/two context reads and actual Claude Code discovery/two context calls are recorded below. The latter use a local deterministic model endpoint. Complete host catalog/resource, Huly-read and lifecycle qualification remains pending. |
 | 6. Alternating fresh-process comparisons | Pending for standalone, managed and direct HTTP with one/ten clients and declared cache boundaries. |
@@ -718,3 +723,64 @@ Source remained fixed during this gate; subsequent edits only record the result.
 The additional input-refusal cases also received a fresh clean Standards review.
 This proves the project gate for this candidate, not the pending complete live,
 native-platform, model or performance qualification.
+
+
+## Repeated catalog validation in process clients — 2026-10-18
+
+After the Windows scope removal, the unchanged runtime candidate failed the full
+`GOMAXPROCS=2 pnpm check-all` process checks: operator stop, damaged ownership
+state and saved-profile changes exceeded their existing scenario deadlines.
+The ten-parent case passed. In total, 476 files / 5729 tests passed and three
+files / three tests failed; no passing aggregate coverage gate was established.
+Log `/tmp/resident-linux-macos-scope-check-all.log`, SHA-256
+`73d35ae3cf3b396266f7e8af6c2c116fb7bba7157c786c09e53155461a7bfe71`.
+A focused run of the three files, without coverage, reproduced operator-stop
+and state-loss deadline failures; the profile file passed. Its log is
+`/tmp/resident-three-process-failures-focused.log`, SHA-256
+`056a0083fbbd85a65b85e96139ee4d388b5b0069d3cb26b41be2b031fbc49735`.
+
+Scratch phase instrumentation and a separate CPU-profiled owned host identify
+repeated client-side schema compilation during `get_huly_context`. The installed
+MCP SDK's `ClientResponseCache.outputValidator` rebuilds validators for every
+listed tool after the catalog stamp changes. Both fixtures deliberately refresh
+the complete catalog before each context read. The profile retains samples
+inside `_compileOutputValidator`; this diagnoses client work and does not prove
+a production backend performance regression. Diagnostic files are retained at
+`/tmp/resident-process-phase-diagnostic`, including the profile with SHA-256
+`a2c9c2aa52cbc846f8e7b16fbd5778233af974b0c56f5e9480e3c21bb82125e2`.
+The first diagnostic coordinator build failed because its guarded source match
+used the wrong parameter name; the corrected diagnostic ran successfully.
+No diagnostic instrumentation was added to production or committed fixtures.
+
+The fixtures now use the SDK's supported `callTool` `toolDefinition` option with
+the exact context-tool definition from the latest real catalog. Absence fails the
+fixture. The SDK still compiles and checks that tool's advertised output schema;
+all catalog/resource requests, equality checks, context calls, process ownership
+checks and deadlines remain. No production runtime logic changed. These synthetic
+SDK clients are not substitutes for actual Claude/Codex qualification or the
+required adapter-inclusive performance campaign.
+
+The corrected focused run passes four files / eleven tests, including the
+unchanged ten-parent case and every case in the three previously failing files.
+Log `/tmp/resident-target-definition-process-check.log`. Fresh read-only Standards
+and Spec reviews have no actionable findings. This is a scoped pass; the full
+aggregate gate and the remaining six-ticket qualification are assessed separately.
+
+
+The fresh complete gate now passes: 479 files / 5732 tests; statements 99.45%
+(29550/29713), branches 99% (12463/12588), functions 99% (7996/8076), lines
+99.55% (27159/27280). Command: `GOMAXPROCS=2 pnpm check-all`; log
+`/tmp/resident-target-definition-check-all.log`, SHA-256
+`336e0b22cc53f4cb28d2ccdd6ea7e272fb7ab67225b3b06bd39bdd1c6954a3be`.
+Focused-run log SHA-256:
+`67a7ea5a328389fed5ce12f99227bae670669d4ca48971d37b0a3d34be453148`.
+Frozen artifacts and the gate log are copied at `/tmp/resident-target-definition-gate-_jdu9f5c`. MCP SHA-256 is
+`7cc7b8c300354694118b08e2b39248e5ea08e1de1df7bae2ce56ecf7a43c8a12`;
+CLI SHA-256 is
+`c957044a36f2559fbdf5230a0f37860911af276f800b1a37933539d7298f5697`.
+All diagnostics, thresholds and existing tests remain. No speedup or root cause
+for the older ten-parent connection failures is claimed from this gate.
+The unused Windows native component/workflow are removed under the amended
+Linux/macOS scope. Live Huly, native macOS and remaining contract qualification
+are still pending; #322–328 remain open. Prepared idle/cleanup schedule ideas
+were not added or executed during this increment and supply no evidence.

@@ -1,10 +1,30 @@
 # Resident MCP #323–#328 implementation handoff
 
+## Scope amendment — 2026-10-18
+
+The user excluded Windows resident support because substantial implementation and native qualification remained. Linux and macOS remain in scope. Windows resident startup continues to refuse unsupported execution; the unused native security component and its CI workflow are removed. Historical Windows investigation below is superseded, not pending delivery work. All other requirements remain, and #322–328 remain open.
+
+
 The user resumed implementation on 2026-10-17 after the pause checkpoint
 `be8855e9`, following the latest #328 comment. All six issues remain incomplete
 and open.
 This document supersedes the early Darwin checkpoint for current implementation
 state. It does not change the authoritative requirements in GitHub #322–#328.
+
+## Current checkpoint — 2026-10-18
+
+Windows resident work is canceled under the scope amendment above. The unused
+native source and its dedicated CI workflow are removed; runtime startup remains
+unsupported there. Linux/macOS and all other qualification requirements remain.
+
+The latest full gate passes 479 files / 5732 tests at the unchanged 99% coverage
+thresholds. Two synthetic SDK clients now pass the actual freshly listed context
+tool definition to `callTool`, retaining target output validation without rebuilding
+validators for every unused catalog entry. The preceding gate/focused failures,
+CPU diagnosis, corrected process checks and frozen artifact hashes are recorded
+in [the current report](issue-328.md#repeated-catalog-validation-in-process-clients--2026-10-18).
+This does not certify actual host performance, live Huly or native macOS. The
+older milestones below remain historical and all six delivery issues stay open.
 
 ## Latest resumed increment
 
@@ -143,8 +163,7 @@ state. Existing separate-parent concurrency cases and healthy-backend isolation
 remain required. A shared backend crash may interrupt all callers.
 
 The new Quint lifecycle model remains a type-only sketch awaiting explicit user
-approval. Do not write init/actions/step until that approval. Native macOS and
-Windows execution availability is also unresolved. No other OS's pass substitutes
+approval. Do not write init/actions/step until that approval. Native macOS execution availability is also unresolved. Windows resident support is out of scope. No other OS's pass substitutes
 for native evidence. Do not repeatedly ask the same pending questions.
 
 Remaining qualification includes actual shared Huly model/read/write behavior,
