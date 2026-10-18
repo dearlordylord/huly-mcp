@@ -490,3 +490,39 @@ retained separately under `/tmp/resident-managed-profile-rotation.log`,
 `/tmp/resident-managed-profile-lifecycle.log` and
 `/tmp/resident-managed-profile-lifecycle-verified.log`; only the final raw-process
 schedule establishes the documented normal refusal exits and secret checks.
+
+## Managed tool-policy catalog and invocation isolation
+
+A new Linux packaged scenario uses identical environment-backed Huly authority
+with two different native `TOOLS` scopes: `list_projects` and `list_issues`.
+Each real adapter must discover its allowed tool and omit the other one. Each
+then actually invokes the forbidden name and must receive the specific unknown-
+tool refusal, rather than any generic error. Parsed local context establishes
+distinct backend ports, and the namespace must contain exactly two generations.
+Both actual owned backends must exit with code 0 and remove private state.
+
+The successful run exercised the tool-error-result branch for both refusals;
+the accepted protocol-error alternative is constrained to the installed Effect
+`ToolNotFound` contract but was not exercised by this run. This is modern-protocol
+native exposure and exact `TOOLS` filtering, not complete TOOLSETS/proxy/strict-
+output or cross-host qualification. No allowed Huly data operation was dispatched;
+the successful context calls require no remote Huly authentication.
+
+The first two attempts failed during the first client connection, before catalog
+or invocation checks. They remain in `/tmp/resident-managed-policy.log` and
+`/tmp/resident-managed-policy-diagnostic.log`, with retained failed fixture state
+and isolated bundles. Host load was high, but no causal diagnosis is established.
+The subsequent run retained all original startup/response, 25-second supervision
+and seven-second retirement bounds; no retries were introduced into the scenario.
+It passes one file/test in `/tmp/resident-managed-policy-verified.log`, SHA-256
+`05f9f8e2c5ccf470e5fbe4f8f8ea3c116d2530d9fcf0d2f0fe8369b90824a4fc`.
+
+Receipt `/tmp/resident-managed-policy-qSSa2Q.receipt.json`, SHA-256
+`975368aa3d9d9801767bf4eef2613001ea9d027ec78d2f101f836796573881cc`,
+records distinct ports, both refusals and two successful kernel-owned exits.
+The phases log has SHA-256
+`145e437b9b76d447d238fc57b3da5110a23abe7e755b8f1682661f6bb9ac8b00`.
+Successful fixture state and its isolated bundle were removed; private evidence
+remains. TypeScript/Effect diagnostics, focused lint and read-only Standards/Spec
+reviews pass. No production code changed. The inconsistent connection attempts,
+full combined gate, real Huly and remaining platform/policy coverage stay pending.
