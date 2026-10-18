@@ -291,7 +291,7 @@ const successfulInvokeResponse = (toolName: ToolName, response: SuccessfulToolCa
   const warnings = response.structuredContent?.warnings ?? []
   const result = {
     toolName,
-    result: response.structuredContent?.result ?? response.content,
+    result: response.structuredContent === undefined ? response.content : response.structuredContent.result,
     ...(warnings.length === 0 ? {} : { warnings })
   }
   return response.imageContent === undefined

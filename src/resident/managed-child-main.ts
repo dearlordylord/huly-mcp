@@ -2,7 +2,6 @@ import "../polyfills.js"
 import { NodeRuntime } from "@effect/platform-node"
 import { Config, Effect, Redacted } from "effect"
 
-import { runConfiguredResidentServer } from "../runtime/server-startup.js"
 import { VERSION } from "../version.js"
 import { encodeChildReply } from "./bootstrap-codec.js"
 import { awaitChildAuthorization, type ChildAuthorizationPort } from "./child-authorization.js"
@@ -63,13 +62,16 @@ const main = Effect.gen(function* () {
     existing: (file) => notify(file),
     absent: (ownership) =>
       runOwnedGeneration(ownership, (ready) =>
-        runConfiguredResidentServer({
-          capture: start.capture,
-          directory: start.directory,
-          environment,
-          lifetime: "managed",
-          startup,
-          report: (file) => ready(file).pipe(Effect.andThen(notify(file)))
+        Effect.gen(function* () {
+          const { runConfiguredResidentServer } = yield* Effect.promise(() => import("../runtime/server-startup.js"))
+          return yield* runConfiguredResidentServer({
+            capture: start.capture,
+            directory: start.directory,
+            environment,
+            lifetime: "managed",
+            startup,
+            report: (file) => ready(file).pipe(Effect.andThen(notify(file)))
+          })
         })
       )
   })

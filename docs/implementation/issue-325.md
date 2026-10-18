@@ -245,3 +245,8 @@ This pass does not establish that the intermittent launch-race failure is fixed.
 These are explicit startup and comparison checks. Automatic ownership/startup,
 complete profile lifecycle qualification, live Huly sharing and final native OS
 and resource certification remain pending. No issue is complete.
+
+
+## Preserve explicit null proxy results
+
+The proxy result wrapper used nullish fallback to text content, replacing an explicit structured `null` result with a text-block array. It now falls back only when structured content is absent. The scripted operation regression failed before the fix and passes afterward; warnings, images and argument observations remain covered. This is payload fidelity shared by resident, standalone and HTTP dispatch, not a new transport guarantee. See the qualification report for exact receipts and the subsequent failed full-gate run.

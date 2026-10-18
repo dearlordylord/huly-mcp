@@ -336,6 +336,7 @@ describe("Effect AI MCP dispatch", () => {
     const warned = await invoke({ structured: true })
     const plain = await invoke('{"serialized":true}')
     const image = await invoke("invalid json")
+    const empty = await invoke({ empty: true })
     const unknownTarget = await handleProxyToolCall({
       toolName: makeToolName("invoke_tool"),
       args: { toolName: "missing_target", arguments: {} },
@@ -446,6 +447,7 @@ describe("Effect AI MCP dispatch", () => {
 
     expect(warned.structuredContent?.warnings).toEqual([warning])
     expect(plain.structuredContent).not.toHaveProperty("warnings")
+    expect(empty.structuredContent).toHaveProperty("result.result", null)
     expect("imageContent" in image ? image.imageContent : undefined).toEqual({
       type: "image",
       data: "cG5n",
@@ -468,7 +470,7 @@ describe("Effect AI MCP dispatch", () => {
     )
     expect(missingWorkspaceClient.isError).toBe(true)
     expect(suppliedWorkspaceClient.isError).toBe(true)
-    expect(received).toEqual([{ structured: true }, { serialized: true }, "invalid json"])
+    expect(received).toEqual([{ structured: true }, { serialized: true }, "invalid json", { empty: true }])
   })
 
   it("dispatches native operations and argument/client failures", async () => {

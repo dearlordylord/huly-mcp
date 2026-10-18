@@ -5,13 +5,13 @@ The live #328 body was read on 2026-10-17; its last update was
 2026-10-17T21:46:31Z. This report does not replace its acceptance criteria.
 
 The Linux candidate is in `/tmp/hulymcp-resident-linux`, branch
-`implement/resident-mcp-linux-323-328`. The latest production checkpoint is
-`15ae6b13`, including retained admission and namespace/locator consistency fixes.
+`implement/resident-mcp-linux-323-328`. The namespace/admission checkpoint
+`15ae6b13` and subsequent increments retain namespace/locator consistency fixes.
 [Issue 327](issue-327.md) records scoped process receipts and exact MCP/CLI
 artifact hashes. Those receipts independently join owned exits rather than
-inferring retirement from CLI acceptance or missing metadata. The current
-unmodified ten-parent run still fails qualification; see the diagnostic section
-below.
+inferring retirement from CLI acceptance or missing metadata. Ten-parent results remain inconsistent: the latest full gate failed connection
+startup and a later owner-only runtime-loading increment passed one focused run.
+Neither establishes complete qualification; see the evidence below.
 
 ## Acceptance evidence index
 
@@ -24,7 +24,7 @@ evidence leaves the criterion pending.
 | 2. Native lifecycle/concurrency/platform scenarios | Linux normal stop, two-caller replacement and version coexistence have process receipts. The ten-parent race has preserved inconsistent results. Complete Linux schedules and native macOS/Windows remain pending. |
 | 3. Windows detachment, ACL and cleanup | Pending. Current POSIX ownership protection refuses unsupported native Windows execution; that is not Windows implementation or qualification. |
 | 4. Auth/profile/policy/protocol behavior | Synthetic environment-token workspaces and actual catalog/context exchange support scoped fixtures. Complete supported profile/env/token/password, policy and modern/legacy qualification remains pending. |
-| 5. Actual host discovery and continued reads | Programmatic pinned MCP client parents exercise the packaged adapter. Naming clients after hosts is not actual application-host discovery. Native host evidence remains pending. |
+| 5. Actual host discovery and continued reads | Actual Codex discovery/two context reads and actual Claude Code discovery/two context calls are recorded below. The latter use a local deterministic model endpoint. Complete host catalog/resource, Huly-read and lifecycle qualification remains pending. |
 | 6. Alternating fresh-process comparisons | Pending for standalone, managed and direct HTTP with one/ten clients and declared cache boundaries. |
 | 7. Total RSS/CPU/completion rates | Pending. No prior direct-HTTP memory figure is adopted as a managed-stdio budget. Include every actual adapter, launcher and backend. |
 | 8. Adversarial routing/backpressure/no replay | Existing scoped routing/request-loss evidence and the [operation-stop fault schedules](issue-327.md#stop-during-an-operation-and-failed-cleanup-2026-10-17) prove scoped local behavior. The latter use an embedded registry and one filesystem write with explicit host cancellation. The [detectable namespace-loss schedules](issue-327.md#refuse-detectable-ownership-state-loss-before-selection-2026-10-17) and [locator-content schedules](issue-327.md#parse-and-compare-current-locator-contents-2026-10-17) cover seven local metadata faults with a live existing caller. Complete real-Huly fault qualification remains pending. |
@@ -610,3 +610,20 @@ Additional actual-filesystem/TLS checks cover stop returning HTTP 503 after fenc
 The next complete gate passed all 477 files / 5716 tests and all preceding build, type, circular, complexity, package and lint checks, but still failed branch coverage: 98.95% (12446/12577). Functions reached 99% (7988/8068); statements 99.44%, lines 99.54%. Six additional covered branches would be required at that denominator. Log `/tmp/resident-stop-behavior-check-all.log`, SHA-256 `07848f406934f17d7a017b3e333f25e0b4c58d5cac57e2141812dbd82dbfbbf4`. The gate remains failed.
 
 Read-only Standards review found one secret-diagnostic issue in the new equal-count inventory test: direct string matchers could print private serialized metadata on failure. Those assertions now compare byte equality through booleans. Read-only Spec review found no actionable findings in that increment. Subsequent focused coverage additions verify that an ENOTDIR ancestor is a typed failure rather than absent state, unsupported managed stop produces a nonretryable CLI input error with no POST, and successful text output still explicitly leaves retirement unconfirmed. The state/namespace files passed 18 tests (`/tmp/resident-state-evidence-preservation.log`, SHA-256 `1f0ed7d696ccd4a4e5edd970101d0a4d0419c1dbd33daac10035f58dc380c9cd`); stop TLS/CLI schedules passed 15 tests (`/tmp/resident-cli-stop-wire.log`, SHA-256 `141780713c771c98892eb55b4463be6455a6416a62eff8621887e40ee36367cd`). Focused lint/format and TypeScript/Effect diagnostics passed (1353 files, zero diagnostics). These later tests have not yet received a full aggregate coverage run; do not infer a passing gate from focused results.
+
+
+### Explicit null proxy result and another full-gate launch failure
+
+A cheap regression reproduced `invoke_tool` replacing a valid structured `null` result with its text-content array. The wrapper now tests whether structured content is absent rather than whether its result is nullish. Red log `/tmp/resident-proxy-null-red.log`, SHA-256 `506823297f188e16b283a041c76056eb25b610455651c5e6015a53bc9188eeda`; green dispatch/property suites passed 17 tests in `/tmp/resident-proxy-null-green.log`, SHA-256 `6607aaa930419a2fcc480ab9f5fd9c731e0e69355a8dbf013d0aa5d338071ef0`. Fresh Standards and Spec reviews found no actionable findings.
+
+The subsequent full gate failed the ten-parent launch fixture: all ten parents exceeded their original five-second connection bound. All other 5718 tests passed (476 files); no aggregate coverage report was established by this failed run. Log `/tmp/resident-proxy-null-check-all.log`, SHA-256 `7ad1fa6b88b7ed3ecdc7add78285a5b261293c90a65d3070c06728bd6e9c309c`; retained fixture directory `dist/stdio-suite-yekkyP` and phases `/tmp/resident-managed-parents-YmsYBr.phases.log`. Build, type, circular, complexity, package and lint stages passed. Thresholds and deadlines remain unchanged.
+
+A diagnostic tested the narrower premise that bundle syntax parsing alone exceeds that allowance. Five alternating batches of ten concurrent `node --check` processes against the 11658754-byte artifact and a minimal control all exited successfully. Artifact batch times ranged 0.225–0.356 seconds; controls 0.024–0.066 seconds. This is syntax-check/process-startup work, not module initialization, MCP connection, Huly work, or end-to-end performance. It supplies no limiter or speedup claim. Receipt `/tmp/resident-parse-premise-cv72rmyz/receipt.json`, SHA-256 `0d6bab9041b8e36f27b67fab4ed1132a31ff9ab0fc873c2eb698029505302d87`, retains individual samples, affinity and load observations. That narrower premise was not supported in these runs. The subsequent owner-only runtime import change and one passing unchanged ten-parent scenario are recorded in [#324](issue-324.md#initialize-the-server-only-in-the-selected-owner); reliability and final gate remain pending.
+
+### Actual Claude Code first and continued context calls
+
+Claude Code 2.1.296 executed two actual `mcp__resident__get_huly_context` calls through the packaged managed adapter. A disposable loopback HTTP Messages API fixture supplied deterministic tool-use responses following the [official streaming protocol](https://platform.claude.com/docs/en/build-with-claude/streaming). This uses the actual installed host, not an MCP SDK client named after it, and tests host tool dispatch without a remote model account. It does not qualify model behavior, remote authentication, or a Huly read.
+
+The probe used temporary HOME/config/cwd, bare mode, strict explicit MCP settings, no built-in tools, one allowed read-only MCP tool, synthetic credentials and an unreachable loopback Huly URL. The host init event reported MCP connected; both non-error tool results returned the selected fixture workspace. Its final result was success after three turns, host exit was 0, stderr was empty, and the existing owned-descendant supervisor completed with code 0 with no forced-cleanup diagnostic. State inspection afterward found no entries. This attempt does not retain a separate backend exit-code receipt, so it does not independently certify backend exit code 0 or bounded graceful adapter release. The existing explicit 45-second expiry supervisor scenario was used; no production timer or prior qualification deadline changed.
+
+Evidence root `/tmp/resident-claude-tool-read-5wnpvft3` retains the executable probe, protocol output, local model observations, host exit, private configuration and an artifact copy. MCP artifact SHA-256 `98d8dc4d363051197b0ec6d4f840ffe668c5c49afe6fd49aa000ac6e6fe500a5` predates the owner-only runtime import change. Receipt SHA-256 `acca63493d77f338a2d5c2bd6e20fd68c6bf089386bff6974785b1fa3dda844d`; `probe.py` `d21bb0dea6db4e7b4a3f3c4019a0578458dd259ee52e334e45ed93572d809398`; host NDJSON `078335ae7caaa8089745304e1204d47d265171c6003ae24ab72edc2f5148bebc`; model observations `fbae85c9dd6f58468249d0a1fc3546e2c206f228987577df34e55ae2b328bce0`. This strengthens scoped actual-host evidence only. Full catalogs/resources, live Huly, supported auth/protocol/platform behavior and aggregate qualification remain pending.
