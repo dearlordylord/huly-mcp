@@ -626,3 +626,8 @@ Test-only after ee9be005: [report](resident-policy-modes-2026-10-18.md). Native/
 ### Backend-only configuration fault — 2026-10-18
 
 [Report](resident-config-backend-only-2026-10-18.md): existingfixture now schema-discriminates adapter+backend and backend-only faults. Backend-only injector retains bothpidfds, verifiesactual liveadapterparent immediatelybefore backendSIGKILL and observesbackendpidfdtermination; no falseouterreaperexitclaim. Aadapterexit1/nosignal observedduringlater shutdown; Bsamegeneration/registry/heldexact41+continued42 andownedexits0. Final4protocol×modecasesPASS33.58s, initial1430typecheckzeroerrorswarnings, local lint/format and correctedsource reviews accepted. Four final roots in report, externalparentlineage/supervisor0 checked. Negativefalseparentprobepass. No production changes/fullgate; all6issues incomplete, failedcleanup/macOS/model/uncertainty/finalmovement remain open.
+
+
+### Produced terminal lost before host observation — 2026-10-18
+
+[Report](resident-terminal-output-loss-2026-10-18.md): uncertain-write process fixture adds closedhoststdout withcommittedfile1/actualterminalHTTPfinish/adapteroutputfailureexit1/nohostbytes/dispatch1. Earlierheaders/progress uncertaintychecks retained; newmode uses actualcountsfornoreplay, notwrongstderrstring. Focused3casesPASS3.46s, local lint/format and both reviewsaccepted. Initialdiagnosticexpectationfailure retained; no productchange/fullgate. SyntheticTLS+packagedadapter boundaryscope only, notnativeHulyterminalqueue/delivery; all six issues remain incomplete.

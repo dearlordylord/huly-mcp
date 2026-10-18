@@ -3,7 +3,7 @@ import { once } from "node:events"
 import * as fs from "node:fs/promises"
 import { join } from "node:path"
 import { createInterface } from "node:readline"
-import { Schema } from "effect"
+import { Deferred, Effect, Schema } from "effect"
 import { expect, it } from "vitest"
 
 import { fixturePackageVersion, startResidentFixture } from "../helpers/resident-fixture.js"
@@ -20,6 +20,11 @@ const FixtureWrite = Schema.Struct({
   params: Schema.Struct({ name: Schema.Literal("fixture_increment"), arguments: Schema.Struct({}) })
 })
 const FixtureState = Schema.Struct({ writes: Schema.Literal(1) })
+const FixtureTerminal = Schema.Struct({
+  jsonrpc: Schema.Literal("2.0"),
+  id: FixtureWrite.fields.id,
+  result: FixtureState
+})
 const FixtureProgress = Schema.Struct({
   jsonrpc: Schema.Literal("2.0"),
   method: Schema.Literal("notifications/progress"),
@@ -31,8 +36,8 @@ const progressLine = Schema.encodeSync(Schema.fromJsonString(FixtureProgress))({
   params: { progressToken: "fixture-write", progress: 1 }
 })
 
-it.each(["before-headers", "after-progress"])(
-  "reports an unknown committed write after %s response loss without dispatching it twice",
+it.each(["before-headers", "after-progress", "terminal-output-loss"])(
+  "does not replay a committed write after %s response loss",
   { timeout: PROCESS_BOUND },
   async (mode) => {
     const bundle = await buildIsolatedStdioServer(PROCESS_BOUND)
@@ -41,6 +46,7 @@ it.each(["before-headers", "after-progress"])(
       await withRegistryDirectory(async (directory) => {
         const stateFile = join(directory, "state.json")
         let dispatches = 0
+        const terminalWritten = Effect.runSync(Deferred.make<void>())
         let truncate: (() => void) | undefined
         const failures: Array<unknown> = []
         const fixture = await startResidentFixture(
@@ -59,6 +65,17 @@ it.each(["before-headers", "after-progress"])(
                   truncate = () => response.destroy()
                   response.writeHead(200, { "content-type": "text/event-stream" })
                   response.write(`data: ${progressLine}\n\n`)
+                } else if (mode === "terminal-output-loss") {
+                  response.once("finish", () => Effect.runSync(Deferred.succeed(terminalWritten, undefined)))
+                  response
+                    .writeHead(200, { "content-type": "application/json" })
+                    .end(
+                      Schema.encodeSync(Schema.fromJsonString(FixtureTerminal))({
+                        jsonrpc: "2.0",
+                        id: 1,
+                        result: { writes: 1 }
+                      })
+                    )
                 } else response.destroy()
               })().catch((error: unknown) => {
                 failures.push(error)
@@ -82,6 +99,7 @@ it.each(["before-headers", "after-progress"])(
           adapter.stdout.on("data", (chunk: Buffer) => output.push(chunk))
           adapter.stderr.on("data", (chunk: Buffer) => diagnostics.push(chunk))
           try {
+            if (mode === "terminal-output-loss") adapter.stdout.destroy()
             adapter.stdin.write(
               `${Schema.encodeSync(Schema.fromJsonString(FixtureWrite))({
                 jsonrpc: "2.0",
@@ -98,8 +116,12 @@ it.each(["before-headers", "after-progress"])(
             }
             expect(await closed).toEqual([1, null])
             expect(Buffer.concat(output).toString("utf8")).toBe(mode === "after-progress" ? `${progressLine}\n` : "")
-            expect(Buffer.concat(diagnostics).toString("utf8")).toContain("operation outcome may be unknown")
-            expect(Buffer.concat(diagnostics).toString("utf8")).toContain("No request was replayed")
+            if (mode === "terminal-output-loss") {
+              await Effect.runPromise(Deferred.await(terminalWritten).pipe(Effect.timeout(RESPONSE_BOUND)))
+              expect(Buffer.concat(diagnostics).toString("utf8")).toContain("Stdio output failed")
+            } else expect(Buffer.concat(diagnostics).toString("utf8")).toContain("operation outcome may be unknown")
+            if (mode !== "terminal-output-loss")
+              expect(Buffer.concat(diagnostics).toString("utf8")).toContain("No request was replayed")
             expect(
               Schema.decodeUnknownSync(Schema.fromJsonString(FixtureState))(await fs.readFile(stateFile, "utf8"))
             ).toEqual({ writes: 1 })
