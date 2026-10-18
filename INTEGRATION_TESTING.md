@@ -804,14 +804,15 @@ bounded process custody, rather than another undifferentiated full campaign.
 ### Resident mutation response-loss probe
 
 `scripts/integration-resident-uncertain-write.ts` qualifies one narrow boundary:
-a packaged adapter sends a request to a test TLS endpoint, which runs the real
-`createProject` domain operation against local Huly and discards its response.
-It does not qualify a native managed-backend fault schedule. The project operation
+a packaged adapter sends a request to a test TLS endpoint. That endpoint forwards
+exactly one `create_project` call through a second packaged adapter and its native
+managed backend, then discards the confirmed response. It does not qualify
+backend-owner death or every mutation fault schedule. The project operation
 is idempotent; the probe separately requires exactly one dispatch and makes no
 general exactly-once claim.
 
 Compile the probe with the candidate's version define and external `ws`, then run
-it under `test/resident/fixtures/reap-descendants.py` with one JSON argument:
+it under `test/resident/fixtures/reap-descendants.py --report-reaped` with one JSON argument:
 `{"bundle":"/absolute/candidate/index.cjs","evidence":"/absolute/new/private/evidence","project":{"identifier":"RTEST","name":"Unique disposable resident fixture","private":true}}`.
 Use an unused identifier and a unique name for each attempt. The probe currently
 requires the container's local `host.docker.internal` Huly URL; authentication
@@ -824,5 +825,7 @@ writes. After any submitted create, cleanup uses fresh readback and checks the
 fixture name before deleting it. A missing or mismatched project leaves cleanup
 unresolved; it never authorizes another create. Private schema-encoded phase
 records distinguish submitted, confirmed, proved and cleanup outcomes. Require
-supervisor exit zero and the final receipt; retain failed attempts and unresolved
-cleanup evidence.
+supervisor exit zero and the final receipt, including the exact backend
+`waitpid` exit 0 and empty managed namespace. The upstream managed adapter must
+close with exit 0 before backend retirement. Retain failed attempts and
+unresolved cleanup evidence.

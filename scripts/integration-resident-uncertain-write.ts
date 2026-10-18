@@ -6,12 +6,19 @@ import { join } from "node:path"
 import { Effect, Layer, Schema } from "effect"
 
 import { HulyConfigService } from "../src/config/config.js"
-import { CreateProjectParamsSchema, GetProjectParamsSchema } from "../src/domain/schemas/projects.js"
+import {
+  CreateProjectParamsSchema,
+  type CreateProjectResultSchema,
+  GetProjectParamsSchema
+} from "../src/domain/schemas/projects.js"
 import { HulyClient } from "../src/huly/client.js"
 import { Diagnostics, makeDiagnosticsScope } from "../src/huly/diagnostics.js"
-import { createProject, deleteProject, getProject } from "../src/huly/operations/projects.js"
+import { deleteProject, getProject } from "../src/huly/operations/projects.js"
 import { ResidentPackagePath } from "../src/resident/managed-contract.js"
 import { ResidentDirectory } from "../src/resident/protected-path.js"
+import { KernelOwnedExit, ReapedEventsFd } from "../test/helpers/kernel-reaped-events.js"
+import { LiveProbeEnvironment } from "./resident-live-read-contract.js"
+import { withLiveManagedWrite } from "./resident-live-managed-write.js"
 import { fixturePackageVersion, startResidentFixture } from "../test/helpers/resident-fixture.js"
 import { testStdioEnvironment } from "../test/helpers/stdio-environment.js"
 
@@ -37,8 +44,8 @@ const Phase = Schema.Struct({
   proved: Schema.Boolean,
   cleanup: Schema.Literals(["not-submitted", "unresolved", "deleted"])
 })
-const Receipt = Schema.Struct({
-  boundary: Schema.Literal("packaged-adapter-test-tls-real-huly-operation"),
+const Observation = Schema.Struct({
+  boundary: Schema.Literal("packaged-adapter-test-tls-packaged-managed-backend"),
   project: CreateProjectParamsSchema.fields.identifier,
   dispatches: Schema.Literal(1),
   created: Schema.Literal(true),
@@ -47,6 +54,11 @@ const Receipt = Schema.Struct({
   uncertaintyReported: Schema.Literal(true),
   readbackMatched: Schema.Literal(true),
   fixtureDeleted: Schema.Literal(true)
+})
+const Receipt = Schema.Struct({
+  ...Observation.fields,
+  backendExit: KernelOwnedExit,
+  privateStateRemoved: Schema.Literal(true)
 })
 const layer = HulyClient.layer.pipe(Layer.provide(HulyConfigService.layer))
 const live = <A, E>(operation: Effect.Effect<A, E, HulyClient | Diagnostics>) =>
@@ -68,12 +80,13 @@ const absent = (target: Schema.Schema.Type<typeof GetProjectParamsSchema>) =>
       Effect.catchTag("ProjectNotFoundError", () => Effect.succeed(true))
     )
   )
-const main = async () => {
-  const input = Schema.decodeUnknownSync(Schema.fromJsonString(Input))(process.argv[2])
+const run = async (
+  input: Schema.Schema.Type<typeof Input>,
+  submit: (
+    project: Schema.Schema.Type<typeof CreateProjectParamsSchema>
+  ) => Promise<Schema.Schema.Type<typeof CreateProjectResultSchema>>
+) => {
   const target = Schema.decodeUnknownSync(GetProjectParamsSchema)({ project: input.project.identifier })
-  requireFact(new URL(process.env.HULY_URL ?? "").hostname === "host.docker.internal", "Local Huly required")
-  await fs.mkdir(input.evidence, { mode: 0o700 })
-  requireFact(await absent(target), "Fixture identifier already exists")
   let dispatches = 0
   let created = false
   let submitted = false
@@ -91,7 +104,7 @@ const main = async () => {
           requireFact(dispatches === 1, "Mutation was dispatched more than once")
           submitted = true
           cleanupState = "unresolved"
-          const result = await live(createProject(input.project))
+          const result = await submit(input.project)
           requireFact(
             result.created && result.identifier === input.project.identifier && result.name === input.project.name,
             "Creation did not confirm the owned fixture"
@@ -190,8 +203,8 @@ const main = async () => {
   for (const result of [...cleanup, ...transportCleanup, ...remoteCleanup, ...evidence])
     if (result.status === "rejected") throw result.reason
   requireFact(proved && deleted, "Fixture evidence incomplete")
-  const receipt = Schema.encodeSync(Schema.fromJsonString(Receipt))({
-    boundary: "packaged-adapter-test-tls-real-huly-operation",
+  return Observation.make({
+    boundary: "packaged-adapter-test-tls-packaged-managed-backend",
     project: input.project.identifier,
     dispatches: 1,
     created: true,
@@ -201,9 +214,31 @@ const main = async () => {
     readbackMatched: true,
     fixtureDeleted: true
   })
+}
+const main = async () => {
+  const input = Schema.decodeUnknownSync(Schema.fromJsonString(Input))(process.argv[2])
+  requireFact(new URL(process.env.HULY_URL ?? "").hostname === "host.docker.internal", "Local Huly required")
+  const environment = Schema.decodeUnknownSync(LiveProbeEnvironment)(
+    Object.fromEntries(Object.entries(process.env).filter(([, value]) => value !== undefined))
+  )
+  const reapedFd = Schema.decodeUnknownSync(ReapedEventsFd)(process.env.HULY_TEST_REAPED_FD)
+  await fs.mkdir(input.evidence, { mode: 0o700 })
+  const target = Schema.decodeUnknownSync(GetProjectParamsSchema)({ project: input.project.identifier })
+  requireFact(await absent(target), "Fixture identifier already exists")
+  const result = await withLiveManagedWrite(
+    { bundle: input.bundle, directory: ResidentDirectory.make(join(input.evidence, "managed")), reapedFd },
+    environment,
+    (submit) => run(input, submit)
+  )
+  const receipt = Schema.encodeSync(Schema.fromJsonString(Receipt))({
+    ...result.observation,
+    backendExit: result.backendExit,
+    privateStateRemoved: true
+  })
   await fs.writeFile(join(input.evidence, "receipt.json"), receipt, { flag: "wx", mode: 0o600 })
   process.stdout.write(`${receipt}\n`)
 }
+
 void main().catch(() => {
   process.stderr.write("Resident real-Huly uncertainty qualification failed; inspect private phase evidence\n")
   process.exitCode = 1
