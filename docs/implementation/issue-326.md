@@ -178,3 +178,13 @@ The [idle/admission tests](resident-idle-admission-race-2026-10-18.md) and [HTTP
 ### Lifecycle model type reconciliation — 2026-10-18
 
 Proposed resident-launch.qnt types now key requests by InvocationId (sameasverificationwritehistory), separatecollidingwireId, representcleanupafterterminal/cancellation, ownercallerforresources and remoteeffectoracletruth distinctfromcallerknowledge. Scope/sketch notes updated. QuinttypecheckPASS /tmp/resident-launch-types-reconciled.log; both scoped typeproposalreviews accepted. Existing explicittypesketchapproval checkpoint retained perquint-modelingSKILLstep2; noinit/actions/invariants/run/proof added or claimed. This doesnotcomplete326.9/327.10/othergoals; independent implementation/qualification cancontinue. No fullgate.
+### Process-boundary controlled idle ordering — 2026-10-18
+
+[Report](resident-process-idle-clock-2026-10-18.md): separately owned backend
+runs the production configured lifecycle under injected TestClock; an actual
+packaged adapter attaches at virtual4900ms, survives another5000ms and completes
+continued context with the same adapter/port and registry bytes. After parent
+release it survives4900ms then closes0 after100ms, leaving empty state. External
+5s/7s/25s bounds retained. Initial focused process test passes12.78s; both scoped
+reviews accepted. No physical-time, queued Huly work, fence-first process order
+or native macOS claim. All six issues remain incomplete.
