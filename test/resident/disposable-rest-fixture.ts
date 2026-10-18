@@ -116,6 +116,7 @@ export const startDisposableRestFixture = async (
   const observed = {
     modelRequests: 0,
     projectReads: 0,
+    projectQueries: new Array<Schema.Schema.Type<typeof ProjectIdentifier>>(),
     projectWrites: 0,
     committedProjectWrites: 0,
     fullModelRequested: true,
@@ -172,6 +173,7 @@ export const startDisposableRestFixture = async (
         const query = Schema.decodeUnknownSync(Schema.fromJsonString(ProjectQuery))(
           url.searchParams.get("query") ?? "{}"
         )
+        if (query.identifier !== undefined) observed.projectQueries.push(query.identifier)
         const projects = projectState.filter(
           (project) => query.identifier === undefined || project.identifier === query.identifier
         )

@@ -651,3 +651,13 @@ now have isolated Linux evidence for installed Claude Code/native and
 Codex/proxy, including actual context, exact restricted catalogs, two Huly
 project results and kernel-owned retirement. They use the existing explicit
 lease-expiry supervisor mode and do not certify the entire host/platform contract.
+
+## Shared model waiter follow-up — 2026-10-18
+
+[The packaged cancellation schedule](resident-model-wait-linux-2026-10-18.md)
+adds the missing two-parent evidence for parent #322 story9: cancel either the
+first model requester or its joining waiter while one model response is held,
+then verify survivor/fresh/continued reads and no late canceled query. Both
+protocols pass in final execution. `pnpm check-all` passes (493 files / 5771
+tests; 1394 diagnostic files, no errors or warnings); both scoped reviews are
+clean. Broader #323 healthy-backend isolation requirements remain open.
