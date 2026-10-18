@@ -1,5 +1,5 @@
 import { join } from "node:path"
-import { NodeHttpClient } from "@effect/platform-node"
+import * as NodeHttpClient from "@effect/platform-node/NodeHttpClient"
 import { ByteSize, Effect, Redacted, Ref, Schema } from "effect"
 import {
   HttpClientRequest,

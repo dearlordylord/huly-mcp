@@ -1,5 +1,5 @@
 import "../polyfills.js"
-import { NodeRuntime } from "@effect/platform-node"
+import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
 import { Config, Effect, Redacted } from "effect"
 
 import { VERSION } from "../version.js"

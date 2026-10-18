@@ -1,4 +1,4 @@
-import { NodeHttpClient } from "@effect/platform-node"
+import * as NodeHttpClient from "@effect/platform-node/NodeHttpClient"
 import { ByteSize, Effect, Redacted } from "effect"
 import { HttpClientRequest, HttpClientResponse, HttpIncomingMessage } from "effect/http"
 

@@ -1,4 +1,4 @@
-import { NodeHttpClient } from "@effect/platform-node"
+import * as NodeHttpClient from "@effect/platform-node/NodeHttpClient"
 import { Effect, type Option, Redacted, Schema } from "effect"
 import { HttpClientRequest, type HttpClientResponse } from "effect/http"
 

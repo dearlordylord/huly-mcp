@@ -1,5 +1,6 @@
 import "../polyfills.js"
-import { NodeRuntime, NodeStdio } from "@effect/platform-node"
+import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
+import * as NodeStdio from "@effect/platform-node/NodeStdio"
 import { Effect, Schema } from "effect"
 
 import { CliProfileStoreError } from "../profiles/model.js"

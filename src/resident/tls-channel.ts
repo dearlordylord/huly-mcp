@@ -1,4 +1,4 @@
-import { NodeHttpServer } from "@effect/platform-node"
+import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer"
 import { constants, randomBytes } from "node:crypto"
 import { Agent, Server, type RequestOptions } from "node:https"
 import type { Socket } from "node:net"
