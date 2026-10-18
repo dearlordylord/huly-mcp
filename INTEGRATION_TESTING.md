@@ -800,3 +800,29 @@ because ambient `NODE_OPTIONS` contained only a heap flag. Repeating the same qu
 gate could not repair that environment mismatch. Earlier lost concurrency replies
 and fixture SIGTERM cleanup races likewise require retained stage evidence and
 bounded process custody, rather than another undifferentiated full campaign.
+
+### Resident mutation response-loss probe
+
+`scripts/integration-resident-uncertain-write.ts` qualifies one narrow boundary:
+a packaged adapter sends a request to a test TLS endpoint, which runs the real
+`createProject` domain operation against local Huly and discards its response.
+It does not qualify a native managed-backend fault schedule. The project operation
+is idempotent; the probe separately requires exactly one dispatch and makes no
+general exactly-once claim.
+
+Compile the probe with the candidate's version define and external `ws`, then run
+it under `test/resident/fixtures/reap-descendants.py` with one JSON argument:
+`{"bundle":"/absolute/candidate/index.cjs","evidence":"/absolute/new/private/evidence","project":{"identifier":"RTEST","name":"Unique disposable resident fixture","private":true}}`.
+Use an unused identifier and a unique name for each attempt. The probe currently
+requires the container's local `host.docker.internal` Huly URL; authentication
+stays in the usual environment/config boundary. Do not pass credentials in JSON.
+
+The receipt requires one confirmed creation, adapter exit 1, no host terminal
+bytes, the uncertainty/no-replay diagnostic, and matching fresh-client readback.
+Readback is explicit fixture reconciliation, not a generic resolution of unknown
+writes. After any submitted create, cleanup uses fresh readback and checks the
+fixture name before deleting it. A missing or mismatched project leaves cleanup
+unresolved; it never authorizes another create. Private schema-encoded phase
+records distinguish submitted, confirmed, proved and cleanup outcomes. Require
+supervisor exit zero and the final receipt; retain failed attempts and unresolved
+cleanup evidence.
