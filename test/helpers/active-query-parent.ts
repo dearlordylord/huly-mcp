@@ -42,7 +42,7 @@ export const spawnActiveQueryParent = (
     next: () => nextWithin(RESPONSE_BOUND),
     nextAfterOutputDeadline: () => nextWithin(OUTPUT_EXIT_BOUND),
     close: async () => {
-      if (child.exitCode === null && child.signalCode === null) {
+      if (child.exitCode === null && child.signalCode === null && !child.stdin.writableEnded) {
         send({ _tag: "close" })
         child.stdin.end()
       }

@@ -32,6 +32,7 @@ const ProjectReply = Schema.Struct({
   isError: Schema.optionalKey(Schema.Literal(false)),
   structuredContent: Schema.Struct({ result: GetProjectResultSchema })
 })
+let failureStage = "input"
 const emit = (event: ActiveQueryEvent) =>
   process.stdout.write(`${Schema.encodeSync(Schema.fromJsonString(ActiveQueryEvent))(event)}\n`)
 
@@ -106,6 +107,7 @@ const main = async () => {
   let nextId = FIRST_ID
   let active: Promise<void> | undefined
   const run = async () => {
+    failureStage = "discover"
     await Effect.runPromise(
       discoverLiveReadProtocol(
         protocol,
@@ -117,6 +119,7 @@ const main = async () => {
         (frame) => Effect.tryPromise({ try: () => send(frame), catch: () => new LiveReadProbeError({ phase: "send" }) })
       )
     )
+    failureStage = "context"
     const context = Schema.decodeUnknownSync(ContextReply)(
       await boundModelWait(request(CONTEXT_ID, "tools/call", { name: "get_huly_context", arguments: {} }))
     ).structuredContent.result
@@ -129,6 +132,7 @@ const main = async () => {
         port: context.transport.http?.port
       })
     )
+    failureStage = "commands"
     for await (const line of commands) {
       const command = Schema.decodeUnknownSync(Schema.fromJsonString(ActiveQueryCommand))(line)
       if (command._tag === "close") break
@@ -227,8 +231,9 @@ const main = async () => {
   const failure = cleanup.find((result) => result.status === "rejected")
   if (failure !== undefined) throw failure.reason
   if (failed) throw new Error("Active query request failed")
+  if (!losing && !burst.occupied()) emit({ _tag: "exit", ...(await closed) })
 }
 void main().catch(() => {
-  process.stderr.write("Active query host failed\n")
+  process.stderr.write(`Active query host failed at ${failureStage}\n`)
   process.exitCode = 1
 })

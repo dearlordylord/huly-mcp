@@ -432,3 +432,8 @@ remain pending.
 ## Pure selection and publication decisions — 2026-10-18
 
 The [selection transition increment](resident-selection-transitions-2026-10-18.md) moves candidate uniqueness/capacity and publication authority into ordinary state/event functions while retaining actual claim and candidate resource scopes. It also fixes the observed cancellation gap between registry publication, receipt recording and claim release. Focused resource tests and pure laws pass; full check-all passed502files5802tests, and scoped current-byte modern/legacy local-Huly sharing/continued reads/kernel-owned retirement passed. This is partial parent D8/D9 evidence, not complete #324 acceptance or lifecycle-model alignment.
+
+
+## Ten independent SDK readers — 2026-10-18
+
+The [focused ten-reader increment](resident-ten-readers-2026-10-18.md) adds ten actual packaged adapters under independent parents, held single-flight full-model acquisition, distinct/colliding-ID project reads and continued reads through every adapter. Both protocols pass with explicit adapter/parent exits and kernel-owned backend retirement. Production bytes are unchanged; focused checks replace routine full gates per user instruction. The initial legacy-readiness failure remains unexplained and retained. This does not certify ten actual hosts/live-Huly readers or complete #324.
