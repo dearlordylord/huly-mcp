@@ -2,7 +2,7 @@ import * as fs from "node:fs/promises"
 import { IncomingMessage } from "node:http"
 import { join } from "node:path"
 import { NodeServices } from "@effect/platform-node"
-import { Effect, Exit, Redacted, Ref, Schema } from "effect"
+import { Cause, Effect, Exit, Redacted, Ref, Schema } from "effect"
 import { Command } from "effect/cli"
 import { TestConsole } from "effect/testing"
 import { HttpServerRequest, HttpServerResponse } from "effect/http"
@@ -93,9 +93,11 @@ it.each([
   "accepted",
   "ack-lost",
   "invalid-ack",
+  "invalid-capability",
   "unexpected-status",
   "unsupported",
   "wrong-capability",
+  "wrong-descriptor-generation",
   "wrong-bearer",
   "explicit-refusal",
   "wrong-ack-generation",
@@ -148,7 +150,11 @@ it.each([
                           }
                           const descriptor = yield* Schema.encodeEffect(ResidentAttachment)({
                             ...attachment,
-                            implementation
+                            implementation,
+                            identity:
+                              schedule === "wrong-descriptor-generation"
+                                ? { ...attachment.identity, generation: OTHER_GENERATION }
+                                : attachment.identity
                           })
                           const published = join(directory, `${identity.generation}.json`)
                           const publishedText = yield* Schema.encodeEffect(Schema.fromJsonString(ResidentAttachment))({
@@ -173,12 +179,37 @@ it.each([
                               : yield* Effect.exit(requestResidentStop(target))
                           if (
                             schedule === "unsupported" ||
+                            schedule === "invalid-capability" ||
                             schedule === "cli-unsupported" ||
                             schedule === "wrong-capability" ||
+                            schedule === "wrong-descriptor-generation" ||
                             schedule === "wrong-bearer" ||
                             schedule === "explicit-refusal"
                           ) {
                             expect(Exit.isFailure(result)).toBe(true)
+                            if (schedule === "wrong-descriptor-generation" && Exit.isFailure(result)) {
+                              expect(
+                                result.cause.reasons.some(
+                                  (reason) =>
+                                    Cause.isFailReason(reason) &&
+                                    reason.error instanceof ResidentStopRefused &&
+                                    reason.error.reason === "namespace-unverified" &&
+                                    reason.error.message.includes("no stop was submitted")
+                                )
+                              ).toBe(true)
+                            }
+                            if (schedule === "invalid-capability" && Exit.isFailure(result)) {
+                              expect(
+                                result.cause.reasons.some(
+                                  (reason) =>
+                                    Cause.isFailReason(reason) &&
+                                    reason.error instanceof ResidentStopRefused &&
+                                    reason.error.reason === "owner-unavailable" &&
+                                    reason.error.message.includes("no stop was submitted") &&
+                                    !reason.error.message.includes("private-invalid-capability-marker")
+                                )
+                              ).toBe(true)
+                            }
                             expect(yield* Ref.get(posts)).toBe(schedule === "explicit-refusal" ? 1 : 0)
                             yield* admissions.release((yield* admissions.admit).token)
                           } else {
@@ -199,8 +230,12 @@ it.each([
                             expect(yield* Ref.get(posts)).toBe(1)
                             expect(Exit.isFailure(yield* Effect.exit(admissions.admit))).toBe(true)
                           }
-                          expect(yield* Effect.promise(() => fs.readFile(record.file, "utf8"))).toBe(rewritten)
-                          expect(yield* Effect.promise(() => fs.readFile(published, "utf8"))).toBe(publishedText)
+                          expect((yield* Effect.promise(() => fs.readFile(record.file, "utf8"))) === rewritten).toBe(
+                            true
+                          )
+                          expect((yield* Effect.promise(() => fs.readFile(published, "utf8"))) === publishedText).toBe(
+                            true
+                          )
                         }),
                       (record) => record.retire
                     )
@@ -224,6 +259,8 @@ it.each([
                       return yield* Effect.die("Expected native request fixture")
                     request.source.socket.destroy()
                   }
+                  if (request.method === "GET" && schedule === "invalid-capability")
+                    return HttpServerResponse.jsonUnsafe({ unexpected: "private-invalid-capability-marker" })
                   return request.method === "POST" && schedule === "unexpected-status"
                     ? HttpServerResponse.empty({ status: 503 })
                     : request.method === "POST" && schedule === "invalid-ack"

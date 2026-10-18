@@ -1,5 +1,5 @@
 import { describe, it } from "@effect/vitest"
-import { ConfigProvider, Effect, Redacted, Schema } from "effect"
+import { Config, ConfigProvider, Effect, Redacted, Schema } from "effect"
 import { expect } from "vitest"
 import {
   ConfigValidationError,
@@ -17,6 +17,24 @@ const loadConfigFromEnv = (env: Record<string, string>) =>
   )
 
 describe("Config Module", () => {
+  it.effect("keeps configuration-source failure typed without inventing a field validation error", () =>
+    Effect.gen(function* () {
+      const sourceFailure = new ConfigProvider.SourceError({ message: "Configuration source unavailable" })
+      const error = yield* HulyConfigService.pipe(
+        Effect.provide(HulyConfigService.layer),
+        Effect.provideService(
+          ConfigProvider.ConfigProvider,
+          ConfigProvider.make(() => Effect.fail(sourceFailure))
+        ),
+        Effect.flip
+      )
+      expect(error).toBeInstanceOf(ConfigValidationError)
+      expect(error.field).toBeUndefined()
+      expect(error.message).toContain("Configuration source unavailable")
+      expect(error.cause instanceof Config.ConfigError && error.cause.cause === sourceFailure).toBe(true)
+    })
+  )
+
   describe("HulyConfigSchema", () => {
     it.effect("validates valid config with password auth", () =>
       Effect.sync(function () {

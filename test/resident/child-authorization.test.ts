@@ -6,7 +6,7 @@ import { expect } from "vitest"
 
 import { encodeChildReply, encodeChildStart } from "../../src/resident/bootstrap-codec.js"
 import { awaitChildAuthorization, type ChildAuthorizationPort } from "../../src/resident/child-authorization.js"
-import { BootstrapNonce, MANAGED_PACKAGE_NAME } from "../../src/resident/managed-contract.js"
+import { BootstrapNonce, MANAGED_PACKAGE_NAME, PREPARED_CHILD_MILLIS } from "../../src/resident/managed-contract.js"
 import { ResidentDirectory } from "../../src/resident/protected-path.js"
 import { captureResidentSelection } from "../../src/resident/selection-config.js"
 
@@ -112,5 +112,20 @@ it.effect("removes private-channel listeners when the waiting child is interrupt
     expect(p.events.listenerCount("message")).toBe(0)
     expect(p.events.listenerCount("disconnect")).toBe(0)
     p.events.emit("message", Redacted.value(p.start))
+  })
+)
+
+it.effect("keeps an authorized Start when the preparation deadline follows immediately", () =>
+  Effect.gen(function* () {
+    const p = yield* peer
+    const child = yield* awaitChildAuthorization(p.port, p.nonce, p.prepared).pipe(Effect.forkChild)
+    yield* Deferred.await(p.sent)
+    yield* TestClock.adjust(PREPARED_CHILD_MILLIS - 1)
+    p.events.emit("message", Redacted.value(p.start))
+    yield* TestClock.adjust(1)
+    p.events.emit("disconnect")
+    expect((yield* Fiber.join(child)).capture.selection.huly.workspace).toBe("authorization")
+    expect(p.events.listenerCount("message")).toBe(0)
+    expect(p.events.listenerCount("disconnect")).toBe(0)
   })
 )
