@@ -16,6 +16,7 @@ import {
   ActiveQueryCommand,
   ActiveQueryEvent,
   ActiveQueryHostInput,
+  ActiveQueryRequestTrace,
   ActiveQueryToolError,
   AdapterExit,
   OUTPUT_EXIT_BOUND
@@ -69,7 +70,16 @@ const main = async () => {
     new Promise<void>((resolve, reject) =>
       child.stdin.write(`${frame}\n`, (error) => (error ? reject(error) : resolve()))
     )
-  const request = async (id: number, method: string, params: Readonly<Record<string, Schema.Json>>) => {
+  const request = async (
+    id: ActiveQueryRequestTrace["id"],
+    method: ActiveQueryRequestTrace["method"],
+    params: Readonly<Record<string, Schema.Json>>
+  ) => {
+    const trace = (step: ActiveQueryRequestTrace["step"]) =>
+      process.stderr.write(
+        `${Schema.encodeSync(Schema.fromJsonString(ActiveQueryRequestTrace))({ kind: "active-query-request", parentPid: process.pid, id, method, step })}\n`
+      )
+    trace({ _tag: "sending" })
     await send(
       Schema.encodeSync(Schema.fromJsonString(HostMessage))({
         jsonrpc: "2.0",
@@ -78,15 +88,29 @@ const main = async () => {
         params: { ...params, ...liveReadMetadata(protocol) }
       })
     )
+    trace({ _tag: "waiting" })
     for (let count = 0; count <= MAX_NOTIFICATIONS; count++) {
       const next = await incoming.next()
-      if (next.done) return undefined
+      if (next.done) {
+        trace({ _tag: "eof" })
+        return undefined
+      }
+      trace({ _tag: "frame", bytes: Buffer.byteLength(next.value) })
       if (Buffer.byteLength(next.value) > MAX_ADAPTER_RESPONSE_BYTES) throw new Error("Oversized adapter response")
       const reply = Schema.decodeUnknownSync(Schema.fromJsonString(BackendMessage))(next.value)
       if (!("id" in reply)) continue
-      if (reply.id !== id || "error" in reply) throw new Error("Unexpected adapter response")
+      if ("error" in reply) {
+        trace({ _tag: "rejected", code: reply.error.code })
+        throw new Error("Unexpected adapter response")
+      }
+      if (reply.id !== id) {
+        trace({ _tag: "wrongId" })
+        throw new Error("Unexpected adapter response")
+      }
+      trace({ _tag: "completed" })
       return reply.result
     }
+    trace({ _tag: "notificationLimit" })
     throw new Error("Adapter notification bound exceeded")
   }
   const burst = makeActiveQueryBurst({

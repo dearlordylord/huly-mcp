@@ -65,6 +65,23 @@ export const ActiveQueryEvent = Schema.TaggedUnion({
   exit: AdapterExit.fields
 })
 export type ActiveQueryEvent = Schema.Schema.Type<typeof ActiveQueryEvent>
+export const ActiveQueryRequestTrace = Schema.Struct({
+  kind: Schema.Literal("active-query-request"),
+  parentPid: ActiveQueryEvent.cases.ready.fields.parentPid,
+  id: ActiveQueryEvent.cases.started.fields.id,
+  method: Schema.Literals(["initialize", "server/discover", "tools/call"]),
+  step: Schema.TaggedUnion({
+    sending: {},
+    waiting: {},
+    frame: { bytes: Schema.Natural },
+    eof: {},
+    wrongId: {},
+    rejected: { code: Schema.Int },
+    completed: {},
+    notificationLimit: {}
+  })
+})
+export type ActiveQueryRequestTrace = Schema.Schema.Type<typeof ActiveQueryRequestTrace>
 export const ActiveQueryReceipt = Schema.Struct({
   mcpSha256: ModelWaitReceipt.fields.mcpSha256,
   protocol: ModelWaitReceipt.fields.protocol,
