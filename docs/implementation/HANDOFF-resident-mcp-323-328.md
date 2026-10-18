@@ -586,3 +586,8 @@ Focused20287 terminalPASS2protocols /tmp/resident-error-routing-first.log; local
 ### Scoped capability transport boundary — 2026-10-18
 
 [Transport report](resident-capability-boundary-2026-10-18.md): two concurrent in-process adapters over real TLS preserve exact capabilities/metadata and isolate legacy sessions across both supported protocols. Three focused files pass19tests; changed-file lint/format and Standards/Spec reviews accepted after schema correction. Production unchanged; no full gate. Synthetic negotiation replies and no interactive/progress producers mean native negotiation, progress, continuations and wider #323.4/.5 remain open. All six issues remain incomplete.
+
+
+### Managed policy three-mode matrix — 2026-10-18
+
+Test-only after ee9be005: [report](resident-policy-modes-2026-10-18.md). Native/strict actual cross-policy refusals retained; non-strict verifies intended scoped native catalog plus full proxy schema visibility, without claiming Huly invocation success. Discriminated receipt prevents mixed evidence. Final focused three cases pass /tmp/resident-policy-three-modes-union.log; local lint/format and both reviews accepted. Initial incorrect strict-only expectation retained in first log. No full gate, no production change; all six tickets remain incomplete.

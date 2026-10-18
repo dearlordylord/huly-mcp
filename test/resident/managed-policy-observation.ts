@@ -3,12 +3,22 @@ import { Schema } from "effect"
 import { HttpPort } from "../../src/mcp/http-transport.js"
 import { KernelOwnedExit } from "../helpers/kernel-reaped-events.js"
 
-export const ManagedPolicyScenario = Schema.Literals(["native", "proxy-strict"])
-export const ManagedPolicyObservation = Schema.Struct({
-  scenario: ManagedPolicyScenario,
+export const ManagedPolicyScenario = Schema.Literals(["native", "proxy-strict", "proxy-non-strict"])
+const receiptFields = {
   projectPort: HttpPort.check(Schema.isGreaterThan(0)),
   issuePort: HttpPort.check(Schema.isGreaterThan(0)),
-  crossPolicyCallsRefused: Schema.Literal(true),
   backendExits: Schema.Array(KernelOwnedExit),
   privateStateRemoved: Schema.Literal(true)
-})
+}
+export const ManagedPolicyObservation = Schema.Union([
+  Schema.Struct({
+    ...receiptFields,
+    scenario: Schema.Literals(["native", "proxy-strict"]),
+    crossPolicyEvidence: Schema.Literal("call-refused")
+  }),
+  Schema.Struct({
+    ...receiptFields,
+    scenario: Schema.Literal("proxy-non-strict"),
+    crossPolicyEvidence: Schema.Literal("schema-visible")
+  })
+])

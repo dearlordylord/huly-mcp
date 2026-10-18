@@ -49,7 +49,11 @@ const main = async () => {
         MCP_RESIDENT_STATE_DIRECTORY: input.directory,
         ...(input.scenario === "native"
           ? { HULY_TOOL_MODE: "native", TOOLS: policy.allowed }
-          : { HULY_TOOL_MODE: "proxy", TOOLSETS: policy.toolset, PROXY_OUTPUT_STRICT: "true" })
+          : {
+              HULY_TOOL_MODE: "proxy",
+              TOOLSETS: policy.toolset,
+              PROXY_OUTPUT_STRICT: String(input.scenario === "proxy-strict")
+            })
       }
     })
     const client = new Client(
@@ -71,9 +75,9 @@ const main = async () => {
         process.stderr.write("Managed policy: reading catalog\n")
         const catalog = await session.client.listTools(undefined, { timeout: RESPONSE_BOUND })
         const names = catalog.tools.map((tool) => tool.name)
-        assert.equal(names.includes(session.allowed), input.scenario === "native")
+        assert.equal(names.includes(session.allowed), input.scenario !== "proxy-strict")
         assert.equal(names.includes(session.forbidden), false)
-        if (input.scenario === "proxy-strict") {
+        if (input.scenario !== "native") {
           assert.equal(names.includes("invoke_tool"), true)
           const definition = await session.client.callTool(
             { name: "get_tool_schema", arguments: { toolName: session.allowed } },
@@ -94,6 +98,20 @@ const main = async () => {
         )
         assert.notEqual(context.isError, true)
         ports.push(Schema.decodeUnknownSync(ContextReply)(context.structuredContent).result.transport.http?.port)
+        if (input.scenario === "proxy-non-strict") {
+          const crossSchema = await session.client.callTool(
+            { name: "get_tool_schema", arguments: { toolName: session.forbidden } },
+            { timeout: RESPONSE_BOUND }
+          )
+          assert.notEqual(crossSchema.isError, true)
+          assert.equal(
+            Schema.decodeUnknownSync(Schema.Struct({ result: Schema.Struct({ name: Schema.String }) }))(
+              crossSchema.structuredContent
+            ).result.name,
+            session.forbidden
+          )
+          continue
+        }
         process.stderr.write("Managed policy: attempting cross-policy call\n")
         await session.client
           .callTool(
@@ -149,7 +167,7 @@ const main = async () => {
             projectPort,
             issuePort,
             scenario: input.scenario,
-            crossPolicyCallsRefused: true,
+            crossPolicyEvidence: input.scenario === "proxy-non-strict" ? "schema-visible" : "call-refused",
             backendExits,
             privateStateRemoved: true
           })

@@ -8,7 +8,7 @@ import { expect, it } from "vitest"
 
 import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
-import { ManagedPolicyObservation } from "./managed-policy-observation.js"
+import { ManagedPolicyObservation, ManagedPolicyScenario } from "./managed-policy-observation.js"
 
 const BUILD_BOUND = 30_000
 const POLICY_PROCESS_BOUND = 30_000
@@ -16,7 +16,7 @@ const TEST_BOUND = BUILD_BOUND + POLICY_PROCESS_BOUND
 const ProcessFailure = Schema.Struct({ stderr: Schema.String })
 const runFile = promisify(execFile)
 
-it.skipIf(process.platform !== "linux").each(["native", "proxy-strict"])(
+it.skipIf(process.platform !== "linux").each(ManagedPolicyScenario.literals)(
   "isolates managed %s tool policies in catalogs and actual cross-policy calls",
   { timeout: TEST_BOUND },
   async (scenario) => {
@@ -63,7 +63,7 @@ it.skipIf(process.platform !== "linux").each(["native", "proxy-strict"])(
       expect(observation.backendExits).toHaveLength(2)
       expect(observation.backendExits.every((exit) => exit.exitCode === 0)).toBe(true)
       expect(observation.projectPort).not.toBe(observation.issuePort)
-      expect(observation.crossPolicyCallsRefused).toBe(true)
+      expect(observation.crossPolicyEvidence).toBe(scenario === "proxy-non-strict" ? "schema-visible" : "call-refused")
       expect(await fs.readdir(root)).toEqual([])
       await fs.writeFile(
         `${root}.receipt.json`,
