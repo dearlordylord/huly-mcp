@@ -427,3 +427,8 @@ project gate is the preceding `eeff872c` candidate with 5732 passing tests.
 It does not exercise this subsequently added native component. Native execution,
 cross-account enforcement, complete Windows support and full #323–328 delivery
 remain pending.
+
+
+## Pure selection and publication decisions — 2026-10-18
+
+The [selection transition increment](resident-selection-transitions-2026-10-18.md) moves candidate uniqueness/capacity and publication authority into ordinary state/event functions while retaining actual claim and candidate resource scopes. It also fixes the observed cancellation gap between registry publication, receipt recording and claim release. Focused resource tests and pure laws pass; full check-all passed502files5802tests, and scoped current-byte modern/legacy local-Huly sharing/continued reads/kernel-owned retirement passed. This is partial parent D8/D9 evidence, not complete #324 acceptance or lifecycle-model alignment.

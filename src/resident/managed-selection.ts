@@ -27,6 +27,8 @@ import type { BackendResponseError } from "./response-stream.js"
 import type { StartupBudget } from "./startup-budget.js"
 import { readResidentNamespace } from "./namespace-inventory.js"
 import { readManagedDirectoryForOwner } from "./managed-directory-config.js"
+import { advanceCandidateSelection, type CandidateSelection } from "./candidate-selection-state.js"
+import { advancePublication, makePublicationState, publicationIsReady } from "./publication-state.js"
 
 const withSelectionOwnership = <A, E, R>(
   directory: ResidentDirectory,
@@ -80,34 +82,45 @@ const withCompatibleCandidate = <A, E, R>(
   descriptors: ReadonlyArray<ResidentAttachment>,
   capture: ResidentStartupCapture,
   startup: StartupBudget,
+  recordCount: number,
   use: (candidate: SelectedCandidate) => Effect.Effect<A, E, R>
 ) => {
   const visit = (
     remaining: ReadonlyArray<ResidentAttachment>,
-    selected: SelectedCandidate | undefined
+    selected: CandidateSelection<SelectedCandidate>
   ): Effect.Effect<Option.Option<A>, E | BackendResponseError | ManagedLaunchError, R> =>
     Effect.gen(function* () {
       const [descriptor, ...rest] = remaining
-      if (descriptor === undefined)
-        return selected === undefined ? Option.none<A>() : yield* use(selected).pipe(Effect.map(Option.some))
+      if (descriptor === undefined) {
+        const decision = advanceCandidateSelection(selected, {
+          _tag: "Completed",
+          recordCount,
+          capacity: MAX_REGISTRY_RECORDS
+        })
+        if (decision._tag === "Capacity") return yield* registryCapacityFailure()
+        return decision._tag === "Absent"
+          ? Option.none<A>()
+          : yield* use(decision.candidate).pipe(Effect.map(Option.some))
+      }
       const matched = yield* withAdapterCandidate(
         descriptor,
         capture.selection,
         (exchange) => {
-          if (selected !== undefined)
+          const decision = advanceCandidateSelection(selected, { _tag: "Matched", candidate: { descriptor, exchange } })
+          if (decision._tag === "Duplicate")
             return Effect.fail(
               new ManagedLaunchError({
                 reason: "ownership",
                 message: "Multiple compatible resident generations are unresolved; replacement refused"
               })
             )
-          return visit(rest, { descriptor, exchange })
+          return visit(rest, decision.state)
         },
         startup
       )
       return Option.isSome(matched) ? matched.value : yield* visit(rest, selected)
     })
-  return visit(descriptors, undefined)
+  return visit(descriptors, { _tag: "Empty" })
 }
 
 export const withResidentSelection = <A, E, R, B, F, S>(options: {
@@ -139,6 +152,7 @@ export const withResidentSelection = <A, E, R, B, F, S>(options: {
               currentDescriptors,
               options.capture,
               options.startup,
+              records.length,
               ({ descriptor, exchange }) =>
                 claim.release.pipe(
                   Effect.andThen(
@@ -150,7 +164,6 @@ export const withResidentSelection = <A, E, R, B, F, S>(options: {
                 )
             )
             if (Option.isSome(matched)) return matched.value
-            if (records.length === MAX_REGISTRY_RECORDS) return yield* registryCapacityFailure()
             return yield* options.absent({ directory: options.directory, registry, release: claim.release })
           }),
         options.startup
@@ -170,36 +183,38 @@ export const runOwnedGeneration = <A, E, R>(
     Scope.make(),
     (publicationScope) =>
       Effect.suspend(() => {
-        type Publication =
-          | { readonly kind: "unpublished" | "publishing" }
-          | {
-              readonly kind: "published"
-              readonly receipt: Effect.Success<ReturnType<typeof ownership.registry.publish>>
-            }
-        let publication: Publication = { kind: "unpublished" }
-        let closed = false
+        let publication = makePublicationState<Effect.Success<ReturnType<typeof ownership.registry.publish>>>()
         const publish = (file: ResidentFilePath) =>
           Effect.gen(function* () {
-            if (closed || publication.kind !== "unpublished")
+            const started = advancePublication(publication, {
+              _tag: "Begin",
+              sameDirectory: dirname(resolve(file)) === ownership.directory
+            })
+            publication = started.state
+            if (started.decision._tag === "RefuseAttempt")
               return yield* new ManagedLaunchError({
                 reason: "protocol",
                 message: "Resident generation publication is fenced or was already attempted"
               })
-            publication = { kind: "publishing" }
-            if (dirname(resolve(file)) !== ownership.directory)
+            if (started.decision._tag === "RefuseDirectory")
               return yield* new ManagedLaunchError({
                 reason: "ownership",
                 message: "Resident readiness reported another owner's directory; publication refused"
               })
-            const receipt = yield* ownership.registry.publish(yield* readResidentAttachment(file))
-            publication = { kind: "published", receipt }
-            yield* ownership.release
+            const descriptor = yield* readResidentAttachment(file)
+            yield* Effect.uninterruptible(
+              Effect.gen(function* () {
+                const receipt = yield* ownership.registry.publish(descriptor)
+                publication = advancePublication(publication, { _tag: "Recorded", receipt }).state
+                yield* ownership.release
+              })
+            )
           })
         const ready = (file: ResidentFilePath) =>
           publish(file).pipe(Effect.forkIn(publicationScope), Effect.flatMap(Fiber.join))
         return run(ready).pipe(
           Effect.tap(() =>
-            publication.kind === "published"
+            publicationIsReady(publication)
               ? Effect.void
               : Effect.fail(
                   new ManagedLaunchError({
@@ -210,11 +225,19 @@ export const runOwnedGeneration = <A, E, R>(
           ),
           Effect.onExit((exit) =>
             Effect.gen(function* () {
-              closed = true
+              publication = advancePublication(publication, {
+                _tag: "Fence",
+                outcome: Exit.isSuccess(exit)
+                  ? "success"
+                  : Cause.hasInterruptsOnly(exit.cause)
+                    ? "interrupts-only"
+                    : "failure"
+              }).state
               yield* Scope.close(publicationScope, exit)
-              if (publication.kind !== "published" || (Exit.isFailure(exit) && !Cause.hasInterruptsOnly(exit.cause)))
-                return
-              const owned = publication.receipt
+              const settled = advancePublication(publication, { _tag: "Settled" })
+              publication = settled.state
+              if (settled.decision._tag === "Retain") return
+              const owned = settled.decision.receipt
               yield* withSelectionOwnership(ownership.directory, () => owned.retire).pipe(
                 Effect.interruptible,
                 Effect.timeoutOrElse({
