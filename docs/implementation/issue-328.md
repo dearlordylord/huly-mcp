@@ -6,17 +6,17 @@ The user excluded Windows resident support because substantial implementation an
 
 
 Status: incomplete. All six issues #323–328 and parent #322 remain open.
-The live #328 body was read on 2026-10-17; its last update was
-2026-10-17T21:46:31Z. This report does not replace its acceptance criteria.
+The live #328 body was refreshed read-only on 2026-10-18; its cached source
+is `/tmp/resident-current-requirements-323-328/328.json`. This report does not replace its acceptance criteria.
 
 The Linux candidate is in `/tmp/hulymcp-resident-linux`, branch
-`implement/resident-mcp-linux-323-328`. The namespace/admission checkpoint
-`15ae6b13` and subsequent increments retain namespace/locator consistency fixes.
-[Issue 327](issue-327.md) records scoped process receipts and exact MCP/CLI
-artifact hashes. Those receipts independently join owned exits rather than
-inferring retirement from CLI acceptance or missing metadata. Ten-parent results remain inconsistent: the latest full gate failed connection
-startup and a later owner-only runtime-loading increment passed one focused run.
-Neither establishes complete qualification; see the evidence below.
+`implement/resident-mcp-linux-323-328`, at documentation checkpoint `a20fe4f1`
+over production candidate `2f19c614`. Its fresh campaign quality gate passes
+483 files / 5742 tests. [Issue 327](issue-327.md) records the preceding ownership
+and uncertainty increments. Earlier ten-parent failures and later focused/full
+gate passes remain preserved below; the passing gate does not explain every
+historical failure or establish native macOS qualification. Current live
+observations and remaining obligations are indexed below.
 
 ## Acceptance evidence index
 
@@ -25,11 +25,11 @@ evidence leaves the criterion pending.
 
 | Criterion | Current evidence and remaining work |
 | --- | --- |
-| 1. Complete contract, coherent final gate and local Huly | Candidate `2f19c614` passes the full 5742-test gate and the [scoped local-Huly read schedules](resident-live-linux-2026-10-18.md). Full integration and complete-contract qualification remain pending. |
+| 1. Complete contract, coherent final gate and local Huly | Candidate `2f19c614` passes the full 5742-test gate and the [scoped local-Huly read schedules](resident-live-linux-2026-10-18.md). All five stock movement suites and the coordinator pass; see the [campaign report](resident-movement-linux-2026-10-18.md). Complete-contract qualification remains pending. |
 | 2. Native lifecycle/concurrency/platform scenarios | Linux normal stop, two-caller replacement and version coexistence have process receipts. Live Huly now covers two-reader idle retirement and a later fresh managed generation. Earlier ten-parent failures remain preserved. Complete Linux schedules and native macOS remain pending. |
 | 3. Unsupported Windows startup | Native Windows work is excluded by the 2026-10-18 user decision. Unsupported resident startup remains refused. |
-| 4. Auth/profile/policy/protocol behavior | Synthetic environment-token workspaces and actual catalog/context exchange support scoped fixtures. Complete supported profile/env/token/password, policy and modern/legacy qualification remains pending. |
-| 5. Actual host discovery and continued reads | Actual Codex discovery/two context reads and actual Claude Code discovery/two context calls are recorded below. The latter use a local deterministic model endpoint. SDK-driven separate parents now pass scoped local-Huly project reads; actual-host Huly reads and complete catalog/resource/lifecycle qualification remain pending. |
+| 4. Auth/profile/policy/protocol behavior | Synthetic fixtures plus live token/password/saved-profile reads now have scoped evidence, including same-reader auth source and launch receipts. A disjoint native live-policy diagnostic passes; its earlier allowed-call timeout remains unexplained. Complete policy/protocol/auth matrices remain pending. |
+| 5. Actual host discovery and continued reads | Actual Codex discovery/two context reads and actual Claude Code discovery/two context calls are recorded below. The latter use a local deterministic model endpoint. SDK-driven separate parents, actual Claude Code and actual Codex app-server now pass scoped local-Huly project reads; complete catalog/resource/lifecycle qualification remains pending. |
 | 6. Alternating fresh-process comparisons | Pending for standalone, managed and direct HTTP with one/ten clients and declared cache boundaries. The read campaign is not a performance comparison. |
 | 7. Total RSS/CPU/completion rates | Raw whole-tree samples accompany the live read campaign; aggregate analysis and the comparison matrix remain pending. No prior direct-HTTP memory figure is adopted as a managed-stdio budget. Include every actual adapter, launcher and backend. |
 | 8. Adversarial routing/backpressure/no replay | Existing scoped routing/request-loss evidence and the [operation-stop fault schedules](issue-327.md#stop-during-an-operation-and-failed-cleanup-2026-10-17) prove scoped local behavior. The latter use an embedded registry and one filesystem write with explicit host cancellation. The [detectable namespace-loss schedules](issue-327.md#refuse-detectable-ownership-state-loss-before-selection-2026-10-17) and [locator-content schedules](issue-327.md#parse-and-compare-current-locator-contents-2026-10-17) cover seven local metadata faults with a live existing caller. Complete real-Huly fault qualification remains pending. |
@@ -902,3 +902,216 @@ supervisor success. No Huly writes, messages or global configuration changes wer
 made. The private evidence root retains all 68 child criteria, original project
 selection, executable probes, receipts and raw resource observations. The
 15-row index above remains partial; no issue or complete campaign is closed.
+
+## Actual Claude Code project reads against local Huly — 2026-10-18
+
+Qualification remains incomplete. The installed Claude Code 2.1.296 now performs
+first and continued `get_project` calls through the packaged managed adapter
+against local Huly. Its two returned project identifiers and names match the
+private selected fixture. A disposable loopback Messages endpoint supplies the
+two tool-use turns and final response; this qualifies actual host dispatch and
+Huly reads, not remote model behavior. The host uses isolated HOME/configuration,
+strict MCP configuration, an explicit tool allowlist and no global settings.
+Credentials pass through the process environment and are absent from MCP config.
+No fixture mutations or recipient messages were requested.
+
+The immutable MCP artifact is the production candidate `2f19c614`, SHA-256
+`908e121f7d9fd4ab49b931b1ee349a448feec5a6db10d616ac3b0267dfe47416`.
+Linux aarch64 / Node 24.20.0 and complete environment-backed Huly selection match
+the scoped read campaign. Host exit is 0. The probe captures the protected
+registry during execution, then matches its backend PID to an actual kernel
+subreaper exit event with code 0. Private state is empty. Supervisor exit is 0
+and its diagnostics are empty; no timeout cleanup was needed. The existing
+explicit 45-second lease-expiry supervisor scenario is used to accommodate a
+host ending an adapter without detach; the host command itself retains a
+12-second bound. This observation does not establish which detach/expiry path
+caused retirement or change the ordinary 25-second supervisor bound.
+
+Private evidence root `/tmp/resident-claude-live-read-665f_0cg/` retains the
+executable `probe.py`, isolated configuration, host NDJSON, local model
+observations, original receipt, captured registry and separate retirement
+receipt. `verify.mts` parses input, project results, registry and exit using the
+existing Effect schemas and compares the target/PID/exit and final empty state.
+Its initial launch used a nonexistent Effect module path; changing that import
+to the package export made verification pass without another host/Huly run.
+`sha256.json` records 15 evidence-file hashes. Receipt SHA-256:
+`8354bbdd47cd5bca2466c37f815c878d9c1f379930eefdc733fdf1ab9a770807`;
+retirement receipt:
+`04b0e547290f058b352946e2da6e3f599ba3c7f97bfcc3c933cafd8245173f3f`;
+probe: `51a07f7d286c75e6478791ce130eb6e6da739cbda59ec5e8385cae9502db03ed`.
+
+Actual Codex Huly reads, full host catalog/resource behavior, configuration and
+protocol matrices, native macOS, remaining live faults, model alignment and
+adapter-inclusive comparisons remain pending. The five-suite movement campaign
+is separately active; this read scenario is not a movement certification pass.
+All six delivery issues remain open.
+
+## Actual Codex project reads against local Huly — 2026-10-18
+
+Qualification remains incomplete. Installed Codex CLI 0.163.0 app-server now
+performs two `get_project` calls through the same immutable packaged managed
+candidate used above, against local Huly. The local app-server API initializes
+an ephemeral thread, requests MCP server status and invokes the tool twice;
+there is no model inference. Isolated HOME/CODEX_HOME configuration names only
+the credential environment variables to inherit and contains no credential
+values. No global host settings, fixture data or recipient messages are changed.
+
+Evidence `/tmp/resident-codex-live-read-5125ura_/` retains the probe, app-server
+protocol, original first/second structured results, host exit, protected registry
+and separate kernel-owned retirement. `verify.mts` parses both results with
+`GetProjectResultSchema`, compares exact selected identifier/name, requires one
+schema-parsed registry, correlates its PID to the observed exit 0, checks host
+exit 0, supervisor exit 0 and empty state. The explicit existing 45-second
+lease-expiry supervisor mode bounds this host shutdown scenario; individual
+app-server responses and shutdown waits retain five-second bounds. No forced
+supervisor cleanup occurred and its diagnostics are empty. The result does not
+identify the detach/expiry mechanism or qualify model-driven Codex behavior.
+
+`sha256.json` retains 14 evidence hashes. MCP artifact SHA-256 is
+`908e121f7d9fd4ab49b931b1ee349a448feec5a6db10d616ac3b0267dfe47416`;
+Codex receipt `b0b16fe173caaa10476baaf7d0a935dd71baf988668744526573311a032c6344`;
+retirement receipt `640e2046513e30f9bcbd1ac1fbdedce9b590b01ddff49d9828ee78be20ddb88e`;
+probe `40ff51dd32e5ac904a55a59242b54cf24fc71bae928df73c1d84e66e3fe844d0`.
+This is one successful two-read attempt on Linux aarch64 / Node 24.20.0 using
+complete environment selection. Full catalog/resource/protocol/auth/platform
+qualification, live fault schedules, model alignment, performance and movement
+certification remain pending. All six issues remain open.
+
+## Live Huly survivor after owned adapter death — 2026-10-18
+
+Qualification remains incomplete. One scoped Linux process schedule now tests
+healthy-backend isolation with actual Huly project reads. Two directly owned
+packaged managed adapters read distinct selected projects using colliding ID 41.
+The harness kills and joins the first adapter (exit -9). The survivor successfully
+reads its own project immediately and at 11, 22 and 31 seconds after that kill,
+reusing ID 42 sequentially. A fresh adapter then reads the first selected project.
+The harness checks one generation and unchanged registry bytes throughout;
+responses match their intended projects rather than only succeeding generically.
+
+Fresh and survivor adapters exit 0 after EOF. The kernel subreaper observes the
+registry-correlated backend exit 0; private state is empty, supervisor exit is 0
+and its diagnostics are empty. The existing explicit 45-second lease-expiry
+supervisor scenario contains the run; response and adapter-exit bounds remain
+five seconds, backend exit observation seven seconds. The 31-second hold crosses
+the configured 30-second dead-adapter lease; it does not independently observe
+which server lease transition ran. There is no claim of transparent recovery
+from backend death. All adapters here share one harness parent; separate-host
+parent loss remains a distinct scenario.
+
+Private evidence `/tmp/resident-live-survivor-9w2cz2g2/` retains the executable
+probe, phases, all selected project results, protected registry, exits and
+schema-based `verify.mts`. Its 13-file SHA-256 manifest includes receipt
+`74935d0e8ce090f90c75b96671892e32012e5e589c4a5c796f1144e8ecd5d1c2`.
+The verifier parses every result with `GetProjectResultSchema`, requires two
+initial/four survivor/one fresh results, checks exact identifiers/names and
+adapter exits, matches the backend PID/exit and checks supervisor exit/empty
+state. The production MCP artifact is unchanged from candidate `2f19c614`, hash
+`908e121f7d9fd4ab49b931b1ee349a448feec5a6db10d616ac3b0267dfe47416`.
+Environment remains Linux aarch64, Node 24.20.0 and complete local-Huly environment
+selection. No Huly mutation was requested. This passing schedule does not certify
+live mutation uncertainty, all lifecycle faults, another OS, resource comparisons
+or complete issue delivery. All six issues remain open.
+
+## Live password and explicitly selected saved-profile reads — 2026-10-18
+
+Qualification remains incomplete. Two separate maintained managed-pair runs executed with additional
+reported local-Huly selection paths on Linux aarch64 / Node 24.20.0:
+
+- Password: unset `HULY_PROFILE` and `HULY_TOKEN`, retain complete environment
+  email/password and the guarded local URL/workspace. Evidence
+  `/tmp/resident-live-password-a00kob3t/`, seven-file hash manifest, receipt SHA-256
+  `79254079c4f7cb54ae997da99ad695ca28a4f5c827b5fcb9179c9cfe8e443f47`.
+- Saved file-token profile: use isolated `XDG_CONFIG_HOME`, explicitly select
+  `selected` while the profile file has active `unrelated`, and unset all
+  environment Huly URL/workspace/email/password/token values. Evidence
+  `/tmp/resident-live-profile-bwco3g8x/`, nine-file hash manifest, receipt SHA-256
+  `14035e89f60453acbfa58bdb1de3d5d82ba0cff95743206f3725b4495c84bd3a`.
+
+Each run has two separate reader parents, distinct target projects and colliding
+request IDs, successful first/continued reads, common generation/backend PID,
+kernel-observed backend exit 0, empty ownership state, supervisor exit 0 and
+empty diagnostics. The retained receipts do not independently establish resolved authentication
+method/source or launch-key absence; those selection facts above are reported
+execution context pending redacted launch/context receipts. Each original
+read/retirement receipt is schema-parsed by its retained
+`verify.mts`; target identifiers/names and process/generation identity are compared.
+The immutable production MCP and maintained probe artifacts match the preceding
+live campaign. Existing 25-second supervision and five-second exchanges remain
+unchanged. These are passing runs, not retry or performance measurements.
+
+The profile fixture uses the real schema-owned profile store. Its first local
+preparation failed before any Huly invocation because it passed an already parsed
+Redacted token through the raw-token decoder again. Passing the schema-derived
+credential directly to the store corrected preparation without exposing the
+secret. The created private credential file was removed after result and owned
+retirement verification, recorded in `credential-cleanup.json`; global/user
+profiles were untouched. Credential bytes are not retained in the evidence
+manifest. The retained profile metadata alone cannot reproduce authentication
+without supplying fresh credentials.
+
+Earlier live reads had token and password values both present; those runs must
+not substitute for the isolated password run. The new scope does not qualify
+keychain storage, live token rotation/logout/revocation, differing live policies,
+all protocol identities, another OS or the complete authentication contract.
+All six issues remain open, and the independent movement campaign is still active.
+
+### Same-reader authentication evidence follow-up
+
+The named diagnostic above now passes for both paths, without changing the
+production MCP artifact. Private evidence
+`/tmp/resident-live-auth-diagnostic-0f_x2pj2/` retains an instrumented copy of the
+maintained reader, its exact source insertion/build script, separate fresh
+password/profile inputs, schema verifiers and redacted launch receipts.
+Instrumentation writes only the schema-encoded `auth` subsection of the already
+parsed `get_huly_context` response from each reader. Both reader parent PIDs are
+matched to their exclusive `auth-PID.json` files.
+
+Both password readers report method `password`, source `env`, token unconfigured
+and email/password configured. The launch receipt independently records absent
+HULY_PROFILE/HULY_TOKEN and present URL/workspace/email/password. Both selected
+profile readers report method `token`, source `profile`, token configured and
+email/password unconfigured. Their launch records profile/XDG selection present
+and all environment URL/workspace/token/email/password absent. The fixture file
+still has a different active profile. Verifiers parse auth with the existing
+context schema, require exact launch-key booleans, and repeat original
+project/identity/supervisor/retirement checks. Both runs pass; diagnostics are
+empty, owned backend exits are 0 and state is empty. The new private profile
+credential was removed after verification, with a cleanup receipt. Original
+weaker receipts and manifests remain untouched. These read-only diagnostics
+address the review gap; broader auth/lifecycle qualification remains incomplete.
+
+## Live disjoint native tool-policy reads and preserved timeout — 2026-10-18
+
+Qualification remains incomplete. A direct two-adapter local-Huly schedule now
+checks `TOOLS=get_project` versus `TOOLS=list_projects` with identical token
+authority. Each catalog exposes its allowed tool and omits the other one; parsed
+context confirms native exposure and the corresponding resolved tool scope.
+Allowed project/list reads return the selected fixture, and both cross-policy
+calls return the precise `Unknown tool: <forbidden name>` error. A continued
+first-policy read succeeds after both policies are admitted. Two distinct
+backend endpoints and protected generations remain isolated. Both adapters and
+kernel-correlated backend owners exit 0; state is empty, supervisor exits 0 and
+its diagnostics are empty. The unchanged production MCP artifact is used.
+
+The first attempt `/tmp/resident-live-policy-vloojeza/` failed at a permitted
+read's unchanged five-second response wait. Its opaque schedule did not retain
+which permitted tool timed out. Adapter stderr was empty; 25-second supervision
+forcibly retired remaining processes and exited 1. It is a preserved failure,
+not a qualification pass or unexplained data operation to replay.
+
+The named distinguishing attempt
+`/tmp/resident-live-policy-diagnostic-lxvamu3r/` ran after the stock movement
+campaign ended. It retains operation/adapter/phase timings and parsed catalog
+and context before each permitted call, without arguments or credentials in
+phase logs. Five-second exchange/exit waits, seven-second backend observation
+and the existing 25-second supervisor remain unchanged. It passes once.
+`verify.mts` parses catalog, full context, result schemas, exact refusal,
+registry and owned exits; it checks selected project values, distinct policy
+ports/generations, both backend exits and final supervisor/empty state.
+Both roots retain hash manifests. Successful diagnostic behavior does not
+establish the earlier timeout's cause; workload timing and instrumentation
+changed together. No performance or general reliability claim follows.
+
+These are native modern-protocol direct child adapters under one harness parent,
+not full proxy/strict/legacy-policy, host-identity, backpressure, backend-crash or
+native macOS qualification. No Huly write was requested. All six issues remain open.
