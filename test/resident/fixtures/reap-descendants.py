@@ -10,11 +10,12 @@ import time
 
 PR_SET_CHILD_SUBREAPER = 36
 RUN_SECONDS = 25
+LEASE_EXPIRY_SECONDS = 45
 CLEANUP_SECONDS = 4
 POLL_SECONDS = 0.02
 
 
-def supervise(arguments, clock, sleep, report_reaped=False, resources=None):
+def supervise(arguments, clock, sleep, report_reaped=False, resources=None, lease_expiry=False):
     libc = ctypes.CDLL(None, use_errno=True)
     if libc.prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) != 0:
         raise OSError(ctypes.get_errno(), "Cannot establish fixture child ownership")
@@ -26,7 +27,7 @@ def supervise(arguments, clock, sleep, report_reaped=False, resources=None):
 
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
-    deadline = clock() + RUN_SECONDS
+    deadline = clock() + (LEASE_EXPIRY_SECONDS if lease_expiry else RUN_SECONDS)
     events_read, events_write = os.pipe() if report_reaped else (None, None)
     environment = None
     if report_reaped:
@@ -100,6 +101,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--report-reaped", action="store_true")
     parser.add_argument("--resources", help="Exclusive new private Linux diagnostic NDJSON file")
+    parser.add_argument("--lease-expiry", action="store_true", help="Separate 45-second abrupt-adapter expiry scenario")
     parser.add_argument("command", nargs=argparse.REMAINDER)
     options = parser.parse_args()
     if not options.command:
@@ -110,7 +112,7 @@ if __name__ == "__main__":
         samples = ResourceSamples(options.resources, os.getpid(), time.monotonic)
     outcome = 1
     try:
-        outcome = supervise(options.command, time.monotonic, time.sleep, options.report_reaped, samples)
+        outcome = supervise(options.command, time.monotonic, time.sleep, options.report_reaped, samples, options.lease_expiry)
     finally:
         if samples is not None:
             samples.close(outcome)

@@ -303,3 +303,37 @@ SHA-256 `5a426f34e324b257470ca9f1d6cf20024c5b2940f261ac7a6525dadf3f1c3ab1`.
 Only that selected test ran (seven other cases were filtered out). This supports
 the existing lease-expiry path on the manual backend; it does not prove managed
 last-adapter idle retirement, real Codex cleanup or the complete suite.
+
+### Managed last-adapter abrupt death and expiry
+
+A new Linux packaged process schedule directly owns one managed adapter,
+completes legacy initialization, confirms it created the sole published backend,
+and kills only that adapter handle with SIGKILL. After its observed exit it waits
+the unchanged production lease duration and joins the backend's actual
+kernel-owned exit. Success requires exit code 0 and complete private-state
+removal. No PID-absence or missing-file inference substitutes for the exit.
+
+This separate expiry schedule uses the supervisor's explicit `--lease-expiry`
+45-second allowance and a 50-second outer process allowance. The ordinary
+supervisor default remains 25 seconds; existing callers, startup/response bounds,
+seven-second kernel-exit wait, production 30-second lease and five-second idle
+policy are unchanged. A 25-second complete scenario cannot cover a 30-second
+lease. This new schedule adds that missing interval instead of changing the
+ordinary launch or real-host failure results.
+
+The focused new expiry test and resource-observer test pass (two files/two tests).
+Log `/tmp/resident-managed-last-expiry.log`, SHA-256
+`c9c70067f722b0ad7a0ca8ef0652a7875d919db790e4e544909ab739c3a15aa5`.
+Receipt `/tmp/resident-last-adapter-expiry-qMsz1r.receipt.json`, SHA-256
+`bcc49ee02ad14c96ccd028ad2bb609f51aca260c33b530e60481767fda403d59`,
+records the owned adapter SIGKILL and backend exit code 0. Its phases log has
+SHA-256 `75d06852d011d4e234caf65317d96e784096f76ade0342b81d6097c060daadc2`.
+The successful fixture removed its empty state directory and isolated bundle;
+private receipt/phases remain. Failure paths retain the bundle/state and save
+available phases while the kernel-owned supervisor still bounds cleanup.
+
+TypeScript/Effect diagnostics and focused lint pass. Standards and Spec reviews
+find no actionable defect. This proves the scoped Linux managed last-adapter
+expiry path with legacy initialization and no active operation. It does not
+qualify actual Codex cleanup, all protocols, active work, another OS or the full
+contract. No production implementation changed; all six issues remain open.
