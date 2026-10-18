@@ -807,3 +807,19 @@ not live Huly or delayed commit after backend-generation retirement/replacement.
 The corrected full gate passes 481 files / 5735 tests at unchanged coverage
 thresholds. Earlier intentionally interrupted gate and review correction remain
 recorded. Complete native/live/model/performance qualification remains pending.
+
+
+## Delayed commit after verified backend replacement — 2026-10-18
+
+The [#327 report](issue-327.md#late-remote-commit-after-confirmed-generation-replacement--2026-10-18)
+now records a bounded Linux process schedule across two actual embedded native
+MCP backends. After the first owned process exits 0 and its namespace retires,
+a different generation reads 0, the old independently owned remote operation
+commits, and a continued read observes 1. Independent server/remote counts require
+one write and two reads; both backend exits and the final adapter exit are joined.
+Replacement is harness-started through real managed selection; the scenario uses
+explicit cancellation and a disposable HTTP/file counter with injected tools,
+not production automatic launch, unexpected crash, Huly SDK or live Huly.
+Existing normal/failed stop-fault behavior remains under the shared shell helper.
+The fresh full gate passes 482 files / 5736 tests at unchanged thresholds.
+Remaining platform, live, model/oracle and performance requirements stay open.

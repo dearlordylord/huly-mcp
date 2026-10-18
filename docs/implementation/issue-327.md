@@ -909,3 +909,79 @@ MCP SHA-256: `7cc7b8c300354694118b08e2b39248e5ea08e1de1df7bae2ce56ecf7a43c8a12`;
 CLI SHA-256: `c957044a36f2559fbdf5230a0f37860911af276f800b1a37933539d7298f5697`.
 Runtime bundles match the preceding candidate. This test increment does not
 complete #327 or the full #323–328 delivery.
+
+
+## Late remote commit after confirmed generation replacement — 2026-10-18
+
+`retired-commit-process.test.ts` runs two separately owned embedded native MCP
+backend processes using the production managed selection, publication, admission,
+TLS, drain and ownership-retirement paths. Both use an explicitly injected tool
+registry and test Huly-client layers. The managed server shell is extracted from
+the existing stop-fault backend into `test/helpers/managed-fault-backend.ts`; its
+normal and failed-cleanup schedules remain unchanged and pass.
+
+The first packaged managed adapter dispatches an increment through the first
+backend to a separately owned HTTP counter. Its write is held before filesystem
+commit. The packaged CLI accepts an exact-generation stop request with retirement
+still unconfirmed. The caller explicitly cancels request 41; native cleanup
+returns, the first backend reports retirement, and its actual owned child close
+event proves exit code 0. The fixture independently observes remote HTTP response
+disconnection and an empty private resident namespace. None of these facts
+causes the remote counter operation to commit or be retried.
+
+Only after that joined exit does the harness start another embedded backend
+through the same managed ownership-selection code. Its published generation
+differs and its registry PID matches its actual parsed child identity. Another
+packaged managed adapter issues read request 41 and observes 0. The harness then
+permits the *old* remote operation's counter commit; read request 42 observes 1.
+The first backend reports one write and no reads, the second no writes and two
+reads, and the independent remote counter records exactly one write/two reads.
+The new adapter exits 0, the second backend is stopped through the packaged CLI
+and its owned close event proves exit 0, and resident state is empty again.
+The first adapter exits 1; its release cannot be confirmed against the retired
+backend. That is recorded separately from confirmed backend retirement.
+
+The final focused run passes four files / six cases, including both old stop
+faults and the earlier adapter-loss/response-loss tests. Log `/tmp/resident-retired-commit-final-focused.log`,
+SHA-256 `2cb159b15f87b8190d99dd73a668c5b67ac0ad20ee7eb511860830315d697c3f`. Receipt `/tmp/resident-retired-commit-4SrYFw.receipt.json`, SHA-256
+`587e9cefc0acdba86928e363e21292914045bdf7c307138c883cf2978284ea26`, binds both generations, child
+exit records, observed counter values and packaged/embedded artifact hashes.
+The outer Linux child subreaper bounds the scenario to its existing 25 seconds;
+individual exchanges/shutdown waits retain five seconds. No deadline, assertion,
+quality threshold or previous test was removed.
+
+The initial focused process schedule passed, but subsequent typechecking exposed
+schema-error mapping, map-key narrowing and circular return-type inference in
+the new fixture. Failed log `/tmp/resident-retired-commit-typecheck.log` has SHA-256 `cf019503e38f5a96b2f82d6ecec65ca83deb2844b8ebffba1a67910867f80e62`;
+the corrected TypeScript/Effect run checks 1369 files with zero diagnostics
+(`/tmp/resident-retired-commit-corrected-typecheck.log`, SHA-256 `10f9713affb889401f805427700c4a0b90aa3b25ea075753473f81ead284617f`). Standards review subsequently
+required preserving protocol/PID types: backend PIDs now parse once at spawn
+and travel as the existing process identifier type; request IDs derive from the
+protocol type. Readback resolves that finding. Spec review has no actionable
+scoped issue. The final full gate is assessed separately below.
+
+This establishes the delayed external-commit schedule after verified local
+backend retirement and a different generation. The replacement is started by the
+harness, not the production automatic-launch branch. The backends use native MCP
+runtime with injected tools; the remote mutation is a disposable HTTP/file
+counter, not Huly SDK or live Huly. The schedule uses explicit caller cancellation,
+not an unexpected backend crash or host-process death. It does not establish
+automatic replay permission, general reconciliation, crash continuity or complete
+#327 acceptance. Live Huly, other required fault/platform/model/performance cases
+and the full six-ticket delivery remain pending.
+
+
+The coherent final candidate passes `GOMAXPROCS=2 pnpm check-all`: 482 files /
+5736 tests, statements 99.45% (29550/29713), branches 99% (12463/12588),
+functions 99% (7996/8076), lines 99.55% (27159/27280). Every gate stage passes
+at unchanged thresholds/bounds; TypeScript/Effect checks 1369 files with zero
+diagnostics. Log `/tmp/resident-retired-commit-check-all.log`, SHA-256 `e2d27360437e97665ddb63d714cfbb163523d3a485c40815e0a1dd11da4f5321`.
+The full-gate process receipt is `/tmp/resident-retired-commit-axf8F2.receipt.json`, SHA-256
+`fc06aad72c07837f7d280b83d68368d4f07ed4294af2570401d798836068b11c`. Its successful supervisor exit and final cleanup
+are required alongside the receipt, not inferred from its printed JSON alone.
+Frozen runtime artifacts, receipt/phases, focused log and failed initial
+typecheck are copied at `/tmp/resident-retired-commit-gate-_50i5cbb`.
+MCP SHA-256 `7cc7b8c300354694118b08e2b39248e5ea08e1de1df7bae2ce56ecf7a43c8a12` and CLI SHA-256
+`c957044a36f2559fbdf5230a0f37860911af276f800b1a37933539d7298f5697` match the preceding runtime candidate.
+Only executable fixture/test/report code changed. This is not complete native,
+live-Huly, model/oracle or six-ticket delivery certification.
