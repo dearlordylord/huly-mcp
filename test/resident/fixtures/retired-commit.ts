@@ -8,6 +8,9 @@ import { createInterface } from "node:readline"
 import { promisify } from "node:util"
 import { Effect, Schema } from "effect"
 
+import { LiveReadProtocol, LiveReadProbeError } from "../../../scripts/resident-live-read-contract.js"
+import { discoverLiveReadProtocol, liveReadMetadata } from "../../../scripts/resident-live-protocol.js"
+
 import { ResidentPackagePath, ResidentRegistryEnvelope } from "../../../src/resident/managed-contract.js"
 import { ResidentDirectory, ResidentFilePath } from "../../../src/resident/protected-path.js"
 import { ResidentStopReport } from "../../../src/resident/operator-stop.js"
@@ -34,7 +37,8 @@ const Input = Schema.Struct({
   cli: ResidentPackagePath,
   backend: ResidentPackagePath,
   coordinator: ResidentPackagePath,
-  root: ResidentDirectory
+  root: ResidentDirectory,
+  protocol: LiveReadProtocol
 })
 const CallResult = Schema.Struct({
   isError: Schema.optionalKey(Schema.Literal(false)),
@@ -42,11 +46,6 @@ const CallResult = Schema.Struct({
 })
 const bounded = <A>(promise: Promise<A>) =>
   Effect.runPromise(Effect.promise(() => promise).pipe(Effect.timeout(RESPONSE_BOUND)))
-const metadata = {
-  "io.modelcontextprotocol/protocolVersion": "2026-07-28",
-  "io.modelcontextprotocol/clientCapabilities": {},
-  "io.modelcontextprotocol/clientInfo": { name: "claude-code", version: "1" }
-}
 
 const main = async () => {
   const input = Schema.decodeUnknownSync(Input)({
@@ -54,8 +53,10 @@ const main = async () => {
     cli: process.argv[3],
     backend: process.argv[4],
     root: process.argv[5],
-    coordinator: process.argv[1]
+    coordinator: process.argv[1],
+    protocol: process.argv[6]
   })
+  const negotiation = { protocol: input.protocol, host: "first" } satisfies Parameters<typeof liveReadMetadata>[0]
   const directory = ResidentDirectory.make(join(input.root, "resident"))
   await fs.mkdir(directory, { mode: 0o700 })
   const remote = await startRetiredCommitCounter(ResidentFilePath.make(join(input.root, "counter.json")))
@@ -93,32 +94,56 @@ const main = async () => {
     const incoming = lines[Symbol.asyncIterator]()
     const send = (message: HostMessage) =>
       child.stdin.write(`${Schema.encodeSync(Schema.fromJsonString(HostMessage))(message)}\n`)
+    const request = (
+      id: NonNullable<HostMessage["id"]>,
+      method: string,
+      params: Readonly<Record<string, Schema.Json>>
+    ) =>
+      bounded(
+        (async () => {
+          send({ jsonrpc: "2.0", id, method, params: { ...params, ...liveReadMetadata(negotiation) } })
+          for (let count = 0; count < MAX_INTERLEAVED_NOTIFICATIONS; count++) {
+            const next = await incoming.next()
+            assert.equal(next.done, false)
+            const message = Schema.decodeUnknownSync(Schema.fromJsonString(BackendMessage))(next.value)
+            if (!("id" in message)) continue
+            assert.equal(message.id, id)
+            assert.ok("result" in message)
+            return message.result
+          }
+          throw new Error("Too many fixture notifications")
+        })()
+      )
     const owned = {
       child,
       closed,
       lines,
       send,
-      read: (id: Extract<NonNullable<HostMessage["id"]>, number>) =>
-        bounded(
-          (async () => {
-            send({
-              jsonrpc: "2.0",
-              id,
-              method: "tools/call",
-              params: { name: retiredCommitToolName("read"), arguments: {}, _meta: metadata }
-            })
-            for (let count = 0; count < MAX_INTERLEAVED_NOTIFICATIONS; count++) {
-              const next = await incoming.next()
-              assert.equal(next.done, false)
-              const message = Schema.decodeUnknownSync(Schema.fromJsonString(BackendMessage))(next.value)
-              if (!("id" in message)) continue
-              assert.equal(message.id, id)
-              assert.ok("result" in message)
-              return Schema.decodeUnknownSync(CallResult)(message.result).structuredContent.result.writes
-            }
-            throw new Error("Too many fixture notifications")
-          })()
-        )
+      discover: () =>
+        Effect.runPromise(
+          discoverLiveReadProtocol(
+            negotiation,
+            (id, method, params) =>
+              Effect.tryPromise({
+                try: () => request(id, method, params),
+                catch: () => new LiveReadProbeError({ phase: "discover" })
+              }),
+            (frame) =>
+              Effect.tryPromise({
+                try: () =>
+                  bounded(
+                    new Promise<void>((resolve, reject) =>
+                      child.stdin.write(`${frame}\n`, (error) => (error ? reject(error) : resolve()))
+                    )
+                  ),
+                catch: () => new LiveReadProbeError({ phase: "send" })
+              })
+          )
+        ),
+      read: async (id: Extract<NonNullable<HostMessage["id"]>, number>) =>
+        Schema.decodeUnknownSync(CallResult)(
+          await request(id, "tools/call", { name: retiredCommitToolName("read"), arguments: {} })
+        ).structuredContent.result.writes
     }
     return owned
   }
@@ -158,11 +183,12 @@ const main = async () => {
     await checkRecord(ready.generation, original.processId)
     const caller = startAdapter()
     adapters.push(caller)
+    await caller.discover()
     caller.send({
       jsonrpc: "2.0",
       id: FIRST_CALL_ID,
       method: "tools/call",
-      params: { name: retiredCommitToolName("increment"), arguments: {}, _meta: metadata }
+      params: { name: retiredCommitToolName("increment"), arguments: {}, ...liveReadMetadata(negotiation) }
     })
     await Effect.runPromise(remote.entered.pipe(Effect.timeout(RESPONSE_BOUND)))
     process.stderr.write("Retired commit: remote dispatched; stop and cancel local invocation\n")
@@ -186,6 +212,7 @@ const main = async () => {
     await checkRecord(fresh.generation, replacement.processId)
     const reader = startAdapter()
     adapters.push(reader)
+    await reader.discover()
     const before = await reader.read(FIRST_CALL_ID)
     assert.equal(before, 0)
     process.stderr.write("Retired commit: fresh read still zero; permit old remote commit\n")
@@ -210,6 +237,7 @@ const main = async () => {
         .update(await fs.readFile(file))
         .digest("hex")
     const receipt = Schema.decodeUnknownSync(RetiredCommitObservation)({
+      protocol: input.protocol,
       artifacts: {
         mcpSha256: await hash(input.bundle),
         cliSha256: await hash(input.cli),

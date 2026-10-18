@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import { LiveReadProtocol } from "../../scripts/resident-live-read-contract.js"
 
 import { ResidentRegistryEnvelope } from "../../src/resident/managed-contract.js"
 import { KernelOwnedExit } from "../helpers/kernel-reaped-events.js"
@@ -22,6 +23,7 @@ export type RetiredCommitEvent = Schema.Schema.Type<typeof RetiredCommitEvent>
 const EXPECTED_READ_DISPATCHES = 2
 const Hash = Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/u))
 export const RetiredCommitObservation = Schema.Struct({
+  protocol: LiveReadProtocol,
   artifacts: Schema.Struct({ mcpSha256: Hash, cliSha256: Hash, backendSha256: Hash, coordinatorSha256: Hash }),
   originalGeneration: ResidentRegistryEnvelope.fields.generation,
   replacementGeneration: ResidentRegistryEnvelope.fields.generation,
