@@ -21,6 +21,7 @@ import { ResidentEndpoint, ResidentTlsIdentity } from "./tls-channel.js"
 
 const MAX_ATTACHMENT_BYTES = 65_536
 const FILE_FORMAT = 1
+export const RESIDENT_PUBLICATION_FILENAME = "attachment.json"
 export const ResidentAttachment = Schema.Struct({
   version: Schema.Literal(FILE_FORMAT),
   transport: Schema.Literal("tls13-external-psk-v1"),
@@ -73,7 +74,7 @@ export const withPublishedResidentAttachment = <A, E, R>(
           Effect.tryPromise({
             try: () =>
               fs.open(
-                path.join(temporaryDirectory, "attachment.json"),
+                path.join(temporaryDirectory, RESIDENT_PUBLICATION_FILENAME),
                 constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW,
                 PRIVATE_FILE_MODE
               ),
@@ -91,7 +92,7 @@ export const withPublishedResidentAttachment = <A, E, R>(
               })
               return yield* Effect.acquireUseRelease(
                 Effect.tryPromise({
-                  try: () => fs.link(path.join(temporaryDirectory, "attachment.json"), destination),
+                  try: () => fs.link(path.join(temporaryDirectory, RESIDENT_PUBLICATION_FILENAME), destination),
                   catch: conflict
                 }),
                 () => use(destination),

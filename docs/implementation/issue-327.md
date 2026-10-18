@@ -761,3 +761,60 @@ This evidence does not qualify actual Huly client cleanup, remote write outcome,
 crash recovery, native macOS/Windows, or the unresolved ten-parent race. The full
 six-ticket delivery, final coherent gate and deferred live-Huly campaign remain
 pending.
+
+## Refuse detectable ownership-state loss before selection (2026-10-17)
+
+Managed startup previously read only the generation registry. Removing a record
+or its directory while leaving a locator therefore allowed the `absent` branch
+to authorize a fresh owner, although read-only status already rejected the same
+inconsistent namespace. `/tmp/resident-state-loss-red.log` preserves the two
+failing-before cases (SHA-256
+`a7a64a03ef0013ffdbef0df87500d938efa61c1a87f284e2d13c52c1fc5b9462`).
+
+The shared `namespace-inventory.ts` core now reads bounded, protected namespace
+entries and parsed registry envelopes. Status projects metadata from that result;
+selection consumes the same parsed records under its claim before opening or
+creating a registry directory. Missing expected records/locators refuse without
+repair or owner launch. Foreign implementation payloads remain opaque.
+
+Review exposed another detectable-loss case: removing both indexes while leaving
+the publication directory. Its failing regression is
+`/tmp/resident-state-loss-orphan-red.log` (SHA-256
+`a512b5d461fb6f253fd7926881b45cf5a962131a7c3ad1208fb0d9e5526d8eb9`).
+Every publication now requires a private attachment file whose device/inode
+matches a protected root locator. The writer and reader share the publication
+filename constant. The check does not interpret a missing PID, quiet port or
+complete namespace erasure as retirement evidence.
+
+The packaged Linux fixture holds a real adapter/backend generation while it
+injects, in order: corrupt registry bytes, a missing record, missing registry
+directory, missing locator, and both indexes missing with publication retained.
+Each new adapter exits 1 with no protocol reply, preserves the fault, and omits
+the tested TLS key/bearer values from diagnostics. The original adapter keeps its
+identity/port/workspace and continues synthetic catalog/context reads. The
+fixture explicitly restores its own injected files; production performs no
+repair. It then closes the caller, joins the supervisor's kernel-owned backend
+exit with code 0, and verifies complete private-state removal.
+
+Final process log: `/tmp/resident-state-loss-final-process.log`, SHA-256
+`cb23bf28b104e3c2dd761df348d5fca44c8f664132fdd31a315b6cd06b4fc2f8`.
+Receipt: `/tmp/resident-state-loss-qTQ8bE.receipt.json`, SHA-256
+`aa4c808b0e010f043839d74de339cd89b301ef69c7f5dcf5047e19e0dd62fafe`.
+Its packaged MCP SHA-256 is
+`a35a9c71155115e206ee54bee0a74f415db212d243bfadb00b6d8d8382e8a95b`;
+coordinator and host hashes are recorded separately. Earlier scoped process
+receipts remain preserved. All existing response/supervision deadlines remain.
+
+Existing fixture owners now publish paired locators and registry records rather
+than relying on incomplete metadata. The final targeted owner/idle/status/state
+loss/admission suite contains 36 tests. Fresh Standards and Spec reviews had
+no residual actionable findings after inode association, artifact path typing,
+and shared filename corrections. This is synthetic local process qualification,
+not real Huly mutation evidence, native macOS/Windows certification, or completion
+of the full six-ticket contract. No operation journal or automatic replay exists.
+
+Final validation logs: `/tmp/resident-state-loss-final-unit.log` (36 passing tests),
+`/tmp/resident-state-loss-final-verified-typecheck.log` (1,342 files, zero
+errors/warnings), and `/tmp/resident-state-loss-final-verified-{lint,circular,complexity}.log`.
+All exited successfully. The source increment does not replace the coherent
+final `check-all` or the deferred real-Huly campaign.

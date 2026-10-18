@@ -25,6 +25,7 @@ import {
 import { acquireSelectionClaim, SelectionClaimError } from "./selection-claim.js"
 import type { BackendResponseError } from "./response-stream.js"
 import type { StartupBudget } from "./startup-budget.js"
+import { readResidentNamespace } from "./namespace-inventory.js"
 import { readManagedDirectoryForOwner } from "./managed-directory-config.js"
 
 const withSelectionOwnership = <A, E, R>(
@@ -122,8 +123,8 @@ export const withResidentSelection = <A, E, R, B, F, S>(options: {
         options.directory,
         (claim) =>
           Effect.gen(function* () {
+            const { records } = yield* options.startup.within(readResidentNamespace(options.directory))
             const registry = yield* options.startup.within(openGenerationRegistry(options.directory))
-            const records = yield* options.startup.within(registry.inventory)
             const descriptors: ResidentAttachment[] = []
             for (const record of records) {
               const descriptor = yield* options.startup.within(decodeCurrentRegistryAttachment(record.envelope))

@@ -212,3 +212,14 @@ the first compatible admission while checking the bounded inventory, then use
 that same admission after proving uniqueness. Ambiguous-owner and interruption
 cleanup pass. Packaged launch attempts still time out and remain preserved; do
 not claim the earlier ten-parent reliability problem is solved by this fix.
+
+## Detectable namespace-loss correction
+
+The [issue 327 report](issue-327.md#refuse-detectable-ownership-state-loss-before-selection-2026-10-17)
+records failing-before tests and the shared namespace reader now used by status
+and selection under claim. Missing/corrupt expected state refuses before registry
+creation or a new owner. Publication inode association also catches loss of both
+indexes while publication evidence remains. Five packaged fault schedules pass
+with an existing caller still usable, explicit fixture restoration, and an actual
+kernel-owned successful backend exit. Whole-namespace destruction remains outside
+automatic recovery. Native platforms, real Huly and the final gate remain pending.

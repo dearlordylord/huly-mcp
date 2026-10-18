@@ -2,7 +2,7 @@ import * as fs from "node:fs/promises"
 import { ConfigProvider, Deferred, Effect, Exit, Fiber, Layer, Redacted, Result, Schema } from "effect"
 import { expect, it } from "vitest"
 
-import { withPublishedResidentAttachment } from "../../src/resident/attachment-file.js"
+import { ResidentAttachment, withPublishedResidentAttachment } from "../../src/resident/attachment-file.js"
 import {
   prepareManagedDirectory,
   runOwnedGeneration,
@@ -204,7 +204,15 @@ for (const count of [1, MAX_REGISTRY_RECORDS]) {
     withOwner((ownership, capture) =>
       Effect.gen(function* () {
         for (let index = 0; index < count; index++) {
-          const receipt = yield* ownership.registry.publish(registryAttachment())
+          const descriptor = registryAttachment()
+          const receipt = yield* ownership.registry.publish(descriptor)
+          yield* Effect.promise(() =>
+            fs.writeFile(
+              `${ownership.directory}/${descriptor.identity.generation}.json`,
+              Schema.encodeSync(Schema.fromJsonString(ResidentAttachment))(descriptor),
+              { mode: 0o600, flag: "wx" }
+            )
+          )
           const records = yield* ownership.registry.inventory
           const record = records.find((entry) => entry.file === receipt.file)
           if (record === undefined) return yield* Effect.die("Fixture publication missing")

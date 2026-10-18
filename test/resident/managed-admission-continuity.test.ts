@@ -6,7 +6,7 @@ import { requestContextMiddleware } from "../../src/mcp/http-request-context.js"
 import { AdmissionPolicy, DEFAULT_LEASE_POLICY } from "../../src/resident/admission-contract.js"
 import { residentAdmissionMiddleware } from "../../src/resident/admission-http.js"
 import { makeResidentAdmissions } from "../../src/resident/admissions.js"
-import { ResidentAttachment } from "../../src/resident/attachment-file.js"
+import { ResidentAttachment, withPublishedResidentAttachment } from "../../src/resident/attachment-file.js"
 import { makeCompatibilityAuthority } from "../../src/resident/compatibility-authority.js"
 import type { ResidentStartupCapture } from "../../src/resident/managed-contract.js"
 import type { ResidentDirectory } from "../../src/resident/protected-path.js"
@@ -58,17 +58,21 @@ const withOwner = <A, E, R>(
             yield* makeCompatibilityAuthority(capture.selection, identity.generation, AUTHORIZATION)
           )
           const registry = yield* openGenerationRegistry(directory)
-          yield* registry.publish(
-            ResidentAttachment.make({
-              version: 1,
-              transport: "tls13-external-psk-v1",
-              implementation: { name: "@firfi/huly-mcp", version: VERSION },
-              endpoint,
-              identity,
-              authorization: AUTHORIZATION
-            })
+          const descriptor = ResidentAttachment.make({
+            version: 1,
+            transport: "tls13-external-psk-v1",
+            implementation: { name: "@firfi/huly-mcp", version: VERSION },
+            endpoint,
+            identity,
+            authorization: AUTHORIZATION
+          })
+          return yield* withPublishedResidentAttachment(directory, descriptor, () =>
+            Effect.acquireUseRelease(
+              registry.publish(descriptor),
+              () => use(admissions, identity.generation),
+              (receipt) => receipt.retire
+            )
           )
-          return yield* use(admissions, identity.generation)
         }),
       {
         middleware: (app) =>
