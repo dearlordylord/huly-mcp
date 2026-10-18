@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 
 import { ResidentRegistryEnvelope } from "../../src/resident/managed-contract.js"
+import { KernelOwnedExit } from "../helpers/kernel-reaped-events.js"
 import { NativeHostObservation } from "./native-host-observation.js"
 
 export const VersionCoexistenceObservation = Schema.Struct({
@@ -15,6 +16,6 @@ export const VersionCoexistenceObservation = Schema.Struct({
   parents: Schema.Array(NativeHostObservation),
   survivor: NativeHostObservation,
   survivorRecordUnchanged: Schema.Literal(true),
-  backendsExited: Schema.Literal(true),
+  backendExits: Schema.Array(KernelOwnedExit),
   privateStateRemoved: Schema.Literal(true)
 })

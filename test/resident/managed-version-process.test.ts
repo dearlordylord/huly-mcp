@@ -81,7 +81,16 @@ it.skipIf(process.platform !== "linux")(
       if (first === undefined || second === undefined) throw new Error("Missing version installation")
       const { stderr, stdout } = await runFile(
         "python3",
-        ["test/resident/fixtures/reap-descendants.py", process.execPath, fixture, first.path, second.path, host, root],
+        [
+          "test/resident/fixtures/reap-descendants.py",
+          "--report-reaped",
+          process.execPath,
+          fixture,
+          first.path,
+          second.path,
+          host,
+          root
+        ],
         { timeout: PROCESS_BOUND, env: testStdioEnvironment() }
       )
       const receipt = Schema.decodeUnknownSync(Schema.fromJsonString(VersionCoexistenceObservation))(stdout)
@@ -90,7 +99,9 @@ it.skipIf(process.platform !== "linux")(
       expect(new Set(receipt.artifacts.map((artifact) => artifact.sha256)).size).toBe(2)
       expect(new Set(receipt.parents.map((item) => item.parentPid)).size).toBe(2)
       expect(receipt.survivorRecordUnchanged).toBe(true)
-      expect(receipt.backendsExited).toBe(true)
+      expect(receipt.backendExits).toHaveLength(versions.length)
+      expect(new Set(receipt.backendExits.map((item) => item.processId)).size).toBe(versions.length)
+      for (const exited of receipt.backendExits) expect(exited.exitCode).toBe(0)
       expect(receipt.privateStateRemoved).toBe(true)
       await fs.writeFile(
         `${root}.receipt.json`,
