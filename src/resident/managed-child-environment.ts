@@ -13,7 +13,6 @@ const replacedKeys = [...Object.keys(ProfileEnvironmentSchema.fields), "MCP_AUTH
 
 export const parseManagedChildEnvironment = Effect.fn("parseManagedChildEnvironment")(function* (
   input: unknown,
-  platform: NodeJS.Platform,
   nonce: BootstrapNonce
 ) {
   const inherited = yield* Schema.decodeUnknownEffect(InheritedEnvironment)(input).pipe(
@@ -25,11 +24,10 @@ export const parseManagedChildEnvironment = Effect.fn("parseManagedChildEnvironm
         })
     )
   )
-  const normalize = (key: string) => (platform === "win32" ? key.toUpperCase() : key)
-  const replaced = new Set(replacedKeys.map(normalize))
+  const replaced = new Set(replacedKeys)
   const preserved = Object.fromEntries(
     Object.entries(inherited).flatMap(([key, value]) =>
-      value !== undefined && !replaced.has(normalize(key))
+      value !== undefined && !replaced.has(key)
         ? [[key, value] satisfies readonly [string, Redacted.Redacted<string>]]
         : []
     )

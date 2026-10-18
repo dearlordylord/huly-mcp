@@ -16,15 +16,14 @@ const inherited = Object.fromEntries(
 )
 
 describe("managed child environment boundary", () => {
-  it("removes every Windows spelling of inherited selection/authentication and emits one bootstrap pair", async () => {
+  it("removes inherited selection and authentication while preserving unrelated environment entries", async () => {
     const input = {
-      ...inherited,
-      hUlY_tOkEn: "private-mixed-case",
+      ...Object.fromEntries(privateKeys.map((key) => [key, "private-inherited-value"])),
       Path: "fixture-search-path",
       EMPTY: "",
       ABSENT: undefined
     }
-    const parsed = await Effect.runPromise(parseManagedChildEnvironment(input, "win32", nonce))
+    const parsed = await Effect.runPromise(parseManagedChildEnvironment(input, nonce))
     expect(Object.keys(parsed).sort()).toEqual(["EMPTY", "MCP_RESIDENT_BOOTSTRAP_NONCE", "MCP_TRANSPORT", "Path"])
     expect(Redacted.value(parsed["MCP_TRANSPORT"] ?? Redacted.make(""))).toBe("resident-child")
     expect(Redacted.value(parsed["MCP_RESIDENT_BOOTSTRAP_NONCE"] ?? Redacted.make("")) === Redacted.value(nonce)).toBe(
@@ -37,8 +36,8 @@ describe("managed child environment boundary", () => {
     ).toBe(true)
   })
 
-  it.each(["linux", "darwin"] as const)("preserves distinct lowercase keys on %s", async (platform) => {
-    const parsed = await Effect.runPromise(parseManagedChildEnvironment(inherited, platform, nonce))
+  it("preserves distinct lowercase keys on supported POSIX platforms", async () => {
+    const parsed = await Effect.runPromise(parseManagedChildEnvironment(inherited, nonce))
     expect(profileKeys.every((key) => !(key in parsed))).toBe(true)
     expect(privateKeys.every((key) => key.toLowerCase() in parsed)).toBe(true)
     expect("MCP_AUTH_TOKEN" in parsed).toBe(false)
@@ -47,9 +46,7 @@ describe("managed child environment boundary", () => {
 
   it("keeps invalid environment input in a redacted typed failure before spawn", async () => {
     const result = await Effect.runPromise(
-      parseManagedChildEnvironment({ HULY_TOKEN: { privateMarker: "must-not-be-reported" } }, "win32", nonce).pipe(
-        Effect.flip
-      )
+      parseManagedChildEnvironment({ HULY_TOKEN: { privateMarker: "must-not-be-reported" } }, nonce).pipe(Effect.flip)
     )
     expect(result.reason).toBe("ipc")
     expect(JSON.stringify(result).includes("must-not-be-reported")).toBe(false)

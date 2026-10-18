@@ -76,13 +76,12 @@ export const launchManagedChild = Effect.fn("launchManagedChild")(function* (opt
     capture: options.capture,
     claim: options.claim.transferProof
   })
-  const environment = yield* parseManagedChildEnvironment(options.environment, process.platform, nonce)
+  const environment = yield* parseManagedChildEnvironment(options.environment, nonce)
   return yield* Effect.acquireUseRelease(
     Effect.try({
       try: () => ({
         child: spawn(options.executable.executable, [options.executable.packageFile], {
           detached: true,
-          windowsHide: true,
           stdio: ["ignore", "ignore", "ignore", "ipc"],
           env: Object.fromEntries(Object.entries(environment).map(([key, value]) => [key, Redacted.value(value)]))
         }),
