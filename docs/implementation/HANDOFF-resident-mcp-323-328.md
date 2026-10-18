@@ -661,3 +661,8 @@ Proposed resident-launch.qnt types now key requests by InvocationId (sameasverif
 ### Native server output validation — 2026-10-18
 
 [Report](resident-native-output-validation-2026-10-18.md): productionregistry/defineTool/nativeHTTPS injectedoperation returnsinvalidnegativecount, rawHTTP(native/proxystrict/nonstrict) receivesexactinvalidoutputerror/no structuredsuccess; nextvalidcall exactcount1/operationcalls2. NoSDKclientvalidationconfound. Final2focusedfiles19testsPASS, local lint/format and bothreviewsaccepted. No productionchange/fullgate; packagedadapter/nativeHuly/allresulttypes/platform/lifecycle stillseparate, all six tickets incomplete.
+
+
+### Packaged output validation fidelity — 2026-10-18
+
+[Report](resident-packaged-output-validation-2026-10-18.md): sharedproductionregistry/nativeHTTPSvalidationfixture preservesraw3modes and addsactualpackagedstdioadapter6protocol×modecases. Realresidentadmission/properprotectedgenerationdescriptor/bundledversion/sharedhandshake; exactservererror/no structuredsuccess thenexactvalidresult/operationcalls2/actualadapterclose0. Final2files9testsPASS4.76s, local lint/format and bothreviewsaccepted. Setupdescriptorfilename/versionfailures and admissionpreparation retainedlogs; no productcompatibilitychanges/fullgate. Inprocessnativefixture+actualadapter scope, notmanagedbackend/remoteHuly/independentparents. All six tickets incomplete.
