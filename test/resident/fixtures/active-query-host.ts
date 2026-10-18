@@ -20,6 +20,8 @@ import {
   OUTPUT_EXIT_BOUND
 } from "../active-query-contract.js"
 
+import { makeActiveQueryBurst } from "./active-query-burst.js"
+
 const MAX_NOTIFICATIONS = 64
 const FIRST_ID = 41
 const CONTEXT_ID = 2
@@ -85,6 +87,20 @@ const main = async () => {
     }
     throw new Error("Adapter notification bound exceeded")
   }
+  const burst = makeActiveQueryBurst({
+    send: (id, project) =>
+      send(
+        Schema.encodeSync(Schema.fromJsonString(HostMessage))({
+          jsonrpc: "2.0",
+          id,
+          method: "tools/call",
+          params: { name: "get_project", arguments: { project }, ...liveReadMetadata(protocol) }
+        })
+      ),
+    closed,
+    diagnostics: () => diagnostics,
+    emit
+  })
   let losing = false
   let failed = false
   let nextId = FIRST_ID
@@ -129,6 +145,11 @@ const main = async () => {
         continue
       }
       if (active !== undefined || losing) throw new Error("Adapter request already active or closed")
+      if (command._tag === "fill" || command._tag === "overflow") {
+        await burst.handle(command)
+        continue
+      }
+      if (burst.occupied()) throw new Error("Burst adapter cannot serve another fixture operation")
       if (command._tag === "stall") {
         losing = true
         const id = nextId++

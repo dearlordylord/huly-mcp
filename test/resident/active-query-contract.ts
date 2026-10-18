@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import { MAX_ADAPTER_REQUESTS } from "../../src/resident/adapter-limits.js"
 
 import { ModelWaitEvent, ModelWaitHostInput, ModelWaitPairInput, ModelWaitReceipt } from "./model-wait-contract.js"
 import { GetProjectResultSchema } from "../../src/domain/schemas/projects.js"
@@ -21,10 +22,18 @@ export const ActiveQueryPairInput = Schema.Struct({
   protocol: ModelWaitPairInput.fields.protocol,
   loss: AdapterLoss
 })
+export const BurstProjects = Schema.Array(ProjectIdentifier).check(
+  Schema.isBetweenLength(MAX_ADAPTER_REQUESTS, MAX_ADAPTER_REQUESTS)
+)
+export const BurstIds = Schema.Array(Schema.Int).check(
+  Schema.isBetweenLength(MAX_ADAPTER_REQUESTS, MAX_ADAPTER_REQUESTS)
+)
 export const ActiveQueryCommand = Schema.TaggedUnion({
   read: { project: ProjectIdentifier },
   lose: { mode: AdapterLoss },
   stall: { project: ProjectIdentifier, mode: BlockedOutput },
+  fill: { projects: BurstProjects },
+  overflow: { project: ProjectIdentifier },
   close: {}
 })
 export type ActiveQueryCommand = Schema.Schema.Type<typeof ActiveQueryCommand>
@@ -41,6 +50,8 @@ export const ActiveQueryEvent = Schema.TaggedUnion({
   interrupted: { project: ProjectIdentifier, id: Schema.Int },
   loss: { mode: AdapterLoss },
   stalled: { project: ProjectIdentifier, id: Schema.Int, mode: BlockedOutput },
+  filled: { ids: BurstIds },
+  limitExit: { ...AdapterExit.fields, admissionFailure: Schema.Literal(true), rejectedId: Schema.Int },
   outputExit: { ...AdapterExit.fields, outputFailure: Schema.Literal(true) },
   exit: AdapterExit.fields
 })
