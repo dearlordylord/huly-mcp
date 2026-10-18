@@ -257,3 +257,9 @@ backend for both protocols and both input orderings. Actual context kinds,
 complete606/6catalogs, exact native/proxy project results and separate reader
 ownership are checked. It changes no profile authority, policy compatibility or
 production defaults. Full capability/auth/invalidation matrices remain pending.
+
+[Actual Codex and Claude auto-exposure evidence](issue-328.md#actual-host-auto-exposure--2026-10-18)
+checks the real host-reported client kind and selected native/proxy mode with
+TOOLS=get_project and strict proxy output. Both pass actual project reads and
+owned retirement. It adds no complete credential-invalidation, concurrent
+actual-host sharing, capability or platform claim.

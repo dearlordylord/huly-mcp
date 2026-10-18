@@ -645,3 +645,9 @@ Scoped packaged managed-process and actual local-Huly scenarios retain different
 project payloads with colliding IDs on one backend, exact catalogs and owned
 cleanup. This does not certify all client capabilities, actual-host auto mode,
 manual-mode auto behavior or complete #323 acceptance.
+
+[Actual-host auto reads](issue-328.md#actual-host-auto-exposure--2026-10-18)
+now have isolated Linux evidence for installed Claude Code/native and
+Codex/proxy, including actual context, exact restricted catalogs, two Huly
+project results and kernel-owned retirement. They use the existing explicit
+lease-expiry supervisor mode and do not certify the entire host/platform contract.

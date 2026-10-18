@@ -1394,3 +1394,56 @@ The private gate-proof binds all10finalsource files and unchanged MCP/CLI
 artifacts. terminal-manifest.json freezes46files. Both scoped live-evidence
 reviews matched43original bindings/10sources without findings; final gate-proof
 review is separate. Complete-ticket acceptance remains unproven.
+
+### Actual host auto exposure — 2026-10-18
+
+On unchanged packaged MCP bytes, actual Codex0.163.0 app-server and Claude
+Code2.1.296 each completed an isolated auto-exposure scenario. Both explicitly
+set HULY_TOOL_MODE=auto, PROXY_OUTPUT_STRICT=true and TOOLS=get_project. Credentials
+were inherited from the token environment; no credential values entered host
+configuration, and neither global host settings nor production defaults changed.
+
+Codex evidence `/tmp/resident-codex-auto-live-49rhstmo`: actual context reports
+auto/proxy, clientKind=codex, strict=true, nativeVisibleToolCount0 and one proxy
+candidate. Actual app-server inventory contains exactly the four proxy tools and
+two built-ins (six total). A context call and two invoke_tool/get_project calls
+complete; each nested result has the exact tool name and expected project.
+No model inference is requested. The response bound is an absolute five seconds,
+including interleaved host notifications; it is not restarted by each message.
+
+Claude evidence `/tmp/resident-claude-auto-live-dbxyk3_q`: actual context reports
+auto/native, clientKind=claude-code and strict=true. The local deterministic
+Messages endpoint observes exactly three visible MCP tools: get_project plus
+the two built-ins. It drives one context call, two project reads and a final
+response through the installed actual host. Four finite fixture turns replace
+three because of the added context call; the existing12-second host deadline
+is unchanged. The earlier Claude probe had already omitted HULY_TOOL_MODE and
+therefore used auto implicitly; this increment proves explicit configuration
+and actual selected context rather than claiming the first-ever auto run.
+
+Both scenarios ran once and passed: host0, exact project results, one owned
+registry, correlated kernel backend exit0, supervisor0, empty private state and
+empty supervisor diagnostics. Both use the already defined explicit45-second
+abrupt-adapter lease-expiry supervisor mode and35-second bounded retirement
+observation, not an extension of ordinary25-second healthy shutdown. Codex
+retains its existing five-second close wait and five-second escalation wait. The read-only runs create no
+Huly fixtures or messages. Existing proof directories and failures remain intact.
+
+Independent Effect-schema verifiers check actual exposure, exact catalogs,
+project results, registry/exit identity and terminal-resource supervisor0.
+Private manifests bind110Codex files (including90isolated host state files) and
+24Claude files. Configured Huly credential values were absent from retained
+non-bundle evidence. MCP SHA908e121f and CLI SHAe15d82af remain unchanged; source
+HEAD89a06619 reuses its passing485file/5758test gate. No runtime/probe source
+changed in this documentation increment.
+
+This certifies scoped, restricted-policy actual-host auto reads on Linux, not
+full unfiltered host catalogs, a complete client-capability/protocol/auth matrix,
+concurrent separate actual hosts on one backend, native macOS or model/oracle
+alignment. Independent review of this increment is pending; all tickets remain
+incomplete.
+
+Final read-only Standards and Spec reviews of this actual-host increment both
+found no actionable findings. Both matched all134private manifest hashes and
+confirmed exact restricted-policy exposure/results/retirement and the stated
+limits. These reviews certify this scoped report, not full-ticket acceptance.
