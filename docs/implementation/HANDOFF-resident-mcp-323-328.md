@@ -611,3 +611,8 @@ Test-only after ee9be005: [report](resident-policy-modes-2026-10-18.md). Native/
 ### Native HTTPS accepted work across fence — 2026-10-18
 
 [Report](resident-http-fence-work-2026-10-18.md): held nativeMCP call survives explicit generation fence with exact terminal reply; newadmission409/renewal403/newwork403, session retained until DELETE204. Shared HTTP test helper now exposes consumed body/contentType. Focused admission/context and neighboring session/shutdown/continuity checks pass; local lint/format and both reviews accepted. No production change/full gate. Explicit-fence component proof does not qualify automatic idle/processrace/full lifecycle; all six tickets remain incomplete.
+
+
+### Audit reconciliation and next fault scenario — 2026-10-18
+
+[Current scoped reconciliation](resident-audit-reconciliation-2026-10-18.md) maps13 report links to post-b3e evidence and residuals. Frozen170row JSON audit is historical: current verifier fails322.7 manual-backend.ts content hash (/tmp/resident-audit-current-validation.log); do not blindly update all evidence hashes or reuse79proven as current certification. Both scoped documentation reviews accepted, linkschecked. #326 now explicitly crossreferences recent idle/HTTPS work reports. Next substantive process work:327.9 fault/cleanup-loss in one incompatible configuration while unrelated held native operation and continued read preserve exact result/generation/registry, with owned exit evidence. All six issues remain incomplete; no full gate for documentation reconciliation.

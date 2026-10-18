@@ -168,3 +168,8 @@ Packaged CLI counts and one read-only local-Huly scenario pass. The combined
 `pnpm check-all` passes (492 files / 5767 tests; 1389 diagnostic files, no errors
 or warnings), and both scoped reviews are clean. This does not close #326 or
 substitute for remaining lifecycle, model and native platform requirements.
+
+
+### Idle and accepted-work evidence reconciliation — 2026-10-18
+
+The [idle/admission tests](resident-idle-admission-race-2026-10-18.md) and [HTTPS accepted-work fence test](resident-http-fence-work-2026-10-18.md) apply primarily to this retirement slice, although their first implementation notes were also recorded under #324. They establish deterministic component orderings and explicit HTTP fencing, not the full packaged automatic-idle race. See [current evidence reconciliation](resident-audit-reconciliation-2026-10-18.md); #326 remains incomplete.
