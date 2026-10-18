@@ -261,3 +261,45 @@ must not be converted into either a leak diagnosis or a cleanup pass. Next work
 must establish the actual adapter shutdown signal/EOF behavior and test its
 bounded release path. Full real-host cleanup, Claude discovery, supported auth
 paths, live Huly and all native/platform requirements remain pending.
+
+### Kernel-observed termination during actual host shutdown
+
+A further isolated Codex attempt at `/tmp/resident-codex-signal-ji6vT2`
+retains a scratch supervisor that additionally prints its actual `waitpid`
+results. It changes neither the packaged MCP artifact nor the existing
+supervision deadline. Discovery and both context reads completed again; Codex
+exited with code 0. The generation record identifies backend PID 1004308 and
+creator PID 1004195. The kernel-owned creator was reaped with exit code -9 at monotonic
+1027351.485; the driver was reaped with code 0 at 1027351.508. The backend
+was subsequently reaped with code -9 during forced supervisor cleanup at
+1027373.428. These timestamps mark waitpid observations, not signal delivery. These distinct kernel events
+must not be conflated as one ordinary idle-retirement failure.
+
+This establishes abrupt creator termination before the supervisor deadline,
+despite successful host exit. It does not establish which actor sent that signal,
+which earlier admission belonged to the creator, or that no other adapter existed.
+No production PID/port is signalled based on registry metadata; this evidence
+comes from the supervisor's actual owned-child wait results. The ordinary
+30-second lease still cannot expire inside this 25-second complete schedule, so
+cleanup after abrupt adapter death remains unqualified by this attempt. The next
+test must distinguish ordinary EOF release from abrupt-adapter expiry; production
+lease/deadline changes are not justified by this observation.
+
+`exits.log` SHA-256:
+`52334c5b5342c01d2cef4962084685040af3077c4c3e871aa88d8c71c9140dff`;
+`codex.receipt.json` SHA-256:
+`f24c234ea9eceac96f703e5413af66e32e15f3cf18a24b56eee09276b71b8257`;
+scratch `reaper.py` SHA-256:
+`a0961264e1c2b86adef1d494a2cbb50a556f7aeb61d5e9fba23d910951e1d77f`.
+This remains a failed diagnostic schedule, with preserved ownership state and
+no complete-contract or real-host cleanup pass.
+
+The existing focused manual-backend control
+`expires an adapter after death while its survivor keeps the same backend`
+passed with its original 45-second bound and 31-second expiry wait. It kills an
+actual owned adapter, observes its exit, keeps a survivor usable and admits a
+fresh caller after expiry. Log `/tmp/resident-codex-abrupt-expiry-control.log`,
+SHA-256 `5a426f34e324b257470ca9f1d6cf20024c5b2940f261ac7a6525dadf3f1c3ab1`.
+Only that selected test ran (seven other cases were filtered out). This supports
+the existing lease-expiry path on the manual backend; it does not prove managed
+last-adapter idle retirement, real Codex cleanup or the complete suite.
