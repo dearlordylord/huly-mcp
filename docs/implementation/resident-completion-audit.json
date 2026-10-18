@@ -1,0 +1,2304 @@
+{
+  "candidate": "b3e28661c6d9b8abb59fee55200e40bf05cd0822",
+  "issues": [
+    {
+      "number": 322,
+      "bodySha256": "409fc516acfcdcbfe2d8eb7b37b82a71537adfa1be5cd797ae9433cc5bde5b98"
+    },
+    {
+      "number": 323,
+      "bodySha256": "c7074d6af19d0adde5d731f7d39f13781016d60752bf27088d6b792b09f5df57"
+    },
+    {
+      "number": 324,
+      "bodySha256": "681eaba8857511f5e80c42a7c7ed228837cf168bfb6654a47c4422fff5bb374e"
+    },
+    {
+      "number": 325,
+      "bodySha256": "11f74e8dcc76677f99ef05638275a4a67fe7855affe7586cd7c599ed0b278f38"
+    },
+    {
+      "number": 326,
+      "bodySha256": "2a46051cc78990ea0201b59d63e824708a2b46c4a12a67f35d4da53bc07af224"
+    },
+    {
+      "number": 327,
+      "bodySha256": "822954793e6319430842743d6d307daf52aaa08d678a99040c7fbc03d4ebfc94"
+    },
+    {
+      "number": 328,
+      "bodySha256": "eec853846ffe8be628cfa3ab4a765e007b7c507c8c01af8f73d502ce4464fa42"
+    }
+  ],
+  "rows": [
+    {
+      "id": "322.1",
+      "requirement": "As an MCP user, I want several compatible agent sessions to reuse heavy Huly resources, so that every session does not load its own model.",
+      "status": "proven",
+      "evidence": [
+        "test/resident/managed-live-read-pair-process.test.ts:93",
+        "/tmp/resident-live-linux-campaign-_dtgfmjg/managed-read-receipt.json",
+        "/tmp/resident-live-auto-qualified-of08j_ff/gate-proof.json"
+      ],
+      "gap": "No residual identified for this story at the demonstrated scope."
+    },
+    {
+      "id": "322.2",
+      "requirement": "As a stdio user, I want the host to keep speaking stdio, so that it does not need a new transport integration.",
+      "status": "proven",
+      "evidence": [
+        "src/resident/manual-adapter.ts:115",
+        "src/launcher.ts:1",
+        "/tmp/resident-codex-auto-live-49rhstmo/verified-schema.json",
+        "/tmp/resident-claude-auto-live-dbxyk3_q/verified-schema.json"
+      ],
+      "gap": "No residual identified for this story at the demonstrated scope."
+    },
+    {
+      "id": "322.3",
+      "requirement": "As a user, I want the adapter and backend supplied in the Huly MCP package, so that I do not install a third-party application.",
+      "status": "proven",
+      "evidence": [
+        "package.json:1",
+        "src/launcher.ts:1",
+        "test/helpers/stdio-build.ts:9"
+      ],
+      "gap": "Own package build bundles resident/adapter launch paths into the same executable, with no third-party gateway application; actual built package entrypoint is exercised. No residual identified for this story."
+    },
+    {
+      "id": "322.4",
+      "requirement": "As a user, I want the managed backend to start when needed, so that I do not manage a terminal process manually.",
+      "status": "proven",
+      "evidence": [
+        "src/resident/managed-adapter-main.ts:1",
+        "src/resident/managed-process.ts:60",
+        "test/resident/managed-live-read-pair-process.test.ts:93"
+      ],
+      "gap": "No residual identified for this story at the demonstrated scope."
+    },
+    {
+      "id": "322.5",
+      "requirement": "As a user, I want simultaneous first connections to converge on one compatible backend, so that startup does not create duplicate owners.",
+      "status": "partial",
+      "evidence": [
+        "test/resident/managed-backend-process.test.ts:59",
+        "test/resident/fixtures/managed-ten-parents.ts:157",
+        "/tmp/resident-live-auto-qualified-of08j_ff/check-all.log"
+      ],
+      "gap": "The full gate demonstrates ten-parent convergence with owned exit. The parent also requires simultaneous explicit/automatic startup races and losing-owner retirement across launch boundaries; no complete combined race schedule was located. Preserved intermittent ten-parent failures have no established cause."
+    },
+    {
+      "id": "322.6",
+      "requirement": "As a user, I want a launcher failure handled without permanent locks, so that a canceled startup does not prevent later use.",
+      "status": "partial",
+      "evidence": [
+        "test/resident/managed-parent-loss-process.test.ts:16",
+        "test/resident/fixtures/managed-parent-loss.ts:84",
+        "src/resident/selection-claim.ts:26",
+        "src/resident/operator-stop.ts:21"
+      ],
+      "gap": "The real before-Start parent-death test explicitly requires retainedClaim=true, no published records and child exit. It does not prove subsequent startup succeeds; current stop/status do not provide verified retirement/reset of that orphan claim. This is safe residue, not proof of the no-permanent-lock usability story."
+    },
+    {
+      "id": "322.7",
+      "requirement": "As a user, I want catalog discovery available independently of full-model readiness, so that background initialization does not delay agent discovery.",
+      "status": "proven",
+      "evidence": [
+        "src/resident/manual-backend.ts:39",
+        "test/resident/managed-request-loss-process.test.ts:21",
+        "test/resident/fixtures/managed-request-loss.ts:67"
+      ],
+      "gap": "Catalog discovery succeeds before the model-loss callback is triggered by the first data operation; application readiness is separate from model readiness."
+    },
+    {
+      "id": "322.8",
+      "requirement": "As an agent, I want a call made during model initialization to join shared acquisition, so that loading is handled normally.",
+      "status": "proven",
+      "evidence": [
+        "src/runtime/huly-clients.ts:43",
+        "test/resident/managed-live-read-pair-process.test.ts:93",
+        "test/runtime/http-client-leases.test.ts:29"
+      ],
+      "gap": "The two-reader overlap fixture requires four correct reads and exactly one full-model request; live two-reader runs supply real-Huly read evidence. No separate residual identified for joining shared acquisition."
+    },
+    {
+      "id": "322.9",
+      "requirement": "As a user, I want canceling one waiting call to leave shared initialization available, so that other sessions continue.",
+      "status": "partial",
+      "evidence": [
+        "test/runtime/huly-clients.test.ts:18",
+        "test/mcp/request-client-lifecycle.test.ts:16",
+        "test/resident/attachment-owner.test.ts:13"
+      ],
+      "gap": "Shared and request-scope acquisition cleanup have local tests, but no retained two-real-adapter schedule cancels one caller while a held shared full-model acquisition continues for the survivor and asserts zero later dispatch for the canceled caller."
+    },
+    {
+      "id": "322.10",
+      "requirement": "As a user, I want my explicit profile or environment configuration preserved, so that I never act through another session's account.",
+      "status": "proven",
+      "evidence": [
+        "src/resident/selection-config.ts:18",
+        "test/resident/managed-auth-paths-process.test.ts:20",
+        "/tmp/resident-live-auth-diagnostic-0f_x2pj2/password/verify.mts",
+        "/tmp/resident-live-auth-diagnostic-0f_x2pj2/profile/verify.mts"
+      ],
+      "gap": "No residual identified for this story at the demonstrated scope."
+    },
+    {
+      "id": "322.11",
+      "requirement": "As a user, I want distinct workspaces and endpoints isolated, so that sharing cannot cross my intended Huly destination.",
+      "status": "proven",
+      "evidence": [
+        "test/resident/selection-config.test.ts:17",
+        "test/resident/managed-operator-stop-process.test.ts:54",
+        "test/resident/fixtures/managed-operator-stop.ts:115",
+        "test/resident/compatibility-http.test.ts:53"
+      ],
+      "gap": "Resolved endpoint/workspace belong to the authenticated compatibility selection; mismatches refuse and separate-workspace managed fixtures retain distinct backends. No residual identified for this story."
+    },
+    {
+      "id": "322.12",
+      "requirement": "As a user, I want different credentials and credential generations distinguished, so that token rotation does not silently reuse an obsolete identity.",
+      "status": "partial",
+      "evidence": [
+        "src/resident/compatibility-contract.ts:7",
+        "src/resident/compatibility-crypto.ts:32",
+        "test/resident/managed-auth-paths-process.test.ts:20",
+        "test/resident/fixtures/managed-auth-paths.ts:207"
+      ],
+      "gap": "Changed token bytes create a new generation and old callers retain captured authority. A same-token credential-generation change is not represented/proven by that test; explicit generation semantics remain unqualified."
+    },
+    {
+      "id": "322.13",
+      "requirement": "As a user, I want profile logout and replacement to have defined shared-resource behavior, so that a daemon does not silently extend a superseded profile's lifetime.",
+      "status": "partial",
+      "evidence": [
+        "test/resident/profile-lifecycle-fixture.ts:29",
+        "test/resident/fixtures/managed-auth-paths.ts:207",
+        "src/resident/selection-config.ts:18"
+      ],
+      "gap": "Local removal/rotation/replacement has defined captured-caller behavior and fresh-process refusal. The managed fixture edits the real store directly; the interactive logout command/keychain lifecycle with a resident owner is not qualified, and same-token generation behavior remains missing."
+    },
+    {
+      "id": "322.14",
+      "requirement": "As a user, I want password-backed and token-backed configurations handled according to their existing contracts, so that a new adapter does not silently downgrade supported authentication.",
+      "status": "partial",
+      "evidence": [
+        "test/resident/managed-auth-paths-process.test.ts:20",
+        "/tmp/resident-live-auth-diagnostic-0f_x2pj2/password/verify.mts",
+        "/tmp/resident-live-auth-diagnostic-0f_x2pj2/profile/verify.mts"
+      ],
+      "gap": "Actual password/env and file-token/profile reads are proved with same-reader auth contexts. Supported macOS/Linux native credential-store paths are not natively qualified with the resident lifecycle."
+    },
+    {
+      "id": "322.15",
+      "requirement": "As a user, I want tool restrictions preserved for every connection, so that sharing cannot broaden tool access.",
+      "status": "proven",
+      "evidence": [
+        "test/resident/managed-policy-isolation-process.test.ts:19",
+        "src/mcp/proxy-tools.ts:47",
+        "/tmp/resident-live-policy-diagnostic-lxvamu3r/verify.mts",
+        "/tmp/resident-live-auto-qualified-of08j_ff/verify.mts"
+      ],
+      "gap": "No residual identified for this story at the demonstrated scope."
+    },
+    {
+      "id": "322.16",
+      "requirement": "As an MCP host, I want my client identity and capabilities preserved, so that automatic native/proxy exposure remains correct.",
+      "status": "partial",
+      "evidence": [
+        "src/resident/request-headers.ts:7",
+        "scripts/resident-live-protocol.ts:25",
+        "test/resident/live-read-exposure.test.ts:13",
+        "/tmp/resident-codex-auto-live-49rhstmo/verify.mts",
+        "/tmp/resident-claude-auto-live-dbxyk3_q/verify.mts"
+      ],
+      "gap": "Both actual host identities and auto exposure are now qualified under a restricted tool policy. Nonempty/differing client capabilities and their supported feature advertisements are not exercised by the retained two-client probes (which send capabilities {})."
+    },
+    {
+      "id": "322.17",
+      "requirement": "As an MCP host, I want advertised schemas, resources and tools to match callable behavior, so that discovery remains sufficient for single-call correctness.",
+      "status": "partial",
+      "evidence": [
+        "scripts/resident-live-read-host.ts:35",
+        "test/resident/managed-policy-isolation-process.test.ts:19",
+        "test/resident/live-read-exposure.test.ts:13",
+        "/tmp/resident-codex-auto-live-49rhstmo/verify.mts"
+      ],
+      "gap": "Full catalogs/templates and representative callable native/proxy reads/refusals are checked, including exact catalogs under restricted actual hosts. No evidence yet closes the full advertised resource-read/capability interaction matrix; resource-template listing alone is not resource-read behavior."
+    },
+    {
+      "id": "322.18",
+      "requirement": "As a user, I want the local backend to authenticate attachments, so that another local client does not automatically gain my Huly authority.",
+      "status": "proven",
+      "evidence": [
+        "src/resident/admission-http.ts:109",
+        "test/resident/admission-http.test.ts:70",
+        "test/resident/compatibility-http.test.ts:53",
+        "test/resident/operator-stop-http.test.ts:21"
+      ],
+      "gap": "No residual identified for this story at the demonstrated scope."
+    },
+    {
+      "id": "322.19",
+      "requirement": "As a user, I want the adapter to verify the backend before transferring secrets, so that an impostor listener cannot collect credentials.",
+      "status": "proven",
+      "evidence": [
+        "src/resident/tls-channel.ts:16",
+        "src/resident/compatibility-authority.ts:34",
+        "test/resident/manual-adapter-process.test.ts:60",
+        "test/resident/tls-channel.test.ts:69"
+      ],
+      "gap": "No residual identified for this story at the demonstrated scope."
+    },
+    {
+      "id": "322.20",
+      "requirement": "As a user, I want local endpoint metadata and secrets protected on my OS, so that another account cannot take over my connection.",
+      "status": "partial",
+      "evidence": [
+        "src/resident/protected-path.ts:11",
+        "src/resident/attachment-file.ts:24",
+        "test/resident/protected-path.test.ts:12",
+        "test/resident/attachment-file.test.ts:51"
+      ],
+      "gap": "Linux/current-user owner-mode/reparse checks and file tests exist. There is no native macOS receipt or actual second-account credential-file takeover/denial campaign; another-platform pass cannot establish the story for macOS."
+    },
+    {
+      "id": "322.21",
+      "requirement": "As a user, I want stale locators and occupied foreign ports handled safely, so that starting Huly MCP cannot interfere with another program.",
+      "status": "proven",
+      "evidence": [
+        "test/resident/managed-crash-process.test.ts:16",
+        "test/resident/fixtures/managed-crash-refusal.ts:1",
+        "test/resident/tls-channel.test.ts:69",
+        "test/resident/managed-state-loss-process.test.ts:45"
+      ],
+      "gap": "No residual identified for this story at the demonstrated scope."
+    },
+    {
+      "id": "322.22",
+      "requirement": "As a user, I want recycled PIDs distinguished from our processes, so that stop or recovery never signals an unrelated process.",
+      "status": "proven",
+      "evidence": [
+        "src/resident/managed-process.ts:60",
+        "src/resident/operator-stop.ts:21",
+        "test/resident/managed-process.test.ts:122",
+        "test/resident/fixtures/managed-crash-refusal.ts:1"
+      ],
+      "gap": "Production signaling is via owned ChildProcess before Start only; stop is generation-authenticated HTTP and does not signal a metadata PID. Unavailable owner remains refusal, not PID takeover."
+    },
+    {
+      "id": "322.23",
+      "requirement": "As an MCP client, I want my request IDs scoped to my own context, so that another client's identical ID cannot capture my response.",
+      "status": "proven",
+      "evidence": [
+        "test/resident/manual-adapter-process.test.ts:60",
+        "test/resident/managed-live-read-pair-process.test.ts:93",
+        "scripts/resident-live-read-host.ts:35",
+        "/tmp/resident-live-auto-qualified-of08j_ff/verify.mts"
+      ],
+      "gap": "No residual identified for this story at the demonstrated scope."
+    },
+    {
+      "id": "322.24",
+      "requirement": "As an MCP client, I want progress and supported interactive exchanges routed to their origin, so that shared resources do not share conversation state.",
+      "status": "partial",
+      "evidence": [
+        "src/resident/response-stream.ts:21",
+        "test/resident/manual-adapter-process.test.ts:60",
+        "test/resident/response-stream.test.ts:22"
+      ],
+      "gap": "Progress routing is checked across colliding IDs. Id-bearing server requests are deliberately rejected (response-stream.ts), with no continuation bridge. Need prove negotiated capabilities never advertise supported interactive exchanges that this bridge cannot route, or implement the actually supported continuation path; current progress proof alone does not close that wording."
+    },
+    {
+      "id": "322.25",
+      "requirement": "As an MCP client, I want negotiated protocol semantics preserved, so that the bridge does not invent sessions or advertise unsupported features.",
+      "status": "partial",
+      "evidence": [
+        "src/resident/protocol-session.ts:5",
+        "src/resident/manual-adapter.ts:115",
+        "test/resident/live-read-protocol.test.ts:16",
+        "test/resident/native-session-ownership.test.ts:22",
+        "/tmp/resident-live-legacy-qualified-k3fdvynd/verify.mts"
+      ],
+      "gap": "Modern and legacy discovery/read flows and native UUID ownership have tests/live receipts. Differing/nonempty capabilities and supported interactive semantics remain unqualified; the two-version read test is not the complete negotiated feature contract."
+    },
+    {
+      "id": "322.26",
+      "requirement": "As a user, I want one session's EOF or cancellation to affect only its work, so that other sessions remain usable.",
+      "status": "proven",
+      "evidence": [
+        "test/resident/manual-adapter-process.test.ts:60",
+        "test/resident/attachment-owner.test.ts:13",
+        "test/resident/managed-idle-protected-work.test.ts:17",
+        "/tmp/resident-live-survivor-9w2cz2g2/verify.mts"
+      ],
+      "gap": "No residual identified for this story at the demonstrated scope."
+    },
+    {
+      "id": "322.27",
+      "requirement": "As an agent, I want transport failures returned rather than swallowed, so that calls do not hang after a failed send.",
+      "status": "proven",
+      "evidence": [
+        "src/resident/attachment-exchange.ts:13",
+        "test/resident/attachment-exchange.test.ts:11",
+        "test/resident/adapter-response-cleanup.test.ts:9",
+        "test/resident/adapter-boundary.test.ts:69"
+      ],
+      "gap": "No residual identified for this story at the demonstrated scope."
+    },
+    {
+      "id": "322.28",
+      "requirement": "As a user, I want an interrupted dispatched write reported as uncertain when necessary, so that I do not mistake a lost response for a failed mutation.",
+      "status": "proven",
+      "evidence": [
+        "src/resident/adapter-attachment.ts:193",
+        "src/resident/response-stream.ts:21",
+        "test/resident/managed-request-loss-process.test.ts:21",
+        "/tmp/resident-live-write-loss-_cpbcg7t/verify.mts"
+      ],
+      "gap": "No residual identified for this story at the demonstrated scope."
+    },
+    {
+      "id": "322.29",
+      "requirement": "As a user, I want reconnection to avoid replaying uncertain writes, so that recovery does not create duplicate changes.",
+      "status": "proven",
+      "evidence": [
+        "test/resident/retired-commit-process.test.ts:55",
+        "test/resident/managed-request-loss-process.test.ts:21",
+        "/tmp/resident-live-write-loss-_cpbcg7t/verify.mts"
+      ],
+      "gap": "Adapter/replacement schedules demonstrate no extra dispatch for the faulted invocation; the SDK has its existing HTTP retry policy, so this is not general remote exactly-once behavior."
+    },
+    {
+      "id": "322.30",
+      "requirement": "As a user, I want late replies and cleanup from old generations fenced off, so that they cannot affect a replacement backend.",
+      "status": "partial",
+      "evidence": [
+        "src/resident/generation-registry.ts:30",
+        "src/resident/selection-claim.ts:26",
+        "test/resident/generation-registry.test.ts:16",
+        "test/resident/native-session-ownership.test.ts:22",
+        "test/resident/retired-commit-process.test.ts:55"
+      ],
+      "gap": "Exact-object cleanup fencing and delayed remote commit across generations are tested. No explicit packaged schedule injects an old generation late response/cleanup into a live new attachment with colliding wire IDs; individual fencing seams are narrower evidence."
+    },
+    {
+      "id": "322.31",
+      "requirement": "As a user, I want an idle backend to release its resources, so that unused sessions do not leave permanent resident memory.",
+      "status": "proven",
+      "evidence": [
+        "src/resident/admissions.ts:37",
+        "test/resident/managed-idle.test.ts:23",
+        "test/resident/managed-last-adapter-expiry-process.test.ts:19",
+        "/tmp/resident-live-linux-campaign-_dtgfmjg/managed-read-receipt.json"
+      ],
+      "gap": "No residual identified for this story at the demonstrated scope."
+    },
+    {
+      "id": "322.32",
+      "requirement": "As a user, I want idle retirement ordered with new work, so that an accepted request is not lost to shutdown.",
+      "status": "proven",
+      "evidence": [
+        "test/resident/admission-fence.test.ts:16",
+        "test/resident/managed-admission-continuity.test.ts:79",
+        "test/resident/managed-idle.test.ts:23"
+      ],
+      "gap": "Atomic acceptance/fence and retained-admission handoff tests cover local ordering. No distinct residual identified for the ordinary idle ordering story."
+    },
+    {
+      "id": "322.33",
+      "requirement": "As a user, I want active and queued work protected during ordinary retirement, so that legitimate calls are not treated as idle.",
+      "status": "proven",
+      "evidence": [
+        "test/resident/managed-idle-protected-work.test.ts:17",
+        "test/resident/attachment-owner.test.ts:13",
+        "test/resident/managed-idle.test.ts:23"
+      ],
+      "gap": "TestClock tests retain expired active work/session through slow cleanup, block new capacity, then grant a complete idle interval; failed cleanup remains retained."
+    },
+    {
+      "id": "322.34",
+      "requirement": "As a user, I want a crashed adapter's attachment to expire, so that an abandoned counter does not keep the backend alive forever.",
+      "status": "proven",
+      "evidence": [
+        "test/resident/managed-last-adapter-expiry-process.test.ts:19",
+        "test/resident/native-backend-process.test.ts:93",
+        "/tmp/resident-live-survivor-9w2cz2g2/verify.mts"
+      ],
+      "gap": "No residual identified for this story at the demonstrated scope."
+    },
+    {
+      "id": "322.35",
+      "requirement": "As a user, I want bounded drain and truthful outcomes, so that a stuck call cannot cause indefinite shutdown waits or be falsely reported as completed.",
+      "status": "proven",
+      "evidence": [
+        "src/resident/admissions.ts:37",
+        "src/resident/attachment-owner.ts:21",
+        "test/resident/admission-fence.test.ts:16",
+        "test/resident/resident-client-close.test.ts:8",
+        "test/resident/managed-stop-fault-process.test.ts:1"
+      ],
+      "gap": "No residual identified for this story at the demonstrated scope."
+    },
+    {
+      "id": "322.36",
+      "requirement": "As a user, I want daemon crashes to account for any owned descendants, so that recovery does not accumulate overlapping processes.",
+      "status": "partial",
+      "evidence": [
+        "test/resident/fixtures/reap-descendants.py:89",
+        "test/resident/managed-request-loss-process.test.ts:21",
+        "src/resident/managed-selection.ts:57",
+        "/tmp/resident-live-query-loss-phases-6deo4c_h/verify.mts"
+      ],
+      "gap": "Crash schedules observe no descendants at the controlled boundary and retain ownership/refuse replacement. They do not establish general accounting for an owner that actually leaves descendants or late acquisitions after crash; no guardian is required, but verified local retirement must still cover real leftover resources before reset."
+    },
+    {
+      "id": "322.37",
+      "requirement": "As a user, I want safe refusal when ownership or cleanup cannot be established, so that availability is not restored by guessing which process to kill.",
+      "status": "partial",
+      "evidence": [
+        "src/resident/operator-stop.ts:21",
+        "src/resident/state-status.ts:26",
+        "test/resident/managed-state-loss-process.test.ts:45",
+        "test/resident/managed-crash-process.test.ts:16"
+      ],
+      "gap": "Bounded refusal is implemented and demonstrated. Actionable verified local retirement/reset of an unresolved claim/record remains prose/manual guidance; current stop only works with a reachable managed owner and proves fencing, not retirement."
+    },
+    {
+      "id": "322.38",
+      "requirement": "As a user, I want old and new package versions to coexist or migrate deliberately, so that upgrading one session does not kill another's in-flight work.",
+      "status": "proven",
+      "evidence": [
+        "test/resident/managed-version-process.test.ts:22",
+        "test/resident/fixtures/managed-version-coexistence.ts:1",
+        "docs/resident-manual.md:1"
+      ],
+      "gap": "Two separately built implementation-version layouts coexist and retire independently. Deliberate coexistence is the selected policy; arbitrary released-version migration is not claimed or required by this either/or story."
+    },
+    {
+      "id": "322.39",
+      "requirement": "As a user, I want slow or closed stdout handled per adapter, so that one host cannot indefinitely stall other hosts.",
+      "status": "proven",
+      "evidence": [
+        "test/resident/adapter-output-process.test.ts:1",
+        "src/resident/manual-adapter.ts:115"
+      ],
+      "gap": "No residual identified for this story at the demonstrated scope."
+    },
+    {
+      "id": "322.40",
+      "requirement": "As a user, I want bounded queueing, message sizes and concurrency, so that sharing does not turn one caller into unbounded resource consumption.",
+      "status": "proven",
+      "evidence": [
+        "src/resident/adapter-limits.ts:2",
+        "src/resident/manual-adapter.ts:115",
+        "src/resident/response-stream.ts:21",
+        "test/resident/adapter-output-process.test.ts:1",
+        "test/resident/adapter-boundary.test.ts:69",
+        "test/resident/attachment-owner.test.ts:13"
+      ],
+      "gap": "No residual identified for this story at the demonstrated scope."
+    },
+    {
+      "id": "322.41",
+      "requirement": "As a macOS user, I want the complete lifecycle checked natively, so that transport portability is not substituted for process evidence.",
+      "status": "unverified",
+      "evidence": [
+        "src/resident/protected-path.ts:11",
+        "docs/implementation/issue-328.md:1"
+      ],
+      "gap": "No native macOS process/permission/lifecycle receipts exist. Darwin source support and Linux passes do not prove complete native lifecycle."
+    },
+    {
+      "id": "322.42",
+      "requirement": "As a Linux user, I want the complete lifecycle checked natively, so that acquisition, credential and cleanup behavior work in that environment.",
+      "status": "partial",
+      "evidence": [
+        "/tmp/resident-live-auto-qualified-of08j_ff/check-all.log",
+        "/tmp/resident-live-auto-qualified-of08j_ff/verify.mts",
+        "/tmp/resident-live-linux-campaign-_dtgfmjg/sha256.json",
+        "/tmp/resident-movement-certification-20261018/sha256.json"
+      ],
+      "gap": "Linux has extensive real process, live-Huly, auth/policy, faults and full-gate evidence. The concrete incomplete lifecycle schedules in stories5/6/9/16/24/30/36 and unresolved operational evidence prevent complete lifecycle certification."
+    },
+    {
+      "id": "322.43",
+      "requirement": "Windows resident support is excluded by the 2026-10-18 scope decision; unsupported resident startup must remain refused.",
+      "status": "proven",
+      "evidence": [
+        "src/resident/protected-path.ts:11",
+        "docs/implementation/resident-windows-design.md:1"
+      ],
+      "gap": "currentPosixOwner parses only linux/darwin before protected resident startup; Windows is an unsupported typed refusal. No Windows implementation/native campaign is required by the amended story."
+    },
+    {
+      "id": "322.44",
+      "requirement": "As a user, I want clear redacted diagnostics, so that I can distinguish adapter failure, backend failure, model loading and an unknown operation outcome.",
+      "status": "partial",
+      "evidence": [
+        "src/resident/state-status.ts:26",
+        "src/resident/operator-stop.ts:21",
+        "src/resident/adapter-attachment.ts:193",
+        "test/resident/state-status-process.test.ts:31"
+      ],
+      "gap": "Uncertainty/refusal diagnostics and redacted static status exist. Operator status does not expose requested readiness/admission, attachment/request counts, drain or model-loading state; liveness is always unverified. Cannot yet distinguish all named states operationally."
+    },
+    {
+      "id": "322.45",
+      "requirement": "As a maintainer, I want explicit lifecycle transitions, so that legal admission and ownership changes are reviewable without a special framework.",
+      "status": "partial",
+      "evidence": [
+        "src/resident/start-authorization.ts:8",
+        "src/resident/attachment-lease.ts:10",
+        "src/resident/response-stream.ts:21",
+        "src/resident/admissions.ts:37",
+        "src/resident/managed-selection.ts:57"
+      ],
+      "gap": "Several deterministic decisions are pure ordinary functions, but admission/idle/ownership state transitions remain embedded in Effect sequencing and mutable scope. No complete explicit transition surface corresponding to the lifecycle specification/oracle has been established."
+    },
+    {
+      "id": "322.46",
+      "requirement": "As a maintainer, I want Quint properties connected to real observed transitions, so that a model-only success does not substitute for implementation evidence.",
+      "status": "unverified",
+      "evidence": [
+        "quint-specs/resident-launch.qnt:1",
+        "quint-specs/resident-launch.md:1",
+        "quint-specs/resident-response-ownership.qnt:1",
+        "test/resident/response-observations.test.ts:11"
+      ],
+      "gap": "The launch/ownership model is types only: no init/actions/step/invariants/runtime traces. Existing response/attachment models and observation tests do not prove the newly required lifecycle properties or implementation alignment."
+    },
+    {
+      "id": "322.47",
+      "requirement": "As a maintainer, I want process-level tests at the public launch/protocol boundary, so that internal implementation refactoring does not invalidate the behavior contract.",
+      "status": "proven",
+      "evidence": [
+        "test/resident/managed-backend-process.test.ts:59",
+        "test/resident/managed-live-read-pair-process.test.ts:93",
+        "test/resident/managed-operator-stop-process.test.ts:54",
+        "test/resident/managed-request-loss-process.test.ts:21",
+        "/tmp/resident-live-auto-qualified-of08j_ff/check-all.log"
+      ],
+      "gap": "No residual identified for this story at the demonstrated scope."
+    },
+    {
+      "id": "322.48",
+      "requirement": "As a maintainer, I want measured total memory including adapters, so that daemon-only RSS is not presented as the complete solution's footprint.",
+      "status": "proven",
+      "evidence": [
+        "docs/implementation/resident-comparison-linux-2026-10-18.md:1",
+        "/tmp/resident-comparison-campaign-v3-pi0hult3/terminal-manifest.json",
+        "/tmp/resident-comparison-case016-diagnostic-ki5e3aql/final-analysis.json"
+      ],
+      "gap": "All30 attempts and failures retained; RSS sums simultaneous observed descendants excluding known driver/supervisor, including adapter/startup descendants. Sampling limitations and failed-attempt resource exclusion are explicit. This proves measured scoped totals, not a universal budget or winner."
+    },
+    {
+      "id": "322.49",
+      "requirement": "As a user, I want standalone stdio and direct HTTP retained, so that managed sharing does not remove the existing explicit transport choices.",
+      "status": "proven",
+      "evidence": [
+        "src/launcher.ts:1",
+        "src/runtime/server-startup.ts:90",
+        "test/resident/standalone-startup.test.ts:9",
+        "docs/implementation/resident-comparison-linux-2026-10-18.md:1"
+      ],
+      "gap": "No residual identified for this story at the demonstrated scope."
+    },
+    {
+      "id": "322.50",
+      "requirement": "As a maintainer, I want executable prototypes kept out of production and retired when superseded, so that a second experimental implementation does not become permanent.",
+      "status": "partial",
+      "evidence": [
+        "src/launcher.ts:1",
+        "docs/implementation/issue-328.md:1"
+      ],
+      "gap": "Executable prototype is not in the production entrypoint. Local prototype/resident-lifecycle-321 and related implementation/prototype worktrees remain; final inspect/preserve/delete retirement has not occurred and is explicitly deferred until integration/qualification."
+    },
+    {
+      "id": "322.D1",
+      "requirement": "Use our native loopback HTTP backend; do not funnel multiple hosts into one upstream stdio stream or share one mutable protocol transport object across clients.",
+      "status": "proven",
+      "evidence": [
+        "src/index.ts:1",
+        "src/resident/manual-adapter-main.ts:1",
+        "docs/resident-manual.md:1",
+        "src/resident/tls-channel.ts:1",
+        "src/resident/attachment-file.ts:1"
+      ],
+      "gap": "Native per-adapter HTTP implementation; no shared upstream stdio stream."
+    },
+    {
+      "id": "322.D2",
+      "requirement": "Create one adapter per host connection and one resident backend per compatible resolved configuration under one OS user. A universal machine-wide or multi-user broker is not required.",
+      "status": "proven",
+      "evidence": [
+        "test/resident/managed-live-read-pair-process.test.ts:93",
+        "/tmp/resident-live-linux-campaign-_dtgfmjg/managed-read-receipt.json",
+        "/tmp/resident-live-auto-qualified-of08j_ff/gate-proof.json",
+        "src/resident/managed-child-main.ts:1",
+        "src/runtime/server-startup.ts:1",
+        "src/resident/managed-process.ts:1"
+      ],
+      "gap": "Compatible Linux clients share one owner; platform qualification is separate."
+    },
+    {
+      "id": "322.D3",
+      "requirement": "Resolve profile/environment inputs before selecting a backend. Compare effective URL, workspace, authentication method/identity/generation, connection settings and process-wide exposure policy. A profile name or workspace alone is insufficient. Keep secret comparison material out of public/persisted identifiers.",
+      "status": "partial",
+      "evidence": [
+        "src/resident/selection-config.ts:1",
+        "src/resident/startup-selection.ts:1",
+        "test/resident/managed-auth-paths-process.test.ts:1",
+        "src/resident/compatibility-contract.ts:1",
+        "src/resident/compatibility-crypto.ts:20",
+        "test/resident/compatibility.test.ts:135",
+        "test/resident/fixtures/managed-auth-paths.ts:122",
+        "test/resident/profile-lifecycle-fixture.ts:1"
+      ],
+      "gap": "Complete credential-generation/native-store invalidation coverage missing."
+    },
+    {
+      "id": "322.D4",
+      "requirement": "Separate incompatible process settings unless explicit, authorized per-client views are implemented. Preserve tool filters and output strictness. Preserve actual host clientInfo/capabilities because auto exposure depends on the host.",
+      "status": "partial",
+      "evidence": [
+        "src/mcp/process-policy.ts:1",
+        "test/resident/managed-policy-isolation-process.test.ts:1",
+        "test/resident/fixtures/managed-policy-isolation.ts:1",
+        "scripts/resident-live-protocol.ts:1",
+        "test/resident/managed-live-read-pair-process.test.ts:1",
+        "/tmp/resident-codex-auto-live-49rhstmo/verify.mts"
+      ],
+      "gap": "Complete capabilities/interactive and policy matrix missing."
+    },
+    {
+      "id": "322.D5",
+      "requirement": "Establish the shared backend's Huly identity once through a protected launch/attachment contract. Existing Huly header overrides intentionally create request-scoped clients and accept token configuration only; forwarding such headers on every invocation would not deliver the measured sharing behavior.",
+      "status": "proven",
+      "evidence": [
+        "src/resident/manual-adapter-main.ts:1",
+        "src/resident/tls-channel.ts:1",
+        "src/resident/attachment-file.ts:1",
+        "test/resident/managed-auth-paths-process.test.ts:1",
+        "/tmp/resident-live-auth-diagnostic-0f_x2pj2/password/verify.mts",
+        "/tmp/resident-live-auth-diagnostic-0f_x2pj2/profile/verify.mts"
+      ],
+      "gap": "Protected launch owns shared configuration; per-call Huly overrides refused."
+    },
+    {
+      "id": "322.D6",
+      "requirement": "Keep local daemon authorization distinct from Huly credentials. Typed boundary parsing and redacted secret handling remain mandatory.",
+      "status": "proven",
+      "evidence": [
+        "src/resident/tls-channel.ts:1",
+        "src/resident/compatibility-crypto.ts:1",
+        "src/resident/admission-http.ts:1",
+        "src/resident/bootstrap-codec.ts:1",
+        "src/resident/managed-child-environment.ts:1"
+      ],
+      "gap": "Separate local/Huly authorization with typed redacted boundaries."
+    },
+    {
+      "id": "322.D7",
+      "requirement": "Supply the managed launch path in our package without a third-party application or mandatory OS-service installation. Do not silently rewrite host configuration or remove standalone stdio/direct HTTP. Production default promotion must be an explicit delivery decision; publishing a model or prototype does not activate managed mode.",
+      "status": "proven",
+      "evidence": [
+        "src/index.ts:1",
+        "src/resident/startup-selection.ts:1",
+        "test/resident/standalone-startup.test.ts:1",
+        "package.json:1",
+        "src/launcher.ts:1",
+        "test/helpers/stdio-build.ts:9",
+        "src/runtime/server-startup.ts:90",
+        "test/resident/standalone-startup.test.ts:9"
+      ],
+      "gap": "Own-package explicit launch; existing transport defaults preserved."
+    },
+    {
+      "id": "322.D8",
+      "requirement": "Implement deterministic state transitions as ordinary functions over explicit state and events. The user approved this approach and rejected the need for a dedicated state-machine library.",
+      "status": "partial",
+      "evidence": [
+        "docs/implementation/resident-managed-design.md:1",
+        "docs/adr/0003-adopt-mcporter-resident-lifecycle.md:1",
+        "test/resident/selection-claim-process.test.ts:1",
+        "src/resident/start-authorization.ts:8",
+        "src/resident/attachment-lease.ts:10",
+        "src/resident/response-stream.ts:21"
+      ],
+      "gap": "Pure Start/lease/response functions exist, but admission, idle and ownership decisions still live within mutable Effect sequencing in admissions.ts and managed-selection.ts; the general explicit-event pure transition boundary remains incomplete."
+    },
+    {
+      "id": "322.D9",
+      "requirement": "Keep process launch, locking, HTTP, configuration, time, telemetry and cleanup in an Effect/resource-owning shell. Feed their results into the transition functions as events. A reducer does not implement an inter-process lock.",
+      "status": "partial",
+      "evidence": [
+        "docs/implementation/resident-lease-policy.md:1",
+        "src/resident/admission-contract.ts:1",
+        "src/resident/admissions.ts:1",
+        "docs/implementation/resident-managed-design.md:1",
+        "docs/adr/0003-adopt-mcporter-resident-lifecycle.md:1",
+        "test/resident/selection-claim-process.test.ts:1"
+      ],
+      "gap": "Pure Start/lease/response functions exist, but admission, idle and ownership decisions still live within mutable Effect sequencing in admissions.ts and managed-selection.ts; the general explicit-event pure transition boundary remains incomplete."
+    },
+    {
+      "id": "322.D10",
+      "requirement": "Model backend ownership/admission, adapter attachment, Huly readiness and request outcome as related lifecycles, rather than one enum containing every combination.",
+      "status": "proven",
+      "evidence": [
+        "docs/implementation/resident-lease-policy.md:1",
+        "src/resident/admission-contract.ts:1",
+        "src/resident/admissions.ts:1",
+        "quint-specs/resident-response-ownership.qnt:1",
+        "quint-specs/resident-response-ownership.md:1",
+        "test/helpers/resident-response-replay.ts:1"
+      ],
+      "gap": "Attachment/request/owner structures separate; full formal lifecycle tracked separately."
+    },
+    {
+      "id": "322.D11",
+      "requirement": "The prototype-derived backend progression is absent \u2192 starting \u2192 accepting \u2192 draining \u2192 absent, with blocked recovery when ownership or retirement cannot be established. These names describe the decision model; public diagnostic wording may be clearer. Accepting catalog requests does not imply full-model readiness.",
+      "status": "proven",
+      "evidence": [
+        "src/resident/manual-backend.ts:121",
+        "src/resident/admissions.ts:164",
+        "src/mcp/http-transport.ts:267",
+        "src/resident/state-status.ts:1",
+        "src/resident/operator-stop.ts:1",
+        "test/resident/managed-stop-fault-process.test.ts:1"
+      ],
+      "gap": "Accepting/drain/retirement/refusal behavior exists at exercised seams."
+    },
+    {
+      "id": "322.D12",
+      "requirement": "A backend generation is distinct from PID, adapter identity and request ID. Fence locator publication, attachments, callbacks, request admission and cleanup by generation. Never delete a replacement's locator or signal a process merely because a stale descriptor records its PID.",
+      "status": "partial",
+      "evidence": [
+        "test/resident/managed-request-loss-process.test.ts:1",
+        "test/resident/managed-parent-loss-process.test.ts:1",
+        "test/resident/managed-crash-process.test.ts:1",
+        "src/resident/generation-registry.ts:30",
+        "src/resident/selection-claim.ts:26",
+        "test/resident/generation-registry.test.ts:16"
+      ],
+      "gap": "Old-generation late response/cleanup colliding-ID process matrix incomplete."
+    },
+    {
+      "id": "322.D13",
+      "requirement": "Coordinate every startup entrypoint, including explicit launch. Concurrent launchers for the same compatibility identity must converge on one admitted generation. Publish an atomic, versioned, schema-parsed locator after authenticated application readiness, not after a TCP port merely opens.",
+      "status": "partial",
+      "evidence": [
+        "test/resident/fixtures/managed-ten-parents.ts:1",
+        "test/resident/managed-backend-process.test.ts:1",
+        "test/resident/managed-live-read-pair-process.test.ts:71",
+        "test/resident/managed-parent-loss-process.test.ts:1",
+        "test/resident/child-authorization.test.ts:1",
+        "test/resident/fixtures/managed-crash-refusal.ts:1"
+      ],
+      "gap": "Combined ten-parent Huly/readiness and precise launch-death matrix missing."
+    },
+    {
+      "id": "322.D14",
+      "requirement": "Bind an explicit loopback address and avoid checking a free port before subsequently claiming it. Treat a foreign listener, stale/corrupt locator, interrupted launcher, unverified ownership and startup deadline as distinct bounded outcomes.",
+      "status": "proven",
+      "evidence": [
+        "src/resident/manual-backend.ts:39",
+        "src/resident/tls-channel.ts:1",
+        "src/resident/attachment-file.ts:1",
+        "test/resident/managed-state-loss-process.test.ts:1",
+        "test/resident/namespace-descriptor.test.ts:1",
+        "test/resident/fixtures/managed-crash-refusal.ts:1"
+      ],
+      "gap": "Port0 binding and distinct typed locator/refusal paths implemented."
+    },
+    {
+      "id": "322.D15",
+      "requirement": "Managed mode requires authenticated requests and expected backend identity verification before credential transfer. Apply the local Host/Origin policy. Random ports and bearer possession alone are not a complete proof of the expected listener's identity.",
+      "status": "proven",
+      "evidence": [
+        "src/resident/tls-channel.ts:1",
+        "src/resident/compatibility-crypto.ts:1",
+        "src/resident/admission-http.ts:1"
+      ],
+      "gap": "Generation TLS/bearer/Host-Origin checks precede authority transfer."
+    },
+    {
+      "id": "322.D16",
+      "requirement": "Choose the actual lock/locator/authentication primitives during the implementation's design step, document their ownership and recovery guarantees, and falsify them with the acceptance cases before production wiring. No particular third-party lock package or elaborate broker protocol is preselected.",
+      "status": "proven",
+      "evidence": [
+        "docs/implementation/resident-managed-design.md:1",
+        "docs/adr/0003-adopt-mcporter-resident-lifecycle.md:1",
+        "test/resident/selection-claim-process.test.ts:1"
+      ],
+      "gap": "Concrete coordination/auth design recorded and real-process primitives exercised."
+    },
+    {
+      "id": "322.D17",
+      "requirement": "Adopt the already researched [MCPorter lifecycle contract](https://github.com/openclaw/mcporter/blob/1e3fa8a893e3245a0843f714f81bfdf3b0ad5dbc/docs/daemon.md): cross-process startup coordination, authenticated application readiness, protected atomic ownership metadata, generation-fenced attachments/cleanup, graceful drain and bounded refusal after unresolved owner loss. Retain our native loopback HTTP/TLS backend and one process per compatible resolved configuration; do not copy a universal broker or upstream stdio gateway. Keep the existing Huly timeouts, limits and native-platform requirements rather than importing MCPorter's budgets.",
+      "status": "proven",
+      "evidence": [
+        "docs/adr/0002-resident-recovery-without-operation-journal.md:1",
+        "docs/adr/0003-adopt-mcporter-resident-lifecycle.md:1",
+        "docs/resident-manual.md:1",
+        "docs/implementation/resident-managed-design.md:1",
+        "test/resident/selection-claim-process.test.ts:1"
+      ],
+      "gap": "Protected ownership/refusal practice adopted without mandatory guardian/foreign budgets."
+    },
+    {
+      "id": "322.D18",
+      "requirement": "A shared backend crash may interrupt all attached clients and their in-flight operations. For an individual Huly operation, possible remote commit followed by response loss has the same uncertainty as standalone stdio. This feature does not require stronger Huly durability, rollback, exactly-once behavior or transparent crash continuity. Preserve no automatic replay, truthful unknown outcomes, credentials/policy isolation and ordinary healthy-backend client isolation. Existing simultaneous-client and fault cases remain required evidence; backend-crash cases need not preserve a surviving client's operation.",
+      "status": "partial",
+      "evidence": [
+        "docs/adr/0002-resident-recovery-without-operation-journal.md:1",
+        "docs/adr/0003-adopt-mcporter-resident-lifecycle.md:1",
+        "docs/resident-manual.md:1",
+        "test/resident/uncertain-write-process.test.ts:1",
+        "test/resident/managed-request-loss-process.test.ts:1",
+        "/tmp/resident-live-write-loss-_cpbcg7t/verify.mts",
+        "src/resident/attachment-exchange.ts:1",
+        "src/resident/manual-adapter.ts:1"
+      ],
+      "gap": "Crash-interruption scope and no replay are proven; ordinary healthy-backend isolation and the complete simultaneous-client/fault matrix remain incomplete."
+    },
+    {
+      "id": "322.D19",
+      "requirement": "Automatic startup is required when no unresolved owner exists and after confirmed normal retirement. Unexpected backend-owner death with unconfirmed resources preserves metadata and produces bounded actionable refusal. Verified local retirement is required before resetting ownership and serializing one replacement. Automatic failover after unverified owner loss is not promised. The baseline has a transient launcher and one resource-owning native backend; a guardian, restricted SDK worker or native containment layer is not mandatory. This explicitly supersedes the stronger conditional guardian/recovery proposal.",
+      "status": "partial",
+      "evidence": [
+        "test/resident/fixtures/managed-operator-stop.ts:1",
+        "test/resident/retired-commit-process.test.ts:1",
+        "src/resident/managed-selection.ts:1",
+        "test/resident/managed-parent-loss-process.test.ts:16",
+        "test/resident/fixtures/managed-parent-loss.ts:84",
+        "src/resident/selection-claim.ts:26"
+      ],
+      "gap": "Unexpected-loss verified-retirement reset/replacement not demonstrated; normal replacement and refusal proven."
+    },
+    {
+      "id": "322.D20",
+      "requirement": "Use a protected per-user production lifecycle namespace. Same-user manual deletion/replacement of live ownership state is not a supported automatic recovery operation; a namespace reset requires stopping and verifying actual owned local resources. Detectable corruption, missing expected records, stale locators, reused PIDs and foreign listeners remain refusal/safety cases. Other OS users are isolated by native permissions and authentication. Do not claim protection against a hostile same-user process or infer retirement from complete file absence. This scopes the earlier arbitrary-erasure proof obligation explicitly rather than pretending another metadata file solves it.",
+      "status": "partial",
+      "evidence": [
+        "src/resident/protected-path.ts:1",
+        "src/resident/managed-directory-config.ts:1",
+        "test/resident/protected-path.test.ts:1",
+        "src/resident/managed-process.ts:1",
+        "src/resident/managed-selection.ts:1",
+        "test/resident/managed-state-loss-process.test.ts:1"
+      ],
+      "gap": "Native macOS namespace/permission behavior unqualified."
+    },
+    {
+      "id": "322.D21",
+      "requirement": "Keep request IDs, responses, errors, progress and supported interactive continuation state bound to their originating adapter/request context. Modern protocol traffic must not invent durable sessions; legacy session behavior is negotiated explicitly.",
+      "status": "partial",
+      "evidence": [
+        "src/resident/request-headers.ts:1",
+        "src/resident/protocol-session.ts:1",
+        "scripts/resident-live-protocol.ts:1",
+        "src/resident/manual-adapter.ts:1",
+        "src/resident/response-stream.ts:1",
+        "test/helpers/resident-response-replay.ts:1",
+        "src/resident/response-stream.ts:21",
+        "test/resident/manual-adapter-process.test.ts:60",
+        "test/resident/response-stream.test.ts:22"
+      ],
+      "gap": "Complete capability/interactive/progress origin matrix missing."
+    },
+    {
+      "id": "322.D22",
+      "requirement": "Cancellation/EOF/death of one adapter releases its attachment and cancels or drains only its work. It must not terminate another adapter's request, the resident backend, or shared initialization still needed elsewhere.",
+      "status": "partial",
+      "evidence": [
+        "test/resident/manual-adapter-process.test.ts:1",
+        "test/resident/managed-last-adapter-expiry-process.test.ts:1",
+        "/tmp/resident-live-survivor-9w2cz2g2/verify.mts",
+        "test/runtime/huly-clients.test.ts:18",
+        "test/mcp/request-client-lifecycle.test.ts:16",
+        "test/resident/attachment-owner.test.ts:13"
+      ],
+      "gap": "Full held active-call/model-wait cancellation plus independent surviving adapter missing."
+    },
+    {
+      "id": "322.D23",
+      "requirement": "Preserve current lazy handlers, fast discovery, lightweight project reads and single-flight full-model acquisition. Cancellation during a wait must prevent later dispatch for that caller.",
+      "status": "partial",
+      "evidence": [
+        "src/resident/manual-backend.ts:91",
+        "src/runtime/server-startup.ts:1",
+        "test/resident/managed-live-read-pair-process.test.ts:71",
+        "test/resident/manual-adapter-process.test.ts:1",
+        "test/resident/attachment-owner.test.ts:1"
+      ],
+      "gap": "Packaged held-model wait/cancel/survivor/no-late-dispatch case missing."
+    },
+    {
+      "id": "322.D24",
+      "requirement": "Distinguish proven refusal before dispatch from an uncertain dispatched operation. Do not automatically replay uncertain writes on timeout, disconnect, expired context, daemon restart or generation change. Safe replay requires established non-dispatch or explicit operation-level idempotency/reconciliation.",
+      "status": "proven",
+      "evidence": [
+        "test/resident/uncertain-write-process.test.ts:1",
+        "test/resident/managed-request-loss-process.test.ts:1",
+        "/tmp/resident-live-write-loss-_cpbcg7t/verify.mts",
+        "src/resident/attachment-exchange.ts:1",
+        "src/resident/manual-adapter.ts:1",
+        "docs/adr/0002-resident-recovery-without-operation-journal.md:1"
+      ],
+      "gap": "Real disposable lost-write response and operation-specific reconciliation; no replay."
+    },
+    {
+      "id": "322.D25",
+      "requirement": "Define attachments as releasable, crash-expiring leases; a permanently incremented client count is insufficient. Count queued/active requests independently of adapter liveness.",
+      "status": "partial",
+      "evidence": [
+        "src/resident/attachment-owner.ts:1",
+        "src/resident/admissions.ts:1",
+        "test/resident/managed-idle-protected-work.test.ts:1",
+        "test/resident/admission-fence.test.ts:1",
+        "test/resident/attachment-owner.test.ts:1",
+        "test/resident/adapter-output-process.test.ts:1"
+      ],
+      "gap": "Full packaged queued/active/model-wait expiry/cleanup schedules incomplete."
+    },
+    {
+      "id": "322.D26",
+      "requirement": "Order idle admission and drain so work cannot be accepted into a retiring generation. Ordinary idle retirement must not interrupt queued/active work. Drain closes admission before resource release and uses explicit bounds.",
+      "status": "partial",
+      "evidence": [
+        "test/resident/managed-idle.test.ts:1",
+        "test/resident/admission-fence.test.ts:1",
+        "test/resident/managed-admission-continuity.test.ts:1",
+        "src/resident/manual-backend.ts:121",
+        "src/resident/admissions.ts:164",
+        "src/mcp/http-transport.ts:267"
+      ],
+      "gap": "Complete real-process idle/new-work/queue races missing."
+    },
+    {
+      "id": "322.D27",
+      "requirement": "Unknown outcomes must remain truthful across recovery. Each invocation belongs to its original adapter incarnation, request and generation, is submitted at most once, and is never restored or replayed into a replacement. A surviving adapter retains bounded request state and reports uncertainty when output remains usable. Host-observed terminal results remain known despite later disconnect. Adapter or host death can prevent reporting; EOF or an incomplete call never proves mutation failure.",
+      "status": "partial",
+      "evidence": [
+        "src/resident/response-stream.ts:1",
+        "src/resident/adapter-attachment.ts:164",
+        "test/resident/delayed-commit-process.test.ts:1"
+      ],
+      "gap": "Remaining amended uncertainty schedules, including post-progress loss, incomplete."
+    },
+    {
+      "id": "322.D28",
+      "requirement": "Evidence lifetime is explicitly scoped to the original caller and adapter. Resident recovery provides no durable per-operation ledger, cross-session operation-status lookup or persisted replay queue. A fresh adapter cannot retrieve or assess an old outcome. Existing redacted diagnostics, caller history and test receipts remain allowed. This intentionally replaces the earlier ambiguous requirement to retain request evidence across restart; protected backend ownership inventory remains required independently.",
+      "status": "proven",
+      "evidence": [
+        "docs/adr/0002-resident-recovery-without-operation-journal.md:1",
+        "docs/adr/0003-adopt-mcporter-resident-lifecycle.md:1",
+        "docs/resident-manual.md:1",
+        "src/resident/attachment-exchange.ts:1",
+        "src/resident/manual-adapter.ts:1",
+        "src/resident/response-stream.ts:1",
+        "src/resident/adapter-attachment.ts:164",
+        "test/resident/delayed-commit-process.test.ts:1"
+      ],
+      "gap": "Evidence scoped to caller/adapter; no durable operation ledger/history/replay queue."
+    },
+    {
+      "id": "322.D29",
+      "requirement": "Confirmed local retirement permits safe local replacement but does not settle or cancel a remote Huly mutation, which may complete later. Healthy replacement, new-generation status or an ordinary fresh read without an operation-specific reconciliation contract cannot establish that an old write failed. Independent new calls may proceed after safe replacement; repeating an uncertain mutation requires operation-specific reconciliation or remote idempotency. No exactly-once or cross-invocation deduplication guarantee is promised. Unknown business outcomes alone do not retain an otherwise safely retired local backend forever.",
+      "status": "proven",
+      "evidence": [
+        "docs/adr/0002-resident-recovery-without-operation-journal.md:1",
+        "docs/adr/0003-adopt-mcporter-resident-lifecycle.md:1",
+        "test/resident/retired-commit-process.test.ts:1",
+        "test/resident/uncertain-write-process.test.ts:1",
+        "test/resident/managed-request-loss-process.test.ts:1",
+        "/tmp/resident-live-write-loss-_cpbcg7t/verify.mts"
+      ],
+      "gap": "Local retirement/new reads do not settle an old remote mutation."
+    },
+    {
+      "id": "322.D30",
+      "requirement": "Account for owned descendants and late acquisitions during cleanup. If retirement/ownership is unconfirmed, block unsafe replacement and give a redacted actionable diagnostic. Do not copy a peer's recovery availability tradeoff without explicitly documenting it.",
+      "status": "partial",
+      "evidence": [
+        "src/resident/managed-process.ts:1",
+        "src/resident/managed-selection.ts:1",
+        "test/resident/managed-state-loss-process.test.ts:1",
+        "test/resident/fixtures/managed-operator-stop.ts:1",
+        "test/resident/retired-commit-process.test.ts:1"
+      ],
+      "gap": "Full unexpected-loss descendants/verified reset evidence missing."
+    },
+    {
+      "id": "322.D31",
+      "requirement": "Define package/wire-version compatibility and coexistence or coordinated migration. An upgraded adapter cannot silently take over another version's live work.",
+      "status": "proven",
+      "evidence": [
+        "docs/resident-manual.md:97",
+        "test/resident/managed-version-process.test.ts:1",
+        "test/resident/fixtures/managed-version-coexistence.ts:1"
+      ],
+      "gap": "Real separately located package versions coexist without destructive takeover."
+    },
+    {
+      "id": "322.D32",
+      "requirement": "Bound queues, concurrent work, message sizes, backpressure and shutdown. Select and record numerical budgets from existing project constraints and representative measurements; do not weaken existing deadlines to qualify the feature.",
+      "status": "partial",
+      "evidence": [
+        "src/resident/manual-adapter.ts:1",
+        "src/resident/adapter-limits.ts:1",
+        "test/resident/adapter-output-process.test.ts:1",
+        "test/resident/admission-fence.test.ts:1",
+        "test/resident/attachment-owner.test.ts:1"
+      ],
+      "gap": "Complete managed slow/closed-host/backpressure isolation schedule missing."
+    },
+    {
+      "id": "322.D33",
+      "requirement": "Launch our installed executable/entrypoint without unnecessary shell or package-manager wrappers. Define detachment and lifetime independently of the first adapter's lifetime.",
+      "status": "proven",
+      "evidence": [
+        "src/resident/managed-child-main.ts:1",
+        "src/runtime/server-startup.ts:1",
+        "src/resident/managed-process.ts:1",
+        "/tmp/resident-live-survivor-9w2cz2g2/verify.mts",
+        "/tmp/resident-live-linux-campaign-_dtgfmjg/managed-replacement-receipt.json",
+        "/tmp/resident-live-auto-qualified-of08j_ff/gate-proof.json"
+      ],
+      "gap": "Direct own-package launch and creator-independent backend lifetime exercised."
+    },
+    {
+      "id": "322.D34",
+      "requirement": "Qualify process and token-file behavior on macOS and Linux. Windows resident support is out of scope; unsupported startup remains refused.",
+      "status": "partial",
+      "evidence": [
+        "src/resident/protected-path.ts:1",
+        "src/resident/managed-directory-config.ts:1",
+        "test/resident/protected-path.test.ts:1",
+        "test/resident/managed-backend-process.test.ts:1",
+        "test/resident/managed-version-process.test.ts:1",
+        "test/resident/managed-state-loss-process.test.ts:1",
+        "src/resident/protected-path.ts:36",
+        "docs/implementation/resident-windows-design.md:1",
+        "docs/resident-manual.md:77"
+      ],
+      "gap": "Native macOS lifecycle/permission receipts missing; Windows implementation excluded/refusal proven."
+    },
+    {
+      "id": "322.D35",
+      "requirement": "Preserve supported credential paths accurately. The current native profile backends cover macOS/Linux; this feature must not claim a Windows native credential-store implementation merely because loopback HTTP works there.",
+      "status": "partial",
+      "evidence": [
+        "test/resident/managed-auth-paths-process.test.ts:1",
+        "/tmp/resident-live-auth-diagnostic-0f_x2pj2/password/verify.mts",
+        "/tmp/resident-live-auth-diagnostic-0f_x2pj2/profile/verify.mts",
+        "test/resident/fixtures/managed-auth-paths.ts:122",
+        "test/resident/profile-lifecycle-fixture.ts:1",
+        "test/resident/compatibility.test.ts:135",
+        "src/resident/selection-config.ts:1",
+        "src/profiles/credential-store.ts:1"
+      ],
+      "gap": "Complete native-store credential-generation lifecycle evidence missing."
+    },
+    {
+      "id": "322.D36",
+      "requirement": "Expose redacted status sufficient to identify backend generation, admission/readiness, attachment/request counts, drain and blocked recovery. Do not expose credentials, complete environment snapshots, private configuration fingerprints or business payloads.",
+      "status": "partial",
+      "evidence": [
+        "src/resident/state-status.ts:26",
+        "src/resident/operator-stop.ts:21",
+        "src/resident/adapter-attachment.ts:193"
+      ],
+      "gap": "Status lacks authenticated readiness/model/admission/attachment/request/drain observations."
+    },
+    {
+      "id": "322.D37",
+      "requirement": "**Primary agreed seam:** launch multiple real stdio adapters from independent parent processes, exchange actual MCP traffic with one managed loopback HTTP backend, and observe externally visible replies, process lifetimes and owned cleanup. Exercise the packaged launch path, not an unrelated substitute implementation. Reuse the existing built-stdio process and HTTP transport harnesses.",
+      "status": "proven",
+      "evidence": [
+        "scripts/resident-live-managed-pair.ts:1",
+        "test/resident/managed-live-read-pair-process.test.ts:1",
+        "/tmp/resident-live-linux-campaign-_dtgfmjg/managed-read-receipt.json",
+        "/tmp/resident-live-auto-qualified-of08j_ff/gate-proof.json"
+      ],
+      "gap": "Packaged managed adapters from independent parent processes exchange actual MCP and local-Huly reads through one shared backend, with correlated owned process retirement."
+    },
+    {
+      "id": "322.D38",
+      "requirement": "Test behavior rather than private fields, helper invocation counts or an implementation-specific state encoding. Correct response ownership, no unsafe replay, confirmed process retirement and preserved identity are the outcomes.",
+      "status": "proven",
+      "evidence": [
+        "/tmp/resident-live-auto-qualified-of08j_ff/gate-proof.json",
+        "docs/implementation/resident-movement-linux-2026-10-18.md:1",
+        "/tmp/resident-movement-certification-20261018/receipts.jsonl",
+        "test/resident/managed-backend-process.test.ts:59",
+        "test/resident/managed-live-read-pair-process.test.ts:93",
+        "test/resident/managed-operator-stop-process.test.ts:54"
+      ],
+      "gap": "Behavioral real-process assertions/DI seams retained without module mocks."
+    },
+    {
+      "id": "322.D39",
+      "requirement": "Reuse the ordinary transition-function seam for deterministic behavior checks and Quint alignment. Existing admission/client-lease observation and oracle forwarding are prior art. The existing HTTP admission model does **not** cover resident launch/discovery/ownership; add the necessary resident lifecycle model rather than relabel existing coverage.",
+      "status": "partial",
+      "evidence": [
+        "quint-specs/resident-launch.qnt:1",
+        "test/resident/managed-backend-process.test.ts:1",
+        "src/mcp/http-admission-observations.ts:1",
+        "quint-specs/resident-attachment-owner.qnt:1",
+        "quint-specs/resident-attachment-owner.md:1",
+        "test/resident/managed-idle-protected-work.test.ts:1"
+      ],
+      "gap": "Lifecycle formal model remains types-only; subdomain models do not replace it."
+    },
+    {
+      "id": "322.D40",
+      "requirement": "Quint properties must cover at least single admitted owner per compatibility identity; generation-fenced admission/cleanup; request-to-client isolation; no dispatch after cancellation while waiting; no new admission after drain; no retirement of protected active work; no replay of unknown writes; and eventual release/recovery only under explicit fairness, failure and ownership assumptions. Record bounded domains and unmodeled OS/network assumptions. Simulation success is not proof of actual cross-process exclusivity.",
+      "status": "partial",
+      "evidence": [
+        "quint-specs/resident-response-ownership.qnt:1",
+        "quint-specs/resident-attachment-owner.qnt:1",
+        "quint-specs/resident-launch.qnt:1",
+        "quint-specs/resident-response-ownership.md:1",
+        "quint-specs/resident-attachment-owner.md:1",
+        "test/helpers/resident-response-replay.ts:1"
+      ],
+      "gap": "Lifecycle transitions/invariants/fairness checks missing."
+    },
+    {
+      "id": "322.D41",
+      "requirement": "Connect implementation transition observations to the established oracle test mechanism where applicable. Do not invent evidence or equate a passing abstract model with a passing process test. Preserve existing model/observation behavior.",
+      "status": "partial",
+      "evidence": [
+        "quint-specs/resident-response-ownership.md:1",
+        "quint-specs/resident-attachment-owner.md:1",
+        "test/helpers/resident-response-replay.ts:1",
+        "quint-specs/resident-launch.qnt:1",
+        "quint-specs/resident-launch.md:1",
+        "quint-specs/resident-response-ownership.qnt:1"
+      ],
+      "gap": "Full lifecycle implementation-observation/oracle replay missing."
+    },
+    {
+      "id": "322.D42",
+      "requirement": "Exercise simultaneous first start from ten independent adapters, direct/automatic launch races, death before/after locator publication and application readiness independent of model readiness. Verify one admitted compatible backend and retirement of losing owned launch attempts.",
+      "status": "partial",
+      "evidence": [
+        "test/resident/fixtures/managed-ten-parents.ts:1",
+        "test/resident/managed-backend-process.test.ts:1",
+        "test/resident/managed-live-read-pair-process.test.ts:71",
+        "src/resident/manual-backend.ts:91",
+        "src/runtime/server-startup.ts:1",
+        "test/resident/managed-parent-loss-process.test.ts:1",
+        "test/resident/child-authorization.test.ts:1",
+        "test/resident/fixtures/managed-crash-refusal.ts:1"
+      ],
+      "gap": "Combined ten-parent Huly/model-readiness and precise launch-death matrix missing."
+    },
+    {
+      "id": "322.D43",
+      "requirement": "Exercise stale/corrupt locator, reused PID, foreign listener, old-generation cleanup, mismatched version and failed cleanup. Assert no foreign signal, credential handoff, locator deletion or overlapping unsafe replacement.",
+      "status": "partial",
+      "evidence": [
+        "test/resident/managed-state-loss-process.test.ts:1",
+        "test/resident/namespace-descriptor.test.ts:1",
+        "test/resident/fixtures/managed-crash-refusal.ts:1",
+        "test/resident/managed-request-loss-process.test.ts:1",
+        "test/resident/managed-parent-loss-process.test.ts:1",
+        "test/resident/managed-crash-process.test.ts:1"
+      ],
+      "gap": "Remaining PID-reuse/old-generation and exact publication death process cases missing."
+    },
+    {
+      "id": "322.D44",
+      "requirement": "Use colliding request IDs with deliberately different read inputs/results. Assert response/progress/cancellation ownership; identical project reads from every client are insufficient to expose cross-client routing errors.",
+      "status": "partial",
+      "evidence": [
+        "src/resident/manual-adapter.ts:1",
+        "src/resident/response-stream.ts:1",
+        "test/helpers/resident-response-replay.ts:1",
+        "src/resident/response-stream.ts:21",
+        "test/resident/manual-adapter-process.test.ts:60",
+        "test/resident/response-stream.test.ts:22"
+      ],
+      "gap": "Full progress/cancellation/interactive origin matrix incomplete despite distinct colliding-ID reads."
+    },
+    {
+      "id": "322.D45",
+      "requirement": "Exercise cancellation during model acquisition, adapter EOF/death during active work, independent surviving clients, closed/slow stdout, bounded queueing and transport-send failures. Reuse existing EOF/SIGTERM, output-drain, request interruption and client-lease tests as prior art.",
+      "status": "partial",
+      "evidence": [
+        "test/resident/manual-adapter-process.test.ts:1",
+        "test/resident/attachment-owner.test.ts:1",
+        "test/resident/managed-live-read-pair-process.test.ts:71",
+        "test/resident/adapter-boundary.test.ts:198",
+        "test/resident/adapter-response-cleanup.test.ts:37",
+        "test/resident/attachment-owner.test.ts:13",
+        "src/resident/manual-adapter.ts:1",
+        "src/resident/adapter-limits.ts:1",
+        "test/resident/adapter-output-process.test.ts:1"
+      ],
+      "gap": "Complete held-model cancel/active survivor/slow-host/backpressure process schedules missing."
+    },
+    {
+      "id": "322.D46",
+      "requirement": "Exercise daemon loss after dispatch with a state-changing disposable fixture: demonstrate no blind replay and truthful unknown-outcome reporting. Verify through the real request boundary; use the project's bounded owned-fixture/cleanup workflow and never message real recipients. A deterministic injected failure adapter at an existing I/O seam may control fault timing without module monkey-patching.",
+      "status": "proven",
+      "evidence": [
+        "test/resident/uncertain-write-process.test.ts:1",
+        "test/resident/managed-request-loss-process.test.ts:1",
+        "/tmp/resident-live-write-loss-_cpbcg7t/verify.mts",
+        "src/resident/attachment-exchange.ts:1",
+        "src/resident/manual-adapter.ts:1",
+        "docs/adr/0002-resident-recovery-without-operation-journal.md:1"
+      ],
+      "gap": "Real committed rename/lost response/reconciliation with one admitted mutation and no replay."
+    },
+    {
+      "id": "322.D47",
+      "requirement": "Exercise idle expiry versus new attachment/request, queued/active work, lost-lease expiry, late completion and old/new package versions. Time belongs to injected clocks; process-level timing remains explicitly bounded.",
+      "status": "partial",
+      "evidence": [
+        "test/resident/managed-idle.test.ts:1",
+        "test/resident/admission-fence.test.ts:1",
+        "test/resident/managed-admission-continuity.test.ts:1",
+        "test/resident/attachment-owner.test.ts:1",
+        "test/resident/adapter-output-process.test.ts:1",
+        "docs/resident-manual.md:97",
+        "test/resident/managed-version-process.test.ts:1",
+        "test/resident/fixtures/managed-version-coexistence.ts:1"
+      ],
+      "gap": "Full idle/queued/active/late-completion process matrix incomplete."
+    },
+    {
+      "id": "322.D48",
+      "requirement": "Test profile/env parity, credential change/logout, token/password distinctions, workspace changes, different tool scopes and actual host clientInfo/native/proxy behavior. Verify authorization and advertisements remain consistent. Secrets must not appear in captured diagnostics or public evidence.",
+      "status": "partial",
+      "evidence": [
+        "test/resident/fixtures/managed-auth-paths.ts:122",
+        "test/resident/profile-lifecycle-fixture.ts:1",
+        "test/resident/compatibility.test.ts:135",
+        "scripts/resident-live-protocol.ts:1",
+        "test/resident/managed-live-read-pair-process.test.ts:1",
+        "/tmp/resident-codex-auto-live-49rhstmo/verify.mts",
+        "/tmp/resident-live-auth-diagnostic-0f_x2pj2/sha256.json",
+        "/tmp/resident-live-auto-qualified-of08j_ff/verify.mts",
+        "/tmp/resident-live-policy-diagnostic-lxvamu3r/verify.mts"
+      ],
+      "gap": "Full invalidation/capability matrix missing despite supported live auth/policy/host names."
+    },
+    {
+      "id": "322.D49",
+      "requirement": "Run native macOS/Linux process and permission scenarios. A skipped platform test, another platform's pass or code inspection is not native qualification.",
+      "status": "partial",
+      "evidence": [
+        "test/resident/managed-backend-process.test.ts:1",
+        "test/resident/managed-version-process.test.ts:1",
+        "test/resident/managed-state-loss-process.test.ts:1",
+        "src/resident/protected-path.ts:11",
+        "docs/implementation/issue-328.md:1"
+      ],
+      "gap": "Native macOS process/permission qualification missing; Linux pass cannot substitute."
+    },
+    {
+      "id": "322.D50",
+      "requirement": "Compare standalone stdio, managed stdio including every adapter, and direct shared HTTP using alternating fresh-process trials and one/ten-client controls. Report completion rates and retained failures, readiness phases, total summed RSS/CPU, cache conditions, artifact/runtime identity, cleanup and measurement boundaries. Do not claim peak/physical memory from post-read summed RSS or establish latency SLAs from a few local samples.",
+      "status": "proven",
+      "evidence": [
+        "docs/implementation/resident-comparison-linux-2026-10-18.md:1",
+        "docs/implementation/resident-comparison-protocol.md:1",
+        "/tmp/resident-comparison-campaign-v3-pi0hult3/terminal-manifest.json",
+        "/tmp/resident-comparison-case016-diagnostic-ki5e3aql/analyze-campaign.py",
+        "docs/implementation/resident-comparison-linux-2026-10-18.md:1",
+        "/tmp/resident-comparison-case016-diagnostic-ki5e3aql/final-analysis.json"
+      ],
+      "gap": "All30 comparisons reported with accounting/failures/boundaries; no SLA/physical-memory/general winner claim."
+    },
+    {
+      "id": "322.D51",
+      "requirement": "Use the complete project quality gate and relevant local-Huly integration on the coherent implementation; preserve coverage thresholds, diagnostics, inventory, output contracts and timeouts. Behavioral stubs use explicit dependency injection, never module mocks. Keep generated/property-based tests in the project's dedicated property-test class.",
+      "status": "proven",
+      "evidence": [
+        "/tmp/resident-live-auto-qualified-of08j_ff/gate-proof.json",
+        "docs/implementation/resident-movement-linux-2026-10-18.md:1",
+        "/tmp/resident-movement-certification-20261018/receipts.jsonl"
+      ],
+      "gap": "Coherent full485-file/5758-test gate and relevant local-Huly evidence; thresholds preserved."
+    },
+    {
+      "id": "322.D52",
+      "requirement": "Progress from the retained in-memory prototype to real process/loopback/scratch-state experiments, then real packaged Huly behavior. Keep prototype executables off the production branch and retire them when superseded. Record the evidence each stage actually supplies.",
+      "status": "deferred",
+      "evidence": [
+        "docs/implementation/issue-328.md:1",
+        "docs/implementation/HANDOFF-resident-mcp-323-328.md:1",
+        "src/launcher.ts:1",
+        "docs/implementation/issue-328.md:1"
+      ],
+      "gap": "Prototype/artifact/branch cleanup not due before completed production integration/qualification."
+    },
+    {
+      "id": "323.1",
+      "status": "proven",
+      "evidence": [
+        "src/index.ts:1",
+        "src/resident/manual-adapter-main.ts:1",
+        "docs/resident-manual.md:1"
+      ],
+      "gap": "Explicit package transport path and manual instructions exist; no third-party/process wrapper or global service is required. This is source/package proof, not platform qualification.",
+      "requirement": "The package supplies an explicit adapter entrypoint and documented manual-backend launch path; no third-party gateway, shell/package-manager child wrapper, global configuration edit or service installation is required."
+    },
+    {
+      "id": "323.2",
+      "status": "proven",
+      "evidence": [
+        "src/resident/manual-adapter-main.ts:1",
+        "src/resident/tls-channel.ts:1",
+        "src/resident/attachment-file.ts:1",
+        "test/resident/tls-channel.test.ts:1"
+      ],
+      "gap": "Manual attachment uses explicitly supplied protected descriptor, generation PSK TLS and separate bearer; the standalone selection boundary is reused deliberately, not an implicit listener/profile search.",
+      "requirement": "Use the existing native loopback HTTP backend and existing local-auth facility with a deliberately supplied endpoint/identity and private authorization. Do not auto-discover a listener, transfer Huly credentials to it, or implicitly substitute a profile in this slice. Define the attachment/generation contract that automatic launch will reuse."
+    },
+    {
+      "id": "323.3",
+      "status": "proven",
+      "evidence": [
+        "scripts/resident-live-read-pair.ts:1",
+        "scripts/resident-live-read-host.ts:1",
+        "docs/implementation/resident-live-linux-2026-10-18.md:1",
+        "/tmp/resident-live-linux-campaign-_dtgfmjg/manual-attempt-2/manual-read-receipt.json"
+      ],
+      "gap": "Two actual manual stdio adapters from separate reader processes performed project-specific first/continued local-Huly reads against one explicit backend; resource-template/catalog checks are in the executable probe. Native macOS is separately incomplete under328.2.",
+      "requirement": "Two actual stdio adapters from separate parent processes discover the expected server/tool/resource metadata and perform Huly reads through one backend without creating a backend per adapter or request."
+    },
+    {
+      "id": "323.4",
+      "status": "partial",
+      "evidence": [
+        "src/resident/request-headers.ts:1",
+        "src/resident/protocol-session.ts:1",
+        "scripts/resident-live-protocol.ts:1",
+        "test/resident/managed-live-read-pair-process.test.ts:1",
+        "/tmp/resident-live-auto-qualified-of08j_ff/verified.json"
+      ],
+      "gap": "Modern/legacy and name-driven native/proxy auto output are exercised, including actual application hosts in restricted auto. Differing capabilities and supported interactive/continuation exchanges are not comprehensively exercised across the bridge; cannot certify entire negotiated semantics contract.",
+      "requirement": "Preserve each actual host clientInfo/capabilities and negotiated modern/legacy semantics, including native/proxy auto exposure and output validation. Forward only supported interactions and continuation context; do not invent durable modern sessions."
+    },
+    {
+      "id": "323.5",
+      "status": "partial",
+      "evidence": [
+        "src/resident/manual-adapter.ts:1",
+        "src/resident/response-stream.ts:1",
+        "test/helpers/resident-response-replay.ts:1",
+        "test/resident/adapter-boundary.test.ts:265",
+        "/tmp/resident-live-auto-qualified-of08j_ff/verified.json"
+      ],
+      "gap": "Different payloads/colliding IDs and local response/progress ownership are tested; actual end-to-end errors/progress and all supported client-directed interaction routing across multiple native backend adapters are not proven by read-pair receipts.",
+      "requirement": "Use colliding JSON-RPC IDs with different read requests/results; replies, errors, progress and supported client-directed interactions remain bound to the originating adapter, not one shared mutable protocol transport."
+    },
+    {
+      "id": "323.6",
+      "status": "partial",
+      "evidence": [
+        "test/resident/manual-adapter-process.test.ts:1",
+        "test/resident/attachment-owner.test.ts:1",
+        "test/resident/managed-live-read-pair-process.test.ts:71",
+        "src/runtime/request-work.ts:1"
+      ],
+      "gap": "Shared full-model acquisition is observed once for two real SDK readers, and existing lazy/cancellation components are covered. A real packaged two-waiter model hold/cancel-one/no-later-dispatch schedule against the resident native backend is not established by these read or ownership tests.",
+      "requirement": "Preserve fast catalog delivery, lazy handlers, lightweight project reads and shared full-model acquisition. A call can wait for the model without another acquisition; cancellation while waiting prevents later dispatch and does not cancel another waiter."
+    },
+    {
+      "id": "323.7",
+      "status": "partial",
+      "evidence": [
+        "test/resident/adapter-boundary.test.ts:198",
+        "test/resident/adapter-response-cleanup.test.ts:37",
+        "test/resident/attachment-owner.test.ts:13",
+        "/tmp/resident-live-survivor-9w2cz2g2/verify.mts"
+      ],
+      "gap": "Owned adapter death with live survivor and continued/fresh reads is proven. Existing local seams cover send/disconnect cleanup. A complete actual native-backend cancel/EOF-during-active-call versus independent completing request matrix remains unverified.",
+      "requirement": "Cancel or close one adapter and prove the other still receives its own response. Swallowed send failures, late responses to a closed host and unbounded pending work are rejected by behavioral checks."
+    },
+    {
+      "id": "323.8",
+      "status": "partial",
+      "evidence": [
+        "src/resident/manual-adapter.ts:1",
+        "src/resident/adapter-limits.ts:1",
+        "test/resident/adapter-output-process.test.ts:1",
+        "test/resident/adapter-boundary.test.ts:127"
+      ],
+      "gap": "Closed/slow stdout, size and work bounds have process/component tests. The stdout process fixture uses the synthetic response server; there is no full packaged shared-native-backend slow-host/independent-host adversarial backpressure proof.",
+      "requirement": "Exercise closed/slow stdout and establish bounded message/concurrency/backpressure behavior using existing project constraints; one downstream host cannot indefinitely stall unrelated clients."
+    },
+    {
+      "id": "323.9",
+      "status": "partial",
+      "evidence": [
+        "quint-specs/resident-response-ownership.qnt:1",
+        "quint-specs/resident-response-ownership.md:1",
+        "test/helpers/resident-response-replay.ts:1",
+        "quint-specs/resident-launch.qnt:1"
+      ],
+      "gap": "Response ownership has executable model/replay alignment, but the full adapter/request lifecycle remains a type-only resident-launch sketch; initialization/actions/invariants/oracle alignment absent.",
+      "requirement": "Add the minimal resident adapter/request Quint behavior and observation alignment alongside the implementation. Record model limits; the existing admission model is prior art, not resident lifecycle coverage."
+    },
+    {
+      "id": "323.10",
+      "status": "proven",
+      "evidence": [
+        "docs/implementation/resident-live-linux-2026-10-18.md:1",
+        "/tmp/resident-live-linux-campaign-_dtgfmjg/manual-attempt-2/manual-owner-receipt.json",
+        "/tmp/resident-live-auto-qualified-of08j_ff/gate-proof.json"
+      ],
+      "gap": "Manual live read demo and owned SIGTERM130 cleanup are independently retained; final current project gate passes. No mutation/message was required for this criterion.",
+      "requirement": "Demo the packaged manual mode against local Huly with confirmed owned cleanup; keep the existing gate and focused stdio/HTTP lifecycle checks green. No unsafe write/replay or real-recipient messaging is required for the demo."
+    },
+    {
+      "id": "324.1",
+      "status": "proven",
+      "evidence": [
+        "docs/implementation/resident-managed-design.md:1",
+        "docs/adr/0003-adopt-mcporter-resident-lifecycle.md:1",
+        "test/resident/selection-claim-process.test.ts:1",
+        "test/resident/managed-process.test.ts:1"
+      ],
+      "gap": "Concrete mkdir claim, immutable hardlink publication, PSK TLS/HMAC compatibility, bounds and threat assumptions documented and exercised at real process/TLS seams; not relying on the HTML prototype.",
+      "requirement": "Before implementing automatic launch, record the concrete lock/locator/authentication primitives, compatibility/ownership contract, launch bounds and threat assumptions; validate the choice against the real-process cases below rather than copying the HTML model as proof."
+    },
+    {
+      "id": "324.2",
+      "status": "proven",
+      "evidence": [
+        "src/index.ts:1",
+        "src/resident/startup-selection.ts:1",
+        "test/resident/standalone-startup.test.ts:1",
+        "docs/resident-manual.md:1"
+      ],
+      "gap": "Managed mode remains explicit; existing standalone/manual/direct-HTTP routing retained. No host/service/default promotion performed.",
+      "requirement": "Preserve the explicit manual mode and standalone/direct-HTTP behavior. Automatic launch is an explicit own-package managed path that does not silently edit the host configuration or activate a new default."
+    },
+    {
+      "id": "324.3",
+      "status": "partial",
+      "evidence": [
+        "test/resident/fixtures/managed-ten-parents.ts:1",
+        "test/resident/managed-backend-process.test.ts:1",
+        "test/resident/managed-live-read-pair-process.test.ts:71",
+        "/tmp/resident-live-auto-qualified-of08j_ff/gate-proof.json"
+      ],
+      "gap": "Ten independent parents converge and retain one generation in current green gate, but that fixture calls context, not Huly model/data. One shared actual SDK model is proven for two separate readers; ten-parent shared heavy-Huly acquisition is not directly established.",
+      "requirement": "For the exact same resolved configuration under one OS user, ten adapters started by independent parents converge on one admitted backend generation and one shared Huly resource. Freeze the compatibility contract for full profile/policy handling without embedding raw secrets in public identifiers."
+    },
+    {
+      "id": "324.4",
+      "status": "proven",
+      "evidence": [
+        "src/resident/managed-child-main.ts:1",
+        "src/runtime/server-startup.ts:1",
+        "src/resident/managed-process.ts:1",
+        "test/resident/fixtures/managed-ten-parents.ts:1",
+        "test/resident/managed-parent-loss-process.test.ts:1"
+      ],
+      "gap": "Explicit configured and automatic starts reuse withResidentSelection/runOwnedGeneration; prepared kill authority is consumed before Start. Real creator-loss/read-survivor fixtures prove independence from first adapter on Linux.",
+      "requirement": "Automatic and explicit backend starts participate in the same ownership protocol; a losing launcher retires only resources it actually owns. The backend lifetime does not depend on the first adapter remaining alive."
+    },
+    {
+      "id": "324.5",
+      "status": "proven",
+      "evidence": [
+        "src/resident/manual-backend.ts:39",
+        "src/resident/tls-channel.ts:1",
+        "src/resident/attachment-file.ts:1",
+        "test/resident/managed-owner.test.ts:295"
+      ],
+      "gap": "Native server binds127.0.0.1 port0 and publishes only after actual binding plus application readiness. Versioned schema/atomic link publication and generation matching are implemented; foreign readiness callback refused.",
+      "requirement": "Use explicit loopback binding and atomic port allocation/claim, not a free-port check followed by bind. Publish a schema-decoded, versioned atomic locator only at authenticated application readiness; an open TCP port is insufficient."
+    },
+    {
+      "id": "324.6",
+      "status": "partial",
+      "evidence": [
+        "src/resident/manual-backend.ts:91",
+        "src/runtime/server-startup.ts:1",
+        "test/resident/managed-live-read-pair-process.test.ts:71"
+      ],
+      "gap": "Application/catalog readiness is structurally before lazy Huly loading and shared SDK acquisition is observed. Missing the resident packaged held-model discovery/first-call/single-flight/cancel-one timing schedule to prove all inherited behavior.",
+      "requirement": "Keep listener/application readiness separate from full Huly-model readiness. Attach/discovery does not wait for the full model and preserves the existing single-flight behavior."
+    },
+    {
+      "id": "324.7",
+      "status": "proven",
+      "evidence": [
+        "src/resident/tls-channel.ts:1",
+        "src/resident/compatibility-crypto.ts:1",
+        "src/resident/admission-http.ts:1",
+        "test/resident/tls-channel.test.ts:1",
+        "test/resident/compatibility-http.test.ts:1"
+      ],
+      "gap": "Generation-specific PSK identity precedes bearer/authority transfer; Host/Origin and separate local authorization are enforced. Tests cover wrong identities/policies/authorization and redacted failure.",
+      "requirement": "Managed attachment requires private local authorization distinct from Huly credentials, expected daemon/generation identity verification before credential handoff, appropriate Host/Origin policy and redacted diagnostics. Random port selection or a PID alone is not identity proof."
+    },
+    {
+      "id": "324.8",
+      "status": "partial",
+      "evidence": [
+        "test/resident/managed-parent-loss-process.test.ts:1",
+        "test/resident/child-authorization.test.ts:1",
+        "test/resident/fixtures/managed-crash-refusal.ts:1",
+        "src/resident/managed-process.ts:1"
+      ],
+      "gap": "Before-Start parent loss and published owner death/refusal are tested. Exact kill timing before/after each claim, private Start send, readiness and locator-publication boundary is not completely exercised with real packaged children; stale unowned claim has bounded refusal but no operator verified-retirement recovery path.",
+      "requirement": "Terminate launchers before/after ownership claim and locator publication. Subsequent starts either recover with verified ownership or return a bounded actionable refusal; no permanent unowned lock or half-ready attachment is treated as success."
+    },
+    {
+      "id": "324.9",
+      "status": "partial",
+      "evidence": [
+        "test/resident/managed-state-loss-process.test.ts:1",
+        "test/resident/namespace-descriptor.test.ts:1",
+        "test/resident/fixtures/managed-crash-refusal.ts:1",
+        "test/resident/managed-owner.test.ts:315"
+      ],
+      "gap": "Corrupt/missing metadata, foreign listener, incompatible payload, wrong identity and late callback/cleanup fences are implemented/tested. Reused-PID and old-cleanup behavior have scoped components; complete native process matrix, especially macOS, is not evidenced as one qualified campaign.",
+      "requirement": "Exercise corrupt/stale locator, reused PID, foreign listener, unauthorized caller, incompatible descriptor and late cleanup from an old generation. No foreign signal, credential disclosure or removal of replacement state is permitted."
+    },
+    {
+      "id": "324.10",
+      "status": "partial",
+      "evidence": [
+        "src/resident/protected-path.ts:1",
+        "src/resident/managed-directory-config.ts:1",
+        "test/resident/protected-path.test.ts:1",
+        "docs/resident-manual.md:1"
+      ],
+      "gap": "Linux ownership/path/permissions and unsupported-win32 code are exercised. Darwin paths are unit-tested but actual macOS account/filesystem permissions and cleanup have no native receipt. Native Windows implementation is explicitly excluded, not pending.",
+      "requirement": "Use protected per-user endpoint/authorization state. Specify real OS ownership/permission behavior, for Linux and macOS; unqualified platform paths must not claim support. Windows resident mode remains unsupported and must refuse startup."
+    },
+    {
+      "id": "324.11",
+      "status": "partial",
+      "evidence": [
+        "quint-specs/resident-launch.qnt:1",
+        "test/resident/managed-backend-process.test.ts:1",
+        "src/mcp/http-admission-observations.ts:1"
+      ],
+      "gap": "Actual OS coordination observations exist, but resident-launch is type-only and has no absent/starting/accepting/blocked transitions, invariants or oracle replay.",
+      "requirement": "Extend Quint and implementation observations for absent/starting/accepting/blocked, single admitted compatible owner, generation-fenced publication/attachment and canceled launch. Validate OS coordination with actual processes, not reducer tests alone."
+    },
+    {
+      "id": "324.12",
+      "status": "proven",
+      "evidence": [
+        "docs/implementation/resident-live-linux-2026-10-18.md:1",
+        "/tmp/resident-live-linux-campaign-_dtgfmjg/managed-read-receipt.json",
+        "/tmp/resident-live-linux-campaign-_dtgfmjg/managed-replacement-receipt.json",
+        "/tmp/resident-live-auto-qualified-of08j_ff/gate-proof.json"
+      ],
+      "gap": "Automatic two-parent live reads, owned idle exits and later fresh generation pass; failed race attempts are preserved and current gate passes unchanged bounds. Native macOS remains separately outstanding.",
+      "requirement": "Demo automatic attachment and independent caller reads against local Huly, retain failed race attempts and prove owned cleanup; run the project gate and affected process/HTTP checks without increasing deadlines."
+    },
+    {
+      "id": "325.1",
+      "status": "proven",
+      "evidence": [
+        "src/resident/selection-config.ts:1",
+        "src/resident/startup-selection.ts:1",
+        "test/resident/managed-auth-paths-process.test.ts:1",
+        "/tmp/resident-live-auth-diagnostic-0f_x2pj2/profile/verify.mts"
+      ],
+      "gap": "Explicit profile over unrelated active profile and missing/deleted credential refusals are exercised; same-reader live auth/source evidence verifies no environment/default identity fallback.",
+      "requirement": "Resolve explicit profile/environment selection at the existing boundary and retain existing precedence and diagnostics. Never use whichever Huly identity launched a backend first as an implicit fallback."
+    },
+    {
+      "id": "325.2",
+      "status": "partial",
+      "evidence": [
+        "src/resident/compatibility-contract.ts:1",
+        "src/resident/compatibility-crypto.ts:20",
+        "test/resident/compatibility.test.ts:135",
+        "test/resident/fixtures/managed-auth-paths.ts:122"
+      ],
+      "gap": "Full effective credential bytes/method/settings/policy compatibility and changed-token isolation are proven. The specification names credential identity/generation, while current compatibility has token/password bytes but no separate generation; same-value replacement semantics have not been settled or tested. This is an unproven semantic requirement, not evidence requiring a new field without clarifying its intended meaning.",
+      "requirement": "Use the complete effective connection/authentication identity for compatibility: URL, workspace, authentication method and credential identity/generation, plus connection settings and process-wide policy. Profile names or workspace strings alone must not match a backend."
+    },
+    {
+      "id": "325.3",
+      "status": "proven",
+      "evidence": [
+        "src/resident/compatibility-crypto.ts:1",
+        "src/resident/bootstrap-codec.ts:1",
+        "src/resident/managed-child-environment.ts:1",
+        "test/resident/private-http.test.ts:1"
+      ],
+      "gap": "Secret-safe HMAC comparison and private typed IPC handoff avoid raw public credential IDs; local bearer/PSK are distinct. Retained ownership may contain daemon secret material privately, not Huly credentials/fingerprints.",
+      "requirement": "Define secret-safe comparison and credential handoff; do not persist/log raw credentials or public credential fingerprints. Local daemon authorization and Huly credentials remain separate."
+    },
+    {
+      "id": "325.4",
+      "status": "proven",
+      "evidence": [
+        "test/resident/managed-auth-paths-process.test.ts:1",
+        "/tmp/resident-live-auth-diagnostic-0f_x2pj2/password/verify.mts",
+        "/tmp/resident-live-auth-diagnostic-0f_x2pj2/profile/verify.mts",
+        "src/runtime/http-client-leases.ts:1"
+      ],
+      "gap": "Live isolated password and saved-token runs have exact reader auth/source evidence and shared backend reads. Direct comparison uses environment authority, not per-call header clients. Existing header override is unchanged/token-only.",
+      "requirement": "Preserve token- and password-backed supported configurations. The existing token-only Huly header override path is not a universal profile transport and must not be used per invocation to claim shared-model performance."
+    },
+    {
+      "id": "325.5",
+      "status": "partial",
+      "evidence": [
+        "test/resident/fixtures/managed-auth-paths.ts:122",
+        "test/resident/profile-lifecycle-fixture.ts:1",
+        "test/resident/compatibility.test.ts:135"
+      ],
+      "gap": "Changed-token rotation, local credentials/profile removal and admitted-context retention are exercised. Actual interactive logout/store-generation changes, live rotation/revocation and complete concurrent URL/workspace/selection-change matrix have not been qualified.",
+      "requirement": "Test token rotation, logout, replacement, profile deletion/selection changes, URL/workspace changes and concurrent adapters. Define which future attachments are rejected/isolated and how already-admitted operations are handled; no old adapter silently acquires new authority."
+    },
+    {
+      "id": "325.6",
+      "status": "partial",
+      "evidence": [
+        "src/mcp/process-policy.ts:1",
+        "test/resident/managed-policy-isolation-process.test.ts:1",
+        "test/resident/fixtures/managed-policy-isolation.ts:1",
+        "/tmp/resident-live-policy-diagnostic-lxvamu3r/verify.mts"
+      ],
+      "gap": "TOOLS and TOOLSETS isolation plus actual forbidden invocations are proven; strict proxy mode is configured, and null result fidelity is fixed. Complete successful-result strict/non-strict output/schema/resource matrix under incompatible policies is not proven.",
+      "requirement": "Preserve TOOLSETS/TOOLS/exposure mode/output strictness compatibility. Separate incompatible process policies unless explicit authorized immutable per-client views are implemented; verify both advertised metadata and actual invocation permission."
+    },
+    {
+      "id": "325.7",
+      "status": "partial",
+      "evidence": [
+        "scripts/resident-live-protocol.ts:1",
+        "test/resident/managed-live-read-pair-process.test.ts:1",
+        "/tmp/resident-codex-auto-live-49rhstmo/verify.mts",
+        "/tmp/resident-claude-auto-live-dbxyk3_q/verify.mts"
+      ],
+      "gap": "Both actual named hosts have scoped auto exposure/allowed reads; synthetic concurrent named readers retain separate catalogs on one backend. Differing capabilities, concurrent actual hosts and full negotiated supported interactions remain unqualified.",
+      "requirement": "Preserve incoming host identity/capabilities and native/proxy auto exposure rather than using a generic shim identity. Two deliberately different host/policy configurations must not broaden each other's catalog or access."
+    },
+    {
+      "id": "325.8",
+      "status": "partial",
+      "evidence": [
+        "src/resident/selection-config.ts:1",
+        "src/profiles/credential-store.ts:1",
+        "/tmp/resident-live-auth-diagnostic-0f_x2pj2/profile/verify.mts"
+      ],
+      "gap": "Real file/environment paths reuse existing stores/precedence; no Windows native credential claim. Native macOS keychain-backed resident use and all supported store failure paths not covered by current Linux live receipts.",
+      "requirement": "Use existing supported credential stores and file/environment paths honestly; do not claim a new Windows native credential backend or silently change storage/secret precedence."
+    },
+    {
+      "id": "325.9",
+      "status": "partial",
+      "evidence": [
+        "quint-specs/resident-launch.qnt:1",
+        "test/resident/managed-live-read-pair-process.test.ts:1",
+        "/tmp/resident-live-auto-qualified-of08j_ff/verify.mts"
+      ],
+      "gap": "Different project results/colliding IDs are exercised. Cross-identity/invalidation lifecycle Quint properties and matching oracle observations are absent from type-only resident-launch.",
+      "requirement": "Add cross-identity and invalidation Quint properties and matching observations at the existing behavioral seam. Test distinct results with colliding client IDs rather than relying on identical read payloads."
+    },
+    {
+      "id": "325.10",
+      "status": "partial",
+      "evidence": [
+        "/tmp/resident-live-auth-diagnostic-0f_x2pj2/sha256.json",
+        "/tmp/resident-live-policy-diagnostic-lxvamu3r/verify.mts",
+        "/tmp/resident-live-auto-qualified-of08j_ff/gate-proof.json"
+      ],
+      "gap": "Live same-config reuse and differing policy separation/read/refusal/owned cleanup pass. Full requirement includes applicable profile/tool-scope/transport combinations; keychain, remaining strict-output/protocol/capability cross-cases and native macOS are not demonstrated.",
+      "requirement": "Demo same-config reuse and incompatible-config separation through real stdio adapters with local Huly disposable fixtures/reads, redacted diagnostics and owned cleanup; run the gate and relevant profile, tool-scope and transport checks."
+    },
+    {
+      "id": "326.1",
+      "status": "proven",
+      "evidence": [
+        "docs/implementation/resident-lease-policy.md:1",
+        "src/resident/admission-contract.ts:1",
+        "src/resident/admissions.ts:1",
+        "test/resident/admission-expiry.test.ts:1"
+      ],
+      "gap": "30s lease/5s renewal/5s idle and bounded cleanup policy recorded with provisional measurement before wiring; explicit injected clock and expired owner retention avoid assuming remote operation termination.",
+      "requirement": "Record concrete lease/heartbeat/crash-expiry and idle/drain policies plus measured bounds before real lifecycle wiring. Attachment count alone is insufficient; define behavior for paused adapters and lost heartbeats without assuming an operation stopped."
+    },
+    {
+      "id": "326.2",
+      "status": "partial",
+      "evidence": [
+        "test/resident/manual-adapter-process.test.ts:1",
+        "test/resident/managed-last-adapter-expiry-process.test.ts:1",
+        "/tmp/resident-live-survivor-9w2cz2g2/verify.mts"
+      ],
+      "gap": "Adapter death and live survivor/fresh reads plus final backend retirement are proven. Clean EOF/close or cancellation during a held native Huly call with another independently completing call remains outside the live read sequence and not fully qualified.",
+      "requirement": "Clean EOF/close and adapter process death release only that adapter's attachment and owned work. A surviving adapter can complete a call and issue another using the same backend."
+    },
+    {
+      "id": "326.3",
+      "status": "partial",
+      "evidence": [
+        "src/resident/attachment-owner.ts:1",
+        "src/resident/admissions.ts:1",
+        "test/resident/managed-idle-protected-work.test.ts:1",
+        "test/resident/managed-idle.test.ts:1"
+      ],
+      "gap": "Actual ownership/admission component tests retain work after lease expiry/failure and hold idle; pending acquisition is accounted. Full real packaged queued/active/model-wait cancellation isolation is not proven by component or idle-read receipts.",
+      "requirement": "Queued/active requests are accounted for independently of adapter liveness and prevent ordinary idle retirement. Waiting caller cancellation must not interrupt shared acquisition needed elsewhere."
+    },
+    {
+      "id": "326.4",
+      "status": "partial",
+      "evidence": [
+        "test/resident/managed-idle.test.ts:1",
+        "test/resident/admission-fence.test.ts:1",
+        "test/resident/managed-admission-continuity.test.ts:1"
+      ],
+      "gap": "TestClock/component tests exercise idle boundary, pending admission, late acquisition and fence eligibility. No exhaustive real separate-process idle/new-call/queued/completion race schedule with safe subsequent generation attachment is recorded.",
+      "requirement": "Race idle expiry with new attachment, queued work, new call and completion. No request is admitted into a retiring generation; the observed result is either admission to the accepting generation or explicit wait/rejection with a safe subsequent attachment."
+    },
+    {
+      "id": "326.5",
+      "status": "proven",
+      "evidence": [
+        "src/resident/manual-backend.ts:121",
+        "src/resident/admissions.ts:164",
+        "src/mcp/http-transport.ts:267",
+        "test/resident/managed-stop-fault-process.test.ts:1",
+        "test/resident/managed-idle-protected-work.test.ts:1"
+      ],
+      "gap": "Drain fence precedes resource closure, bounded confirmed transport cleanup propagates failures, request cleanup/session retained until completion. Explicit stop may interrupt clients under approved scope and never reports interrupted mutation successful.",
+      "requirement": "Drain closes admission before releasing the Huly client/listener and uses bounded waits with truthful outcomes. Do not close shared clients while an admitted operation still needs them or report an interrupted operation as successfully completed."
+    },
+    {
+      "id": "326.6",
+      "status": "proven",
+      "evidence": [
+        "docs/adr/0002-resident-recovery-without-operation-journal.md:1",
+        "docs/adr/0003-adopt-mcporter-resident-lifecycle.md:1",
+        "test/resident/retired-commit-process.test.ts:1",
+        "test/resident/managed-idle-protected-work.test.ts:1"
+      ],
+      "gap": "Unknown business result is scoped to original invocation; normal confirmed local retirement permits new work but not replay. Late external commit after local retirement/fresh read is concretely exercised without journal or forever-retention solely for unknown business outcome.",
+      "requirement": "Record how unknown outcomes affect retention/reconciliation rather than silently making the prototype's conservative forever-retention policy production behavior. Idle expiry must never infer non-dispatch or enable automatic write replay."
+    },
+    {
+      "id": "326.7",
+      "status": "partial",
+      "evidence": [
+        "test/resident/admission-fence.test.ts:1",
+        "test/resident/attachment-owner.test.ts:1",
+        "test/resident/adapter-output-process.test.ts:1",
+        "test/resident/operator-stop-http.test.ts:1",
+        "test/resident/generation-registry.test.ts:1"
+      ],
+      "gap": "Repeated release, late acquired owner retention, close idempotence and output faults have component/TLS fixtures. Complete combined real-process late-Huly-acquisition, repeated stop/idle and backpressure generation-cleanup schedules remain unverified.",
+      "requirement": "Exercise repeated release, close during acquisition, late acquisition completion, slow/closed stdout and repeated stop/idle events. Owned resources close once; cleanup cannot remove another generation's state or double-release an attachment."
+    },
+    {
+      "id": "326.8",
+      "status": "proven",
+      "evidence": [
+        "src/resident/state-status.ts:1",
+        "src/resident/operator-stop.ts:1",
+        "test/resident/managed-stop-fault-process.test.ts:1",
+        "test/resident/state-status-process.test.ts:1"
+      ],
+      "gap": "Failed-close process fixtures preserve exact registry evidence and refuse subsequent startup with bounded redacted cleanup/no-dispatch diagnostics; read-only status expressly preserves unverified ownership. No automatic crash recovery or new CLI command is required by this criterion.",
+      "requirement": "A blocked/failed close produces an actionable redacted status and blocks unsafe overlapping replacement. Do not kill foreign processes or rely only on numeric PID presence."
+    },
+    {
+      "id": "326.9",
+      "status": "partial",
+      "evidence": [
+        "quint-specs/resident-attachment-owner.qnt:1",
+        "quint-specs/resident-attachment-owner.md:1",
+        "test/resident/managed-idle-protected-work.test.ts:1",
+        "quint-specs/resident-launch.qnt:1"
+      ],
+      "gap": "Attachment expiry/resource safety model exists, clocks injected and process tests bounded. Full generation accepting/draining/absent/request accounting model and implementation-oracle alignment are not implemented; current launch model only defines types.",
+      "requirement": "Extend Quint/oracle coverage for attachment expiry, request accounting, accepting/draining/absent, no admission after drain and no ordinary retirement of protected work. State fairness and timeout assumptions; clocks use explicit injection, with independently bounded process tests."
+    },
+    {
+      "id": "326.10",
+      "status": "proven",
+      "evidence": [
+        "/tmp/resident-live-survivor-9w2cz2g2/verify.mts",
+        "/tmp/resident-live-linux-campaign-_dtgfmjg/managed-replacement-receipt.json",
+        "/tmp/resident-live-auto-qualified-of08j_ff/gate-proof.json"
+      ],
+      "gap": "Live survivor after owned caller death, eventual owned backend exit after EOF/expiry, later new generation in same namespace and current green project gate collectively demonstrate the scoped Linux demo. This is not all lifecycle/platform certification.",
+      "requirement": "Demo a shared local-Huly backend surviving one caller's death, then retiring after the last eligible use and accepting a later fresh managed start. Verify confirmed process cleanup and the project gate without weakening timeouts."
+    },
+    {
+      "id": "327.1",
+      "status": "proven",
+      "evidence": [
+        "docs/adr/0002-resident-recovery-without-operation-journal.md:1",
+        "docs/adr/0003-adopt-mcporter-resident-lifecycle.md:1",
+        "docs/resident-manual.md:1",
+        "src/resident/managed-process.ts:1"
+      ],
+      "gap": "Policies explicitly preserve no replay, operation-specific reconciliation, version separation, retained unresolved owner and no PID/port takeover. Guardian/journal not required.",
+      "requirement": "Record the crash-retirement, unknown-outcome/reconciliation and version coexistence/migration policies. Safe recovery must not be implemented as new-client kills the process at the old PID/port."
+    },
+    {
+      "id": "327.2",
+      "status": "proven",
+      "evidence": [
+        "test/resident/uncertain-write-process.test.ts:1",
+        "test/resident/managed-request-loss-process.test.ts:1",
+        "/tmp/resident-live-write-loss-_cpbcg7t/verify.mts"
+      ],
+      "gap": "Actual project rename committed then response held/backend killed; original unknown and fresh predispatch refusal verified. Exactly one admitted Tx, independent reconciliation and owned fixture cleanup recorded; no general SDK exactly-once claim.",
+      "requirement": "Distinguish failure before dispatch from lost response after dispatch. A disposable real state-changing fixture demonstrates an unknown outcome without a second mutation attempt; timeout, disconnect, context expiry or restart alone never authorizes replay."
+    },
+    {
+      "id": "327.3",
+      "status": "proven",
+      "evidence": [
+        "src/resident/attachment-exchange.ts:1",
+        "src/resident/manual-adapter.ts:1",
+        "docs/adr/0002-resident-recovery-without-operation-journal.md:1",
+        "/tmp/resident-live-write-loss-_cpbcg7t/verify.mts"
+      ],
+      "gap": "Resident adapter has no automatic retry; explicit reconciliation is operation-specific. Existing SDK HTTP retry behavior is separately acknowledged and not represented as exactly-once delivery.",
+      "requirement": "If retry is allowed, establish non-dispatch for that specific operation or use an explicit operation-level idempotency/reconciliation contract. Do not claim general exactly-once behavior."
+    },
+    {
+      "id": "327.4",
+      "status": "partial",
+      "evidence": [
+        "src/resident/response-stream.ts:1",
+        "src/resident/adapter-attachment.ts:164",
+        "test/resident/delayed-commit-process.test.ts:1",
+        "test/resident/retired-commit-process.test.ts:1",
+        "/tmp/resident-live-write-loss-_cpbcg7t/verify.mts"
+      ],
+      "gap": "Connection/stream/renewal uncertainty and fresh read not resolving old commit are covered. Full amended fault list still lacks complete process cases for post-progress commit loss, terminal queued/lost before host observation, heartbeat failure during actual mutation and late old replies with colliding IDs across replacement.",
+      "requirement": "Preserve necessary uncertainty/status evidence for surviving original callers through backend loss and generation changes; do not report an unknown old write as unchanged workspace merely because a new generation is healthy. Apply the explicit evidence-lifetime scope below: new sessions provide no historical operation-status lookup, and caller death cannot turn an unconfirmed call into a failed mutation."
+    },
+    {
+      "id": "327.5",
+      "status": "partial",
+      "evidence": [
+        "src/resident/managed-process.ts:1",
+        "src/resident/managed-selection.ts:1",
+        "test/resident/managed-state-loss-process.test.ts:1",
+        "test/resident/fixtures/managed-request-loss.ts:1"
+      ],
+      "gap": "Detectable missing/corrupt records and failed cleanup refuse overlapping startup, without claiming arbitrary-erasure safety. Late acquisitions/descendants have scoped component and pre-kill snapshot evidence, not a complete actual-native-resource inventory-loss/late-descendant retirement fault campaign. No mandatory guardian or particular recovery command is inferred.",
+      "requirement": "Track and retire actual owned resources/descendants and late acquisitions. Crash recovery accounts for inventory loss; dead-host metadata alone is not proof that children exited. Unverified retirement blocks unsafe replacement."
+    },
+    {
+      "id": "327.6",
+      "status": "partial",
+      "evidence": [
+        "test/resident/managed-request-loss-process.test.ts:1",
+        "test/resident/managed-parent-loss-process.test.ts:1",
+        "test/resident/managed-crash-process.test.ts:1",
+        "test/resident/managed-owner.test.ts:315"
+      ],
+      "gap": "Actual packaged SDK model/read/write loss and harness native drain-entry death have evidence; stale/foreign/callback components exist. Before/after every locator/claim publication boundary and late old-generation native reply/cleanup plus reused-PID complete process matrix not proven. Drain test pauses at entry, not later drain phases.",
+      "requirement": "Exercise kill before/after locator publication, backend death during model acquisition/read/write/drain, retired generation callbacks, stale lock/locator, reused PID and foreign listener. Never signal/delete another process's state."
+    },
+    {
+      "id": "327.7",
+      "status": "partial",
+      "evidence": [
+        "test/resident/fixtures/managed-operator-stop.ts:1",
+        "test/resident/retired-commit-process.test.ts:1",
+        "src/resident/managed-selection.ts:1"
+      ],
+      "gap": "Two concurrent callers converge after verified normal retirement, with generation-fenced callbacks/receipt cleanup. The actual crashed-owner case presently proves retained-state refusal. A distinct verified-retirement/reset plus concurrent replacement after unexpected loss is not demonstrated; this asks for required behavior evidence, not automatic failover or a particular CLI verb.",
+      "requirement": "Concurrent recovering callers serialize behind one verified replacement generation. Old adapters cannot publish into or tear down the replacement, and pending writes are not queued for automatic retry."
+    },
+    {
+      "id": "327.8",
+      "status": "proven",
+      "evidence": [
+        "docs/resident-manual.md:97",
+        "test/resident/managed-version-process.test.ts:1",
+        "test/resident/fixtures/managed-version-coexistence.ts:1"
+      ],
+      "gap": "Two separately located package layouts with deliberately distinct implementation versions share private inventory, select distinct backends and retire independently; strict attach compatibility and upgrade policy documented. Same source was built for both versions; this is intentional version-boundary coexistence evidence, not certification of arbitrary released-package upgrades (not asserted here).",
+      "requirement": "Define wire/implementation compatibility across two installed package versions. Demonstrate intentional coexistence or coordinated drain/migration, with no destructive takeover or silent use of another version's credentials/tool policy."
+    },
+    {
+      "id": "327.9",
+      "status": "partial",
+      "evidence": [
+        "test/resident/fixtures/managed-operator-stop.ts:1",
+        "test/resident/managed-auth-paths-process.test.ts:1",
+        "/tmp/resident-live-policy-diagnostic-lxvamu3r/verify.mts"
+      ],
+      "gap": "Normal operator stop preserves unrelated configuration and policy/auth isolation evidence exists. Failure/cleanup-loss for one real native configuration while unrelated held operations continue is not fully exercised.",
+      "requirement": "Preserve identity isolation from the profile slice and bounded lease/drain behavior from the retirement slice. A failure for one configuration does not reset unrelated compatible resources."
+    },
+    {
+      "id": "327.10",
+      "status": "partial",
+      "evidence": [
+        "quint-specs/resident-response-ownership.qnt:1",
+        "quint-specs/resident-attachment-owner.qnt:1",
+        "quint-specs/resident-launch.qnt:1"
+      ],
+      "gap": "Local response/attachment models cover bounded subdomains. Generation fencing, invocation outcome/delivery, recovery/refusal and upgrade lifecycle actions/invariants/oracle observations remain absent from type-only launch model.",
+      "requirement": "Extend Quint and observed implementation transitions for generation fencing, uncertain writes, safe recovery/refusal and upgrades. Record liveness assumptions separately from safety; OS/process evidence remains independently required."
+    },
+    {
+      "id": "327.11",
+      "status": "partial",
+      "evidence": [
+        "test/resident/managed-request-loss-process.test.ts:1",
+        "test/resident/retired-commit-process.test.ts:1",
+        "/tmp/resident-live-write-loss-_cpbcg7t/verify.mts",
+        "/tmp/resident-live-auto-qualified-of08j_ff/gate-proof.json"
+      ],
+      "gap": "Bounded real process loss and actual Huly rename/reconciliation/fixture cleanup plus green gate exist. Remaining explicit amended uncertainty schedules, native macOS and automatic crash verified-recovery matrix are incomplete, so broad fault qualification is not proven.",
+      "requirement": "Run bounded real-process fault fixtures and relevant local-Huly write/reconciliation checks with verified owned cleanup. Use explicit fault-timing seams, no module mocks or real-recipient messages; run the project gate and affected regressions."
+    },
+    {
+      "id": "328.1",
+      "status": "partial",
+      "evidence": [
+        "/tmp/resident-live-auto-qualified-of08j_ff/gate-proof.json",
+        "docs/implementation/resident-movement-linux-2026-10-18.md:1",
+        "/tmp/resident-movement-certification-20261018/receipts.jsonl"
+      ],
+      "gap": "Current coherent artifact passes full gate and five stock movement suites, with unchanged thresholds. All parent/child obligations not achieved: model/oracle, native macOS, recovery and remaining protocol/fault matrices still missing.",
+      "requirement": "The complete parent contract and the five implementation slices have traceable evidence. Run the full project quality gate and required local-Huly integrations on one coherent artifact without weakening coverage, diagnostics, inventory or existing deadlines."
+    },
+    {
+      "id": "328.2",
+      "status": "partial",
+      "evidence": [
+        "test/resident/managed-backend-process.test.ts:1",
+        "test/resident/managed-version-process.test.ts:1",
+        "test/resident/managed-state-loss-process.test.ts:1",
+        "docs/implementation/issue-328.md:1"
+      ],
+      "gap": "Extensive Linux schedules pass with preserved failures; no native macOS launch/ACL/termination/fault/version receipts. Linux cannot substitute for that OS; Windows excluded.",
+      "requirement": "Run native macOS/Linux separate-parent launch races, attachment isolation, permissions/authentication, stale locator/PID/port, adapter/backend crash, drain/idle, generation and version coexistence scenarios. A skip or another OS's pass is pending evidence, not native qualification."
+    },
+    {
+      "id": "328.3",
+      "status": "proven",
+      "evidence": [
+        "src/resident/protected-path.ts:36",
+        "docs/implementation/resident-windows-design.md:1",
+        "docs/resident-manual.md:77"
+      ],
+      "gap": "Windows resident startup retains typed unsupported protection refusal; unused native component/workflow removed per explicit scope amendment. Standalone supported paths unchanged.",
+      "requirement": "Keep Windows resident mode explicitly unsupported with safe startup refusal. Native Windows implementation and qualification are excluded from this delivery."
+    },
+    {
+      "id": "328.4",
+      "status": "partial",
+      "evidence": [
+        "/tmp/resident-live-auth-diagnostic-0f_x2pj2/sha256.json",
+        "/tmp/resident-live-auto-qualified-of08j_ff/verify.mts",
+        "/tmp/resident-live-policy-diagnostic-lxvamu3r/verify.mts",
+        "/tmp/resident-codex-auto-live-49rhstmo/verify.mts"
+      ],
+      "gap": "Supported Linux file/env/password/token, native/proxy names and both protocol read paths have proof. Native macOS credential store, differing capabilities, broad schema/resource/output strictness and complete auth/profile/protocol/policy cross-matrix remain unqualified.",
+      "requirement": "Use real supported profile/env/token/password paths and differing tool scopes; verify exact catalog/resource/output behavior and supported modern/legacy protocol/client identity behavior. No current-user identity fallback or credential disclosure is accepted."
+    },
+    {
+      "id": "328.5",
+      "status": "proven",
+      "evidence": [
+        "/tmp/resident-codex-auto-live-49rhstmo/verify.mts",
+        "/tmp/resident-claude-auto-live-dbxyk3_q/verify.mts",
+        "/tmp/resident-codex-live-read-5125ura_/verify.mts",
+        "/tmp/resident-claude-live-read-665f_0cg/verify.mts"
+      ],
+      "gap": "Actual installed Codex and Claude discover and perform first/continued local-Huly project reads through immutable managed package, isolated settings, no recipient messages. Claude uses local deterministic model; Codex direct app-server dispatch; complete matrices belong to328.4.",
+      "requirement": "Exercise actual MCP host discovery and first/continued reads through the packaged managed adapter in an isolated configuration without rewriting global host settings or sending real messages."
+    },
+    {
+      "id": "328.6",
+      "status": "proven",
+      "evidence": [
+        "docs/implementation/resident-comparison-linux-2026-10-18.md:1",
+        "docs/implementation/resident-comparison-protocol.md:1",
+        "/tmp/resident-comparison-campaign-v3-pi0hult3/terminal-manifest.json",
+        "/tmp/resident-comparison-case016-diagnostic-ki5e3aql/final-analysis.json"
+      ],
+      "gap": "All30 rotating fresh-process attempts executed once, both client counts and three modes;2failures retained. Phase/read/shutdown and explicit fresh-process/warm-external-cache boundaries reported. No stable limiter or universal performance conclusion claimed; portable maintained runner remains useful delivery work but this execution criterion is fulfilled.",
+      "requirement": "Run alternating fresh-process comparisons for standalone stdio, managed stdio and direct shared HTTP, with one- and ten-client controls and declared warm/cold cache boundaries. Include launch/discovery/model readiness, immediate/delayed/warm calls and shutdown."
+    },
+    {
+      "id": "328.7",
+      "status": "proven",
+      "evidence": [
+        "docs/implementation/resident-comparison-linux-2026-10-18.md:1",
+        "/tmp/resident-comparison-campaign-v3-pi0hult3/terminal-manifest.json",
+        "/tmp/resident-comparison-case016-diagnostic-ki5e3aql/analyze-campaign.py"
+      ],
+      "gap": "All observed product descendants included in simultaneous RSS; terminal child/adopted CPU and completion/timeouts reported. Failed-teardown attribution incomplete and excluded from resource distributions explicitly, failures remain denominator; RSS not PSS/physical, sampled startup misses/quantization retained. No resource budget claim.",
+      "requirement": "Measure total server plus every adapter RSS/CPU and completion/timeout rates. The prior0.57GiB direct-HTTP figure excludes adapters and is not a managed-stdio budget. Distinguish summed RSS from physical/PSS/idle/peak memory and retain raw spread and failures."
+    },
+    {
+      "id": "328.8",
+      "status": "partial",
+      "evidence": [
+        "test/resident/adapter-output-process.test.ts:1",
+        "test/resident/managed-live-read-pair-process.test.ts:1",
+        "/tmp/resident-live-write-loss-_cpbcg7t/verify.mts"
+      ],
+      "gap": "Distinct payload/colliding-ID routing and actual committed rename loss/no replay are proven. End-to-end shared-native-backend queues/slow stdout with unrelated host, supported interactive traffic and all uncertainty schedules are not fully qualified.",
+      "requirement": "Verify adversarial routing with different payloads and colliding request IDs, not just identical reads. Check bounded backpressure/queues and uncertain-write no-replay behavior under real process failure."
+    },
+    {
+      "id": "328.9",
+      "status": "partial",
+      "evidence": [
+        "quint-specs/resident-response-ownership.md:1",
+        "quint-specs/resident-attachment-owner.md:1",
+        "test/helpers/resident-response-replay.ts:1",
+        "quint-specs/resident-launch.qnt:1"
+      ],
+      "gap": "Two bounded submodels have checks/local alignment. Complete launch/ownership/admission/drain/recovery/upgrade lifecycle model remains type-only; no actions/safety/liveness or full oracle campaign.",
+      "requirement": "Run the relevant Quint checks and oracle-aligned implementation scenarios. Report checked domains, invariants, assumptions, failing traces and unmodeled boundaries; abstract success cannot replace OS or live integration evidence."
+    },
+    {
+      "id": "328.10",
+      "status": "partial",
+      "evidence": [
+        "docs/implementation/issue-328.md:1",
+        "docs/implementation/resident-live-linux-2026-10-18.md:1",
+        "docs/implementation/resident-movement-linux-2026-10-18.md:1",
+        "docs/implementation/resident-comparison-linux-2026-10-18.md:1"
+      ],
+      "gap": "Redacted Linux receipts/hashes, failed attempts and owned process/selected fixture cleanup are documented. Required native macOS/source-artifact receipts and remaining fault/platform suffix do not exist. Historical reports retain incomplete states; complete per-platform publication unavailable.",
+      "requirement": "Publish redacted per-platform/source/artifact receipts and independently confirm process/fixture cleanup. Preserve failed attempts and clearly state any unexecuted suffix, unsupported path or remaining blocker."
+    },
+    {
+      "id": "328.11",
+      "status": "partial",
+      "evidence": [
+        "docs/resident-manual.md:1",
+        "docs/resident-read-qualification.md:1",
+        "packages/huly-cli/src/resident-commands.ts:1",
+        "docs/adr/0003-adopt-mcporter-resident-lifecycle.md:1"
+      ],
+      "gap": "Launch/status/acceptance-only stop/upgrade choices are documented, with safe refusal and no replay. The manual guide explicitly says verified local retirement and safe recovery remain separate work (lines155\u2013160); no concrete recovery verification/namespace-reset instructions are supplied for unresolved ownership. Requirement is usable documented safe recovery behavior, not a mandatory CLI reset verb or automatic takeover.",
+      "requirement": "Document explicit managed/manual/standalone launch choices, redacted status, safe stop/recovery and upgrade behavior. Do not install services, rewrite host settings, publish packages or promote a new default without the separate delivery decision."
+    },
+    {
+      "id": "328.12",
+      "status": "deferred",
+      "evidence": [
+        "docs/implementation/issue-328.md:1",
+        "docs/implementation/HANDOFF-resident-mcp-323-328.md:1"
+      ],
+      "gap": "Prototype removal explicitly ordered after production integration/qualification. Preconditions not achieved; do not remove prematurely. No completed cleanup evidence.",
+      "requirement": "After the production implementation is integrated and qualified, remove the superseded resident-lifecycle prototype and its generated/temporary artifacts, including any prototype worktree, while retaining useful decisions and redacted evidence in the maintained specification/reports. Update documentation so it no longer instructs users to run the removed prototype."
+    },
+    {
+      "id": "328.13",
+      "status": "deferred",
+      "evidence": [
+        "docs/implementation/issue-328.md:1",
+        "docs/implementation/HANDOFF-resident-mcp-323-328.md:1"
+      ],
+      "gap": "Local/remote prototype branch deletion, dirty/unmerged inspection and useful-work preservation deferred until post-qualification; no deletion evidence inspected/claimed.",
+      "requirement": "Delete the local and remote `prototype/resident-lifecycle-321` branch after verifying its worktree has no uncommitted changes and inspecting commits not in master. Preserve/integrate any useful work before deletion; do not force-delete unexplained unmerged work. Record cleanup and branch-deletion evidence. This cleanup happens after production integration, not during specification/prototyping."
+    },
+    {
+      "id": "328.14",
+      "status": "proven",
+      "evidence": [
+        "docs/implementation/resident-windows-design.md:1",
+        "docs/implementation/resident-comparison-linux-2026-10-18.md:1"
+      ],
+      "gap": "No prototype cleanup performed, no unrelated branch deletion/heap/model-cache rewrite introduced by observed resident work. Scope restriction remains enforced; post-qualification cleanup must keep it.",
+      "requirement": "Do not broaden prototype cleanup into per-process heap reduction, model caching, unrelated release fixes or deletion of other branches/artifacts."
+    },
+    {
+      "id": "328.15",
+      "status": "proven",
+      "evidence": [
+        "docs/implementation/issue-328.md:1",
+        "docs/implementation/resident-comparison-linux-2026-10-18.md:1"
+      ],
+      "gap": "Current reports explicitly keep all six issues/parent incomplete; no subset-platform/model/performance result is represented as complete acceptance. This is compliance with no-premature-close requirement, not proof of remaining product requirements.",
+      "requirement": "Do not close the parent based only on a subset of platforms, a logic prototype or performance success; this ticket reports exact complete-contract qualification and outstanding limits."
+    }
+  ],
+  "evidenceSha256": {
+    "/tmp/resident-claude-auto-live-dbxyk3_q/verified-schema.json": "9d55290e5d6e06958c0f77d1d06787c6b65a25a20a7b90237fd02fe37954205b",
+    "/tmp/resident-claude-auto-live-dbxyk3_q/verify.mts": "170609535d3a56ea4a20efbaf9abed3d71db175db15e070e5d93356ea1a20d96",
+    "/tmp/resident-claude-live-read-665f_0cg/verify.mts": "7aadd99d7c0a2ce3b3ccd43e67408e817edc81b1c56526805c41982d0dce8e33",
+    "/tmp/resident-codex-auto-live-49rhstmo/verified-schema.json": "2920fa611ba7ed6cb611f9841762759013356b479881b6c810eb6e63ac361c44",
+    "/tmp/resident-codex-auto-live-49rhstmo/verify.mts": "5ec976ea9dc9e128c449a2fbdcc803c9c460afaae72bf62d7976de1fc10d77de",
+    "/tmp/resident-codex-live-read-5125ura_/verify.mts": "d3f01475b5f9500c56fac6da9925f952dbf7d270a8e4ab67e47e6c720c28b2c6",
+    "/tmp/resident-comparison-campaign-v3-pi0hult3/terminal-manifest.json": "b0bb4f5e102dcb3ab6911ed1da957f981cb1a87f2ceb1faef70873d3a0633c78",
+    "/tmp/resident-comparison-case016-diagnostic-ki5e3aql/analyze-campaign.py": "33ebe6ea77ac7f25e67455bbe1439061d145ef37e63ddefbe7f62f224ea8c76b",
+    "/tmp/resident-comparison-case016-diagnostic-ki5e3aql/final-analysis.json": "ddac3df5a3460b4dadec29dd711a6494e343ff1fd594ce0717ad51c95081cfae",
+    "/tmp/resident-live-auth-diagnostic-0f_x2pj2/password/verify.mts": "9c5913ad40f697f7db2604833997b22d58b267cfef1b0f55fb178da39f42a246",
+    "/tmp/resident-live-auth-diagnostic-0f_x2pj2/profile/verify.mts": "1a5306d99924975c97ce3cd9652cec09a04fb3f0d131ae8bd043267663fc6479",
+    "/tmp/resident-live-auth-diagnostic-0f_x2pj2/sha256.json": "dcfb5ef9e8ca3be7e3a03779490319a0624879b87cac21819a813a8edb99bd82",
+    "/tmp/resident-live-auto-qualified-of08j_ff/check-all.log": "ab19656dfd9e761bd6f6e2cfb5af6e43f293d59f4ac1729a8da2cd9e14b3692c",
+    "/tmp/resident-live-auto-qualified-of08j_ff/gate-proof.json": "fa6a43c78c59b438cdd4c814b1bfccd474a3f3e596807d5512457c44a6e330ca",
+    "/tmp/resident-live-auto-qualified-of08j_ff/verified.json": "4d55190e5b980b2b6a675c5449c676bf27e968756093aa8fcd7e080397cfa007",
+    "/tmp/resident-live-auto-qualified-of08j_ff/verify.mts": "ed514708e0a2c2ae11c219bbad44bb86e56005bc28446d2287aac2b10511fef5",
+    "/tmp/resident-live-legacy-qualified-k3fdvynd/verify.mts": "8daace417bbf82d101c00301b45942f2e70295885f1505d0a87d17cead8ebf80",
+    "/tmp/resident-live-linux-campaign-_dtgfmjg/managed-read-receipt.json": "c65aa37c4904e562bd94339a3f7658b6458351d4c436dfcf6bfab09c2d632ff8",
+    "/tmp/resident-live-linux-campaign-_dtgfmjg/managed-replacement-receipt.json": "c29886405157761754cd9022fe89a25b341bd9a0f015d072d26bcad087bdcf6c",
+    "/tmp/resident-live-linux-campaign-_dtgfmjg/manual-attempt-2/manual-owner-receipt.json": "cda22e9412f1ec421771c6e6fca0f4a691bcc0f78a6a1f58569c132b58b3017f",
+    "/tmp/resident-live-linux-campaign-_dtgfmjg/manual-attempt-2/manual-read-receipt.json": "3b653bce3d2c9a1452e653c3cbe8621867820c2b25ae2b378901539428d93283",
+    "/tmp/resident-live-linux-campaign-_dtgfmjg/sha256.json": "ea6edc51043fa957ddaae996961ca8c38e918907bf4017a947b828afd046b232",
+    "/tmp/resident-live-policy-diagnostic-lxvamu3r/verify.mts": "f3e83b57d56a9f986fe2c8a33e997680b28440fef650e8fd10f412de3a73df41",
+    "/tmp/resident-live-query-loss-phases-6deo4c_h/verify.mts": "bf5920be9064700d22f775b1e482136d6097b72f671a7cb04cd4531ab387a23b",
+    "/tmp/resident-live-survivor-9w2cz2g2/verify.mts": "fa673345f07324b5ab76a16a56c3c9944dd7a732ce544131a9842c2a525d4b09",
+    "/tmp/resident-live-write-loss-_cpbcg7t/verify.mts": "b7c394bbe3fab0b38981a96f4b1704f3cb50ca3f806f3c1d032948bf7ed9b6ea",
+    "/tmp/resident-movement-certification-20261018/receipts.jsonl": "8bf76f4b60412a68b17401adc9037914a6e10cb22ceafe763f3c723cb786222d",
+    "/tmp/resident-movement-certification-20261018/sha256.json": "44bd16c72708afed5ccb09fdd45ba4f8bdd8078b6b3745041bcdedc8720a47d9",
+    "docs/adr/0002-resident-recovery-without-operation-journal.md": "2d93f9fb88a7de8427210b8349d4ca3febafb459758c44a7376385d029c77f38",
+    "docs/adr/0003-adopt-mcporter-resident-lifecycle.md": "5b6208be13c116a4cb64ddfa61632a2b0730cab8bc17a968431e4f624fb841af",
+    "docs/implementation/HANDOFF-resident-mcp-323-328.md": "b3db4d992719058663ba74564fdacc42e2479114ffb8d2c2db75cde7b27ffe80",
+    "docs/implementation/issue-328.md": "1419ffa2696454a896e39986dba30405ab8d365a2fd6a15d43bb255ecb5233d2",
+    "docs/implementation/resident-comparison-linux-2026-10-18.md": "4c0477c2f4747f702cb61cb5132788dba3a965f969c67d18f8b71e45a3594710",
+    "docs/implementation/resident-comparison-protocol.md": "6b3f4eda69a8be08e4ac6d5041e4c01045dffca73b272ef4432381a39aa1361c",
+    "docs/implementation/resident-lease-policy.md": "3e5daab32147698a7edd641c8464f176b82f68739c821a2c0177cb33647d42cd",
+    "docs/implementation/resident-live-linux-2026-10-18.md": "490407328635599d3d5d99b09a66fe434dcd4499b8b284495d613e6b2b60a71f",
+    "docs/implementation/resident-managed-design.md": "5919c59b272d00323b583f61ae8a8430cbb32d54e494096f2b2a8c116973c7e1",
+    "docs/implementation/resident-movement-linux-2026-10-18.md": "e60a0ff3ec0e2f0af7f9d4d1c22c2eee79d92154eb009b57bdd3e8c76a869f95",
+    "docs/implementation/resident-windows-design.md": "c3017162541370092cfb6620a4bb0e7a9623f8000ed68bbb42f62f453593c851",
+    "docs/resident-manual.md": "4a1f0af9653b6f102cd1bc2518d948ed342a17c2beffb611c929c118c1feb6fb",
+    "docs/resident-read-qualification.md": "21eca39d6782527cd27c879d39b76fa19b9ec56678405b74ee524b87b4cbfd8e",
+    "package.json": "0b8843f3eed85e22e223d86d3c18e0572a8645558be5eaaf1b024c35da71345d",
+    "packages/huly-cli/src/resident-commands.ts": "ad421f94d0d1063541d1cc6eab1f02aba8eeb2830bd1bdb910fd27c77ba63051",
+    "quint-specs/resident-attachment-owner.md": "f213954e1ee921a73185a9c667cef01153f44d5b6176d465d9e4290704b44526",
+    "quint-specs/resident-attachment-owner.qnt": "5580cba3be4e63b9faab8dee1491e977b9f8e836cb70baad24f7aabeaafd205f",
+    "quint-specs/resident-launch.md": "340229e4f7891d7ea7d956f01c26c8038652cdf3f5d20151d32744e969211fc0",
+    "quint-specs/resident-launch.qnt": "3e409a24254a936529623a031c0f529ec6136a34c19507df4e4f1b78b6e90e95",
+    "quint-specs/resident-response-ownership.md": "aa0fbdbd31fc6451bff66a22b67b7901ef7a6e42edfc553a70406d1953842482",
+    "quint-specs/resident-response-ownership.qnt": "4578069b23cd681498964abcbcce34a10c3217f16065e15abe5781da120f64ec",
+    "scripts/resident-live-protocol.ts": "803ed9e17587cc0fd058f3edeb0a1d92784f2edf7f435a3a033b91ca8672e7dc",
+    "scripts/resident-live-read-host.ts": "17cb72e5ce773900370562771a3e81a34eb3f899887d66ff5f6005e87033c51c",
+    "scripts/resident-live-read-pair.ts": "9b0f76c23068fe3933c61bf3d62554d902c60218632088ee42fc99c55cb389f6",
+    "src/index.ts": "17e6e45346a76762ee515c7b33f4d21609f8a20e0b1eff7edd02eb3e60b1d2f0",
+    "src/launcher.ts": "d44e5b11d189acf972f805f85f40fde792542ad141985327f53297bfa4c50c19",
+    "src/mcp/http-admission-observations.ts": "fef0d568045433ffd1e541f8119de8639b45d091a269d99271025bf5120a7297",
+    "src/mcp/http-transport.ts": "bebf8d94560c495f542394b5f5562c8b1a307f2b3cece9e33baf99068405ebac",
+    "src/mcp/process-policy.ts": "e62fcfad5c0023b25588dca135cca99853a6dd8ab37cfb1a8d6d2a9afe991683",
+    "src/mcp/proxy-tools.ts": "23a6eeb2d93e9985234281935fd263651020872f2b84700051e09ca06eac4241",
+    "src/profiles/credential-store.ts": "ddc438363cb4231bcdabe0ce59e572e06e7cc109457b83ea0f77f6bb5c471c14",
+    "src/resident/adapter-attachment.ts": "2838239733786b07457320fe8de682001d4d5a3bfcc8e38656796970f8a768d9",
+    "src/resident/adapter-limits.ts": "1f11b7a1409a9cfde7cd65930423d600db79de6a3b61fbfb1b284a4d362bc5e3",
+    "src/resident/admission-contract.ts": "32ede041fb7a0fe6d8d8164d05a422176dc5f74ce1f4223a662f7e7713c0052b",
+    "src/resident/admission-http.ts": "e28670fc122b81e23091e2341abbad5d57c4f4946c81b93df32eabaf39ccc1d8",
+    "src/resident/admissions.ts": "bfd6ff4a4f8463b7bc9938cbab113b295c5974d42d8a0e31d43dc0653e05d2f2",
+    "src/resident/attachment-exchange.ts": "1c3402326ef902bd803070b6a3a8efe6da149d0cf1298ec6eea6038c8ccba466",
+    "src/resident/attachment-file.ts": "02cd94470aa3cabb9e9a8d15a879c02fac6f60875bd051d56ae4798b56d43108",
+    "src/resident/attachment-lease.ts": "d93e764336bd3feb1b19367c8e886b2ca62b6c92364e682667e5e303c20cafba",
+    "src/resident/attachment-owner.ts": "589037d8a91886e64418a631e9d26c274d5cd158fb0233c6db21b5364fd07464",
+    "src/resident/bootstrap-codec.ts": "32e35ccdfcca686bfcb91c5a660d8aff0b4027753022e12ee1392064202d5820",
+    "src/resident/compatibility-authority.ts": "bd5c45fb1dea5cca7da4efc14eb1a8a818dd9136428fbde640f43617f7608205",
+    "src/resident/compatibility-contract.ts": "0fcc888c69b906ccefd84162b678d232cc0a44802ea0b3345c4cecb991f33c5d",
+    "src/resident/compatibility-crypto.ts": "68fc809e3a47c0a399b27ae8ddd894f6ae7920d7de813bba51f1aa3d104c405e",
+    "src/resident/generation-registry.ts": "7cf25110cab2f1da143c96282da87d5aed4926f5ac069accd326910a30179299",
+    "src/resident/managed-adapter-main.ts": "a95ede0327e0f7d1b93f4409356382e25a8b2188a5096a15652afd5412ab402b",
+    "src/resident/managed-child-environment.ts": "5f58ede921e7c32cd6d55b2485f9170a5430ae65ef6612215a8d2b666c8b537a",
+    "src/resident/managed-child-main.ts": "b6db0fa653f1d559db145c31cdfe09223ff2f092be39ae968981df41255e4179",
+    "src/resident/managed-directory-config.ts": "359c01afc423440219b77a7daedc1e90380bda72796185d0851498acc00eefdb",
+    "src/resident/managed-process.ts": "e81d4506b521e4ca0ca2ddeb2cfd47f23cf11977bcb7774984a595fae94299e8",
+    "src/resident/managed-selection.ts": "0f8015e46e867265153ef0a8eef595cd9e7abc44443cc7bfe01ca1371ee9cb51",
+    "src/resident/manual-adapter-main.ts": "52106041cef4413aae427ec1dcde27ac6e3295f048122171a9694bee4caf2c68",
+    "src/resident/manual-adapter.ts": "067e86f4add2d2cdf166b328363af8a3942d1c238302378883bc8ba2a159de64",
+    "src/resident/manual-backend.ts": "73d469df5f4772506f85a5cb6ca4d849f7f70095c9331bd10b9b4578ba4fe90f",
+    "src/resident/operator-stop.ts": "7c2273af276cd48a16bfecb0f0d4568322866dded84a75cff3f88a4939d30903",
+    "src/resident/protected-path.ts": "67acbfe00c2e94eca475937bd88fbbe82995d586d8138d2542197ce249d2c259",
+    "src/resident/protocol-session.ts": "9937f6c301893139ec8998d2efc6f894a0dd2a3b40eaccfa4318772b7086d4d3",
+    "src/resident/request-headers.ts": "6ccdfaa912d931bfd3b409c2fbefa9640f6449d547cd555d01046dfccfb1b2a8",
+    "src/resident/response-stream.ts": "49fdee388f2c917b805306d66dddf44189a0c60a2da63cfbb7fa5128b40f0f4d",
+    "src/resident/selection-claim.ts": "815f4488f4b5fb005df0ff765e107a5c6b9e9f2c5f3fe333927e80b32ac82184",
+    "src/resident/selection-config.ts": "941ed1c76aabc3140e8bd3aa1a2e7d6b34cd972fbf74da781970e0f375778c4f",
+    "src/resident/start-authorization.ts": "da9377e93ea349e11ca1268082a7078eae9b3d050491eb52fb1ad047e63c3477",
+    "src/resident/startup-selection.ts": "4d4f62c24660eaf8141b767da9b831144c27c8869b87e9e58b750d0829832c6e",
+    "src/resident/state-status.ts": "5ad60d1269129e6c81bc8ace6941c49e9289e06fabd5e1c10490d53011fe875d",
+    "src/resident/tls-channel.ts": "63fea983df4c897557096aa56fdbdf6cfc76d2935611122c8b8830298f689e56",
+    "src/runtime/http-client-leases.ts": "b843dd93f1d5ecea951944ae91f98ec5d28b7afb81d68e421040eea85c7cac9a",
+    "src/runtime/huly-clients.ts": "b1134ea4c35c6c3826795eeb7dd97afc197321379bdcbbd5bc154f60efd81719",
+    "src/runtime/request-work.ts": "43819ba9cc1e9a098021e5e904491bcee7f33f4b75c58cc4340777833fa79bd6",
+    "src/runtime/server-startup.ts": "543951625e369cbda1c4660a5dcfe0db78ecbdf29da4d465b0b10286b33c8365",
+    "test/helpers/resident-response-replay.ts": "69b1889e497913871954139c245fc3e69e60a1796ecc5940407f3d4ddce4f051",
+    "test/helpers/stdio-build.ts": "df713a6371fe18b579d290a920fbcf251f7a2f7753f43fc4c63d5b7a69fb52ba",
+    "test/mcp/request-client-lifecycle.test.ts": "c7e93740ffe919f67b49aa69d51a4dc6be3279589661361ab8ba7d52be9d5b19",
+    "test/resident/adapter-boundary.test.ts": "1223071a0bc6f966af3ad1ab8287a798da58d60176adbac62372128a21afe9d4",
+    "test/resident/adapter-output-process.test.ts": "0944a36bd0c184eaafaed0654586f8f0fcebe6de84134333cb047c9392cf1a51",
+    "test/resident/adapter-response-cleanup.test.ts": "9610006d11d2aa804a047652c4fdcdbea7d95ac035530aa7b1019e0ff2898b7a",
+    "test/resident/admission-expiry.test.ts": "dc911a7bdec8121f986908f22b651713bf4f0e10efea774d443aa804eb257c3d",
+    "test/resident/admission-fence.test.ts": "f492ad8df8b987470860eac0c8afa10fe624bcc986f2e5f73f1ff25452d1da05",
+    "test/resident/admission-http.test.ts": "769f955c3f0bf57001790b72f025bd5b9c51c45f6cd38513e62b7e6a0ba04350",
+    "test/resident/attachment-exchange.test.ts": "9fe007b652fd1b070685e691d2aec38c18af6321c8ab572b4eab5c4d3ade595e",
+    "test/resident/attachment-file.test.ts": "215bff2ed4cb3ef25587e0b2509c13a8efd46428918cb2bb7922c39ace4a0350",
+    "test/resident/attachment-owner.test.ts": "d233a44b0acc850b5fe38fc22fa9d57032e7fe4ebb7e4b42431bb509198c2f8e",
+    "test/resident/child-authorization.test.ts": "324f118fa1696156e2d34903af3503f9cb3dfc85df178caef8593973e4ae464c",
+    "test/resident/compatibility-http.test.ts": "c1ae36dce78df62e80357d8e78476334620ec799de2349aec90b38dc96bb5e37",
+    "test/resident/compatibility.test.ts": "8367a2cad99f869804a6dd238a50b2ec452a944e80221e09043c1e5c145b3238",
+    "test/resident/delayed-commit-process.test.ts": "73a5a7276b0ca76a9b6d720ced4d8929ff94fa3f9cf3e7a749ef94b649e069c9",
+    "test/resident/fixtures/managed-auth-paths.ts": "4418160ac1231616c216c1c6a20630af6189db00c9ca1c7b5fe22f35bf1a2f7c",
+    "test/resident/fixtures/managed-crash-refusal.ts": "66e4f503a9ca4eba42a438e4601382d7eb12855e09c34a8494b712949b65245b",
+    "test/resident/fixtures/managed-operator-stop.ts": "8f1be84c7ecd8d1529cd1faa4d77919dfc89645237a39fa3f3395443b762e9b6",
+    "test/resident/fixtures/managed-parent-loss.ts": "9be2df06401813d599300f402517d2661d5da1479479311d389c5d37923676e6",
+    "test/resident/fixtures/managed-policy-isolation.ts": "47120bc5c05c2c85f201b17360eea5b10a47630a05f90bf11e4560032d076ab3",
+    "test/resident/fixtures/managed-request-loss.ts": "eeb6370c7046d46608f4aabfe985812c7872e3c9652e2391815180eed5d82d36",
+    "test/resident/fixtures/managed-ten-parents.ts": "623efb563edbe6e16b16966911eb9199fa30ddc2c202b0d59a506506594653ef",
+    "test/resident/fixtures/managed-version-coexistence.ts": "174eaddf8f996feae33e3418ef710f9446b1894b09777cac87d827670f53f12a",
+    "test/resident/fixtures/reap-descendants.py": "70a464bf81f3648c4b96ad3257c766d960fa06a935a5b9732acc4f76f8f19981",
+    "test/resident/generation-registry.test.ts": "18a74264af75eb07b0321ddeeeefadc4e6bf99412e7647278246d0151006b3ce",
+    "test/resident/live-read-exposure.test.ts": "a20057116ab4b1d50865c7477ed630cbcee36c7b24631c3194b424e04f0a710e",
+    "test/resident/live-read-protocol.test.ts": "08d182778def83d1286e24baa443c07ae2c1b973032c8223cc73c896d7c0f1cb",
+    "test/resident/managed-admission-continuity.test.ts": "580750866882046e8a7097e91f7ba013377c864139ea2ba5200ec31e99ef715e",
+    "test/resident/managed-auth-paths-process.test.ts": "e8d4ecda933176455fa0d01f2a671778cb747b1b6bc7344b7ef4e973d7607b26",
+    "test/resident/managed-backend-process.test.ts": "03dd10b6fbe8fbdfb855d894ea7792b386ffa00e788b068239609ca3c3c2070a",
+    "test/resident/managed-crash-process.test.ts": "811cb264926c7838087a87a93918278826cff13f09db83814dbeaf5129fde1f2",
+    "test/resident/managed-idle-protected-work.test.ts": "b69856866c64b70b5c317233a85ca36281a6326c8ee83860d6d27a10a2f6acfd",
+    "test/resident/managed-idle.test.ts": "241d7502cfa6b3d88a305bbf4d4c34140593237af6cb05d18410cfeac3022eb9",
+    "test/resident/managed-last-adapter-expiry-process.test.ts": "c87d24cd5e66008bd1e996afa8def8879acd10665a59860d300ba83b2d8c98eb",
+    "test/resident/managed-live-read-pair-process.test.ts": "363ae8ab1be48ecf5ebb4ba2d61f7d9cfbf785552fae65fb37db189f9aee8aad",
+    "test/resident/managed-operator-stop-process.test.ts": "ce81a10b3857d06920cd66d1930492f0ceca5745e03b71eba9863a6b51a5bf1f",
+    "test/resident/managed-owner.test.ts": "13e2f96759e1b406e1c24732587e30ab2e466678d714e103f87de0a02db33a2f",
+    "test/resident/managed-parent-loss-process.test.ts": "624083cadf0703ff8b7dc67d4b1d687ebe611ebe80d14d1103a270d3d4f95e23",
+    "test/resident/managed-policy-isolation-process.test.ts": "a1ad6a1ed10d4b4d81aa11980b6254d088fa603133b46d676526186353cece29",
+    "test/resident/managed-process.test.ts": "c06c9c9f2027807f3f0792f813ca9ab34500ea01fe8f91399da734f41e595f4e",
+    "test/resident/managed-request-loss-process.test.ts": "14c365216d27e44338dfc01eb2710e44b14cf665acb166c7764e8ee63bdc0ea4",
+    "test/resident/managed-state-loss-process.test.ts": "ff1ea338a2a639552e44183fd44e77f9cf5781d2ec891652629fceb4bb617961",
+    "test/resident/managed-stop-fault-process.test.ts": "56da794961ab40696a3941dfed8268b4324274cc5cea85946f9ebeebded62e46",
+    "test/resident/managed-version-process.test.ts": "42c39e0053261222f5912d22379321f3b285c3c28682e6446788d93f8181d47e",
+    "test/resident/manual-adapter-process.test.ts": "17f6cd9d2f4a1bc6adbd192fe76c0ee13d7ba6da30b6ed96ee109cb17af8fee9",
+    "test/resident/namespace-descriptor.test.ts": "68dd499ccbcdd2243758b90c5e934baeffa606c87373de89e625c68a460183a5",
+    "test/resident/native-backend-process.test.ts": "223db509ed1ad56e07484ba2b13400e00b4d68581cf7d3eb25c6f9e92a8675ea",
+    "test/resident/native-session-ownership.test.ts": "9600c9547bdfe3e4f61dfd54d080f9ee2b10f73cc5a5ecbca3ccc61e0731ae44",
+    "test/resident/operator-stop-http.test.ts": "79b821d185aad8937a3699f2711668d33f008ee682207bdd07c92ecf7cac6d77",
+    "test/resident/private-http.test.ts": "59501f387c24bd90d2b598eae48eb7031b61968a9a3b9fc8502ebb1db1278722",
+    "test/resident/profile-lifecycle-fixture.ts": "74058414ef7332982b1c450e51c4aff933082de684ec70ed4f5b6af0b83a866e",
+    "test/resident/protected-path.test.ts": "33bff2ce250855eb8027e444b6f08e62eaf76cfcf89a277b08748e978c0e226d",
+    "test/resident/resident-client-close.test.ts": "4225635790f3033c9df87fa0dadd67bb77694a17ac088a5748e05a179408d766",
+    "test/resident/response-observations.test.ts": "8b855c029634fcb82fa1d815e6a40f9a5b9d590a1b89c8c1db3086c246f1d677",
+    "test/resident/response-stream.test.ts": "1d31e60b0cf99bbce18d6f6b596220b1e013ee7332e5e185799200e4a3782bc0",
+    "test/resident/retired-commit-process.test.ts": "09d42e69325a32692348794b9ec4f64161ba0156c2f5e60eb614cd009aa64c86",
+    "test/resident/selection-claim-process.test.ts": "beee810e6511e727a84ff18b9c59825ecf669c2d776a3b034152293b2d1ef783",
+    "test/resident/selection-config.test.ts": "af104fc1bad44c05a4447c331d3c13e7c9d3e6ee8b7e0353a560c1a55b858a2e",
+    "test/resident/standalone-startup.test.ts": "ad3df4fe9e841c80816c456a316bd840b2d8220e8d21d98e12f3470a0870dab7",
+    "test/resident/state-status-process.test.ts": "1c1d2aad99fad89b107e10b5590dcae8c3d8d7f5d7fa41054621877dc84391ce",
+    "test/resident/tls-channel.test.ts": "be34db5aab3276bb15125815356a83c370734d1a82890d2ef630717625a3e36d",
+    "test/resident/uncertain-write-process.test.ts": "97fdf0867b88fa6ea8b79c34777e419adbe8e88919d65039b1806465a69c1fc0",
+    "test/runtime/http-client-leases.test.ts": "322f7a263b37952bda7032a2357b5e9ad5f6b1792f5338d7bdefae902cf6bcd7",
+    "test/runtime/huly-clients.test.ts": "19a0577671ae0a0f7e35e081d2bedd80d317bd8cf95c107b287170d53b2637c5",
+    "scripts/resident-live-managed-pair.ts": "c6dd2f85e849f7f1ed0e12c92782f2e5eda3e391764ff974c121b3b0a59da9b9"
+  }
+}
