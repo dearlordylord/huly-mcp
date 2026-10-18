@@ -16,6 +16,7 @@ import {
   ActiveQueryCommand,
   ActiveQueryEvent,
   ActiveQueryHostInput,
+  ActiveQueryToolError,
   AdapterExit,
   OUTPUT_EXIT_BOUND
 } from "../active-query-contract.js"
@@ -191,6 +192,13 @@ const main = async () => {
             if (!losing) throw new Error("Unexpected adapter EOF")
             process.stderr.write(`Active host ${input.role}: request EOF observed\n`)
             emit({ _tag: "interrupted", project: command.project, id })
+          } else if (command._tag === "readError") {
+            emit({
+              _tag: "toolError",
+              project: command.project,
+              id,
+              reply: Schema.decodeUnknownSync(ActiveQueryToolError)(reply)
+            })
           } else {
             emit({
               _tag: "result",

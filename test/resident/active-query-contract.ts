@@ -30,6 +30,7 @@ export const BurstIds = Schema.Array(Schema.Int).check(
 )
 export const ActiveQueryCommand = Schema.TaggedUnion({
   read: { project: ProjectIdentifier },
+  readError: { project: ProjectIdentifier },
   lose: { mode: AdapterLoss },
   stall: { project: ProjectIdentifier, mode: BlockedOutput },
   fill: { projects: BurstProjects },
@@ -38,6 +39,13 @@ export const ActiveQueryCommand = Schema.TaggedUnion({
 })
 export type ActiveQueryCommand = Schema.Schema.Type<typeof ActiveQueryCommand>
 export const AdapterExit = Schema.Struct({ code: Schema.NullOr(Schema.Int), signal: Schema.NullOr(Schema.String) })
+export const ActiveQueryToolError = Schema.Struct({
+  isError: Schema.Literal(true),
+  content: Schema.Array(Schema.Struct({ type: Schema.Literal("text"), text: Schema.String })).check(
+    Schema.isMinLength(1)
+  ),
+  structuredContent: Schema.optionalKey(Schema.Never)
+})
 export const ActiveQueryEvent = Schema.TaggedUnion({
   ready: {
     protocol: ModelWaitEvent.cases.ready.fields.protocol,
@@ -47,6 +55,7 @@ export const ActiveQueryEvent = Schema.TaggedUnion({
   },
   started: { project: ProjectIdentifier, id: Schema.Int },
   result: { project: ProjectIdentifier, id: Schema.Int, result: GetProjectResultSchema },
+  toolError: { project: ProjectIdentifier, id: Schema.Int, reply: ActiveQueryToolError },
   interrupted: { project: ProjectIdentifier, id: Schema.Int },
   loss: { mode: AdapterLoss },
   stalled: { project: ProjectIdentifier, id: Schema.Int, mode: BlockedOutput },

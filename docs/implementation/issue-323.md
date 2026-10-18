@@ -674,3 +674,8 @@ clean. Broader #323 healthy-backend isolation requirements remain open.
 ## Explicit admission state transitions — 2026-10-18
 
 The [admission transition increment](resident-admission-transitions-2026-10-18.md) replaces mutable admission counters and ownership decisions with one identity-keyed inventory and pure event transitions. The Effect shell retains resource lifetime and cleanup. Nine focused files pass36tests, the new core has100% coverage, and TypeScript/Effect diagnostics pass1414files without errors or warnings. Both scoped reviews are clean after restoring digest typing. Full check-all passed 499 files/5793 tests with unchanged global coverage thresholds; current-byte Huly qualification and the wider parent D8/D9 boundary remain incomplete. No complete issue is accepted.
+
+
+## Actual operation-error routing — 2026-10-18
+
+The [focused error-routing increment](resident-error-routing-2026-10-18.md) adds two independent parents with colliding ID41, a real missing-project domain error and a separately held peer read. The error caller completes FRESH42 while the peer remains held; the peer then receives exact41/42 results. Both protocols, explicit adapter/parent exits, kernel backend retirement and post-retirement counters passed. No production changes or full gate. This closes only the native domain-error subset of the routing gap; progress/continuations/capabilities and overall #323 remain incomplete.
