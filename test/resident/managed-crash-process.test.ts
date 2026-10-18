@@ -14,7 +14,7 @@ const PROCESS_BOUND = 30_000
 const runFile = promisify(execFile)
 
 it.skipIf(process.platform !== "linux")(
-  "preserves crash uncertainty and refuses a stale locator or foreign listener without takeover",
+  "preserves crash uncertainty and refuses stale, foreign or corrupt ownership without takeover",
   { timeout: PROCESS_BOUND },
   async () => {
     const bundle = await buildIsolatedStdioServer(PROCESS_BOUND)
@@ -42,9 +42,10 @@ it.skipIf(process.platform !== "linux")(
       )
       const receipt = Schema.decodeUnknownSync(Schema.fromJsonString(CrashRefusalObservation))(stdout)
       expect(receipt.backendChildrenBeforeKill).toBe(0)
-      expect(receipt.recoveringExitCodes).toEqual([1, 1])
+      expect(receipt.recoveringExitCodes).toEqual([1, 1, 1])
       expect(receipt.originalRecordRetained).toBe(true)
       expect(receipt.foreignListenerSurvived).toBe(true)
+      expect(receipt.corruptRecordRetained).toBe(true)
       expect(receipt.credentialDisclosure).toBe(false)
       expect(receipt.stdoutBytes).toBe(0)
       await fs.writeFile(

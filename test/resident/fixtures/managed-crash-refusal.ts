@@ -85,7 +85,7 @@ const main = async () => {
     process.stderr.write("Crash refusal: killing the owned backend handle\n")
     backend.kill("SIGKILL")
     assert.deepEqual(await bounded(backendClosed), [null, "SIGKILL"])
-    const recover = async () => {
+    const recover = async (expectedRecord = original) => {
       const adapter = spawn(process.execPath, [input.bundle], {
         env: { ...environment, MCP_TRANSPORT: "stdio-resident" }
       })
@@ -105,8 +105,8 @@ const main = async () => {
         assert.ok(Buffer.concat(diagnostics).toString("utf8").includes("No request was replayed"))
         assert.ok(Buffer.concat(diagnostics).toString("utf8").includes("no Huly request was dispatched"))
         process.stderr.write("Crash refusal: no-replay diagnostic confirmed\n")
-        assert.equal(await fs.readFile(registryFile, "utf8"), original)
-        process.stderr.write("Crash refusal: original record confirmed\n")
+        assert.equal(await fs.readFile(registryFile, "utf8"), expectedRecord)
+        process.stderr.write("Crash refusal: expected record bytes confirmed\n")
         assert.deepEqual((await fs.readdir(input.directory)).sort(), originalInventory)
         assert.deepEqual((await fs.readdir(join(input.directory, "generations"))).sort(), originalRegistryInventory)
       } finally {
@@ -136,14 +136,21 @@ const main = async () => {
     await recover()
     assert.equal(foreign.listening, true)
     assert.equal(disclosure, false)
+    const corruptRecord = "{invalid-json\n"
+    await fs.writeFile(registryFile, corruptRecord, { mode: 0o600 })
+    process.stderr.write("Crash refusal: refusing corrupt ownership metadata without repairing it\n")
+    await recover(corruptRecord)
+    assert.equal(foreign.listening, true)
+    assert.equal(disclosure, false)
     process.stdout.write(
       Schema.encodeSync(Schema.fromJsonString(CrashRefusalObservation))({
         backendPid: backend.pid,
         backendChildrenBeforeKill: 0,
         backendExitSignal: "SIGKILL",
-        recoveringExitCodes: [1, 1],
+        recoveringExitCodes: [1, 1, 1],
         originalRecordRetained: true,
         foreignListenerSurvived: true,
+        corruptRecordRetained: true,
         credentialDisclosure: false,
         stdoutBytes: 0
       })

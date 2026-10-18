@@ -473,3 +473,14 @@ retained. Existing ten-contender crash test additionally verifies exact SIGKILL
 and retained claim device/inode after refusal. Two files/seven tests pass.
 Primitive process evidence does not qualify packaged publication boundaries;
 all six issues remain incomplete.
+
+### Corrupt crash ownership through packaged startup — 2026-10-18
+
+[Report](resident-corrupt-owner-process-2026-10-18.md): actual packaged backend
+SIGKILL and joined exit precede stale-owner, foreign-listener and malformed
+registry startup attempts. All three adapters exit1 with no stdout, explicit
+non-dispatch/no-replay diagnostics and unchanged expected state. Corrupt bytes
+are retained; foreign listener survives without detected credential disclosure.
+One focused process test passes with supervisor0 and both scoped reviews
+accepted. This proves safe refusal, not repair or live-state destruction
+recovery. No full gate; all six issues remain incomplete.
