@@ -199,3 +199,13 @@ with kernel-confirmed replacement cleanup. One focused process test passes
 11.16s; typecheck/lint and both scoped reviews accepted. Controlled-clock original
 backend fixture, not physical timeout or real Huly work qualification. All six
 issues remain incomplete.
+### Cleanup retained beyond adapter death and expiry — 2026-10-18
+
+[Report](resident-process-idle-work-2026-10-18.md): actual packaged adapter begins
+one held synthetic tool call then is killed/joined by owned handle. Separate
+managed backend retains held cancellation cleanup and unchanged ownership
+through default lease plus two idle intervals. Cleanup completion starts a full
+new idle interval before backend close0/empty state; dispatches exactly1.
+Controlled-clock fixture, not Huly mutation/physical timing or queued fairness
+proof. Initial process test passes3.36s; scoped reviews accepted after removal
+of an unreachable controller branch. All six issues remain incomplete.
