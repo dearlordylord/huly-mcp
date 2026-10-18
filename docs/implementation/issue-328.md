@@ -1269,3 +1269,24 @@ Both independent reviews matched the eight paused-drain and 41 all-mode control
 hashes with no actionable findings. This establishes the current quality gate;
 the three preceding failed gates remain preserved. It does not complete the
 comparison, native platforms, model/oracle or the six delivery issues.
+
+### Alternating Linux comparison — 2026-10-18
+
+The [complete 30-attempt report](resident-comparison-linux-2026-10-18.md)
+records five attempts for each mode/client-count cell on unchanged packaged
+production2f19c614 bytes. All15 one-client attempts passed; ten-client managed
+and HTTP each passed5/5; ten-client standalone passed3/5. Both standalone
+failures retain exact first-read timeouts, partial reads, failed normal cleanup
+and forced kernel-owned retirement. No failed attempt was repeated or removed.
+Final denominator30 attempted/28 verified/2 failed/0 unexecuted; final controller
+exit1 is expected and preserves those failures.
+
+The report includes per-phase median/range, complete-attempt CPU and sampled
+simultaneous summed RSS including additional startup descendants. Failed
+resource attribution remains incomplete. Private terminal-manifest.json binds
+1015 campaign files; the analysis and two named boundary diagnostics are
+retained. Untimed owner profiles do not establish a single stable limiter, so
+there is no general performance winner, durable budget, complete comparison
+qualification or complete delivery claim. Portable maintained campaign tooling,
+independent final report review, native macOS, model/oracle alignment and all
+remaining contract matrices are pending. No runtime source changed.

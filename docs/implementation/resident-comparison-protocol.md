@@ -1,6 +1,7 @@
 # Resident comparison protocol
 
-Status: measurement preparation, not a benchmark result. Applies to #328 and
+Status: measurement protocol. The [2026-10-18 Linux series](resident-comparison-linux-2026-10-18.md)
+completed30 attempts with28 verified and2 failed; it establishes no general winner. Applies to #328 and
 parent #322. Production candidate is `2f19c614`; report commits may advance
 without changing the packaged MCP/CLI bytes. Recheck artifact hashes before
 admitting each run. Do not mix samples from different artifacts.
@@ -32,6 +33,10 @@ explicit HTTP server plus one HTTP session per client). Count every server and
 adapter. Record client-driver and supervisor resources separately: these are
 measurement overhead, not part of the product total. Preserve a whole-tree
 upper observation as well so excluded overhead remains visible.
+Include additional product descendants created during startup, even when they
+are absent from the principal adapter/backend role list. In this harness the
+only excluded sampled processes are the known supervisor and client driver;
+retain principal and additional process counts separately.
 
 For each client count, run five rounds of all three modes. Rotate order:
 standalone/managed/HTTP, managed/HTTP/standalone, HTTP/standalone/managed,
@@ -77,6 +82,9 @@ No lease-expiry extension applies to ordinary healthy shutdown. If the phases
 cannot complete within these bounds, retain a failed run and diagnose before
 admitting another equivalent run. All teardown paths retain kernel ownership
 and run even after an earlier phase fails.
+The separate result verifier has a five-second deadline. On expiry its owner
+kills and joins that verifier, records the timeout, and stops further admission;
+this does not extend a product scenario's deadline.
 
 ## Cache and resource accounting
 
