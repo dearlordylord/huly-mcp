@@ -447,3 +447,8 @@ The [focused ten-reader increment](resident-ten-readers-2026-10-18.md) adds ten 
 ### Native HTTPS accepted work across fence — 2026-10-18
 
 [Report](resident-http-fence-work-2026-10-18.md): held nativeMCP call survives explicit generation fence with exact terminal reply; newadmission409/renewal403/newwork403, session retained until DELETE204. Shared HTTP test helper now exposes consumed body/contentType. Focused admission/context and neighboring session/shutdown/continuity checks pass; local lint/format and both reviews accepted. No production change/full gate. Explicit-fence component proof does not qualify automatic idle/processrace/full lifecycle; all six tickets remain incomplete.
+
+
+### Concurrent incompatible configuration launch — 2026-10-18
+
+[Report](resident-concurrent-config-launch-2026-10-18.md): schema-owned launch seq/concurrent; both independentparents spawnedbeforeawaitready innewconcurrent/backend-only cases, same namespace/different effectiveURLs. Existing heldpeer/fault isolation retained. Final6casesPASS50.00s /tmp/resident-config-launch-fault-six-cases.log; local lint/format and reviewsaccepted. Postrunall6roots terminal0/parentlineage/onlyfailedAregistryretained/Brecordremoved independentlychecked. Originaldiscoverreadinessfailure not reproduced; cause remainsunknown, no timeoutrelaxed or productionfix claimed. No fullgate, all6issues incomplete; exactkillboundaries/macOS/model/finalqualification open.

@@ -641,3 +641,8 @@ Test-only after ee9be005: [report](resident-policy-modes-2026-10-18.md). Native/
 ### Renewal loss during committed write — 2026-10-18
 
 [Report](resident-write-renewal-loss-2026-10-18.md): actualpackagedmanualadapter/privateTLS controlledrenewal403 onlyafterwritefilecommit, responseheld; adapterexit1/unknown/nooutput, exact1renewal/1dispatch/state1. Typedfixturelease seam retainsdefaultauth/tokenregistration; shorttestlease only, productboundsunchanged. Bothwrite+renewalpromises owned/joined, failuregatesreleased andprimaryerrorpreserved. Final3focusedfiles28testsPASS, local lint/format and reviewsaccepted. No productionchange/fullgate; nativeHuly/leaseexpiry/alluncertainty/platform/model/finalqualification remain open, all six issues incomplete.
+
+
+### Concurrent incompatible configuration launch — 2026-10-18
+
+[Report](resident-concurrent-config-launch-2026-10-18.md): schema-owned launch seq/concurrent; both independentparents spawnedbeforeawaitready innewconcurrent/backend-only cases, same namespace/different effectiveURLs. Existing heldpeer/fault isolation retained. Final6casesPASS50.00s /tmp/resident-config-launch-fault-six-cases.log; local lint/format and reviewsaccepted. Postrunall6roots terminal0/parentlineage/onlyfailedAregistryretained/Brecordremoved independentlychecked. Originaldiscoverreadinessfailure not reproduced; cause remainsunknown, no timeoutrelaxed or productionfix claimed. No fullgate, all6issues incomplete; exactkillboundaries/macOS/model/finalqualification open.

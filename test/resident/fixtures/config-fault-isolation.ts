@@ -54,15 +54,18 @@ const main = async () => {
     input.host,
     Schema.decodeUnknownSync(ActiveQueryHostInput)({ ...input, endpoint: restA.endpoint, role: "departing" })
   )
-  const parents = [failed]
-  const run = async () => {
-    stage = "ready"
-    const first = Schema.decodeUnknownSync(ActiveQueryEvent.cases.ready)(await failed.next())
-    const survivor = spawnActiveQueryParent(
+  const startSurvivor = () =>
+    spawnActiveQueryParent(
       input.host,
       Schema.decodeUnknownSync(ActiveQueryHostInput)({ ...input, endpoint: restB.endpoint, role: "survivor" })
     )
-    parents.push(survivor)
+  const earlySurvivor = input.launch === "concurrent" ? startSurvivor() : undefined
+  const parents = earlySurvivor === undefined ? [failed] : [failed, earlySurvivor]
+  const run = async () => {
+    stage = "ready"
+    const first = Schema.decodeUnknownSync(ActiveQueryEvent.cases.ready)(await failed.next())
+    const survivor = earlySurvivor ?? startSurvivor()
+    if (earlySurvivor === undefined) parents.push(survivor)
     const second = Schema.decodeUnknownSync(ActiveQueryEvent.cases.ready)(await survivor.next())
     assert.notEqual(first.port, second.port)
     assert.notEqual(first.parentPid, second.parentPid)
@@ -189,6 +192,7 @@ const main = async () => {
       Schema.encodeSync(Schema.fromJsonString(ConfigFaultReceipt))(
         Schema.decodeUnknownSync(ConfigFaultReceipt)({
           protocol: input.protocol,
+          launch: input.launch,
           failed: first,
           survivor: second,
           statuses: [before, after, final],

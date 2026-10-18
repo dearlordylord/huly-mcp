@@ -5,7 +5,12 @@ import { ActiveQueryEvent } from "./active-query-contract.js"
 import { ErrorRoutingInput } from "./error-routing-contract.js"
 
 export const ConfigFaultMode = Schema.Literals(["adapter-backend", "backend-only"])
-export const ConfigFaultInput = Schema.Struct({ ...ErrorRoutingInput.fields, mode: ConfigFaultMode })
+export const ConfigFaultLaunch = Schema.Literals(["sequential", "concurrent"])
+export const ConfigFaultInput = Schema.Struct({
+  ...ErrorRoutingInput.fields,
+  mode: ConfigFaultMode,
+  launch: ConfigFaultLaunch
+})
 
 export const CONFIG_FAULT_READS = 2
 export const OwnedBackendSignal = Schema.Struct({
@@ -17,6 +22,7 @@ export const OwnedBackendSignal = Schema.Struct({
 })
 export const ConfigFaultReceipt = Schema.Struct({
   protocol: ActiveQueryEvent.cases.ready.fields.protocol,
+  launch: ConfigFaultLaunch,
   survivor: ActiveQueryEvent.cases.ready,
   failed: ActiveQueryEvent.cases.ready,
   statuses: Schema.Tuple([ResidentLiveStatus, ResidentLiveStatus, ResidentLiveStatus]),

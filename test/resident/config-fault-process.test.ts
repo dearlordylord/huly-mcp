@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
 import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
 import { residentSelectionEnvironment } from "../helpers/resident-selection-environment.js"
-import { ConfigFaultInput, ConfigFaultMode, ConfigFaultReceipt } from "./config-fault-contract.js"
+import { ConfigFaultInput, ConfigFaultMode, ConfigFaultReceipt, ConfigFaultLaunch } from "./config-fault-contract.js"
 
 const PROCESS_BOUND = 30_000
 const runFile = promisify(execFile)
@@ -45,14 +45,29 @@ describe.skipIf(process.platform !== "linux")("packaged configuration fault isol
   afterAll(async () => {
     if (!failed) await bundle.cleanup()
   })
-  it.each(protocols.flatMap((protocol) => ConfigFaultMode.literals.map((mode) => ({ protocol, mode }))))(
-    "isolates a backend crash from an unrelated active configuration with $protocol / $mode",
+  it.each(
+    protocols.flatMap((protocol) =>
+      ConfigFaultLaunch.literals.flatMap((launch) =>
+        ConfigFaultMode.literals
+          .filter((mode) => launch === "sequential" || mode === "backend-only")
+          .map((mode) => ({ protocol, mode, launch }))
+      )
+    )
+  )(
+    "isolates a backend crash from an unrelated active configuration with $protocol / $mode / $launch",
     { timeout: PROCESS_BOUND },
-    async ({ mode, protocol }) => {
+    async ({ launch, mode, protocol }) => {
       const root = await fs.mkdtemp(join(await fs.realpath(tmpdir()), "resident-config-faults-"))
       const directory = join(root, "state")
       await fs.mkdir(directory, { mode: 0o700 })
-      const input = Schema.decodeUnknownSync(ConfigFaultInput)({ bundle: bundle.path, host, directory, protocol, mode })
+      const input = Schema.decodeUnknownSync(ConfigFaultInput)({
+        bundle: bundle.path,
+        host,
+        directory,
+        protocol,
+        mode,
+        launch
+      })
       try {
         const result = await runFile(
           "python3",
@@ -71,6 +86,7 @@ describe.skipIf(process.platform !== "linux")("packaged configuration fault isol
         await fs.writeFile(join(root, "receipt.json"), result.stdout, { mode: 0o600, flag: "wx" })
         const receipt = Schema.decodeUnknownSync(Schema.fromJsonString(ConfigFaultReceipt))(result.stdout)
         expect(receipt.protocol).toBe(protocol)
+        expect(receipt.launch).toBe(launch)
         expect(receipt.failed.parentPid).not.toBe(receipt.survivor.parentPid)
         expect(receipt.failed.adapterPid).not.toBe(receipt.survivor.adapterPid)
         expect(receipt.failed.port).not.toBe(receipt.survivor.port)
