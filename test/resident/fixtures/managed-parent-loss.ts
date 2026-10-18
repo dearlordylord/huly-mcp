@@ -65,7 +65,7 @@ const main = async () => {
       RESIDENT_TEST_GATE_DIRECTORY: input.directory,
       NODE_OPTIONS: `--import=${pathToFileURL(input.preload).href}`
     },
-    stdio: ["ignore", "ignore", "pipe"]
+    stdio: ["pipe", "ignore", "pipe"]
   })
   parent.stderr.on("data", () => {})
   const closed = once(parent, "close")
