@@ -66,6 +66,7 @@ const main = async () => {
   const lines = createInterface({ input: child.stdout })
   const incoming = lines[Symbol.asyncIterator]()
   const commands = createInterface({ input: process.stdin })
+  const incomingCommands = commands[Symbol.asyncIterator]()
   const send = async (frame: string) =>
     new Promise<void>((resolve, reject) =>
       child.stdin.write(`${frame}\n`, (error) => (error ? reject(error) : resolve()))
@@ -158,7 +159,7 @@ const main = async () => {
       })
     )
     failureStage = "commands"
-    for await (const line of commands) {
+    for await (const line of incomingCommands) {
       const command = Schema.decodeUnknownSync(Schema.fromJsonString(ActiveQueryCommand))(line)
       if (command._tag === "close") break
       if (command._tag === "lose") {

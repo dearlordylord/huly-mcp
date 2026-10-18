@@ -38,6 +38,7 @@ const main = async () => {
   })
   transport.stderr?.on("data", (chunk: Buffer) => process.stderr.write(chunk))
   const commands = createInterface({ input: process.stdin })
+  const incomingCommands = commands[Symbol.asyncIterator]()
   // Internal owned request capability; command/event schemas own the IPC contract.
   let active: { readonly abort: AbortController; readonly settled: Promise<void> } | undefined
   let failed = false
@@ -76,7 +77,7 @@ const main = async () => {
         port: parsed.transport.http?.port
       })
     )
-    for await (const line of commands) {
+    for await (const line of incomingCommands) {
       const command = Schema.decodeUnknownSync(Schema.fromJsonString(ModelWaitCommand))(line)
       if (command._tag === "close") break
       if (command._tag === "cancel") {
