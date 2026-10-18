@@ -22,7 +22,9 @@ export const ManagedRequestLossObservation = Schema.Union([
     projectName: Schema.Literal(RequestLossProjectName),
     stopAcknowledgment: Schema.Literal("not-requested"),
     drainEntry: Schema.Literal("not-requested"),
-    locatorAfterLoss: Schema.Literal("retained")
+    drainPausedBeforeKill: Schema.Literal(false),
+    locatorAfterLoss: Schema.Literal("retained"),
+    publicationAfterLoss: Schema.Literal("retained")
   }),
   Schema.Struct({
     ...Common.fields,
@@ -33,7 +35,9 @@ export const ManagedRequestLossObservation = Schema.Union([
     projectName: Schema.Literal(RequestLossProjectName),
     stopAcknowledgment: Schema.Literal("not-requested"),
     drainEntry: Schema.Literal("not-requested"),
-    locatorAfterLoss: Schema.Literal("retained")
+    drainPausedBeforeKill: Schema.Literal(false),
+    locatorAfterLoss: Schema.Literal("retained"),
+    publicationAfterLoss: Schema.Literal("retained")
   }),
   Schema.Struct({
     ...Common.fields,
@@ -44,7 +48,9 @@ export const ManagedRequestLossObservation = Schema.Union([
     projectName: Schema.Literal(RequestLossUpdatedName),
     stopAcknowledgment: Schema.Literal("not-requested"),
     drainEntry: Schema.Literal("not-requested"),
-    locatorAfterLoss: Schema.Literal("retained")
+    drainPausedBeforeKill: Schema.Literal(false),
+    locatorAfterLoss: Schema.Literal("retained"),
+    publicationAfterLoss: Schema.Literal("retained")
   }),
   Schema.Struct({
     ...Common.fields,
@@ -55,6 +61,8 @@ export const ManagedRequestLossObservation = Schema.Union([
     projectName: Schema.Literal(RequestLossUpdatedName),
     stopAcknowledgment: Schema.Literal("admission-fenced"),
     drainEntry: Schema.Literal("observed-with-attachment"),
-    locatorAfterLoss: Schema.Literals(["retained", "removed-during-drain"])
+    drainPausedBeforeKill: Schema.Literal(true),
+    locatorAfterLoss: Schema.Literals(["retained", "removed-during-drain"]),
+    publicationAfterLoss: Schema.Literals(["retained", "removed-during-drain"])
   })
 ])

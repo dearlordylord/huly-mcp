@@ -105,6 +105,26 @@ Where attribution cannot be completed, report the gap and keep the corresponding
 comparison inconclusive. Include process counts and driver CPU to detect a
 saturated load generator.
 
+Linux terminal CPU receipts can supplement those samples. The supervisor's
+optional `--cpu-receipts <exclusive-private-file>` records `wait4` usage for each
+child it actually reaps. The driver snapshots `/proc/self/stat` waited-child
+user/system ticks after all directly owned product processes have exited. Add
+those waited-child ticks to the CPU of product descendants separately adopted
+and reaped by the supervisor. Correlate adopted PIDs with product roles/exits;
+never add the driver's entire `wait4` subtree usage to its waited-child ticks,
+which would double-count those children and include the driver itself.
+
+Retain the driver's own CPU snapshot and whole-subtree kernel receipt as an
+accounting cross-check. Waited-child ticks are quantized (10 ms on the observed
+Linux host), and the driver snapshot precedes its last serialization/exit work.
+Report the observed closure residual and rounding limitation; do not print a
+tick-based product sum as microsecond-accurate. Missing exits, unknown adopted
+processes or failed receipt recording leave the result incomplete. The
+supervisor must continue joining owned processes even if receipt writing fails.
+This method has control evidence for direct, nested and adopted children and one
+managed MCP client; the alternating campaign still must exercise every mode and
+client count.
+
 ## Admission, analysis and evidence
 
 Before execution capture uptime, affinity/core count and competing CPU load.

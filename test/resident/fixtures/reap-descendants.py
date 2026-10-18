@@ -15,7 +15,7 @@ CLEANUP_SECONDS = 4
 POLL_SECONDS = 0.02
 
 
-def supervise(arguments, clock, sleep, report_reaped=False, resources=None, lease_expiry=False):
+def supervise(arguments, clock, sleep, report_reaped=False, resources=None, lease_expiry=False, cpu_receipts=None):
     libc = ctypes.CDLL(None, use_errno=True)
     if libc.prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) != 0:
         raise OSError(ctypes.get_errno(), "Cannot establish fixture child ownership")
@@ -44,9 +44,20 @@ def supervise(arguments, clock, sleep, report_reaped=False, resources=None, leas
     result = None
     forced = False
     sampling_failed = False
+    accounting_failed = False
 
-    def reaped(pid, status):
-        nonlocal result
+    def reaped(pid, status, usage):
+        nonlocal result, accounting_failed
+        if cpu_receipts is not None and not accounting_failed:
+            try:
+                cpu_receipts.write(json.dumps({"processId": pid, "exitCode": os.waitstatus_to_exitcode(status),
+                    "userSeconds": usage.ru_utime, "systemSeconds": usage.ru_stime,
+                    "maxRssKiB": usage.ru_maxrss, "minorFaults": usage.ru_minflt,
+                    "majorFaults": usage.ru_majflt}) + "\n")
+                cpu_receipts.flush()
+            except OSError:
+                accounting_failed = True
+                sys.stderr.write("Kernel CPU receipt recording failed; owned cleanup continues\n")
         if pid == child.pid:
             result = os.waitstatus_to_exitcode(status)
             child.returncode = result
@@ -65,11 +76,11 @@ def supervise(arguments, clock, sleep, report_reaped=False, resources=None, leas
                 sampling_failed = True
                 sys.stderr.write("Diagnostic resource sampling failed; owned cleanup continues\n")
         try:
-            pid, status = os.waitpid(-1, os.WNOHANG)
+            pid, status, usage = os.wait4(-1, os.WNOHANG)
         except ChildProcessError:
             break
         if pid:
-            reaped(pid, status)
+            reaped(pid, status, usage)
             continue
         if stopping or clock() >= deadline:
             forced = True
@@ -78,9 +89,9 @@ def supervise(arguments, clock, sleep, report_reaped=False, resources=None, leas
                 owned = [int(value) for value in children.read().split()]
             for owned_pid in owned:
                 # A live, unreaped direct child cannot have its PID recycled.
-                pid, status = os.waitpid(owned_pid, os.WNOHANG)
+                pid, status, usage = os.wait4(owned_pid, os.WNOHANG)
                 if pid:
-                    reaped(pid, status)
+                    reaped(pid, status, usage)
                 else:
                     try:
                         os.kill(owned_pid, signal.SIGKILL)
@@ -94,12 +105,13 @@ def supervise(arguments, clock, sleep, report_reaped=False, resources=None, leas
     if forced:
         sys.stderr.write("Fixture supervision deadline exceeded; owned descendants terminated\n")
         return 1
-    return 1 if result is None or sampling_failed else result
+    return 1 if result is None or sampling_failed or accounting_failed else result
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--report-reaped", action="store_true")
+    parser.add_argument("--cpu-receipts", help="Exclusive kernel wait4 resource receipts")
     parser.add_argument("--resources", help="Exclusive new private Linux diagnostic NDJSON file")
     parser.add_argument("--lease-expiry", action="store_true", help="Separate 45-second abrupt-adapter expiry scenario")
     parser.add_argument("command", nargs=argparse.REMAINDER)
@@ -110,10 +122,16 @@ if __name__ == "__main__":
     if options.resources is not None:
         from process_resources import ResourceSamples
         samples = ResourceSamples(options.resources, os.getpid(), time.monotonic)
+    cpu_receipts = None
+    if options.cpu_receipts is not None:
+        descriptor = os.open(options.cpu_receipts, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        cpu_receipts = os.fdopen(descriptor, "w", encoding="ascii", buffering=1)
     outcome = 1
     try:
-        outcome = supervise(options.command, time.monotonic, time.sleep, options.report_reaped, samples, options.lease_expiry)
+        outcome = supervise(options.command, time.monotonic, time.sleep, options.report_reaped, samples, options.lease_expiry, cpu_receipts)
     finally:
+        if cpu_receipts is not None:
+            cpu_receipts.close()
         if samples is not None:
             samples.close(outcome)
     sys.exit(outcome)

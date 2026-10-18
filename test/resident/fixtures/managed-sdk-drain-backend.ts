@@ -1,6 +1,7 @@
 import "../../../src/polyfills.js"
 import { NodeRuntime } from "@effect/platform-node"
 import { channel } from "node:diagnostics_channel"
+import { writeSync } from "node:fs"
 import { Effect, Schema } from "effect"
 
 import { runConfiguredResidentServer } from "../../../src/runtime/server-startup.js"
@@ -17,8 +18,13 @@ NodeRuntime.runMain(
         const observations = channel(HTTP_ADMISSION_CHANNEL)
         const listener = (input: unknown) => {
           const event = Schema.decodeUnknownSync(HttpAdmissionObservationSchema)(input)
-          if (event._tag === "ResidentAdmissions_drainStarted")
-            process.stderr.write(`${Schema.encodeSync(Schema.fromJsonString(HttpAdmissionObservationSchema))(event)}\n`)
+          if (event._tag === "ResidentAdmissions_drainStarted") {
+            writeSync(
+              process.stderr.fd,
+              `${Schema.encodeSync(Schema.fromJsonString(HttpAdmissionObservationSchema))(event)}\n`
+            )
+            if (event.attachments > 0) process.kill(process.pid, "SIGSTOP")
+          }
         }
         observations.subscribe(listener)
         return () => observations.unsubscribe(listener)

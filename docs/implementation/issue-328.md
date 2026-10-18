@@ -1164,3 +1164,108 @@ observations of the supervisor tree, not an adapter-inclusive resource budget;
 complete final CPU attribution, independent evidence review and five alternating
 samples per mode/client-count cell are still pending. No timing distribution,
 RSS winner, complete performance qualification or overall completion is claimed.
+
+## Terminal CPU accounting preparation — 2026-10-18
+
+Qualification remains incomplete. The maintained Linux fixture supervisor now
+accepts optional `--cpu-receipts` and records kernel `wait4` usage for the children
+it reaps. Existing response/retirement/supervision deadlines are unchanged. CPU
+receipt write failure marks the run failed but continues owned-process cleanup;
+exclusive mode-0600 output is opened before launching any child.
+
+The measurement driver also snapshots its waited-child CPU ticks after directly
+owned processes have exited. Its product total adds those ticks to separately
+adopted product descendants' `wait4` CPU. The driver's own CPU and entire subtree
+receipt are retained as cross-checks, not added again. This addresses short-lived
+process/final-sample loss for successful, completely correlated Linux runs while
+preserving tick quantization and accounting residuals. It does not turn sampled
+RSS into physical/PSS memory or establish complete accounting for failed teardown.
+
+Seven maintained Python checks pass, including real waited grandchildren,
+separately adopted descendants, cleanup after a failing receipt writer, and
+private/exclusive output before child launch. The existing Vitest wrapper passes
+under its unchanged five-second bound. Five additional real-process controls
+(zero, one, three, nested and orphaned children) pass in private evidence
+`/tmp/resident-cpu-accounting-qualified-r9azhi1c/`.
+
+A fresh actual managed one-client control with the updated supervisor passes:
+three independently schema-parsed exact-project reads, 606 tools, three templates,
+adapter/backend exits 0, correlated kernel retirement, empty state and supervisor
+exit 0. The independent verifier checks those facts, role/exit/start-tick
+correlation and terminal CPU closure. It retains each parsed project result and
+computes simultaneous product RSS from samples. These are control observations,
+excluded from comparative samples and resource-budget claims. External harness
+and verifier TypeScript checks pass. Full project gate and independent review of
+this increment are pending. No production runtime source changed.
+
+The first full gate then failed: 482 files / 5741 tests passed, one drain
+request-loss test failed after reporting replacement refusal. Raw
+`check-all-failed.log` remains preserved in the CPU evidence root. A named
+invariant diagnostic exposed another outcome: replacement exit 0 instead of the
+required refusal exit 1. A subsequent diagnostic that retained replacement
+stdout/stderr passed; changed timing is not a proven fix. An isolated comparison
+on the original retained namespace tried immediate stdin EOF and held-open stdin;
+both refused with exit 1, zero stdout, the no-dispatch diagnostic and unchanged
+ownership hashes. It used an unavailable disposable loopback authority, not a
+new live Huly mutation. Evidence `/tmp/resident-refusal-eof-diagnostic-nesia8ub/`.
+That control does not establish EOF as the cause of the original failures.
+
+Inspection also found a sequencing gap in the fixture: it awaited original
+adapter closure but did not explicitly join backend death before spawning the
+fresh adapter. The REST-side loss callback joins that death independently; an
+adapter can disconnect while drain/kill is still proceeding. The fixture now
+requires the owned backend's exact SIGKILL exit before starting the replacement,
+retains refusal stdout/stderr in private sibling diagnostic directories, and
+labels failed invariants. Every refusal/no-replay/registry assertion and deadline
+remains. All four request-loss scenarios pass after this strengthening. The
+original failures remain unexplained beyond the observed ordering gap; this is
+not a claimed general runtime-race fix. Fresh full gate and review of the fixture
+addition are pending. `drain-diagnostics-manifest.json` freezes the failed gate,
+diagnostics, source versions and retained sidecars separately from the 48-file
+CPU-control manifest.
+
+The formatted full gate again failed one drain fixture (482 files / 5741 tests
+passed), this time with a precise invariant: the original inode-backed
+`.attachment-*` publication directory had legitimately disappeared during drain.
+`withPublishedResidentAttachment` owns that directory through its use scope and
+removes it during cleanup. Requiring that known publication to remain was a
+fixture error. The fixture now first requires exactly one backing publication
+and verifies its device/inode equals the original descriptor. Only that exact
+owned directory and its locator may be withdrawn during drain; the remaining
+inventory and original registry bytes must still match. Other loss points retain
+the complete inventory requirement. A schema-owned `publicationAfterLoss`
+records the observed state. No arbitrary publication-prefix exclusion is used
+when comparing post-loss inventories.
+
+To fix the crash schedule itself, the SDK drain fixture synchronously emits the
+actual drain-entry event with an attached caller and stops its own process there.
+The parent observes kernel state `T` before SIGKILL and joins that exact exit
+before fresh startup. The receipt requires `drainPausedBeforeKill: true` for the
+drain case and false otherwise. This controls a real process fault at drain entry;
+it does not change production shutdown or establish every later drain schedule.
+The passing receipt reports retained locator/publication/registry and truthful
+uncertainty. Five focused tests (all four loss points plus resource wrapper) pass.
+Eight new source/log/receipt hashes are in `paused-drain-manifest.json`. Earlier
+failures and the unproven separate exit-0 cause remain preserved. Fresh final gate
+and independent review of this last correction remain pending.
+
+One-client terminal-CPU controls now also pass for standalone and environment-
+shared HTTP. The generic verifier revalidates the existing managed evidence
+without another managed invocation. Private evidence
+`/tmp/resident-comparison-campaign-prep-nlfrh_4e/` freezes 41 files. All three
+reports contain three correct reads, stable product-role identities and correlated
+retirement; standalone/HTTP observe one product process, managed two. These ran
+alongside quality verification and are excluded from timing comparisons. Full
+ten-client CPU qualification and the alternating campaign remain pending.
+
+The corrected candidate's fresh `pnpm check-all` now passes: 483 files / 5742
+tests; TypeScript/Effect checks cover 1373 files with zero errors/warnings.
+Coverage remains statements 99.45%, branches 99%, functions 99%, lines 99.55%.
+Gate log SHA-256:
+`5f075c03ad01ccfb2d254cd5238c7e2cad2a16f9055d48bfe9708a97d25c13d7`.
+`gate-proof.json` and the eight-file `gate-manifest.json` in the CPU evidence root
+bind the log, final six helper/fixture sources and unchanged MCP/CLI artifacts.
+Both independent reviews matched the eight paused-drain and 41 all-mode control
+hashes with no actionable findings. This establishes the current quality gate;
+the three preceding failed gates remain preserved. It does not complete the
+comparison, native platforms, model/oracle or the six delivery issues.
