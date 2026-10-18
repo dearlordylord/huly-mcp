@@ -9,6 +9,7 @@ import { afterAll, beforeAll, expect, it } from "vitest"
 import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { LiveReadProtocol } from "../../scripts/resident-live-read-contract.js"
+import { CrashedCommitObservation } from "./crashed-commit-observation.js"
 import { RetiredCommitObservation } from "./retired-commit-observation.js"
 
 const PROCESS_BOUND = 30_000
@@ -51,7 +52,7 @@ beforeAll(async () => {
   }
 }, PROCESS_BOUND)
 afterAll(async () => {
-  if (passedCases === LiveReadProtocol.literals.length) await bundle.cleanup()
+  if (passedCases === LiveReadProtocol.literals.length * 2) await bundle.cleanup()
 })
 it.skipIf(process.platform !== "linux").each(LiveReadProtocol.literals)(
   "keeps an old remote write uncertain through confirmed backend retirement and replacement under %s",
@@ -68,7 +69,8 @@ it.skipIf(process.platform !== "linux").each(LiveReadProtocol.literals)(
         cli,
         backend,
         root,
-        protocol
+        protocol,
+        "drain"
       ],
       { env: testStdioEnvironment(), timeout: PROCESS_BOUND }
     )
@@ -84,6 +86,43 @@ it.skipIf(process.platform !== "linux").each(LiveReadProtocol.literals)(
     await fs.writeFile(
       `${root}.receipt.json`,
       Schema.encodeSync(Schema.fromJsonString(RetiredCommitObservation))(receipt),
+      { mode: 0o600, flag: "wx" }
+    )
+    await fs.rm(root, { recursive: true })
+    passedCases++
+  }
+)
+
+it.skipIf(process.platform !== "linux").each(LiveReadProtocol.literals)(
+  "retains uncertainty and refuses replacement after backend crash during a write under %s",
+  { timeout: PROCESS_BOUND },
+  async (protocol) => {
+    const root = await fs.mkdtemp(join(await fs.realpath(tmpdir()), "resident-crashed-commit-"))
+    const result = await runFile(
+      "python3",
+      [
+        "test/resident/fixtures/reap-descendants.py",
+        process.execPath,
+        fixture,
+        bundle.path,
+        cli,
+        backend,
+        root,
+        protocol,
+        "crash"
+      ],
+      { env: testStdioEnvironment(), timeout: PROCESS_BOUND }
+    )
+    await fs.writeFile(`${root}.phases.log`, result.stderr, { mode: 0o600, flag: "wx" })
+    const receipt = Schema.decodeUnknownSync(Schema.fromJsonString(CrashedCommitObservation))(result.stdout)
+    expect(receipt.protocol).toBe(protocol)
+    expect(receipt.backendExitSignal).toBe("SIGKILL")
+    expect(receipt.originalOutcomeUnknown).toBe(true)
+    expect(receipt.ownershipBytesRetained).toBe(true)
+    expect(receipt.writeDispatches).toBe(1)
+    await fs.writeFile(
+      `${root}.receipt.json`,
+      Schema.encodeSync(Schema.fromJsonString(CrashedCommitObservation))(receipt),
       { mode: 0o600, flag: "wx" }
     )
     await fs.rm(root, { recursive: true })

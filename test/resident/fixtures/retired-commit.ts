@@ -27,6 +27,9 @@ import {
   retiredCommitToolName
 } from "../retired-commit-observation.js"
 
+import { CommitRetirementMode, CrashedCommitObservation } from "../crashed-commit-observation.js"
+import { qualifyCrashedCommit } from "./crashed-commit.js"
+
 const FIRST_CALL_ID = 41
 const CONTINUED_CALL_ID = 42
 const MAX_INTERLEAVED_NOTIFICATIONS = 64
@@ -38,7 +41,8 @@ const Input = Schema.Struct({
   backend: ResidentPackagePath,
   coordinator: ResidentPackagePath,
   root: ResidentDirectory,
-  protocol: LiveReadProtocol
+  protocol: LiveReadProtocol,
+  mode: CommitRetirementMode
 })
 const CallResult = Schema.Struct({
   isError: Schema.optionalKey(Schema.Literal(false)),
@@ -54,7 +58,8 @@ const main = async () => {
     backend: process.argv[4],
     root: process.argv[5],
     coordinator: process.argv[1],
-    protocol: process.argv[6]
+    protocol: process.argv[6],
+    mode: process.argv[7]
   })
   const negotiation = { protocol: input.protocol, host: "first" } satisfies Parameters<typeof liveReadMetadata>[0]
   const directory = ResidentDirectory.make(join(input.root, "resident"))
@@ -88,7 +93,13 @@ const main = async () => {
     const child = spawn(process.execPath, [input.bundle], { env: { ...environment, MCP_TRANSPORT: "stdio-resident" } })
     const closed = once(child, "close")
     void closed.catch(() => {})
-    child.stderr.on("data", (bytes: Buffer) => process.stderr.write(bytes))
+    const output: Buffer[] = []
+    const diagnostics: Buffer[] = []
+    child.stdout.on("data", (bytes: Buffer) => output.push(bytes))
+    child.stderr.on("data", (bytes: Buffer) => {
+      diagnostics.push(bytes)
+      process.stderr.write(bytes)
+    })
     child.stdin.on("error", () => {})
     const lines = createInterface({ input: child.stdout })
     const incoming = lines[Symbol.asyncIterator]()
@@ -119,6 +130,8 @@ const main = async () => {
       closed,
       lines,
       send,
+      output,
+      diagnostics,
       discover: () =>
         Effect.runPromise(
           discoverLiveReadProtocol(
@@ -184,6 +197,7 @@ const main = async () => {
     const caller = startAdapter()
     adapters.push(caller)
     await caller.discover()
+    const negotiationStdoutBytes = Buffer.concat(caller.output).length
     caller.send({
       jsonrpc: "2.0",
       id: FIRST_CALL_ID,
@@ -191,6 +205,27 @@ const main = async () => {
       params: { name: retiredCommitToolName("increment"), arguments: {}, ...liveReadMetadata(negotiation) }
     })
     await Effect.runPromise(remote.entered.pipe(Effect.timeout(RESPONSE_BOUND)))
+    if (input.mode === "crash") {
+      const receipt = await qualifyCrashedCommit({
+        directory,
+        stateFile: ResidentFilePath.make(join(input.root, "counter.json")),
+        protocol: input.protocol,
+        generation: ready.generation,
+        startRecovering: () => {
+          const adapter = startAdapter()
+          adapters.push(adapter)
+          return adapter
+        },
+        negotiationStdoutBytes,
+        original,
+        caller,
+        callerOutput: caller.output,
+        callerDiagnostics: caller.diagnostics,
+        remote
+      })
+      process.stdout.write(Schema.encodeSync(Schema.fromJsonString(CrashedCommitObservation))(receipt))
+      return
+    }
     process.stderr.write("Retired commit: remote dispatched; stop and cancel local invocation\n")
     await stop(ready.generation)
     caller.send({ jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: FIRST_CALL_ID } })
