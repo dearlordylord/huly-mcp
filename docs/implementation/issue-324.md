@@ -383,3 +383,42 @@ Private copies are at `/tmp/resident-windows-env-gate-qjec35y6`. Sources remaine
 fixed during this gate; later report text records its result. Windows native
 storage and qualification, other native platforms and the deferred complete
 live-Huly campaign remain pending. No issue is closed by this result.
+
+## Begin the native Windows security component
+
+`native/resident-win32` now contains process-token SID acquisition, creation-time
+user/SYSTEM protected security descriptors, handle ACL/reparse inspection and
+volume/file identity. Ancestor grants use a known-rights allowlist after Windows
+generic-right expansion. Read/traverse and new-subdirectory-only rights are
+allowed; replacement/control and unknown grants refuse. New-child creation alone
+does not permit replacing an existing protected child. Both review axes withdrew
+an initial overly broad rejection recommendation after checking that distinction.
+The future path walker must still pin and verify components and refuse foreign
+precreation; this component alone establishes no safe traversal claim.
+
+An executable Windows fixture covers private creation, independently reopened
+identity, world-readable/null DACL refusal, readable/new-child-only ancestors,
+write rejection and exact-handle cleanup with subsequent absence confirmation.
+A separate Windows workflow builds with warnings/static analysis and runs it.
+That workflow has only been authored and YAML-parsed here; native build and
+execution have not occurred. Node-API, path traversal, bounded file operations,
+publication, cancellation and production caller migration remain unimplemented.
+Current Windows resident mode continues to refuse.
+
+Clang 14 with MinGW-w64 10.0.0-3 declarations passes x64 Windows cross-syntax,
+COFF object compilation, formatting and static analysis for both translation
+units with zero diagnostics. This is build/static evidence, not native Windows
+qualification. Exact sources, workflow, object files, analysis outputs and hashes
+are retained at `/tmp/resident-win32-security-current-g6s43koi`; receipt SHA-256
+`d7a01a6b8a60b0f3035a6c0a9b5bb8e58ad8bfa453e41e8a49bbb3d6d952ad64`.
+The earlier pre-allowlist snapshot is retained separately at
+`/tmp/resident-win32-security-evidence-2sefptj0`.
+Fresh read-only Standards/Spec reviews found no actionable remaining findings;
+the final known-rights tightening also passed Standards readback.
+
+Toolchain packages were extracted under `/tmp/resident-windows-toolchain`; the
+canonical checkout and its dependencies were not changed. The last complete
+project gate is the preceding `eeff872c` candidate with 5732 passing tests.
+It does not exercise this subsequently added native component. Native execution,
+cross-account enforcement, complete Windows support and full #323–328 delivery
+remain pending.

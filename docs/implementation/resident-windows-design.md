@@ -53,8 +53,11 @@ The Windows implementation must establish these facts:
   unsafe, rather than repaired. Elevated administrator/SYSTEM interference is
   outside the same threat boundary as POSIX root interference.
 - Inspect ancestry and opened objects for ACL and reparse behavior. Reject
-  foreign replacement/deletion authority and unsupported ACL forms. The policy
-  must accept ordinary supported Windows profile ancestry in native fixtures.
+  foreign replacement/deletion authority and unsupported ACL forms. A right to
+  create new subdirectories alone does not grant replacement authority; every
+  created/opened component still needs private-owner checks and foreign
+  precreation refusal. The policy must accept ordinary supported Windows profile
+  ancestry in native fixtures.
 - Preserve temporary-file plus hard-link publication and the inventory proof
   linking temporary and final descriptors. Obtain identity from volume/file ID,
   not POSIX uid/mode assumptions.
