@@ -114,3 +114,47 @@ The focused run passed 17 tests; successful cleanup permits a fresh generation,
 while failed cleanup preserves ownership and refuses replacement. These are
 embedded-backend DI fixtures, not real Huly mutation/cleanup certification.
 All six tickets and their remaining qualification stay open.
+
+
+## Retained cleanup versus idle retirement — 2026-10-18
+
+`managed-idle-protected-work.test.ts` joins the actual admission registry,
+attachment work owner, native session-release port and idle waiter under
+TestClock. A running operation enters cancellation cleanup after its lease
+expires. Cleanup remains held across two complete idle intervals: the idle
+waiter stays pending, the session stays owned and admission capacity stays
+occupied. After cleanup succeeds, the session releases once; the waiter remains
+pending until a full new idle interval expires and then fences new admission.
+A separate failed-cleanup case retains the native session and capacity after
+lease expiry, two idle intervals and repeated explicit release attempts.
+
+Four focused files / sixteen tests pass with the restored production source:
+`/tmp/resident-idle-protected-work-restored.log`, SHA-256
+`e890ab040ac9398c504bab82891229d7436dfda5d9a12e50b4f58b178554a41a`.
+Two temporary source mutations establish sensitivity: dropping retained members
+from the idle guard fails both new tests; forgetting a member after failed
+cleanup fails the failed-cleanup test. The original `admissions.ts` was restored
+in each mutation's `finally` block and has no diff from the preceding commit.
+Mutation logs are `/tmp/resident-idle-ignore-retained-members-mutant.log` and
+`/tmp/resident-idle-forget-failed-cleanup-mutant.log`. These failures are expected
+verification evidence, not failures in the retained candidate.
+
+Fresh read-only Standards and Spec reviews found no actionable issue. This
+increment changes tests only: it adds no production persistence, journal, timer
+or shutdown policy. It supplies deterministic component evidence for retained
+cleanup and idle ordering, not OS-process timing, live Huly cleanup, remote
+mutation outcomes, Quint/oracle alignment or complete #326 acceptance. Those
+remaining qualification obligations and all six delivery issues remain open.
+
+
+The fresh `GOMAXPROCS=2 pnpm check-all` passes all 480 files / 5734 tests.
+Coverage: statements 99.45% (29550/29713), branches 99% (12463/12588), functions
+99% (7996/8076), lines 99.55% (27159/27280). Log:
+`/tmp/resident-idle-protected-work-check-all.log`, SHA-256 `ad03966d2bd81b28cbda64981647da9fd9fb59cc9e533ba12bc9e695a7c0ea7c`.
+All build, diagnostics, circular, complexity, metadata/schema, packaging, lint,
+formatting, duplication and test stages pass without changed thresholds or bounds.
+Frozen artifacts and all three focused/mutation logs are copied at `/tmp/resident-idle-retention-gate-1jsdkdwy`.
+MCP SHA-256: `7cc7b8c300354694118b08e2b39248e5ea08e1de1df7bae2ce56ecf7a43c8a12`.
+CLI SHA-256: `c957044a36f2559fbdf5230a0f37860911af276f800b1a37933539d7298f5697`.
+The runtime artifacts match the preceding candidate; this increment adds one
+fast test file with two behavioral cases. No live certification is claimed.

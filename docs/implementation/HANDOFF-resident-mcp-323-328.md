@@ -17,8 +17,10 @@ Windows resident work is canceled under the scope amendment above. The unused
 native source and its dedicated CI workflow are removed; runtime startup remains
 unsupported there. Linux/macOS and all other qualification requirements remain.
 
-The latest full gate passes 479 files / 5732 tests at the unchanged 99% coverage
-thresholds. Two synthetic SDK clients now pass the actual freshly listed context
+The latest full gate passes 480 files / 5734 tests at the unchanged 99% coverage
+thresholds. Two new [cleanup/idle component schedules](issue-326.md#retained-cleanup-versus-idle-retirement--2026-10-18)
+verify slow/failed cleanup retention across lease expiry; negative mutations are
+rejected and production source is unchanged. Two synthetic SDK clients now pass the actual freshly listed context
 tool definition to `callTool`, retaining target output validation without rebuilding
 validators for every unused catalog entry. The preceding gate/focused failures,
 CPU diagnosis, corrected process checks and frozen artifact hashes are recorded

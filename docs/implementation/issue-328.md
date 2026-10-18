@@ -784,3 +784,13 @@ The unused Windows native component/workflow are removed under the amended
 Linux/macOS scope. Live Huly, native macOS and remaining contract qualification
 are still pending; #322–328 remain open. Prepared idle/cleanup schedule ideas
 were not added or executed during this increment and supply no evidence.
+
+
+## Idle cleanup qualification increment — 2026-10-18
+
+The [#326 report](issue-326.md#retained-cleanup-versus-idle-retirement--2026-10-18)
+records two new TestClock scenarios for delayed/failed cleanup across lease expiry
+and idle retirement, including temporary negative mutations and restored-source
+checks. The fresh full gate passes 480 files / 5734 tests at unchanged thresholds.
+This is component evidence only; native macOS, deferred live Huly, lifecycle model
+alignment and the rest of the six-ticket qualification remain pending.
