@@ -410,3 +410,42 @@ raw `protocol.ndjson` SHA-256:
 `1fb78e5eced3cc25a3ff491a560ba505365ef08a6e86aced979d332b9599b058`;
 `probe.py` SHA-256:
 `0a419278c61673a5158ca1459893534bfce754d68a6fdd1cd820e0ca367bff70`.
+
+## Managed profile, environment token and password selection
+
+The new Linux packaged `managed-auth-paths-process.test.ts` fixture writes an
+actual saved profile and file credential using the existing profile store. It
+selects that profile explicitly while another profile is active. Three real
+managed adapters use the saved token, its equivalent environment token, and a
+separate complete environment email/password configuration. Parsed context
+results prove the selected workspace and token/password method; the first two
+callers share one port, and password authority has a different port. The original
+profile caller performs a continued context read after the other admissions and
+retains its token authority, workspace and port. The namespace contains exactly
+two backend records.
+
+All three owned sessions close; the fixture joins both actual kernel-owned
+backend exits with code 0 and checks empty managed state. The successful test
+removes its isolated bundle, profile/credential fixture files and state directory,
+retaining only private receipt/phases. Failures retain available evidence and the
+kernel-owned supervisor still bounds process cleanup. Default 25-second
+supervision, five-second per-response and seven-second exit waits are unchanged.
+Secret absence is checked through booleans, so a failed assertion cannot print
+the token/password as matcher arguments.
+
+The final focused run passes one file/test. Log
+`/tmp/resident-managed-auth-paths-final.log`, SHA-256
+`5382fc5dd3e6d4d2bec5c52bbfaf9fe0c8ec7347b2dd84a1f8e181167722c03a`.
+Receipt `/tmp/resident-managed-auth-Tej7A8.receipt.json`, SHA-256
+`cc72cbd2316cacf11fc8f7f7f757436c28534a8ed0ce9c665ce3ef67711f1e9d`,
+records ports 43767/43767/36889 and two owned exit-code-0 events. Its stderr
+phases file is empty. Earlier passing attempts remain separately retained under
+`/tmp/resident-managed-auth-paths.log` and
+`/tmp/resident-managed-auth-paths-verified.log`.
+
+TypeScript/Effect diagnostics cover 1,350 files with zero errors/warnings;
+focused formatting/lint and fresh Standards/Spec reviews pass. This is packaged
+configuration selection and isolation using local context calls, not successful
+remote Huly authentication, keychain qualification, rotation/logout or full
+profile/policy coverage. The deferred real-Huly campaign, final coherent gate
+and all remaining requirements stay pending. No production code changed.
