@@ -5,8 +5,14 @@ import { Config, Effect, Fiber, Redacted, Schema } from "effect"
 
 import { ProfileEnvironmentSchema } from "../../../src/profiles/model.js"
 import { encodeChildReply, parseChildStart } from "../../../src/resident/bootstrap-codec.js"
-import { BootstrapNonce, ManagedLaunchError, MANAGED_PACKAGE_NAME } from "../../../src/resident/managed-contract.js"
+import {
+  BootstrapNonce,
+  ManagedLaunchError,
+  MANAGED_PACKAGE_NAME,
+  MANAGED_BOOTSTRAP_VERSION
+} from "../../../src/resident/managed-contract.js"
 import { ResidentDirectory, ResidentFilePath } from "../../../src/resident/protected-path.js"
+import { adoptSelectionClaim } from "../../../src/resident/selection-claim.js"
 import { VERSION } from "../../../src/version.js"
 import { PeerMode, PeerObservation } from "../managed-peer-observation.js"
 
@@ -49,7 +55,7 @@ const main = Effect.gen(function* () {
   if (mode === "exit-before-prepared") return
   const prepared = yield* encodeChildReply({
     kind: "prepared",
-    version: 1,
+    version: MANAGED_BOOTSTRAP_VERSION,
     nonce,
     implementation: { name: MANAGED_PACKAGE_NAME, version: mode === "wrong-version" ? "incompatible-version" : VERSION }
   })
@@ -59,31 +65,38 @@ const main = Effect.gen(function* () {
     yield* send(
       yield* encodeChildReply({
         kind: "ready",
-        version: 1,
+        version: MANAGED_BOOTSTRAP_VERSION,
         file: ResidentFilePath.make(join(directory, "application.json"))
       })
     )
-  else if (mode === "refused") yield* send(yield* encodeChildReply({ kind: "refused", version: 1 }))
+  else if (mode === "refused")
+    yield* send(yield* encodeChildReply({ kind: "refused", version: MANAGED_BOOTSTRAP_VERSION }))
   else if (mode === "wrong-nonce") {
     const raw = Redacted.value(nonce)
     const wrong = yield* Schema.decodeUnknownEffect(BootstrapNonce)(`${raw.startsWith("a") ? "b" : "a"}${raw.slice(1)}`)
     yield* send(
       yield* encodeChildReply({
         kind: "prepared",
-        version: 1,
+        version: MANAGED_BOOTSTRAP_VERSION,
         nonce: wrong,
         implementation: { name: MANAGED_PACKAGE_NAME, version: VERSION }
       })
     )
   } else yield* send(prepared)
   const start = yield* parseChildStart(yield* Fiber.join(receive))
+  const claim = yield* adoptSelectionClaim(start.directory, start.claim)
+  yield* claim.release
   yield* write("started.json", { ...observation, workspace: start.capture.selection.huly.workspace })
   if (mode === "exit-before-ready") return
   yield* send(
     yield* encodeChildReply(
       mode === "refuse-after-start"
-        ? { kind: "refused", version: 1 }
-        : { kind: "ready", version: 1, file: ResidentFilePath.make(join(directory, "application.json")) }
+        ? { kind: "refused", version: MANAGED_BOOTSTRAP_VERSION }
+        : {
+            kind: "ready",
+            version: MANAGED_BOOTSTRAP_VERSION,
+            file: ResidentFilePath.make(join(directory, "application.json"))
+          }
     )
   )
   yield* Effect.callback<void>((resume) => {

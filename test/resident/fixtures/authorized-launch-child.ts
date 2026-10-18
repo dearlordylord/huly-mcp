@@ -7,8 +7,13 @@ import { Config, Deferred, Effect, Redacted, Schema } from "effect"
 import { readResidentAttachment } from "../../../src/resident/attachment-file.js"
 import { encodeChildReply } from "../../../src/resident/bootstrap-codec.js"
 import { awaitChildAuthorization, type ChildAuthorizationPort } from "../../../src/resident/child-authorization.js"
-import { BootstrapNonce, ManagedLaunchError, MANAGED_PACKAGE_NAME } from "../../../src/resident/managed-contract.js"
-import { runOwnedGeneration, withResidentSelection } from "../../../src/resident/managed-selection.js"
+import {
+  BootstrapNonce,
+  ManagedLaunchError,
+  MANAGED_PACKAGE_NAME,
+  MANAGED_BOOTSTRAP_VERSION
+} from "../../../src/resident/managed-contract.js"
+import { runOwnedGeneration, withTransferredSelection } from "../../../src/resident/managed-selection.js"
 import { ResidentDirectory } from "../../../src/resident/protected-path.js"
 import { makeStartupBudget } from "../../../src/resident/startup-budget.js"
 import { runConfiguredResidentServer } from "../../../src/runtime/server-startup.js"
@@ -49,7 +54,7 @@ const main = Effect.gen(function* () {
   }
   const prepared = yield* encodeChildReply({
     kind: "prepared",
-    version: 1,
+    version: MANAGED_BOOTSTRAP_VERSION,
     nonce,
     implementation: { name: MANAGED_PACKAGE_NAME, version: VERSION }
   })
@@ -86,28 +91,23 @@ const main = Effect.gen(function* () {
   yield* write({ phase: "authorized", ...identity })
   yield* Deferred.await(disconnected)
   const startup = yield* makeStartupBudget
-  yield* withResidentSelection({
-    directory: start.directory,
-    capture: start.capture,
-    startup,
-    existing: () => Effect.die("No competing owner expected after parent loss"),
-    absent: (ownership) =>
-      runOwnedGeneration(ownership, (ready) =>
-        runConfiguredResidentServer({
-          directory: start.directory,
-          capture: start.capture,
-          environment,
-          lifetime: "managed",
-          startup,
-          report: (file) =>
-            ready(file).pipe(
-              Effect.andThen(readResidentAttachment(file)),
-              Effect.flatMap((attachment) =>
-                write({ phase: "published", ...identity, generation: attachment.identity.generation })
-              )
+  yield* withTransferredSelection(start, startup, (ownership) =>
+    runOwnedGeneration(ownership, (ready) =>
+      runConfiguredResidentServer({
+        directory: start.directory,
+        capture: start.capture,
+        environment,
+        lifetime: "managed",
+        startup,
+        report: (file) =>
+          ready(file).pipe(
+            Effect.andThen(readResidentAttachment(file)),
+            Effect.flatMap((attachment) =>
+              write({ phase: "published", ...identity, generation: attachment.identity.generation })
             )
-        })
-      )
-  })
+          )
+      })
+    )
+  )
 }).pipe(Effect.scoped)
 NodeRuntime.runMain(main, { disableErrorReporting: true })

@@ -31,9 +31,8 @@ const main = Effect.gen(function* () {
       launchManagedChild({
         executable,
         capture,
-        directory: input.directory,
+        claim: ownership.claim,
         startup,
-        authorize: ownership.release,
         environment: { ...process.env, RESIDENT_TEST_DIRECTORY: input.markers }
       })
   })

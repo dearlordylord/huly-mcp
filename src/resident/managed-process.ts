@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process"
 import { randomBytes } from "node:crypto"
-import { Effect, Redacted, Schema } from "effect"
+import { Effect, Redacted, Result, Schema } from "effect"
 
 import { VERSION } from "../version.js"
 import { encodeChildStart, parseChildReply } from "./bootstrap-codec.js"
@@ -9,12 +9,12 @@ import {
   type ChildReply,
   type ManagedExecutable,
   ManagedLaunchError,
+  MANAGED_BOOTSTRAP_VERSION,
   MANAGED_FAILURE_CLEANUP_MILLIS,
   type ResidentStartupCapture
 } from "./managed-contract.js"
-import type { ResidentDirectory } from "./protected-path.js"
 import { parseManagedChildEnvironment } from "./managed-child-environment.js"
-import type { SelectionClaimError } from "./selection-claim.js"
+import type { AcquiredSelectionClaim, SelectionClaimError } from "./selection-claim.js"
 import type { StartupBudget } from "./startup-budget.js"
 
 const ipcFailure = () =>
@@ -28,16 +28,16 @@ const NONCE_BYTES = 32
 const waitForReply = <A>(
   child: ChildProcess,
   accept: (reply: ChildReply) => Effect.Effect<A, ManagedLaunchError>,
-  initiate: (fail: () => void) => void = () => {}
+  initiate: (fail: (error: ManagedLaunchError | SelectionClaimError) => void) => void = () => {}
 ) =>
-  Effect.callback<A, ManagedLaunchError>((resume) => {
+  Effect.callback<A, ManagedLaunchError | SelectionClaimError>((resume) => {
     const cleanup = () => {
       child.removeListener("message", message)
       child.removeListener("error", fail)
       child.removeListener("exit", fail)
       child.removeListener("disconnect", fail)
     }
-    const finish = (result: Effect.Effect<A, ManagedLaunchError>) => {
+    const finish = (result: Effect.Effect<A, ManagedLaunchError | SelectionClaimError>) => {
       cleanup()
       resume(result)
     }
@@ -48,7 +48,7 @@ const waitForReply = <A>(
     child.on("exit", fail)
     child.on("disconnect", fail)
     if (child.exitCode !== null || child.signalCode !== null || !child.connected) fail()
-    else initiate(fail)
+    else initiate((error) => finish(Effect.fail(error)))
     return Effect.sync(cleanup)
   })
 
@@ -60,10 +60,9 @@ const preparedMatches = (frame: ChildReply, nonce: BootstrapNonce) =>
 export const launchManagedChild = Effect.fn("launchManagedChild")(function* (options: {
   readonly executable: ManagedExecutable
   readonly capture: ResidentStartupCapture
-  readonly directory: ResidentDirectory
+  readonly claim: AcquiredSelectionClaim
   readonly environment: NodeJS.ProcessEnv
   readonly startup: StartupBudget
-  readonly authorize: Effect.Effect<void, SelectionClaimError>
 }) {
   const nonce = yield* Effect.sync(() => randomBytes(NONCE_BYTES).toString("hex")).pipe(
     Effect.flatMap(Schema.decodeUnknownEffect(BootstrapNonce)),
@@ -71,10 +70,11 @@ export const launchManagedChild = Effect.fn("launchManagedChild")(function* (opt
   )
   const start = yield* encodeChildStart({
     kind: "start",
-    version: 1,
+    version: MANAGED_BOOTSTRAP_VERSION,
     nonce,
-    directory: options.directory,
-    capture: options.capture
+    directory: options.claim.directory,
+    capture: options.capture,
+    claim: options.claim.transferProof
   })
   const environment = yield* parseManagedChildEnvironment(options.environment, process.platform, nonce)
   return yield* Effect.acquireUseRelease(
@@ -97,20 +97,22 @@ export const launchManagedChild = Effect.fn("launchManagedChild")(function* (opt
             preparedMatches(frame, nonce) ? Effect.void : Effect.fail(ipcFailure())
           )
         )
-        yield* options.startup.within(options.authorize)
         return yield* options.startup.within(
           waitForReply(
             owned.child,
             (frame) => (frame.kind === "ready" ? Effect.succeed(frame.file) : Effect.fail(ipcFailure())),
             (fail) => {
-              owned.startAttempted = true
-              try {
-                owned.child.send(Redacted.value(start), (error) => {
-                  if (error !== null) fail()
-                })
-              } catch {
-                fail()
-              }
+              const transferred = options.claim.transferTo(() => {
+                owned.startAttempted = true
+                try {
+                  owned.child.send(Redacted.value(start), (error) => {
+                    if (error !== null) fail(ipcFailure())
+                  })
+                } catch {
+                  fail(ipcFailure())
+                }
+              })
+              if (Result.isFailure(transferred)) fail(transferred.failure)
             }
           )
         )

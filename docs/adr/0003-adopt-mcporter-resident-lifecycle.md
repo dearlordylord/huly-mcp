@@ -57,6 +57,15 @@ Start authorization. Once Start may have reached the child, that child can own a
 shared backend. Canceling the launcher then closes its wait rather than killing
 the backend; a lost acknowledgment never restores termination authority.
 
+Managed startup transfers the continuously held selection claim to the prepared
+child through private, versioned Start IPC. The parent revokes its release
+capability synchronously with the send attempt; it never removes the claim to
+let the child compete for it again. The child checks the exact private claim
+inode and namespace integrity before starting the backend, then releases the
+claim only through its publication or cleanup bracket. A lost transfer may leave
+unresolved ownership and bounded refusal; it does not authorize takeover. The
+current private bootstrap format is version 2 and rejects older frames.
+
 An attachment lease grants eligibility for new work. Expiry fences new work and
 requests cancellation, but does not prove that a request or remote mutation has
 stopped. Retain ownership and capacity until actual resource cleanup succeeds;

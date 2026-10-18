@@ -5,6 +5,7 @@ import { SanitizedHulyRuntimeConfigContextSchema } from "../domain/schemas/huly-
 import { ResidentSelection } from "./compatibility-contract.js"
 import { ResidentDirectory, ResidentFilePath } from "./protected-path.js"
 import { ResidentTlsIdentity } from "./tls-channel.js"
+import { SelectionClaimTransfer } from "./selection-claim.js"
 
 export const MANAGED_SELECTION_MILLIS = 10_000
 export const MANAGED_FAILURE_CLEANUP_MILLIS = 5_000
@@ -15,6 +16,7 @@ export const MAX_REGISTRY_RECORDS = 16
 export const MAX_REGISTRY_BYTES = 65_536
 export const MAX_BOOTSTRAP_BYTES = 65_536
 export const MANAGED_PACKAGE_NAME = "@firfi/huly-mcp"
+export const MANAGED_BOOTSTRAP_VERSION = 2
 
 export const ResidentStartupCapture = Schema.Struct({
   selection: ResidentSelection,
@@ -29,21 +31,26 @@ export type BootstrapNonce = Schema.Schema.Type<typeof BootstrapNonce>
 const PackageIdentity = Schema.Struct({ name: Schema.Literal(MANAGED_PACKAGE_NAME), version: Schema.NonEmptyString })
 export const PreparedChild = Schema.Struct({
   kind: Schema.Literal("prepared"),
-  version: Schema.Literal(1),
+  version: Schema.Literal(MANAGED_BOOTSTRAP_VERSION),
   implementation: PackageIdentity,
   nonce: BootstrapNonce
 })
 export const StartChild = Schema.Struct({
   kind: Schema.Literal("start"),
-  version: Schema.Literal(1),
+  version: Schema.Literal(MANAGED_BOOTSTRAP_VERSION),
   nonce: BootstrapNonce,
   directory: ResidentDirectory,
-  capture: ResidentStartupCapture
+  capture: ResidentStartupCapture,
+  claim: SelectionClaimTransfer
 })
 export const ChildReply = Schema.Union([
   PreparedChild,
-  Schema.Struct({ kind: Schema.Literal("ready"), version: Schema.Literal(1), file: ResidentFilePath }),
-  Schema.Struct({ kind: Schema.Literal("refused"), version: Schema.Literal(1) })
+  Schema.Struct({
+    kind: Schema.Literal("ready"),
+    version: Schema.Literal(MANAGED_BOOTSTRAP_VERSION),
+    file: ResidentFilePath
+  }),
+  Schema.Struct({ kind: Schema.Literal("refused"), version: Schema.Literal(MANAGED_BOOTSTRAP_VERSION) })
 ])
 export type ChildReply = Schema.Schema.Type<typeof ChildReply>
 

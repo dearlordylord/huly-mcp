@@ -38,14 +38,7 @@ const main = Effect.gen(function* () {
       existing: (_file, exchange) => bridge(exchange),
       absent: (ownership) =>
         Effect.gen(function* () {
-          const file = yield* launchManagedChild({
-            executable,
-            capture,
-            directory,
-            environment,
-            startup,
-            authorize: ownership.release
-          })
+          const file = yield* launchManagedChild({ executable, capture, claim: ownership.claim, environment, startup })
           const attachment = yield* startup.within(readResidentAttachment(file))
           yield* withAdapterAttachment(attachment, bridge, capture.selection, startup)
         })

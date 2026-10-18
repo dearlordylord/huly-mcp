@@ -6,7 +6,12 @@ import { expect } from "vitest"
 
 import { encodeChildReply, encodeChildStart } from "../../src/resident/bootstrap-codec.js"
 import { awaitChildAuthorization, type ChildAuthorizationPort } from "../../src/resident/child-authorization.js"
-import { BootstrapNonce, MANAGED_PACKAGE_NAME, PREPARED_CHILD_MILLIS } from "../../src/resident/managed-contract.js"
+import {
+  BootstrapNonce,
+  MANAGED_PACKAGE_NAME,
+  PREPARED_CHILD_MILLIS,
+  MANAGED_BOOTSTRAP_VERSION
+} from "../../src/resident/managed-contract.js"
 import { ResidentDirectory } from "../../src/resident/protected-path.js"
 import { captureResidentSelection } from "../../src/resident/selection-config.js"
 
@@ -23,16 +28,17 @@ const peer = Effect.gen(function* () {
   const nonce = Schema.decodeUnknownSync(BootstrapNonce)("a".repeat(64))
   const prepared = yield* encodeChildReply({
     kind: "prepared",
-    version: 1,
+    version: MANAGED_BOOTSTRAP_VERSION,
     implementation: { name: MANAGED_PACKAGE_NAME, version: "fixture" },
     nonce
   })
   const start = yield* encodeChildStart({
     kind: "start",
-    version: 1,
+    version: MANAGED_BOOTSTRAP_VERSION,
     nonce,
     directory: ResidentDirectory.make("/private-fixture"),
-    capture
+    capture,
+    claim: { device: 0n, inode: 1n }
   })
   const port: ChildAuthorizationPort = {
     onMessage: (listener) => {

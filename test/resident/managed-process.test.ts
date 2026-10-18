@@ -13,7 +13,7 @@ import {
 } from "../../src/resident/managed-contract.js"
 import { launchManagedChild } from "../../src/resident/managed-process.js"
 import { captureResidentSelection } from "../../src/resident/selection-config.js"
-import { SelectionClaimError } from "../../src/resident/selection-claim.js"
+import { acquireSelectionClaim } from "../../src/resident/selection-claim.js"
 import { makeStartupBudget, type StartupBudget } from "../../src/resident/startup-budget.js"
 import { withRegistryDirectory } from "../helpers/resident-registry-fixture.js"
 import { type PeerMode, PeerObservation } from "./managed-peer-observation.js"
@@ -91,20 +91,25 @@ const withPeer = async <E>(
             HULY_WORKSPACE: "managed-peer",
             HULY_TOKEN: "captured-fixture-token"
           })
-          yield* use({
-            executable,
-            capture,
-            directory,
-            startup: yield* makeStartupBudget,
-            authorize: Effect.void,
-            environment: {
-              RESIDENT_TEST_CHILD_MODE: mode,
-              RESIDENT_TEST_DIRECTORY: directory,
-              HULY_TOKEN: "raw-env-secret",
-              HULY_PROFILE: "raw-profile",
-              MCP_AUTH_TOKEN: "raw-authorization"
-            }
-          })
+          const startup = yield* makeStartupBudget
+          yield* Effect.acquireUseRelease(
+            acquireSelectionClaim(directory),
+            (claim) =>
+              use({
+                executable,
+                capture,
+                claim,
+                startup,
+                environment: {
+                  RESIDENT_TEST_CHILD_MODE: mode,
+                  RESIDENT_TEST_DIRECTORY: directory,
+                  HULY_TOKEN: "raw-env-secret",
+                  HULY_PROFILE: "raw-profile",
+                  MCP_AUTH_TOKEN: "raw-authorization"
+                }
+              }),
+            (claim) => claim.release
+          )
         })
       )
     } finally {
@@ -122,7 +127,7 @@ const withPeer = async <E>(
 it("refuses a prepared child that has already exited before control admission", { timeout: PROCESS_BOUND }, async () =>
   withPeer("exit-before-prepared", (options) =>
     Effect.gen(function* () {
-      const prepared = join(options.directory, "prepared.json")
+      const prepared = join(options.claim.directory, "prepared.json")
       const beforeControl = awaitCondition(Effect.promise(() => exists(prepared))).pipe(
         Effect.andThen(read(prepared)),
         Effect.flatMap((observation) => awaitCondition(Effect.sync(() => absent(observation.pid)))),
@@ -134,7 +139,7 @@ it("refuses a prepared child that has already exited before control admission", 
         within: (operation) => options.startup.within(beforeControl.pipe(Effect.andThen(operation)))
       }
       expect((yield* launchManagedChild({ ...options, startup }).pipe(Effect.flip))._tag).toBe("ManagedLaunchError")
-      expect(yield* Effect.promise(() => exists(join(options.directory, "started.json")))).toBe(false)
+      expect(yield* Effect.promise(() => exists(join(options.claim.directory, "started.json")))).toBe(false)
     })
   )
 )
@@ -143,8 +148,8 @@ it("disconnects instead of killing when an authorized child refuses readiness", 
   withPeer("refuse-after-start", (options) =>
     Effect.gen(function* () {
       expect((yield* launchManagedChild(options).pipe(Effect.flip))._tag).toBe("ManagedLaunchError")
-      yield* awaitCondition(Effect.promise(() => exists(join(options.directory, "disconnected.json"))))
-      expect((yield* read(join(options.directory, "started.json"))).workspace).toBe("managed-peer")
+      yield* awaitCondition(Effect.promise(() => exists(join(options.claim.directory, "disconnected.json"))))
+      expect((yield* read(join(options.claim.directory, "started.json"))).workspace).toBe("managed-peer")
     })
   )
 )
@@ -156,10 +161,10 @@ it(
     withPeer("ready", (options) =>
       Effect.gen(function* () {
         const file = yield* launchManagedChild(options)
-        expect(file).toBe(join(options.directory, "application.json"))
-        yield* awaitCondition(Effect.promise(() => exists(join(options.directory, "disconnected.json"))))
-        const prepared = yield* read(join(options.directory, "prepared.json"))
-        const started = yield* read(join(options.directory, "started.json"))
+        expect(file).toBe(join(options.claim.directory, "application.json"))
+        yield* awaitCondition(Effect.promise(() => exists(join(options.claim.directory, "disconnected.json"))))
+        const prepared = yield* read(join(options.claim.directory, "prepared.json"))
+        const started = yield* read(join(options.claim.directory, "started.json"))
         expect(prepared.rawHulyEnvironmentPresent).toBe(false)
         expect(started.workspace).toBe("managed-peer")
         yield* awaitCondition(Effect.sync(() => absent(prepared.pid)))
@@ -177,9 +182,9 @@ for (const mode of ["wrong-version", "wrong-nonce", "premature-ready", "malforme
       withPeer(mode, (options) =>
         Effect.gen(function* () {
           expect((yield* launchManagedChild(options).pipe(Effect.flip))._tag).toBe("ManagedLaunchError")
-          const prepared = yield* read(join(options.directory, "prepared.json"))
+          const prepared = yield* read(join(options.claim.directory, "prepared.json"))
           expect(prepared.rawHulyEnvironmentPresent).toBe(false)
-          expect(yield* Effect.promise(() => exists(join(options.directory, "started.json")))).toBe(false)
+          expect(yield* Effect.promise(() => exists(join(options.claim.directory, "started.json")))).toBe(false)
           yield* awaitCondition(Effect.sync(() => absent(prepared.pid)))
         })
       )
@@ -189,16 +194,12 @@ for (const mode of ["wrong-version", "wrong-nonce", "premature-ready", "malforme
 it("joins its owned prepared child when claim authorization fails before Start", { timeout: PROCESS_BOUND }, async () =>
   withPeer("ready", (options) =>
     Effect.gen(function* () {
-      const error = yield* launchManagedChild({
-        ...options,
-        authorize: Effect.fail(
-          new SelectionClaimError({ reason: "ownership", message: "Fixture authorization refused" })
-        )
-      }).pipe(Effect.flip)
+      yield* options.claim.release
+      const error = yield* launchManagedChild(options).pipe(Effect.flip)
       expect(error._tag).toBe("SelectionClaimError")
-      const prepared = yield* read(join(options.directory, "prepared.json"))
+      const prepared = yield* read(join(options.claim.directory, "prepared.json"))
       expect(absent(prepared.pid)).toBe(true)
-      expect(yield* Effect.promise(() => exists(join(options.directory, "started.json")))).toBe(false)
+      expect(yield* Effect.promise(() => exists(join(options.claim.directory, "started.json")))).toBe(false)
     })
   )
 )
@@ -207,7 +208,7 @@ it("reports lost readiness after Start and confirms the child exits", { timeout:
   withPeer("exit-before-ready", (options) =>
     Effect.gen(function* () {
       expect((yield* launchManagedChild(options).pipe(Effect.flip))._tag).toBe("ManagedLaunchError")
-      const started = yield* read(join(options.directory, "started.json"))
+      const started = yield* read(join(options.claim.directory, "started.json"))
       expect(started.workspace).toBe("managed-peer")
       yield* awaitCondition(Effect.sync(() => absent(started.pid)))
     })
@@ -219,12 +220,12 @@ it("reports failure to spawn its exact executable without creating child state",
     Effect.gen(function* () {
       const missing = Schema.decodeUnknownSync(ManagedExecutable)({
         ...options.executable,
-        executable: join(options.directory, "missing-node")
+        executable: join(options.claim.directory, "missing-node")
       })
       expect((yield* launchManagedChild({ ...options, executable: missing }).pipe(Effect.flip))._tag).toBe(
         "ManagedLaunchError"
       )
-      expect(yield* Effect.promise(() => fs.readdir(options.directory))).toEqual([])
+      expect(yield* Effect.promise(() => fs.readdir(options.claim.directory))).toEqual(["selection.claim"])
     })
   )
 )
@@ -243,7 +244,7 @@ it("refuses oversized private authority before creating a child", { timeout: PRO
         }
       })
       expect((yield* launchManagedChild({ ...options, capture }).pipe(Effect.flip))._tag).toBe("ManagedLaunchError")
-      expect(yield* Effect.promise(() => fs.readdir(options.directory))).toEqual([])
+      expect(yield* Effect.promise(() => fs.readdir(options.claim.directory))).toEqual(["selection.claim"])
     })
   )
 )

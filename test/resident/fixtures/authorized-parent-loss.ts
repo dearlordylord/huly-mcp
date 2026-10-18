@@ -7,6 +7,7 @@ import { Effect, Schedule, Schema } from "effect"
 
 import { ResidentPackagePath } from "../../../src/resident/managed-contract.js"
 import { ResidentDirectory } from "../../../src/resident/protected-path.js"
+import { acquireSelectionClaim } from "../../../src/resident/selection-claim.js"
 import { openKernelReapedEvents, ReapedEventsFd } from "../../helpers/kernel-reaped-events.js"
 import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
 import { AuthorizedOwnerMarker, AuthorizedParentLossObservation } from "../authorized-parent-loss-contract.js"
@@ -65,9 +66,12 @@ const main = async () => {
     )
     const children = childLists.flatMap((line) => (line.trim() === "" ? [] : line.trim().split(/\s+/)))
     assert.deepEqual(children, [String(authorized.childPid)])
-    assert.equal((await fs.readdir(directory)).includes("selection.claim"), false)
+    assert.equal((await fs.readdir(directory)).includes("selection.claim"), true)
+    const contender = await Effect.runPromise(acquireSelectionClaim(directory).pipe(Effect.flip))
+    assert.equal(contender._tag, "SelectionClaimError")
+    if (contender._tag === "SelectionClaimError") assert.equal(contender.reason, "busy")
     assert.deepEqual(await fs.readdir(join(directory, "generations")), [])
-    process.stderr.write("Authorized parent loss: Start accepted, claim released, publication not begun\n")
+    process.stderr.write("Authorized parent loss: Start accepted, claim continuously held, publication not begun\n")
     assert.equal(parent.kill("SIGKILL"), true)
     assert.deepEqual(await bounded(closed), [null, "SIGKILL"])
     const published = await marker(input.root, "published")

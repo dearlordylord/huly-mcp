@@ -1,6 +1,6 @@
 import * as fs from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
-import { Cause, Effect, Exit, Fiber, Option, Result, Scope } from "effect"
+import { Cause, Effect, Exit, Fiber, Option, Result, Scope, type Schema } from "effect"
 
 import { withAdapterCandidate, type AdapterExchange } from "./adapter-attachment.js"
 import { readResidentAttachment } from "./attachment-file.js"
@@ -12,7 +12,8 @@ import {
   registryCapacityFailure,
   ManagedLaunchError,
   MANAGED_FAILURE_CLEANUP_MILLIS,
-  type ResidentStartupCapture
+  type ResidentStartupCapture,
+  type StartChild
 } from "./managed-contract.js"
 import {
   currentPosixOwner,
@@ -22,7 +23,12 @@ import {
   ResidentDirectory,
   ResidentFilePath
 } from "./protected-path.js"
-import { acquireSelectionClaim, SelectionClaimError } from "./selection-claim.js"
+import {
+  acquireSelectionClaim,
+  adoptSelectionClaim,
+  SelectionClaimError,
+  type AcquiredSelectionClaim
+} from "./selection-claim.js"
 import type { BackendResponseError } from "./response-stream.js"
 import type { StartupBudget } from "./startup-budget.js"
 import { readResidentNamespace } from "./namespace-inventory.js"
@@ -128,7 +134,9 @@ export const withResidentSelection = <A, E, R, B, F, S>(options: {
   readonly capture: ResidentStartupCapture
   readonly startup: StartupBudget
   readonly existing: (file: ResidentFilePath, exchange: AdapterExchange) => Effect.Effect<A, E, R>
-  readonly absent: (ownership: SelectionOwnership) => Effect.Effect<B, F, S>
+  readonly absent: (
+    ownership: SelectionOwnership & { readonly claim: AcquiredSelectionClaim }
+  ) => Effect.Effect<B, F, S>
 }) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -164,11 +172,27 @@ export const withResidentSelection = <A, E, R, B, F, S>(options: {
                 )
             )
             if (Option.isSome(matched)) return matched.value
-            return yield* options.absent({ directory: options.directory, registry, release: claim.release })
+            return yield* options.absent({ directory: options.directory, registry, release: claim.release, claim })
           }),
         options.startup
       )
     })
+  )
+
+export const withTransferredSelection = <A, E, R>(
+  start: Schema.Schema.Type<typeof StartChild>,
+  startup: StartupBudget,
+  use: (ownership: SelectionOwnership) => Effect.Effect<A, E, R>
+) =>
+  Effect.acquireUseRelease(
+    adoptSelectionClaim(start.directory, start.claim),
+    (claim) =>
+      Effect.gen(function* () {
+        yield* startup.within(readResidentNamespace(start.directory))
+        const registry = yield* startup.within(openGenerationRegistry(start.directory))
+        return yield* use({ directory: start.directory, registry, release: claim.release })
+      }),
+    (claim) => claim.release
   )
 
 export const runOwnedGeneration = <A, E, R>(

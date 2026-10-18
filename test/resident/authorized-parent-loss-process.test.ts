@@ -16,7 +16,7 @@ const runFile = promisify(execFile)
 const FixtureFailure = Schema.Struct({ stderr: Schema.String })
 
 it.skipIf(process.platform !== "linux")(
-  "preserves authorized startup after parent loss before ownership claim and publication",
+  "preserves transferred startup exclusion after parent loss before child adoption and publication",
   { timeout: BUILD_BOUND },
   async () => {
     const bundle = await buildIsolatedStdioServer(BUILD_BOUND)
