@@ -1,9 +1,9 @@
 # Run adapters against an explicitly started resident backend
 
 This experimental path currently has Linux process evidence with Node 24.20.0.
-Full local Huly and platform qualification remains pending. See the
-[implementation record](implementation/issue-323.md) for evidence and remaining
-work, including attachment admission and legacy-session release.
+Full local Huly and platform qualification remains pending. Track remaining
+implementation and qualification in
+[the resident feature issue](https://github.com/dearlordylord/huly-mcp/issues/322).
 
 ## Start the backend
 

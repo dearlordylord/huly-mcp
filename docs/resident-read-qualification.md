@@ -1,9 +1,8 @@
 # Check first and continued reads from two resident adapters
 
 Use this Linux-only probe during the final local Huly campaign after all six
-resident implementation slices are integrated. Scoped manual and managed runs
-passed against local Huly on Linux; see the [campaign report](implementation/resident-live-linux-2026-10-18.md)
-for the exact candidate, preserved failed attempt and remaining qualification.
+resident implementation slices are integrated. Track candidate qualification and remaining work in
+[the resident feature issue](https://github.com/dearlordylord/huly-mcp/issues/322).
 The probe uses two Node reader processes and two packaged stdio adapters. It
 checks modern MCP discovery or legacy initialization, the native tool catalog, resource templates, and
 first and continued `get_project` calls with colliding IDs across readers.

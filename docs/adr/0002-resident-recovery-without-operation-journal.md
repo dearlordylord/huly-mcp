@@ -5,8 +5,8 @@ sharing needs a durable operation journal. The decision is to remove that
 requirement and amend #322 and #327 explicitly. Resident recovery does not
 maintain or consult a durable per-operation ledger, expose cross-session
 operation-status lookup, or persist a replay queue. Protected backend ownership
-inventory remains a separate requirement. This decision supersedes the journal
-proposal in `resident-recovery-design.md` and the initial guardian model sketch.
+inventory remains a separate requirement. This decision supersedes the earlier journal proposal and initial guardian
+model sketch.
 It does not qualify the unfinished recovery implementation.
 
 The later [ADR 0003](0003-adopt-mcporter-resident-lifecycle.md) selects the

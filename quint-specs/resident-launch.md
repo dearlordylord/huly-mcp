@@ -8,7 +8,7 @@ response-ownership model remains separate and unchanged.
 
 The source contract is GitHub #322 through #328,
 [ADR 0003](../docs/adr/0003-adopt-mcporter-resident-lifecycle.md) and
-[the selected recovery design](../docs/implementation/resident-recovery-design.md).
+[the selected lifecycle contract](../docs/adr/0003-adopt-mcporter-resident-lifecycle.md).
 The sketch follows the adopted MCPorter lifecycle practices: callers, native
 backends, per-identity ownership claims, publication receipts, attachment leases,
 requests and explicit retirement evidence. It does not require a guardian,

@@ -45,6 +45,23 @@ adopted. Once local work and resources are safely retired, uncertainty about a
 remote mutation alone does not retain a backend forever or become resolved by
 its shutdown.
 
+## Channel identity and lifetime ownership
+
+Authenticate the expected backend generation with TLS PSK before sending HTTP
+or private authorization. TLS supplies channel authentication and framing without
+a custom cryptographic stream protocol; a bearer preflight alone cannot protect
+a subsequent connection to a replaced listener.
+
+A launcher may terminate its prepared child only before attempting to transfer
+Start authorization. Once Start may have reached the child, that child can own a
+shared backend. Canceling the launcher then closes its wait rather than killing
+the backend; a lost acknowledgment never restores termination authority.
+
+An attachment lease grants eligibility for new work. Expiry fences new work and
+requests cancellation, but does not prove that a request or remote mutation has
+stopped. Retain ownership and capacity until actual resource cleanup succeeds;
+expiry alone cannot authorize replacement or replay.
+
 ## Crash and operation semantics
 
 A backend crash may fail all its in-flight requests, including writes. For a
