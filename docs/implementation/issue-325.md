@@ -250,3 +250,10 @@ and resource certification remain pending. No issue is complete.
 ## Preserve explicit null proxy results
 
 The proxy result wrapper used nullish fallback to text content, replacing an explicit structured `null` result with a text-block array. It now falls back only when structured content is absent. The scripted operation regression failed before the fix and passes afterward; warnings, images and argument observations remain covered. This is payload fidelity shared by resident, standalone and HTTP dispatch, not a new transport guarantee. See the qualification report for exact receipts and the subsequent failed full-gate run.
+
+The [name-driven auto-exposure increment](issue-328.md#name-driven-auto-exposure-on-one-backend--2026-10-18)
+checks Claude Code/native and Codex/proxy reader names through one auto-configured
+backend for both protocols and both input orderings. Actual context kinds,
+complete606/6catalogs, exact native/proxy project results and separate reader
+ownership are checked. It changes no profile authority, policy compatibility or
+production defaults. Full capability/auth/invalidation matrices remain pending.

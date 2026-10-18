@@ -68,8 +68,13 @@ export const observeLiveReadPair = Effect.fn("observeLiveReadPair")(function* (
   executable: LiveReadPairInput["bundle"]
 ) {
   const attachment = yield* readResidentAttachmentEnvelope(input.attachment)
-  const reader = (host: LiveReadHostInput["host"], target: LiveReadHostInput["target"]) =>
+  const reader = (
+    host: LiveReadHostInput["host"],
+    target: LiveReadHostInput["target"],
+    client: LiveReadHostInput["client"]
+  ) =>
     Schema.encodeEffect(Schema.fromJsonString(LiveReadHostInput))({
+      ...(client === undefined ? {} : { client }),
       bundle: input.bundle,
       protocol: resolveLiveReadProtocol(input.protocol),
       attachment: input.attachment,
@@ -77,8 +82,8 @@ export const observeLiveReadPair = Effect.fn("observeLiveReadPair")(function* (
       host,
       generation: attachment.identity.generation
     })
-  const first = yield* reader("first", input.targets[0])
-  const second = yield* reader("second", input.targets[1])
+  const first = yield* reader("first", input.targets[0], input.clients?.[0])
+  const second = yield* reader("second", input.targets[1], input.clients?.[1])
   return yield* withLiveProbeChild([executable, "parent", first], environment, (left) =>
     withLiveProbeChild([executable, "parent", second], environment, (right) =>
       Effect.gen(function* () {

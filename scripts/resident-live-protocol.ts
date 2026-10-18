@@ -2,7 +2,12 @@ import { Effect, Schema } from "effect"
 
 import { HostMessage } from "../src/resident/request-headers.js"
 import { NativeDiscoverySchema } from "./integration-mcp-prior.js"
-import { type LiveReadHostInput, resolveLiveReadProtocol, LiveReadProbeError } from "./resident-live-read-contract.js"
+import {
+  type LiveReadHostInput,
+  resolveLiveReadProtocol,
+  resolveLiveReadClient,
+  LiveReadProbeError
+} from "./resident-live-read-contract.js"
 
 const DISCOVER_ID = 1
 const LegacyInitialization = Schema.Struct({
@@ -11,7 +16,7 @@ const LegacyInitialization = Schema.Struct({
   serverInfo: Schema.Struct({ name: Schema.NonEmptyString, version: Schema.NonEmptyString })
 })
 // Internal request/send ports. HostMessage and response schemas own the wire payloads.
-type ProtocolInput = Pick<LiveReadHostInput, "protocol" | "host">
+type ProtocolInput = Pick<LiveReadHostInput, "protocol" | "host" | "client">
 type ProtocolRequest = (
   id: NonNullable<HostMessage["id"]>,
   method: "initialize" | "server/discover",
@@ -24,7 +29,10 @@ export const liveReadMetadata = (input: ProtocolInput) =>
         _meta: {
           "io.modelcontextprotocol/protocolVersion": "2026-07-28",
           "io.modelcontextprotocol/clientCapabilities": {},
-          "io.modelcontextprotocol/clientInfo": { name: `resident-live-${input.host}`, version: "1.0" }
+          "io.modelcontextprotocol/clientInfo": {
+            name: resolveLiveReadClient(input.host, input.client).name,
+            version: "1.0"
+          }
         }
       }
 
@@ -38,7 +46,7 @@ export const discoverLiveReadProtocol = Effect.fn("discoverLiveReadProtocol")(fu
       yield* request(DISCOVER_ID, "initialize", {
         protocolVersion: resolveLiveReadProtocol(input.protocol),
         capabilities: {},
-        clientInfo: { name: `resident-live-${input.host}`, version: "1.0" }
+        clientInfo: { name: resolveLiveReadClient(input.host, input.client).name, version: "1.0" }
       })
     ).pipe(Effect.mapError(() => new LiveReadProbeError({ phase: "discover" })))
     const frame = yield* Schema.encodeEffect(Schema.fromJsonString(HostMessage))({

@@ -1342,3 +1342,55 @@ statements,99%branches,99.01%functions,99.55%lines; output200/300. Log
 artifacts; `terminal-manifest.json` freezes49evidence files, preserving the
 preparation failure, both failed coverage gates and exact pre-review/final
 sources. All broader native/platform/model/full-contract limits above remain.
+
+### Name-driven auto exposure on one backend — 2026-10-18
+
+The maintained read-pair probe accepts optional per-reader client selections:
+name, expected configured mode and expected native/proxy exposure. Modern
+metadata and legacy initialization carry that name; omitted selections retain
+the existing generic/native probe behavior. New receipts include selected
+client, actual context exposure and the complete tool-name catalog. Those
+fields are optional in the receipt schema so older retained receipts still parse;
+new auto qualification requires them and treats absence as missing evidence.
+
+Managed identity acquisition checks the actual configured/resolved exposure
+before reading Huly. Project calls use native get_project or proxy invoke_tool;
+the proxy parser requires the exact get_project tool name and nested project
+schema, rejecting crossed envelopes and isError results. Neither path broadens
+production visibility or changes server defaults.
+
+The process fixture covers both protocols with the existing native readers and
+two auto client input orderings (Claude Code/native and Codex/proxy). It checks
+exact606/6tool catalogs, actual client kinds, distinct parent/adapter PIDs,
+colliding request IDs with different project targets, four exact reads, one
+backend and one full-model request at the disposable REST fixture. Wrong expected
+exposure is refused before any project read. Five pure/port tests additionally
+cover selected/default names, legacy name propagation, native/proxy call shapes,
+correct outputs and wrong/error/crossed envelopes. All23focused tests pass;
+1377TypeScript/Effectfiles pass diagnostics; final full gate is pending.
+
+Actual local-Huly evidence `/tmp/resident-live-auto-qualified-of08j_ff` completes
+four scheduled scenarios (both protocols × both input orderings), each once
+with supervisor exit0. Each probe verifies four exact project results from two
+separate parents/adapters, one generation/backend, and normal parent/adapter
+exits. Independent verify.mts parses schema-owned inputs/receipts and kernel
+terminal records, checks exact606native/6proxy catalogs and actual auto client
+kinds, target/owner correlation, backend exit0, empty namespaces and empty
+diagnostics. All16reads passed; no Huly writes or new defaults. live-manifest.json
+freezes43source/preparation/live files, excluding the active full-gate log.
+
+Input ordering is not a claim about deterministic owner-election timing. The
+one-model-request assertion belongs to the disposable REST fixture, not direct
+instrumentation of the live Huly process. These are Node reader parents using
+selected client names, not actual Codex/Claude hosts in auto mode. Differing
+capabilities, the complete identity/auth matrix, native macOS, model/oracle and
+other complete-contract qualification remain pending. No ticket is completed.
+
+The auto-exposure increment's full gate passed (session81104 terminal0):485files,
+5758tests;1377TypeScript/Effectfiles with0errors/warnings. Coverage99.45%
+statements,99%branches,99.01%functions,99.55%lines; output200/300. Log
+SHA-256 `ab19656dfd9e761bd6f6e2cfb5af6e43f293d59f4ac1729a8da2cd9e14b3692c`.
+The private gate-proof binds all10finalsource files and unchanged MCP/CLI
+artifacts. terminal-manifest.json freezes46files. Both scoped live-evidence
+reviews matched43original bindings/10sources without findings; final gate-proof
+review is separate. Complete-ticket acceptance remains unproven.

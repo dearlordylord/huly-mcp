@@ -638,3 +638,10 @@ This verifies the manual attachment admission and lease increment. It does not
 accept any complete issue. Live Huly, automatic ownership, profile isolation,
 managed idle, durable recovery, complete lifecycle observation alignment and
 final native platform qualification remain outstanding.
+
+The [auto client-exposure increment](issue-328.md#name-driven-auto-exposure-on-one-backend--2026-10-18)
+adds maintained modern/legacy reader selection and native/proxy output parsing.
+Scoped packaged managed-process and actual local-Huly scenarios retain different
+project payloads with colliding IDs on one backend, exact catalogs and owned
+cleanup. This does not certify all client capabilities, actual-host auto mode,
+manual-mode auto behavior or complete #323 acceptance.

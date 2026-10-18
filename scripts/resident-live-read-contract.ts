@@ -1,5 +1,6 @@
 import { Schema } from "effect"
 
+import { GetHulyContextResultSchema } from "../src/domain/schemas/huly-context.js"
 import { ProjectIdentifier } from "../src/domain/schemas/shared.js"
 import { ResidentPackagePath, ResidentRegistryEnvelope } from "../src/resident/managed-contract.js"
 import { ResidentDirectory, ResidentFilePath } from "../src/resident/protected-path.js"
@@ -10,6 +11,15 @@ export type LiveReadProtocol = Schema.Schema.Type<typeof LiveReadProtocol>
 export const resolveLiveReadProtocol = (protocol: LiveReadProtocol | undefined): LiveReadProtocol =>
   protocol ?? "2026-07-28"
 export const LiveReadProtocolInput = Schema.optionalKey(LiveReadProtocol)
+export const LiveReadClient = Schema.Struct({
+  name: Schema.NonEmptyString,
+  configuredMode: GetHulyContextResultSchema.fields.toolExposure.fields.configuredMode,
+  exposure: GetHulyContextResultSchema.fields.toolExposure.fields.resolvedMode
+})
+export type LiveReadClient = Schema.Schema.Type<typeof LiveReadClient>
+export const resolveLiveReadClient = (host: "first" | "second", client: LiveReadClient | undefined): LiveReadClient =>
+  client ?? { name: `resident-live-${host}`, configuredMode: "native", exposure: "native" }
+const LiveReadClients = Schema.optionalKey(Schema.Tuple([LiveReadClient, LiveReadClient]))
 export const LIVE_FIRST_READ_ID = 41
 export const LIVE_CONTINUED_READ_ID = 42
 export const LIVE_PROBE_IO_BOUND = "5 seconds"
@@ -25,12 +35,14 @@ export const LiveReadTargets = Schema.Tuple([LiveProjectTarget, LiveProjectTarge
   )
 )
 export const LiveReadPairInput = Schema.Struct({
+  clients: LiveReadClients,
   protocol: LiveReadProtocolInput,
   bundle: ResidentPackagePath,
   attachment: ResidentFilePath,
   targets: LiveReadTargets
 })
 export const ManagedLiveReadPairInput = Schema.Struct({
+  clients: LiveReadClients,
   protocol: LiveReadProtocolInput,
   bundle: ResidentPackagePath,
   directory: ResidentDirectory,
@@ -39,6 +51,7 @@ export const ManagedLiveReadPairInput = Schema.Struct({
 export type ManagedLiveReadPairInput = Schema.Schema.Type<typeof ManagedLiveReadPairInput>
 export type LiveReadPairInput = Schema.Schema.Type<typeof LiveReadPairInput>
 export const LiveReadHostInput = Schema.Struct({
+  client: Schema.optionalKey(LiveReadClient),
   protocol: LiveReadProtocolInput,
   bundle: ResidentPackagePath,
   attachment: ResidentFilePath,
@@ -48,6 +61,7 @@ export const LiveReadHostInput = Schema.Struct({
 })
 export type LiveReadHostInput = Schema.Schema.Type<typeof LiveReadHostInput>
 export const ManagedLiveReadHostInput = Schema.Struct({
+  client: Schema.optionalKey(LiveReadClient),
   protocol: LiveReadProtocolInput,
   bundle: LiveReadHostInput.fields.bundle,
   directory: ResidentDirectory,
@@ -57,6 +71,9 @@ export const ManagedLiveReadHostInput = Schema.Struct({
 export type ManagedLiveReadHostInput = Schema.Schema.Type<typeof ManagedLiveReadHostInput>
 const ProcessId = Schema.Int.check(Schema.isGreaterThan(0))
 export const LiveReadHostReceipt = Schema.Struct({
+  client: Schema.optionalKey(LiveReadClient),
+  catalog: Schema.optionalKey(Schema.Array(Schema.String)),
+  exposure: Schema.optionalKey(GetHulyContextResultSchema.fields.toolExposure),
   mode: Schema.Literal("manual"),
   host: LiveReadHostInput.fields.host,
   parentPid: ProcessId,

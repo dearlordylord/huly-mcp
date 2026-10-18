@@ -6,7 +6,11 @@ import { readResidentAttachmentEnvelope } from "../src/resident/attachment-file.
 import { ResidentDirectory, ResidentFilePath } from "../src/resident/protected-path.js"
 import { openRegistryInventory } from "../src/resident/registry-inventory.js"
 import type { HostMessage } from "../src/resident/request-headers.js"
-import { type ManagedLiveReadHostReceipt, LiveReadProbeError } from "./resident-live-read-contract.js"
+import {
+  type LiveReadClient,
+  type ManagedLiveReadHostReceipt,
+  LiveReadProbeError
+} from "./resident-live-read-contract.js"
 
 const CONTEXT_ID = 4
 const ContextCall = Schema.Struct({
@@ -20,10 +24,16 @@ export type LiveReadContextRequest = (
   params: Readonly<Record<string, Schema.Json>>
 ) => Effect.Effect<unknown, LiveReadProbeError>
 export const captureManagedReadIdentity = Effect.fn("captureManagedReadIdentity")(
-  function* (directory: ResidentDirectory, request: LiveReadContextRequest) {
+  function* (directory: ResidentDirectory, request: LiveReadContextRequest, client: LiveReadClient | undefined) {
     const context = yield* Schema.decodeUnknownEffect(ContextCall)(
       yield* request(CONTEXT_ID, "tools/call", { name: "get_huly_context", arguments: {} })
     )
+    const exposure = context.structuredContent.result.toolExposure
+    if (
+      client !== undefined &&
+      (exposure.configuredMode !== client.configuredMode || exposure.resolvedMode !== client.exposure)
+    )
+      return yield* new LiveReadProbeError({ phase: "ownership" })
     const port = context.structuredContent.result.transport.http?.port
     if (context.structuredContent.result.transport.type !== "http" || port === undefined)
       return yield* new LiveReadProbeError({ phase: "ownership" })
@@ -41,10 +51,11 @@ export const captureManagedReadIdentity = Effect.fn("captureManagedReadIdentity"
     )
       return yield* new LiveReadProbeError({ phase: "ownership" })
     return {
+      exposure,
       mode: "managed",
       generation: descriptor.identity.generation,
       backendProcessId: record.envelope.diagnostics.processId
-    } satisfies Pick<ManagedLiveReadHostReceipt, "mode" | "generation" | "backendProcessId">
+    } satisfies Pick<ManagedLiveReadHostReceipt, "mode" | "generation" | "backendProcessId" | "exposure">
   },
   Effect.mapError(() => new LiveReadProbeError({ phase: "ownership" }))
 )

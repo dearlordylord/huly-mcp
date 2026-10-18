@@ -30,7 +30,9 @@ const Input = Schema.Union([
 NodeRuntime.runMain(
   Effect.gen(function* () {
     const snapshot = { ...process.env }
-    yield* Schema.decodeUnknownEffect(Schema.Struct({ HULY_TOOL_MODE: Schema.Literal("native") }))(snapshot)
+    yield* Schema.decodeUnknownEffect(Schema.Struct({ HULY_TOOL_MODE: Schema.Literals(["native", "proxy", "auto"]) }))(
+      snapshot
+    )
     const environment = yield* Schema.decodeUnknownEffect(LiveProbeEnvironment)(
       Object.fromEntries(Object.entries(snapshot).filter(([, value]) => value !== undefined))
     )

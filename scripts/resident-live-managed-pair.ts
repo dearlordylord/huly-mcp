@@ -25,16 +25,21 @@ export const observeManagedLiveReadPair = Effect.fn("observeManagedLiveReadPair"
   )
   if ((yield* probeIo("ownership", () => fs.readdir(input.directory))).length !== 0)
     return yield* new LiveReadProbeError({ phase: "ownership" })
-  const reader = (host: ManagedLiveReadHostInput["host"], target: ManagedLiveReadHostInput["target"]) =>
+  const reader = (
+    host: ManagedLiveReadHostInput["host"],
+    target: ManagedLiveReadHostInput["target"],
+    client: ManagedLiveReadHostInput["client"]
+  ) =>
     Schema.encodeEffect(Schema.fromJsonString(ManagedLiveReadHostInput))({
+      ...(client === undefined ? {} : { client }),
       bundle: input.bundle,
       protocol: resolveLiveReadProtocol(input.protocol),
       directory: input.directory,
       host,
       target
     })
-  const first = yield* reader("first", input.targets[0])
-  const second = yield* reader("second", input.targets[1])
+  const first = yield* reader("first", input.targets[0], input.clients?.[0])
+  const second = yield* reader("second", input.targets[1], input.clients?.[1])
   const readers = yield* withLiveProbeChild([executable, "managed-parent", first], environment, (left) =>
     withLiveProbeChild([executable, "managed-parent", second], environment, (right) =>
       Effect.all([receiveLiveReader(left), receiveLiveReader(right)], { concurrency: "unbounded" })

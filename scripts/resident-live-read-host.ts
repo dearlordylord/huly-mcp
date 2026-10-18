@@ -2,12 +2,13 @@ import { createInterface } from "node:readline"
 import { Effect, Redacted, Schema } from "effect"
 
 import { MAX_ADAPTER_RESPONSE_BYTES } from "../src/resident/adapter-limits.js"
-import { GetProjectParamsSchema, GetProjectResultSchema } from "../src/domain/schemas/projects.js"
+import { GetProjectParamsSchema } from "../src/domain/schemas/projects.js"
 import { readResidentAttachmentEnvelope } from "../src/resident/attachment-file.js"
 import { BackendMessage } from "../src/resident/response-stream.js"
 import { HostMessage } from "../src/resident/request-headers.js"
 import { NativeToolListSchema } from "./integration-mcp-prior.js"
 import {
+  resolveLiveReadClient,
   LIVE_PROBE_IO_BOUND,
   LIVE_PROBE_HOST_BOUND,
   LIVE_CONTINUED_READ_ID,
@@ -21,16 +22,13 @@ import {
   LiveReadProbeError
 } from "./resident-live-read-contract.js"
 import { discoverLiveReadProtocol, liveReadMetadata } from "./resident-live-protocol.js"
+import { liveProjectCall, parseLiveProjectReply } from "./resident-live-exposure.js"
 import { captureManagedReadIdentity } from "./resident-live-managed-identity.js"
 import { probeIo, withLiveProbeChild } from "./resident-live-read-process.js"
 
 const MAX_INTERLEAVED_NOTIFICATIONS = 64
 const CATALOG_ID = 2
 const RESOURCE_TEMPLATES_ID = 3
-const ProjectCall = Schema.Struct({
-  isError: Schema.optionalKey(Schema.Literal(false)),
-  structuredContent: Schema.Struct({ result: GetProjectResultSchema })
-})
 const Templates = Schema.Struct({ resourceTemplates: Schema.Array(Schema.Struct({ uriTemplate: Schema.String })) })
 const refuse = (phase: LiveReadProbeError["phase"]) => new LiveReadProbeError({ phase })
 
@@ -107,14 +105,18 @@ export const observeLiveResidentReads = Effect.fn("observeLiveResidentReads")(fu
           )
           const identity:
             | Pick<LiveReadHostReceipt, "mode" | "generation">
-            | Pick<ManagedLiveReadHostReceipt, "mode" | "generation" | "backendProcessId"> =
+            | Pick<ManagedLiveReadHostReceipt, "mode" | "generation" | "backendProcessId" | "exposure"> =
             "attachment" in input
               ? { mode: "manual", generation: input.generation }
-              : yield* captureManagedReadIdentity(input.directory, request)
+              : yield* captureManagedReadIdentity(input.directory, request, input.client)
           const catalog = yield* Schema.decodeUnknownEffect(NativeToolListSchema)(
             yield* request(CATALOG_ID, "tools/list", {})
           ).pipe(Effect.mapError(() => refuse("catalog")))
-          if (!catalog.tools.some((tool) => tool.name === "get_project")) return yield* refuse("input")
+          const client = resolveLiveReadClient(input.host, input.client)
+          const operation = client.exposure === "native" ? "get_project" : "invoke_tool"
+          if (!catalog.tools.some((tool) => tool.name === operation)) return yield* refuse("catalog")
+          if (identity.mode === "managed" && catalog.tools.length !== identity.exposure?.visibleToolCount)
+            return yield* refuse("catalog")
           const templates = yield* Schema.decodeUnknownEffect(Templates)(
             yield* request(RESOURCE_TEMPLATES_ID, "resources/templates/list", {})
           ).pipe(Effect.mapError(() => refuse("templates")))
@@ -122,13 +124,11 @@ export const observeLiveResidentReads = Effect.fn("observeLiveResidentReads")(fu
             return yield* refuse("response")
           for (const id of [LIVE_FIRST_READ_ID, LIVE_CONTINUED_READ_ID]) {
             const argumentsValue = yield* Schema.encodeEffect(GetProjectParamsSchema)({ project: input.target.project })
-            const call = yield* Schema.decodeUnknownEffect(ProjectCall)(
-              yield* request(id, "tools/call", { name: "get_project", arguments: argumentsValue })
-            ).pipe(Effect.mapError(() => refuse("read")))
-            if (
-              call.structuredContent.result.identifier !== input.target.project ||
-              call.structuredContent.result.name !== input.target.name
+            const call = yield* parseLiveProjectReply(
+              client,
+              yield* request(id, "tools/call", liveProjectCall(client, argumentsValue))
             )
+            if (call.identifier !== input.target.project || call.name !== input.target.name)
               return yield* refuse("read")
           }
           owned.process.stdin.end()
@@ -137,6 +137,8 @@ export const observeLiveResidentReads = Effect.fn("observeLiveResidentReads")(fu
             if (next.done) {
               yield* owned.exited
               return yield* Schema.decodeUnknownEffect(AnyLiveReadHostReceipt)({
+                client,
+                catalog: catalog.tools.map((tool) => tool.name),
                 host: input.host,
                 parentPid,
                 adapterPid: owned.process.pid,

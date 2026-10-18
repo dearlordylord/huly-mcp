@@ -122,3 +122,32 @@ disposable REST fixture through the real Huly SDK. It requires four project
 reads and one shared full-model acquisition. This proves the local process
 schedule; live Huly, real client hosts, and native macOS qualification remain
 separate campaign requirements.
+
+
+## Check name-driven auto exposure
+
+For managed qualification, set HULY_TOOL_MODE=auto and add this optional clients
+selection to the private pair input. Entries correspond to the two targets:
+
+```json
+"clients": [
+  { "name": "claude-code", "configuredMode": "auto", "exposure": "native" },
+  { "name": "codex", "configuredMode": "auto", "exposure": "proxy" }
+]
+```
+
+Run with each supported protocol, then repeat with the two client entries
+reversed. The selections state expected behavior; they do not override server
+policy. The managed probe compares actual context exposure with those
+expectations and refuses a mismatch before project reads. Each reader invokes
+the project operation through its expected native or proxy interface and parses
+the corresponding output schema. Require both receipts' client/exposure/catalog
+fields; historical receipts without them do not prove this scenario. Compare the
+complete catalog against the candidate's expected inventory, not only the
+presence of one tool. The current unfiltered candidate has606native tools and
+6proxy-visible tools including the two built-ins.
+
+Both readers must share the generation/backend and retain their distinct target
+results and process identities. Keep the existing response/exit/supervisor bounds
+and verify kernel-owned retirement and empty private state. These name-selected
+Node readers do not replace actual-host or capability-negotiation qualification.
