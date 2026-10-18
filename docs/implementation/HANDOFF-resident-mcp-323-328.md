@@ -234,3 +234,15 @@ Foreign versions remain opaque. All 43 nearby tests and seven packaged metadata
 fault schedules pass, with successful kernel-owned exit and cleanup; static
 checks/reviews pass. This does not settle ten-parent timing, real Huly, native
 platforms or the final combined gate. All six issues remain open.
+
+## Ten-parent diagnostic distinction after `15ae6b13`
+
+The latest unmodified run completed all ten observations and survivor read but
+exceeded supervisor time while awaiting backend retirement. Earlier connection
+failures remain a separate unresolved class. A scratch admission trace never
+reached admission and cannot prove a lease leak. A backend CPU-profile copy passed
+with actual kernel-owned exit; it is diagnostic, not a production pass. See the
+[current evidence](issue-328.md#current-ten-parent-failure-stage-and-diagnostic-cpu-profile-2026-10-17).
+No production code, deadline or validation changed. Backend-only profiling and a
+single instrumented pass are insufficient to choose an optimization or claim
+reliable performance. Per-process phase evidence remains the next diagnostic need.

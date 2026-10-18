@@ -6,11 +6,12 @@ The live #328 body was read on 2026-10-17; its last update was
 
 The Linux candidate is in `/tmp/hulymcp-resident-linux`, branch
 `implement/resident-mcp-linux-323-328`. The latest production checkpoint is
-`b3a3fc5c`; the subsequent normal-stop/concurrent-replacement increment changes
-only fixtures and reports. [Issue 327](issue-327.md#linux-packaged-stop-and-concurrent-normal-replacement-2026-10-17)
-records exact MCP/CLI artifact hashes, the redacted receipt and preserved attempts.
-It independently joins kernel-owned exits rather than inferring retirement from
-CLI acceptance or missing metadata.
+`15ae6b13`, including retained admission and namespace/locator consistency fixes.
+[Issue 327](issue-327.md) records scoped process receipts and exact MCP/CLI
+artifact hashes. Those receipts independently join owned exits rather than
+inferring retirement from CLI acceptance or missing metadata. The current
+unmodified ten-parent run still fails qualification; see the diagnostic section
+below.
 
 ## Acceptance evidence index
 
@@ -26,7 +27,7 @@ evidence leaves the criterion pending.
 | 5. Actual host discovery and continued reads | Programmatic pinned MCP client parents exercise the packaged adapter. Naming clients after hosts is not actual application-host discovery. Native host evidence remains pending. |
 | 6. Alternating fresh-process comparisons | Pending for standalone, managed and direct HTTP with one/ten clients and declared cache boundaries. |
 | 7. Total RSS/CPU/completion rates | Pending. No prior direct-HTTP memory figure is adopted as a managed-stdio budget. Include every actual adapter, launcher and backend. |
-| 8. Adversarial routing/backpressure/no replay | Existing scoped routing/request-loss evidence and the [operation-stop fault schedules](issue-327.md#stop-during-an-operation-and-failed-cleanup-2026-10-17) prove scoped local behavior. The latter use an embedded registry and one filesystem write with explicit host cancellation. The [detectable namespace-loss schedules](issue-327.md#refuse-detectable-ownership-state-loss-before-selection-2026-10-17) additionally cover five local metadata faults with a live existing caller. Complete real-Huly fault qualification remains pending. |
+| 8. Adversarial routing/backpressure/no replay | Existing scoped routing/request-loss evidence and the [operation-stop fault schedules](issue-327.md#stop-during-an-operation-and-failed-cleanup-2026-10-17) prove scoped local behavior. The latter use an embedded registry and one filesystem write with explicit host cancellation. The [detectable namespace-loss schedules](issue-327.md#refuse-detectable-ownership-state-loss-before-selection-2026-10-17) and [locator-content schedules](issue-327.md#parse-and-compare-current-locator-contents-2026-10-17) cover seven local metadata faults with a live existing caller. Complete real-Huly fault qualification remains pending. |
 | 9. Quint and aligned oracle scenarios | The newer lifecycle model is type-only awaiting its recorded sketch checkpoint. Full lifecycle logic, checks and observed scenario alignment remain pending. |
 | 10. Per-platform receipts and cleanup | Linux receipts include source/artifact evidence and owned exit checks. Complete platform receipts, preserved failures and all cleanup suffixes remain pending. |
 | 11. Operational launch/status/stop/recovery/upgrade guidance | [Manual](../resident-manual.md), status/stop help and generated CLI skill document current behavior. Acceptance explicitly leaves retirement unconfirmed. Final supported-path audit remains pending. |
@@ -93,3 +94,55 @@ probe/session stderr files were empty. It does not identify the cause of the
 earlier connection timeout. This change strengthens retirement evidence only;
 launch reliability, complete platform qualification and final integration remain
 pending. No production code or recovery policy changed.
+
+## Current ten-parent failure stage and diagnostic CPU profile (2026-10-17)
+
+The unmodified production artifact at `15ae6b13` was tested once with all original
+callers and deadlines. This attempt completed connections and initial catalog /
+context observations for all ten parents, passed creator-loss and survivor-read
+checks, and closed the remaining parents. It then exceeded the supervisor's
+existing 25-second run deadline while waiting for idle backend exit. This failure
+is therefore distinct from the earlier connection-stage timeouts; neither class
+is resolved. Log `/tmp/resident-current-ten-parent-15ae6b13.log`, SHA-256
+`08ae81e9f6ffc6b891ef3ee9def5e092a0e29743e39636605498efdd5cec0975`.
+The retained artifact `dist/stdio-suite-yXSVRO/index.cjs` has SHA-256
+`46d6da1873caab884f407e205a809db70cbc9904cf85fdf39317d70f82b49db6`.
+
+An admission-trace scratch copy under `/tmp/resident-idle-trace-od2tb61j` failed
+earlier, before any admission was recorded. Its fence events with zero members
+cannot establish whether a successfully connected run leaks a lease. Do not cite
+that attempt as successful cleanup or a negative leak test.
+
+A second diagnostic copy changed only managed-child arguments to enable Node's
+CPU profiler. This instrumented run passed ten-parent convergence, caller loss,
+the retained eleven-second session hold, survivor read, and kernel-owned backend
+exit code 0, with complete private-state removal. The original supervisor and
+response deadlines were unchanged. Receipt
+`/tmp/resident-startup-cpu-67spu_9w/receipt.json`, SHA-256
+`b6aa47a701162dbb9e1ac4a07b88961d3e86441c64fd4ac700e4de0b6c7f7bf1`;
+phases SHA-256 `4c7c6abaddf24a35a532386ede51b970aaed3bcb3204ff857543b04432490437`.
+This is diagnostic evidence, not a production qualification pass.
+
+The retained CPU profile is
+`/tmp/resident-startup-cpu-67spu_9w/CPU.20261017.201759.102260.0.001.cpuprofile`,
+SHA-256 `ef3b88ef729a13bc5041fe9aeafa8e20ae60d178842fdf3f612e1863adb88ec9`.
+Its active samples include JSON-tree checks, JSON-RPC encoding, module loading
+and garbage collection. The large idle portion includes the fixture's deliberate
+session hold and production idle wait; it cannot itself identify an unexpected
+wait. Only the backend was profiled, so client/adapter CPU and complete system
+resource costs remain unmeasured. Environment/claim and raw profile summaries are
+retained beside it. Both the effective process affinity and host-reported CPU
+count in the retained claim are 12. No separate physical-core inventory was
+established.
+
+The esbuild metafile in the same directory shows no static import path from the
+managed adapter entrypoint to `src/mcp/tools/index.ts` when dynamic import edges
+are excluded. This rejects the proposed eager full-registry import path; it does
+not eliminate bundle parsing or runtime import costs.
+
+Performance verdict: inconclusive. One instrumented run, preserved inconsistent
+ordinary attempts and a backend-only profile do not establish a stable limiter,
+repeatable improvement or a complete resource comparison. No production timer,
+lease, validation or protocol behavior was changed from these observations.
+Further diagnosis needs phase-aligned per-process evidence, including actual
+adapters/clients. All qualification criteria remain required.
