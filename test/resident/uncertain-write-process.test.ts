@@ -6,6 +6,8 @@ import { createInterface } from "node:readline"
 import { Deferred, Effect, Schema } from "effect"
 import { expect, it } from "vitest"
 
+import { LeasePolicy } from "../../src/resident/admission-contract.js"
+
 import { fixturePackageVersion, startResidentFixture } from "../helpers/resident-fixture.js"
 import { withRegistryDirectory } from "../helpers/resident-registry-fixture.js"
 import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
@@ -36,7 +38,7 @@ const progressLine = Schema.encodeSync(Schema.fromJsonString(FixtureProgress))({
   params: { progressToken: "fixture-write", progress: 1 }
 })
 
-it.each(["before-headers", "after-progress", "terminal-output-loss"])(
+it.each(["before-headers", "after-progress", "terminal-output-loss", "renewal-loss"])(
   "does not replay a committed write after %s response loss",
   { timeout: PROCESS_BOUND },
   async (mode) => {
@@ -46,6 +48,10 @@ it.each(["before-headers", "after-progress", "terminal-output-loss"])(
       await withRegistryDirectory(async (directory) => {
         const stateFile = join(directory, "state.json")
         let dispatches = 0
+        let renewals = 0
+        const committed = Effect.runSync(Deferred.make<void>())
+        const releaseResponse = Effect.runSync(Deferred.make<void>())
+        const pending: Array<Promise<void>> = []
         const terminalWritten = Effect.runSync(Deferred.make<void>())
         let truncate: (() => void) | undefined
         const failures: Array<unknown> = []
@@ -54,14 +60,18 @@ it.each(["before-headers", "after-progress", "terminal-output-loss"])(
             const chunks: Array<Buffer> = []
             request.on("data", (chunk: Buffer) => chunks.push(chunk))
             request.once("end", () => {
-              void (async () => {
+              const operation = (async () => {
                 Schema.decodeUnknownSync(Schema.fromJsonString(FixtureWrite))(Buffer.concat(chunks).toString("utf8"))
                 dispatches++
                 await fs.writeFile(stateFile, Schema.encodeSync(Schema.fromJsonString(FixtureState))({ writes: 1 }), {
                   flag: "wx",
                   mode: 0o600
                 })
-                if (mode === "after-progress") {
+                Effect.runSync(Deferred.succeed(committed, undefined))
+                if (mode === "renewal-loss") {
+                  await Effect.runPromise(Deferred.await(releaseResponse))
+                  response.destroy()
+                } else if (mode === "after-progress") {
                   truncate = () => response.destroy()
                   response.writeHead(200, { "content-type": "text/event-stream" })
                   response.write(`data: ${progressLine}\n\n`)
@@ -77,15 +87,35 @@ it.each(["before-headers", "after-progress", "terminal-output-loss"])(
                       })
                     )
                 } else response.destroy()
-              })().catch((error: unknown) => {
+              })()
+              pending.push(operation)
+              void operation.catch((error: unknown) => {
                 failures.push(error)
                 response.destroy()
               })
             })
           },
           "uncertain-write-private-fixture",
-          await fixturePackageVersion()
+          await fixturePackageVersion(),
+          undefined,
+          mode === "renewal-loss"
+            ? {
+                lease: Schema.decodeUnknownSync(LeasePolicy)({ durationMillis: 1000, renewEveryMillis: 10 }),
+                renew: (_request, response) => {
+                  renewals++
+                  const renewal = Effect.runPromise(Deferred.await(committed)).then(() => {
+                    response.writeHead(403).end()
+                  })
+                  pending.push(renewal)
+                  void renewal.catch((error: unknown) => {
+                    failures.push(error)
+                    response.destroy()
+                  })
+                }
+              }
+            : undefined
         )
+        let cleanupFailed = false
         try {
           const adapter = spawn(process.execPath, [bundle.path], {
             env: { ...testStdioEnvironment(), MCP_TRANSPORT: "stdio-http", MCP_RESIDENT_ATTACHMENT_FILE: fixture.file }
@@ -120,12 +150,15 @@ it.each(["before-headers", "after-progress", "terminal-output-loss"])(
               await Effect.runPromise(Deferred.await(terminalWritten).pipe(Effect.timeout(RESPONSE_BOUND)))
               expect(Buffer.concat(diagnostics).toString("utf8")).toContain("Stdio output failed")
             } else expect(Buffer.concat(diagnostics).toString("utf8")).toContain("operation outcome may be unknown")
-            if (mode !== "terminal-output-loss")
+            if (mode === "renewal-loss") expect(renewals).toBe(1)
+            if (mode !== "terminal-output-loss" && mode !== "renewal-loss")
               expect(Buffer.concat(diagnostics).toString("utf8")).toContain("No request was replayed")
             expect(
               Schema.decodeUnknownSync(Schema.fromJsonString(FixtureState))(await fs.readFile(stateFile, "utf8"))
             ).toEqual({ writes: 1 })
             expect(dispatches).toBe(1)
+            Effect.runSync(Deferred.succeed(releaseResponse, undefined))
+            await Effect.runPromise(Effect.promise(() => Promise.all(pending)).pipe(Effect.timeout(RESPONSE_BOUND)))
             expect(failures).toEqual([])
           } finally {
             lines.close()
@@ -135,8 +168,14 @@ it.each(["before-headers", "after-progress", "terminal-output-loss"])(
             }
           }
         } finally {
-          await fixture.cleanup()
+          Effect.runSync(Deferred.succeed(committed, undefined))
+          Effect.runSync(Deferred.succeed(releaseResponse, undefined))
+          const handlers = await Promise.allSettled(pending)
+          const resources = await Promise.allSettled([fixture.cleanup()])
+          cleanupFailed = [...handlers, ...resources].some((result) => result.status === "rejected")
+          if (cleanupFailed) process.stderr.write("Uncertain-write fixture cleanup failed\n")
         }
+        if (cleanupFailed) throw new Error("Uncertain-write fixture cleanup failed")
       })
       passed = true
     } finally {

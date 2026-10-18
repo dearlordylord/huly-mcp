@@ -1293,3 +1293,8 @@ pending. All six delivery issues remain open.
 ### Late old response versus fresh colliding ID — 2026-10-18
 
 [Report](resident-late-colliding-reply-2026-10-18.md): delayedcommit actualpackagedmanualadapter fixture adds freshreadID1held whiledeadoldadapterwriteID1 commits/attemptsterminalonclosedconnection. Operationdiscriminator rulesoutwrites1falsematch; entirefreshstdout aftercloseexactly ID1read/ID2read, one write/two reads/nohandlerfailures. Originalread0beforecommit preserved. Final2focusedfiles5testsPASS3.92s; local lint/format and reviews accepted. No productionchange/fullgate. Adapter-incarnation/syntheticTLSscope, notbackendgeneration replacement/liveHuly; all six tickets remain incomplete.
+
+
+### Renewal loss during committed write — 2026-10-18
+
+[Report](resident-write-renewal-loss-2026-10-18.md): actualpackagedmanualadapter/privateTLS controlledrenewal403 onlyafterwritefilecommit, responseheld; adapterexit1/unknown/nooutput, exact1renewal/1dispatch/state1. Typedfixturelease seam retainsdefaultauth/tokenregistration; shorttestlease only, productboundsunchanged. Bothwrite+renewalpromises owned/joined, failuregatesreleased andprimaryerrorpreserved. Final3focusedfiles28testsPASS, local lint/format and reviewsaccepted. No productionchange/fullgate; nativeHuly/leaseexpiry/alluncertainty/platform/model/finalqualification remain open, all six issues incomplete.

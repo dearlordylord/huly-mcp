@@ -12,6 +12,7 @@ import { makeResidentHttpsListener, ResidentTlsIdentity } from "../../src/reside
 import { VERSION } from "../../src/version.js"
 import {
   AttachmentAdmitted,
+  type LeasePolicy,
   DEFAULT_LEASE_POLICY,
   RESIDENT_ATTACHMENT_HEADER,
   RESIDENT_ATTACHMENTS_PATH
@@ -31,7 +32,8 @@ export const startResidentFixture = async (
   handler: RequestListener,
   authorization: string,
   implementationVersion = VERSION,
-  controlHandler?: RequestListener
+  controlHandler?: RequestListener,
+  leaseControl?: { readonly lease: LeasePolicy; readonly renew: RequestListener }
 ) => {
   const directory = await fs.mkdtemp(path.join(await fs.realpath(tmpdir()), "resident-fixture-"))
   const identity = Schema.decodeUnknownSync(ResidentTlsIdentity)({
@@ -59,12 +61,16 @@ export const startResidentFixture = async (
           const admitted = Schema.decodeUnknownSync(AttachmentAdmitted)({
             version: 1,
             token,
-            lease: DEFAULT_LEASE_POLICY
+            lease: leaseControl?.lease ?? DEFAULT_LEASE_POLICY
           })
           response
             .writeHead(HTTP_CREATED, { "content-type": "application/json" })
             .end(Schema.encodeSync(Schema.fromJsonString(AttachmentAdmitted))(admitted))
         } else {
+          if (request.method === "PUT" && leaseControl !== undefined) {
+            leaseControl.renew(request, response)
+            return
+          }
           const token = request.headers[RESIDENT_ATTACHMENT_HEADER]
           if (request.method === "DELETE" && typeof token === "string") attachments.delete(token)
           response.writeHead(HTTP_NO_CONTENT).end()
