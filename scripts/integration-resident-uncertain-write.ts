@@ -1,6 +1,7 @@
 import "../src/polyfills.js"
 import { spawn } from "node:child_process"
 import { once } from "node:events"
+import { createInterface } from "node:readline"
 import * as fs from "node:fs/promises"
 import { join } from "node:path"
 import { Effect, Layer, Schema } from "effect"
@@ -25,10 +26,23 @@ import { testStdioEnvironment } from "../test/helpers/stdio-environment.js"
 const REQUEST_ID = 41
 const RESPONSE_BOUND = 5_000
 const EXIT_BOUND = 7_000
+const HTTP_OK = 200
+const ResponseLoss = Schema.Literals(["before-headers", "after-progress"])
+const Progress = Schema.Struct({
+  jsonrpc: Schema.Literal("2.0"),
+  method: Schema.Literal("notifications/progress"),
+  params: Schema.Struct({ progressToken: Schema.Literal("live-fixture-write"), progress: Schema.Literal(1) })
+})
+const progressLine = Schema.encodeSync(Schema.fromJsonString(Progress))({
+  jsonrpc: "2.0",
+  method: "notifications/progress",
+  params: { progressToken: "live-fixture-write", progress: 1 }
+})
 
 const Input = Schema.Struct({
   bundle: ResidentPackagePath,
   upstreamProtocol: LiveReadProtocol,
+  responseLoss: ResponseLoss,
   evidence: ResidentDirectory,
   project: CreateProjectParamsSchema
 })
@@ -39,6 +53,8 @@ const Call = Schema.Struct({
   params: Schema.Struct({ name: Schema.Literal("fixture_create_project"), arguments: Schema.Struct({}) })
 })
 const Phase = Schema.Struct({
+  responseLoss: ResponseLoss,
+  progressObserved: Schema.Boolean,
   dispatches: Schema.Int,
   submitted: Schema.Boolean,
   created: Schema.Boolean,
@@ -48,6 +64,7 @@ const Phase = Schema.Struct({
 const Observation = Schema.Struct({
   boundary: Schema.Literal("packaged-adapter-test-tls-packaged-managed-backend"),
   upstreamProtocol: LiveReadProtocol,
+  responseLoss: ResponseLoss,
   project: CreateProjectParamsSchema.fields.identifier,
   dispatches: Schema.Literal(1),
   created: Schema.Literal(true),
@@ -95,6 +112,8 @@ const run = async (
   let cleanupState: Schema.Schema.Type<typeof Phase>["cleanup"] = "not-submitted"
   const handlers: Array<Promise<void>> = []
   let handlerFailed = false
+  let truncate: (() => void) | undefined
+  let progressObserved = false
   const fixture = await startResidentFixture(
     (request, response) => {
       const chunks: Array<Buffer> = []
@@ -112,7 +131,11 @@ const run = async (
             "Creation did not confirm the owned fixture"
           )
           created = true
-          response.destroy()
+          if (input.responseLoss === "after-progress") {
+            truncate = () => response.destroy()
+            response.writeHead(HTTP_OK, { "content-type": "text/event-stream" })
+            response.write(`data: ${progressLine}\n\n`)
+          } else response.destroy()
         })()
         handlers.push(handler)
         void handler.catch(() => {
@@ -129,6 +152,9 @@ const run = async (
   })
   const closed = once(adapter, "close")
   void closed.catch(() => {})
+  const lines = createInterface({ input: adapter.stdout })
+  const progress = input.responseLoss === "after-progress" ? once(lines, "line") : undefined
+  void progress?.catch(() => {})
   const output: Array<Buffer> = []
   const diagnostics: Array<Buffer> = []
   adapter.stdout.on("data", (chunk: Buffer) => output.push(chunk))
@@ -145,11 +171,21 @@ const run = async (
         params: { name: "fixture_create_project", arguments: {} }
       })}\n`
     )
+    if (progress !== undefined) {
+      const observed = Schema.decodeUnknownSync(Schema.Tuple([Schema.String]))(await bounded(progress, RESPONSE_BOUND))
+      if (observed[0] !== progressLine || truncate === undefined)
+        throw new Error("Expected committed-write progress missing")
+      progressObserved = true
+      truncate()
+    }
     const exited = await bounded(closed, RESPONSE_BOUND)
     requireFact(exited[0] === 1 && exited[1] === null, "Adapter did not report failure")
     await bounded(Promise.all(handlers), RESPONSE_BOUND)
     requireFact(!handlerFailed && created && dispatches === 1, "One real mutation was not confirmed")
-    requireFact(Buffer.concat(output).length === 0, "Host observed unexpected terminal output")
+    requireFact(
+      Buffer.concat(output).toString("utf8") === (input.responseLoss === "after-progress" ? `${progressLine}\n` : ""),
+      "Host observed unexpected terminal output"
+    )
     const diagnostic = Buffer.concat(diagnostics).toString("utf8")
     requireFact(
       diagnostic.includes("operation outcome may be unknown") && diagnostic.includes("No request was replayed"),
@@ -175,6 +211,7 @@ const run = async (
     bounded(Promise.all(handlers), RESPONSE_BOUND)
   ])
   const transportCleanup = await Promise.allSettled([fixture.cleanup()])
+  lines.close()
   let deleted = false
   const remoteCleanup = await Promise.allSettled([
     (async () => {
@@ -192,6 +229,8 @@ const run = async (
     fs.writeFile(
       join(input.evidence, "phases.json"),
       Schema.encodeSync(Schema.fromJsonString(Phase))({
+        responseLoss: input.responseLoss,
+        progressObserved,
         dispatches,
         submitted,
         created,
@@ -208,6 +247,7 @@ const run = async (
   return Observation.make({
     boundary: "packaged-adapter-test-tls-packaged-managed-backend",
     upstreamProtocol: input.upstreamProtocol,
+    responseLoss: input.responseLoss,
     project: input.project.identifier,
     dispatches: 1,
     created: true,

@@ -813,7 +813,14 @@ general exactly-once claim.
 
 Compile the probe with the candidate's version define and external `ws`, then run
 it under `test/resident/fixtures/reap-descendants.py --report-reaped` with one JSON argument:
-`{"bundle":"/absolute/candidate/index.cjs","upstreamProtocol":"2026-07-28","evidence":"/absolute/new/private/evidence","project":{"identifier":"RTEST","name":"Unique disposable resident fixture","private":true}}`.
+`{"bundle":"/absolute/candidate/index.cjs","upstreamProtocol":"2026-07-28","responseLoss":"after-progress","evidence":"/absolute/new/private/evidence","project":{"identifier":"RTEST","name":"Unique disposable resident fixture","private":true}}`.
+Choose `responseLoss` explicitly. `before-headers` discards the confirmed response
+without sending HTTP headers. `after-progress` sends one schema-encoded progress
+notification from the test TLS endpoint, waits until the downstream host observes
+it, then truncates the response. This notification tests adapter forwarding; it
+does not demonstrate a native Huly progress producer. The receipt records the
+selected fault boundary. In the latter case, host stdout must contain exactly the
+progress notification and no terminal response.
 Choose `upstreamProtocol` explicitly: `2026-07-28` uses modern request metadata;
 `2025-06-18` requires a checked initialize reply and initialized notification
 before the native mutation. The receipt names the upstream protocol. This selects
