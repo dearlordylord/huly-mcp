@@ -25,7 +25,8 @@ module resident_launch {
     model: ModelPhase,
     parentConnected: bool,
   }
-  type ClaimOwner = LauncherOwner(CallerId) | BackendOwner(BackendId)
+  type ClaimOwner = LauncherOwner(CallerId)
+    | TransferOwner({ parent: CallerId, backend: BackendId }) | BackendOwner(BackendId)
   type Claim = Free | Held({ owner: ClaimOwner, capability: CapabilityId }) | Unresolved
   type Locator = {
     generation: GenerationId,
@@ -39,7 +40,7 @@ module resident_launch {
   type RetirementEvidence = RetirementUnverified | OwnedClosureConfirmed | OperatorRetirementVerified
   type Cleanup = Active | CleanupPending | CleanupFailed | CleanupConfirmed
   type OwnedResource = { caller: CallerId, backend: BackendId, generation: GenerationId, cleanup: Cleanup, admitted: bool }
-  type StartMessage = { parent: CallerId, backend: BackendId, authenticated: bool }
+  type StartMessage = { parent: CallerId, backend: BackendId, authenticated: bool, claim: CapabilityId }
   type AttachmentPhase = LeaseLive | LeaseExpired | LeaseReleased
   type Attachment = { caller: CallerId, generation: GenerationId, phase: AttachmentPhase, expires: int }
   type RequestPhase = Queued | WaitingForModel | Running | RequestCancelled | Terminal
@@ -55,7 +56,8 @@ module resident_launch {
 
   var callers: CallerId -> Caller
   var backends: BackendId -> Backend
-  var claims: SelectionKey -> Claim
+  // One protected namespace serializes selection across configuration identities.
+  var claim: Claim
   var registry: GenerationId -> RegistryEntry
   var publication: GenerationId -> PublicationReceipt
   var retirement: GenerationId -> RetirementEvidence

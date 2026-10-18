@@ -10,7 +10,7 @@ The source contract is GitHub #322 through #328,
 [ADR 0003](../docs/adr/0003-adopt-mcporter-resident-lifecycle.md) and
 [the selected lifecycle contract](../docs/adr/0003-adopt-mcporter-resident-lifecycle.md).
 The sketch follows the adopted MCPorter lifecycle practices: callers, native
-backends, per-identity ownership claims, publication receipts, attachment leases,
+backends, namespace selection claims, publication receipts, attachment leases,
 requests and explicit retirement evidence. It does not require a guardian,
 restricted worker or operation journal.
 
@@ -92,3 +92,14 @@ These are proposed type corrections only. They add no actions, invariants, initi
 
 
 The proposed coordination abstraction remains plain Quint: protected claims/registry are shared-state coordination, while `starts` represents explicitly scheduled delivery of startup messages. This keeps ownership/retirement interleavings in one bounded state model but requires explicit message-delivery actions rather than Choreo scaffolding. The choice and the grouping of per-caller/per-backend records are part of the existing type-sketch sign-off, not an approved transition design.
+
+The sketch represents one protected state directory. Its single `claim` serializes
+selection across configuration identities, matching `selection.claim` in that
+directory. Backends for distinct configuration or implementation identities may
+coexist after publication releases the claim. `TransferOwner` represents the
+interval after the parent revokes its release capability and before the child
+adopts it. Start carries the same claim
+capability; the native device/inode pair remains an abstraction boundary. A lost
+Start does not make the claim free or restore parent release authority. These
+changes reconcile the proposed types with private bootstrap version 2; they add
+no transitions or verification claim and still await type-sketch approval.
