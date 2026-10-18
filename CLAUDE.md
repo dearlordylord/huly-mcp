@@ -2,6 +2,10 @@
 
 Rules are reflexive: when adding a rule, apply it immediately.
 
+## Legacy requires evidence
+
+Keep or introduce legacy behavior only for a demonstrated current requirement. Before preserving a compatibility path, name the concrete supported consumer that needs it, verify that need, and test whether an update or ordinary client restart resolves it. Apply especially strict scrutiny to every legacy proposal; hypothetical consumers, stale specifications and "just in case" are insufficient. When no current requirement remains, remove the legacy path and update its specification and tests together.
+
 ## Design Principle: LLM-First API
 
 The primary consumer of this MCP server is an LLM coding agent, not a human developer. All design decisions — tool naming, parameter shapes, description writing, error messages, defaults — must optimize for LLM comprehension and single-call correctness. Prefer fewer tool calls with clear semantics over multi-step protocols. Auto-resolve identifiers where possible rather than requiring the caller to decompose them. Write tool descriptions as if the reader has no documentation beyond the schema and the description string.
@@ -16,7 +20,7 @@ When setting up a new project from this one, ALL of these components must be cop
 3. **Circular dependency detection** (`dpdm --exit-code circular:1` in `circular`, wired into `check-all`): catches import cycles while ignoring type-only dependencies.
 4. **Cyclomatic complexity** (`oxlint.complexity.json`, wired into `check-all`): The lint gate caps classic McCabe complexity at 8 for all production TypeScript, with no suppression baseline.
 5. **Pre-commit hooks** (`.husky/pre-commit`): lint-staged + gitleaks secrets scanning.
-6. **check-all** (`pnpm check-all`): build + TypeScript 7 and Effect diagnostics + circular + complexity + lint (Oxlint + jscpd) + test. Gate for all work.
+6. **check-all** (`pnpm check-all`): build + TypeScript 7 and Effect diagnostics + circular + complexity + lint (Oxlint + jscpd) + test. Preserve this full gate; choose its execution cadence according to Verification below.
 7. **Effect testing** (`@effect/vitest`): Effect-aware test runner integration.
 8. **Effect language-service diagnostics** (`effect-tsgo diagnostics --project tsconfig.json --strict --severity error,warning`): run through `@effect/tsgo` as part of `typecheck` without patching TypeScript; Effect errors and warnings fail the gate.
 9. **Oxc lint and formatting** (`.oxlintrc.json` + `oxlint-tsgolint` + `dprint.json` with `dprint-plugin-oxc`): type-aware Oxlint plus Oxc formatting through dprint, without the ESLint runtime. Project-only architectural rules live in `scripts/oxlint-project-plugin.mjs`.
@@ -36,9 +40,9 @@ Use `pnpm`, not npm. Prefer package.json scripts over raw commands (e.g., `pnpm 
 For movement qualification retries, follow [verified quality receipt reuse](INTEGRATION_TESTING.md#reusing-verified-movement-quality-evidence) before repeating preparation.
 For a multi-suite campaign or a completion report, use [campaign policy and evidence publication](INTEGRATION_TESTING.md#campaign-policy-and-evidence-publication).
 
-Run before considering work complete:
-1. `pnpm check-all` (runs build, typecheck, circular, lint, test)
-2. Integration tests against local Huly (Docker) — **required** for any new feature, major change, or pre-release. Do not defer to the user; run them yourself. See `INTEGRATION_TESTING.md` for test patterns and `CLAUDE.local.md` for credentials/setup.
+Prefer focused local verification during implementation: run the affected tests and checks, and broaden only when a concrete failure or cross-cutting change requires it. Do not routinely run `pnpm check-all` or whole integration suites after each increment. Keep full qualification for the coherent final candidate or release, subject to the user's current instructions. Preserve all thresholds and diagnostics.
+
+Run relevant integration scenarios against local Huly (Docker) when needed to prove changed behavior; follow the current campaign cadence rather than repeating the whole suite. Do not defer authorized verification to the user. See `INTEGRATION_TESTING.md` for test patterns and `CLAUDE.local.md` for credentials/setup.
 
 For movement qualification and failure diagnosis, follow [bounded movement qualification](INTEGRATION_TESTING.md#bounded-movement-qualification).
 
