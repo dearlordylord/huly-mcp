@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
 import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
 import { residentSelectionEnvironment } from "../helpers/resident-selection-environment.js"
-import { ConfigFaultInput, ConfigFaultReceipt } from "./config-fault-contract.js"
+import { ConfigFaultInput, ConfigFaultMode, ConfigFaultReceipt } from "./config-fault-contract.js"
 
 const PROCESS_BOUND = 30_000
 const runFile = promisify(execFile)
@@ -45,14 +45,14 @@ describe.skipIf(process.platform !== "linux")("packaged configuration fault isol
   afterAll(async () => {
     if (!failed) await bundle.cleanup()
   })
-  it.each(protocols)(
-    "isolates a backend crash from an unrelated active configuration with %s",
+  it.each(protocols.flatMap((protocol) => ConfigFaultMode.literals.map((mode) => ({ protocol, mode }))))(
+    "isolates a backend crash from an unrelated active configuration with $protocol / $mode",
     { timeout: PROCESS_BOUND },
-    async (protocol) => {
+    async ({ mode, protocol }) => {
       const root = await fs.mkdtemp(join(await fs.realpath(tmpdir()), "resident-config-faults-"))
       const directory = join(root, "state")
       await fs.mkdir(directory, { mode: 0o700 })
-      const input = Schema.decodeUnknownSync(ConfigFaultInput)({ bundle: bundle.path, host, directory, protocol })
+      const input = Schema.decodeUnknownSync(ConfigFaultInput)({ bundle: bundle.path, host, directory, protocol, mode })
       try {
         const result = await runFile(
           "python3",
@@ -80,9 +80,17 @@ describe.skipIf(process.platform !== "linux")("packaged configuration fault isol
           [41, "SURVIVE", "Surviving configuration"],
           [42, "SURVIVE", "Surviving configuration"]
         ])
-        expect(receipt.failedAdapterExit.signal).toBe("SIGKILL")
-        expect(receipt.backendSignal.processId).toBe(receipt.failedBackendExit.processId)
-        expect(receipt.failedBackendExit.exitCode).toBe(-9)
+        expect(receipt.fault.kind).toBe(mode)
+        if (receipt.fault.kind === "adapter-backend") {
+          expect(receipt.fault.adapterExit.signal).toBe("SIGKILL")
+          expect(receipt.fault.signal.processId).toBe(receipt.fault.backendExit.processId)
+          expect(receipt.fault.backendExit.exitCode).toBe(-9)
+        } else {
+          expect(receipt.fault.signal.adapterPid).toBe(receipt.failed.adapterPid)
+          expect(receipt.fault.adapterExit.code).toBe(1)
+          expect(receipt.fault.adapterExit.signal).toBe(null)
+        }
+        expect(receipt.fault.signal.closed).toBe(true)
         expect(receipt.survivorBackendExit.exitCode).toBe(0)
         expect(receipt.survivorAdapterExit.code).toBe(0)
         expect(receipt.survivorRegistryUnchanged).toBe(true)

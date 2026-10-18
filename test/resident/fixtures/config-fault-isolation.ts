@@ -96,26 +96,40 @@ const main = async () => {
     const authenticatedA = await Effect.runPromise(readResidentLiveStatus(descriptorA))
     assert.equal(authenticatedA.kind, "authenticated")
     process.stderr.write("Config fault: both owned generations authenticated; survivor query held\n")
-    // Transfer the detached backend to the fixture subreaper before crashing it.
-    failed.send({ _tag: "lose", mode: "kill" })
-    assert.deepEqual(await failed.next(), { _tag: "loss", mode: "kill" })
-    const lostAdapter = Schema.decodeUnknownSync(ActiveQueryEvent.cases.exit)(await failed.next())
-    assert.equal(lostAdapter.signal, "SIGKILL")
-    const fault = await runFile(
-      "python3",
-      [
-        "test/resident/fixtures/signal-owned-backend.py",
-        String(ownerA.envelope.diagnostics.processId),
-        String(process.ppid),
-        input.bundle
-      ],
-      { timeout: 5_000 }
-    )
-    const signaled = Schema.decodeUnknownSync(Schema.fromJsonString(OwnedBackendSignal))(fault.stdout)
-    assert.equal(signaled.processId, ownerA.envelope.diagnostics.processId)
-    stage = "crash-exit"
-    const failedBackendExit = await kernel.wait(ownerA.envelope.diagnostics.processId)
-    assert.equal(failedBackendExit.exitCode, SIGKILL_EXIT)
+    const signalBackend = async (
+      adapterPid?: Schema.Schema.Type<typeof ActiveQueryEvent.cases.ready.fields.adapterPid>
+    ) => {
+      const output = await runFile(
+        "python3",
+        [
+          "test/resident/fixtures/signal-owned-backend.py",
+          String(ownerA.envelope.diagnostics.processId),
+          String(process.ppid),
+          input.bundle,
+          ...(adapterPid === undefined ? [] : [String(adapterPid)])
+        ],
+        { timeout: 5_000 }
+      )
+      const signal = Schema.decodeUnknownSync(Schema.fromJsonString(OwnedBackendSignal))(output.stdout)
+      assert.equal(signal.processId, ownerA.envelope.diagnostics.processId)
+      return signal
+    }
+    const injected = await (async () => {
+      if (input.mode === "adapter-backend") {
+        failed.send({ _tag: "lose", mode: "kill" })
+        assert.deepEqual(await failed.next(), { _tag: "loss", mode: "kill" })
+        const adapterExit = Schema.decodeUnknownSync(ActiveQueryEvent.cases.exit)(await failed.next())
+        assert.equal(adapterExit.signal, "SIGKILL")
+        const signal = await signalBackend()
+        stage = "crash-exit"
+        const backendExit = await kernel.wait(ownerA.envelope.diagnostics.processId)
+        assert.equal(backendExit.exitCode, SIGKILL_EXIT)
+        return { kind: input.mode, adapterExit, backendExit, signal }
+      }
+      const signal = await signalBackend(first.adapterPid)
+      assert.equal(signal.adapterPid, first.adapterPid)
+      return { kind: input.mode, signal }
+    })()
     stage = "post-crash-status"
     const after = await status()
     assert.equal(after.work.retainedRequests, 1)
@@ -152,6 +166,15 @@ const main = async () => {
     const survivorBackendExit = await kernel.wait(ownerB.envelope.diagnostics.processId)
     assert.equal(survivorBackendExit.exitCode, 0)
     stage = "failed-parent-close"
+    const fault = await (async () => {
+      if (injected.kind === "adapter-backend") return injected
+      failed.send({ _tag: "close" })
+      failed.child.stdin.end()
+      const adapterExit = Schema.decodeUnknownSync(ActiveQueryEvent.cases.exit)(await failed.next())
+      assert.equal(adapterExit.code, 1)
+      assert.equal(adapterExit.signal, null)
+      return { ...injected, adapterExit }
+    })()
     assert.deepEqual(await failed.close(), [0, null])
     assert.equal(await fs.readFile(pathA, "utf8"), originalA)
     assert.equal(restB.observed.modelRequests, 1)
@@ -170,9 +193,7 @@ const main = async () => {
           survivor: second,
           statuses: [before, after, final],
           results: [result, continued],
-          failedAdapterExit: lostAdapter,
-          backendSignal: signaled,
-          failedBackendExit,
+          fault,
           survivorBackendExit,
           survivorAdapterExit,
           survivorRegistryUnchanged: true,

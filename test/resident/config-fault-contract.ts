@@ -2,13 +2,18 @@ import { Schema } from "effect"
 import { ResidentLiveStatus } from "../../src/resident/status-contract.js"
 import { KernelOwnedExit } from "../helpers/kernel-reaped-events.js"
 import { ActiveQueryEvent } from "./active-query-contract.js"
-export { ErrorRoutingInput as ConfigFaultInput } from "./error-routing-contract.js"
+import { ErrorRoutingInput } from "./error-routing-contract.js"
+
+export const ConfigFaultMode = Schema.Literals(["adapter-backend", "backend-only"])
+export const ConfigFaultInput = Schema.Struct({ ...ErrorRoutingInput.fields, mode: ConfigFaultMode })
 
 export const CONFIG_FAULT_READS = 2
 export const OwnedBackendSignal = Schema.Struct({
   processId: KernelOwnedExit.fields.processId,
   startTicks: Schema.Natural,
-  signal: Schema.Literal("SIGKILL")
+  signal: Schema.Literal("SIGKILL"),
+  closed: Schema.Literal(true),
+  adapterPid: Schema.optionalKey(KernelOwnedExit.fields.processId)
 })
 export const ConfigFaultReceipt = Schema.Struct({
   protocol: ActiveQueryEvent.cases.ready.fields.protocol,
@@ -16,9 +21,19 @@ export const ConfigFaultReceipt = Schema.Struct({
   failed: ActiveQueryEvent.cases.ready,
   statuses: Schema.Tuple([ResidentLiveStatus, ResidentLiveStatus, ResidentLiveStatus]),
   results: Schema.Tuple([ActiveQueryEvent.cases.result, ActiveQueryEvent.cases.result]),
-  failedAdapterExit: ActiveQueryEvent.cases.exit,
-  backendSignal: OwnedBackendSignal,
-  failedBackendExit: KernelOwnedExit,
+  fault: Schema.Union([
+    Schema.Struct({
+      kind: Schema.Literal("adapter-backend"),
+      adapterExit: ActiveQueryEvent.cases.exit,
+      backendExit: KernelOwnedExit,
+      signal: OwnedBackendSignal
+    }),
+    Schema.Struct({
+      kind: Schema.Literal("backend-only"),
+      adapterExit: ActiveQueryEvent.cases.exit,
+      signal: Schema.Struct({ ...OwnedBackendSignal.fields, adapterPid: KernelOwnedExit.fields.processId })
+    })
+  ]),
   survivorBackendExit: KernelOwnedExit,
   survivorAdapterExit: ActiveQueryEvent.cases.exit,
   survivorRegistryUnchanged: Schema.Literal(true),
