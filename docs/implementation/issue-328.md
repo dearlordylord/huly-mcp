@@ -449,3 +449,44 @@ configuration selection and isolation using local context calls, not successful
 remote Huly authentication, keychain qualification, rotation/logout or full
 profile/policy coverage. The deferred real-Huly campaign, final coherent gate
 and all remaining requirements stay pending. No production code changed.
+
+### Managed saved-profile rotation and removal
+
+The packaged auth-path scenario now also replaces the saved profile's token
+while existing adapters remain attached. Before rotation the original two
+generations are still required. A fresh adapter selecting the same profile then
+observes a third distinct port; the original caller continues through its old
+port. Password isolation and equivalent environment-token sharing remain checked.
+
+Next the fixture removes the saved credential locally and starts a fresh raw
+packaged adapter. It must exit normally with code 1, no signal/timeout, empty
+stdout and the existing missing-credentials diagnostic. Removing the selected
+profile file entry produces the corresponding missing-profile diagnostic in
+another fresh process. Both refusals leave the three generation records unchanged,
+and the original caller remains usable after deletion. This exercises local file
+removal, not the interactive logout command or remote token revocation; captured
+authority is intentionally retained by an admitted caller. Changed-token rotation
+does not establish same-token credential-generation semantics.
+
+All three actual backend owners must exit with code 0 and leave empty managed
+state. Secret-absence checks on both refused-process stderr and normal process
+outputs pass only booleans to assertions. Existing response, supervision and
+retirement bounds are unchanged. The receipt now includes the rotated profile
+port and explicit refusal facts; older receipts remain historical scoped evidence.
+
+TypeScript/Effect diagnostics, focused lint and the executable scenario pass;
+fresh Standards/Spec reviews have no remaining findings. This increment adds no
+production behavior and does not qualify real Huly auth, another OS or the full
+contract. All six tickets remain open.
+
+Final focused log `/tmp/resident-managed-profile-lifecycle-final.log`, SHA-256
+`35bb96974600974dd977d9c1f8a98c77b657431444b3ddcabefb225e7fcb4682`,
+records one passing file/test. Receipt
+`/tmp/resident-managed-auth-4v1SZK.receipt.json`, SHA-256
+`e6aa8b490023b8097d13278e85ea0c5b73a6a9c34c9849c712b1aeb832b67504`,
+retains the shared/isolated/rotated ports, two refusal facts and all three owned
+exit-code-0 events. Earlier rotation and weaker connection-refusal attempts are
+retained separately under `/tmp/resident-managed-profile-rotation.log`,
+`/tmp/resident-managed-profile-lifecycle.log` and
+`/tmp/resident-managed-profile-lifecycle-verified.log`; only the final raw-process
+schedule establishes the documented normal refusal exits and secret checks.

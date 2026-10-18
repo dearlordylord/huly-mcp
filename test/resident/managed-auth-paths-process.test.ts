@@ -18,7 +18,7 @@ const ProcessFailure = Schema.Struct({ stderr: Schema.String })
 const runFile = promisify(execFile)
 
 it.skipIf(process.platform !== "linux")(
-  "shares resolved profile and environment tokens while isolating password authority",
+  "shares equivalent tokens and isolates password authority and rotated profile tokens",
   { timeout: TEST_BOUND },
   async () => {
     const bundle = await buildIsolatedStdioServer(BUILD_BOUND)
@@ -51,13 +51,21 @@ it.skipIf(process.platform !== "linux")(
         throw error
       })
       await fs.writeFile(`${root}.phases.log`, stderr, { mode: 0o600, flag: "wx" })
-      for (const secret of [residentSelectionEnvironment().HULY_TOKEN, "fixture-private-password"])
+      for (const secret of [
+        residentSelectionEnvironment().HULY_TOKEN,
+        "fixture-private-password",
+        "fixture-rotated-profile-token"
+      ])
         expect(`${stderr}${stdout}`.includes(secret)).toBe(false)
       const observation = Schema.decodeUnknownSync(Schema.fromJsonString(ManagedAuthObservation))(stdout)
-      expect(observation.backendExits).toHaveLength(2)
+      expect(observation.backendExits).toHaveLength(3)
       expect(observation.backendExits.every((exit) => exit.exitCode === 0)).toBe(true)
       expect(observation.profilePort).toBe(observation.environmentTokenPort)
       expect(observation.profilePort).not.toBe(observation.passwordPort)
+      expect(observation.rotatedProfilePort).not.toBe(observation.profilePort)
+      expect(observation.rotatedProfilePort).not.toBe(observation.passwordPort)
+      expect(observation.logoutRefused).toBe(true)
+      expect(observation.deletedProfileRefused).toBe(true)
       expect(await fs.readdir(join(root, "state"))).toEqual([])
       await fs.writeFile(
         `${root}.receipt.json`,

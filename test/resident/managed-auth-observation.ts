@@ -8,6 +8,9 @@ export const ManagedAuthObservation = Schema.Struct({
   profilePort: ListeningPort,
   environmentTokenPort: ListeningPort,
   passwordPort: ListeningPort,
+  rotatedProfilePort: ListeningPort,
+  logoutRefused: Schema.Literal(true),
+  deletedProfileRefused: Schema.Literal(true),
   backendExits: Schema.Array(KernelOwnedExit),
   privateStateRemoved: Schema.Literal(true)
 })
