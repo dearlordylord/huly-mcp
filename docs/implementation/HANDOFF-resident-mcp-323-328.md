@@ -223,3 +223,14 @@ indexes while publication evidence remains. Five packaged fault schedules pass
 with an existing caller still usable, explicit fixture restoration, and an actual
 kernel-owned successful backend exit. Whole-namespace destruction remains outside
 automatic recovery. Native platforms, real Huly and the final gate remain pending.
+
+## Locator-content consistency checkpoint
+
+The [issue 327 report](issue-327.md#parse-and-compare-current-locator-contents-2026-10-17)
+records five failing-before locator-corruption tests and the current fix. The
+namespace reader parses current locators, compares schema-owned fields with the
+registry using Redacted-safe equivalence, and passes parsed descriptors onward.
+Foreign versions remain opaque. All 43 nearby tests and seven packaged metadata
+fault schedules pass, with successful kernel-owned exit and cleanup; static
+checks/reviews pass. This does not settle ten-parent timing, real Huly, native
+platforms or the final combined gate. All six issues remain open.

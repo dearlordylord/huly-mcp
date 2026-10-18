@@ -5,7 +5,7 @@ import { Cause, Effect, Exit, Fiber, Option, Result, Scope } from "effect"
 import { withAdapterCandidate, type AdapterExchange } from "./adapter-attachment.js"
 import { readResidentAttachment } from "./attachment-file.js"
 import type { ResidentAttachment } from "./attachment-file.js"
-import { decodeCurrentRegistryAttachment, openGenerationRegistry } from "./generation-registry.js"
+import { openGenerationRegistry } from "./generation-registry.js"
 import {
   CLAIM_RETRY_MILLIS,
   MAX_REGISTRY_RECORDS,
@@ -123,15 +123,12 @@ export const withResidentSelection = <A, E, R, B, F, S>(options: {
         options.directory,
         (claim) =>
           Effect.gen(function* () {
-            const { records } = yield* options.startup.within(readResidentNamespace(options.directory))
+            const { currentDescriptors, records } = yield* options.startup.within(
+              readResidentNamespace(options.directory)
+            )
             const registry = yield* options.startup.within(openGenerationRegistry(options.directory))
-            const descriptors: ResidentAttachment[] = []
-            for (const record of records) {
-              const descriptor = yield* options.startup.within(decodeCurrentRegistryAttachment(record.envelope))
-              if (descriptor !== undefined) descriptors.push(descriptor)
-            }
             const matched = yield* withCompatibleCandidate(
-              descriptors,
+              currentDescriptors,
               options.capture,
               options.startup,
               ({ descriptor, exchange }) =>

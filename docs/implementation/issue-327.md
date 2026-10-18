@@ -818,3 +818,45 @@ Final validation logs: `/tmp/resident-state-loss-final-unit.log` (36 passing tes
 errors/warnings), and `/tmp/resident-state-loss-final-verified-{lint,circular,complexity}.log`.
 All exited successfully. The source increment does not replace the coherent
 final `check-all` or the deferred real-Huly campaign.
+
+## Parse and compare current locator contents (2026-10-17)
+
+Private permissions and publication inode association did not detect changed
+locator contents when the registry copy remained intact. Five failing-before
+cases cover malformed JSON and otherwise valid descriptors with changed bearer,
+TLS key, endpoint or generation. Log `/tmp/resident-locator-corruption-red.log`,
+SHA-256 `2e42b509aaacfb7d9ca62c2d291e98ce1bc7ed8eee3eb7bc9076953800d35645`.
+
+The shared namespace reader now parses current-version locators through the
+existing bounded attachment codec and compares all schema-owned fields with the
+registered descriptor. Schema-derived equivalence compares Redacted secret
+values without unwrapping or stringifying them. Endpoints compare their normalized
+`href` values. The parsed matching descriptors are passed directly to selection;
+the previous second registry-descriptor parse is removed. Whitespace-only JSON
+changes are accepted, while another implementation's locator and descriptor
+payload remain opaque. Filename, permission and publication-link checks still
+apply to every version.
+
+The final nearby run passes 43 tests in six files, including the five regressions,
+whitespace equivalence, foreign opaque payloads, status, missing metadata,
+selection, ambiguity/interruption cleanup, owner lifecycle and idle retirement.
+Log `/tmp/resident-locator-final-nearby.log`, SHA-256
+`478a7c7cfd3dc8045109eb846359fb7617a1bb2211323d8e9b79de02ad71d964`.
+TypeScript/Effect checked 1,343 files with zero errors/warnings; lint, circular,
+complexity and both fresh read-only reviews pass without actionable findings.
+
+The packaged fixture now requires all seven metadata-fault schedules: its prior
+five plus malformed locator bytes and a valid mismatched bearer. The original
+adapter remains usable; new adapters refuse without a protocol reply or fixture
+Huly token/original/mutated bearer/TLS-key text in diagnostics. Explicit fixture
+restoration precedes successful kernel-owned backend exit and complete cleanup.
+Process log `/tmp/resident-locator-corruption-process.log`, SHA-256
+`953377632df9c49a6a700bef98d7fcb0dcefe53ae1001069fc82208479d54e2e`.
+Receipt `/tmp/resident-state-loss-IWfDMp.receipt.json`, SHA-256
+`e1add847a8a147b811be08b54b4807d86d4625fe6178a7a3c33cbf501a57cf04`,
+records MCP artifact SHA-256
+`46d6da1873caab884f407e205a809db70cbc9904cf85fdf39317d70f82b49db6`
+and separate coordinator/host hashes. All deadlines and required earlier faults
+remain intact. This is synthetic Linux metadata-fault evidence, not real Huly
+mutation or native macOS/Windows qualification. The final combined gate and full
+six-ticket delivery remain pending; no operation journal or replay was added.

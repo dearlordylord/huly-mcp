@@ -8,7 +8,9 @@ export const StateFault = Schema.Literals([
   "missing-record",
   "missing-registry",
   "missing-descriptor",
-  "missing-indexes"
+  "missing-indexes",
+  "corrupt-descriptor",
+  "mismatched-descriptor"
 ])
 const Sha256 = Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/u))
 export const StateLossObservation = Schema.Struct({

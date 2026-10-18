@@ -32,9 +32,12 @@ const refuse = async (
   directory: ResidentDirectory,
   secrets: ReadonlyArray<string>
 ) => {
-  const adapter = spawn(process.execPath, [input.bundle], {
-    env: { ...residentSelectionEnvironment(), MCP_TRANSPORT: "stdio-resident", MCP_RESIDENT_STATE_DIRECTORY: directory }
-  })
+  const environment = {
+    ...residentSelectionEnvironment(),
+    MCP_TRANSPORT: "stdio-resident",
+    MCP_RESIDENT_STATE_DIRECTORY: directory
+  }
+  const adapter = spawn(process.execPath, [input.bundle], { env: environment })
   const closed = once(adapter, "close")
   void closed.catch(() => {})
   const output: Array<Buffer> = []
@@ -48,7 +51,7 @@ const refuse = async (
     assert.equal(Buffer.concat(output).length, 0)
     const diagnostic = Buffer.concat(errors).toString("utf8")
     assert.ok(diagnostic.includes("Resident registry is unresolved"))
-    for (const secret of secrets) assert.equal(diagnostic.includes(secret), false)
+    for (const secret of [...secrets, environment.HULY_TOKEN]) assert.equal(diagnostic.includes(secret), false)
   } finally {
     if (adapter.exitCode === null && adapter.signalCode === null) {
       adapter.kill("SIGKILL")
@@ -82,21 +85,31 @@ const main = async () => {
     const envelope = Schema.decodeUnknownSync(Schema.fromJsonString(ResidentRegistryEnvelope))(original)
     const descriptor = Schema.decodeUnknownSync(ResidentAttachment)(Redacted.value(envelope.descriptor))
     const locator = join(directory, `${envelope.generation}.json`)
+    const originalLocator = await fs.readFile(locator, "utf8")
+    const mismatched = { ...descriptor, authorization: Redacted.make("different-fixture-authorization") }
     const inventory = (await fs.readdir(directory)).sort()
     const completed: Array<Schema.Schema.Type<typeof StateFault>> = []
     for (const fault of StateFault.literals) {
       process.stderr.write(`Managed state loss: ${fault}\n`)
-      const target = fault === "missing-registry" ? registry : fault === "missing-descriptor" ? locator : record
+      const descriptorFault = fault === "corrupt-descriptor" || fault === "mismatched-descriptor"
+      const rewritten = fault === "corrupt-record" || descriptorFault
+      const target =
+        fault === "missing-registry" ? registry : fault === "missing-descriptor" || descriptorFault ? locator : record
+      const changed =
+        fault === "mismatched-descriptor"
+          ? Schema.encodeSync(Schema.fromJsonString(ResidentAttachment))(mismatched)
+          : "corrupt fixture metadata"
       const targets = fault === "missing-indexes" ? [record, locator] : [target]
       const held = targets.map((target, index) => ({ target, moved: join(input.root, `held-state-${index}`) }))
-      if (fault === "corrupt-record") await fs.writeFile(record, "corrupt fixture record")
+      if (rewritten) await fs.writeFile(target, changed)
       else for (const { moved, target } of held) await fs.rename(target, moved)
       try {
         await refuse(input, directory, [
           Redacted.value(descriptor.authorization),
-          Redacted.value(descriptor.identity.key)
+          Redacted.value(descriptor.identity.key),
+          Redacted.value(mismatched.authorization)
         ])
-        if (fault === "corrupt-record") assert.equal(await fs.readFile(record, "utf8"), "corrupt fixture record")
+        if (rewritten) assert.equal((await fs.readFile(target, "utf8")) === changed, true)
         else for (const { target } of held) await assert.rejects(fs.lstat(target), { code: "ENOENT" })
         parent.child.stdin.write("read\n")
         const current = await parent.read()
@@ -106,10 +119,11 @@ const main = async () => {
         assert.equal(current.contextIsError, false)
         completed.push(fault)
       } finally {
-        if (fault === "corrupt-record") await fs.writeFile(record, original)
+        if (rewritten) await fs.writeFile(target, descriptorFault ? originalLocator : original)
         else for (const { moved, target } of held) await fs.rename(moved, target)
       }
-      assert.equal(await fs.readFile(record, "utf8"), original)
+      assert.equal((await fs.readFile(record, "utf8")) === original, true)
+      assert.equal((await fs.readFile(locator, "utf8")) === originalLocator, true)
       assert.deepEqual((await fs.readdir(directory)).sort(), inventory)
       assert.deepEqual(await fs.readdir(registry), names)
     }

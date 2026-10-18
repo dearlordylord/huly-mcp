@@ -3,7 +3,8 @@ import type { Dirent } from "node:fs"
 import { join } from "node:path"
 import { Effect, Schema } from "effect"
 
-import { RESIDENT_PUBLICATION_FILENAME, type ResidentAttachment } from "./attachment-file.js"
+import { RESIDENT_PUBLICATION_FILENAME, ResidentAttachment, readResidentAttachment } from "./attachment-file.js"
+import { decodeCurrentRegistryAttachment } from "./generation-registry.js"
 import { MAX_REGISTRY_RECORDS } from "./managed-contract.js"
 import {
   closePrivateFile,
@@ -20,6 +21,10 @@ import { ResidentTlsIdentity } from "./tls-channel.js"
 const GENERATION_ROOT_ENTRIES = 2
 const SHARED_ROOT_ENTRIES = 2
 const MAX_ROOT_ENTRIES = MAX_REGISTRY_RECORDS * GENERATION_ROOT_ENTRIES + SHARED_ROOT_ENTRIES
+
+const sameDescriptorFields = Schema.toEquivalence(
+  Schema.Struct({ ...ResidentAttachment.fields, endpoint: Schema.String })
+)
 
 // Internal parsed directory entries, never serialized.
 type NamespaceEntry =
@@ -100,10 +105,22 @@ export const readResidentNamespace = Effect.fn("readResidentNamespace")(function
         Effect.flatMap((registry) => registry.inventory)
       )
     : []
-  if (
-    namespace.descriptors.size !== records.length ||
-    records.some(({ envelope }) => !namespace.descriptors.has(envelope.generation))
-  )
-    return yield* registryFailure()
-  return { claimPresent: namespace.claimPresent, records }
+  if (namespace.descriptors.size !== records.length) return yield* registryFailure()
+  const currentDescriptors: ResidentAttachment[] = []
+  for (const { envelope } of records) {
+    const file = namespace.descriptors.get(envelope.generation)
+    if (file === undefined) return yield* registryFailure()
+    const registered = yield* decodeCurrentRegistryAttachment(envelope)
+    if (registered === undefined) continue
+    const published = yield* readResidentAttachment(file).pipe(Effect.mapError(registryFailure))
+    if (
+      !sameDescriptorFields(
+        { ...registered, endpoint: registered.endpoint.href },
+        { ...published, endpoint: published.endpoint.href }
+      )
+    )
+      return yield* registryFailure()
+    currentDescriptors.push(published)
+  }
+  return { claimPresent: namespace.claimPresent, records, currentDescriptors }
 })
