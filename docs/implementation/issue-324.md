@@ -462,3 +462,14 @@ distinct generation publication, fresh selection of its exact path, successful
 HTTPS ping, and joined replacement idle cleanup. Two files/seven tests pass in
 `/tmp/resident-idle-replacement-final.log`. This closes the replacement-startup
 limitation of this scoped test; OS-process races and full qualification remain.
+
+### Selection claim process cancellation — 2026-10-18
+
+[Report](resident-claim-process-cancellation-2026-10-18.md): actual claimed child
+SIGTERM exits130 without signal termination, removes its claim, and permits a
+second child to acquire and release. Shared5s scenario deadline plus2s owned
+cleanup allowance; original failures preserved and unconfirmed namespace
+retained. Existing ten-contender crash test additionally verifies exact SIGKILL
+and retained claim device/inode after refusal. Two files/seven tests pass.
+Primitive process evidence does not qualify packaged publication boundaries;
+all six issues remain incomplete.
