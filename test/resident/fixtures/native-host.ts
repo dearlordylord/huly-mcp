@@ -12,7 +12,8 @@ const main = async () => {
     bundle: process.argv[2],
     attachment: process.argv[3],
     host: process.argv[4],
-    mode: process.argv[5]
+    mode: process.argv[5],
+    url: process.argv[6]
   })
   const transport = new StdioClientTransport({
     command: process.execPath,
@@ -20,6 +21,7 @@ const main = async () => {
     stderr: "pipe",
     env: {
       ...residentSelectionEnvironment(),
+      HULY_URL: input.url,
       MCP_TRANSPORT: "stdio-http",
       MCP_RESIDENT_ATTACHMENT_FILE: input.attachment
     }

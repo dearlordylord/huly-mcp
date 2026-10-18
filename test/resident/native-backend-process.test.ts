@@ -9,13 +9,15 @@ import { Client } from "@modelcontextprotocol/client"
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"
 import { Deferred, Effect, Schema } from "effect"
 import { McpSchema } from "effect/ai"
-import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFailed } from "vitest"
 
 import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { residentSelectionEnvironment } from "../helpers/resident-selection-environment.js"
 import { NativeHostObservation } from "./native-host-observation.js"
-import { exercisePackagedProfileLifecycle } from "./profile-lifecycle-fixture.js"
+import { exercisePackagedProfileLifecycle, ProfileLifecycleProject } from "./profile-lifecycle-fixture.js"
+import { startDisposableRestFixture } from "./disposable-rest-fixture.js"
+import { ProfileUrlSchema } from "../../src/profiles/model.js"
 
 const PROCESS_BOUND = 30_000
 const RESPONSE_BOUND = 5_000
@@ -31,9 +33,22 @@ let bundle: Awaited<ReturnType<typeof buildIsolatedStdioServer>>
 let backend: ChildProcessWithoutNullStreams
 let attachmentFile: string
 let stateDirectory: string
+let rest: Awaited<ReturnType<typeof startDisposableRestFixture>>
+let profileUrl: Schema.Schema.Type<typeof ProfileUrlSchema>
+let prepared = false
+let failed = false
+const backendEnvironment = () => ({ ...residentSelectionEnvironment(), HULY_URL: profileUrl })
+
+beforeEach(() =>
+  onTestFailed(() => {
+    failed = true
+  })
+)
 
 beforeAll(async () => {
   bundle = await buildIsolatedStdioServer(PROCESS_BOUND)
+  rest = await startDisposableRestFixture({ projects: [ProfileLifecycleProject] })
+  profileUrl = Schema.decodeUnknownSync(ProfileUrlSchema)(rest.endpoint)
   stateDirectory = await fs.mkdtemp(join(await fs.realpath(tmpdir()), "resident-native-process-"))
   await runFile(
     "pnpm",
@@ -50,7 +65,7 @@ beforeAll(async () => {
   )
   backend = spawn(process.execPath, [bundle.path], {
     env: {
-      ...residentSelectionEnvironment(),
+      ...backendEnvironment(),
       MCP_TRANSPORT: "resident-http",
       MCP_RESIDENT_STATE_DIRECTORY: stateDirectory,
       MCP_RESIDENT_ATTACHMENT_CAPACITY: "2"
@@ -65,42 +80,52 @@ beforeAll(async () => {
     throw new Error("Owned native backend exited before announcing its listener")
   })()
   attachmentFile = await Effect.runPromise(Effect.promise(() => readiness).pipe(Effect.timeout(RESPONSE_BOUND)))
+  prepared = true
 }, PROCESS_BOUND)
 
 afterAll(async () => {
-  if (backend !== undefined && backend.exitCode === null && backend.signalCode === null) {
-    const exit = once(backend, "exit", { signal: AbortSignal.timeout(RESPONSE_BOUND) })
-    backend.kill("SIGTERM")
-    try {
-      await exit
-    } finally {
-      if (backend.exitCode === null && backend.signalCode === null) {
-        const forcedExit = once(backend, "exit", { signal: AbortSignal.timeout(RESPONSE_BOUND) })
-        backend.kill("SIGKILL")
-        await forcedExit
+  const backendCleanup = (async () => {
+    if (backend !== undefined && backend.exitCode === null && backend.signalCode === null) {
+      const exit = once(backend, "exit", { signal: AbortSignal.timeout(RESPONSE_BOUND) })
+      backend.kill("SIGTERM")
+      try {
+        await exit
+      } finally {
+        if (backend.exitCode === null && backend.signalCode === null) {
+          const forcedExit = once(backend, "exit", { signal: AbortSignal.timeout(RESPONSE_BOUND) })
+          backend.kill("SIGKILL")
+          await forcedExit
+        }
       }
     }
-  }
-  await bundle?.cleanup()
+  })()
+  const cleanup = await Promise.allSettled([backendCleanup, rest?.close()])
+  const failure = cleanup.find((result) => result.status === "rejected")
+  if (failure !== undefined) throw failure.reason
   if (stateDirectory !== undefined) {
     const remaining = await fs.readdir(stateDirectory)
-    await fs.rm(stateDirectory, { recursive: true, force: true })
     expect(remaining).toEqual([])
+    await fs.rmdir(stateDirectory)
   }
+  if (prepared && !failed) await bundle?.cleanup()
 })
 
 describe("manual adapters against the packaged native HTTP backend", { timeout: PROCESS_BOUND }, () => {
   it.skipIf(process.platform !== "linux")(
     "keeps admitted profile authority through saved-profile changes",
     async () => {
-      await exercisePackagedProfileLifecycle(bundle.path, attachmentFile)
+      const readsBefore = rest.observed.projectReads
+      await exercisePackagedProfileLifecycle(bundle.path, attachmentFile, profileUrl)
+      expect(rest.observed.projectReads - readsBefore).toBe(9)
+      expect(rest.observed.projectWrites).toBe(0)
+      expect(rest.observed.invalidRequests).toBe(0)
       expect(backend.exitCode).toBeNull()
       expect(backend.signalCode).toBeNull()
     }
   )
 
   it("refuses another identity, policy, or missing selection before admitting an MCP session", async () => {
-    const base = residentSelectionEnvironment()
+    const base = backendEnvironment()
     for (const selected of [
       { ...base, HULY_TOKEN: "other-fixture-token" },
       { ...base, HULY_WORKSPACE: "other-workspace" },
@@ -135,11 +160,7 @@ describe("manual adapters against the packaged native HTTP backend", { timeout: 
         command: process.execPath,
         args: [bundle.path],
         stderr: "pipe",
-        env: {
-          ...residentSelectionEnvironment(),
-          MCP_TRANSPORT: "stdio-http",
-          MCP_RESIDENT_ATTACHMENT_FILE: attachmentFile
-        }
+        env: { ...backendEnvironment(), MCP_TRANSPORT: "stdio-http", MCP_RESIDENT_ATTACHMENT_FILE: attachmentFile }
       })
       const survivor = new Client(
         { name: "claude-code", version: "1.0" },
@@ -148,11 +169,7 @@ describe("manual adapters against the packaged native HTTP backend", { timeout: 
       const survivorClosed = Effect.runSync(Deferred.make<void>())
       survivor.onclose = () => Effect.runSync(Deferred.succeed(survivorClosed, undefined))
       const abandoned = spawn(process.execPath, [bundle.path], {
-        env: {
-          ...residentSelectionEnvironment(),
-          MCP_TRANSPORT: "stdio-http",
-          MCP_RESIDENT_ATTACHMENT_FILE: attachmentFile
-        }
+        env: { ...backendEnvironment(), MCP_TRANSPORT: "stdio-http", MCP_RESIDENT_ATTACHMENT_FILE: attachmentFile }
       })
       const output: Array<string> = []
       const firstReply = Effect.runSync(Deferred.make<void>())
@@ -182,11 +199,7 @@ describe("manual adapters against the packaged native HTTP backend", { timeout: 
           command: process.execPath,
           args: [bundle.path],
           stderr: "pipe",
-          env: {
-            ...residentSelectionEnvironment(),
-            MCP_TRANSPORT: "stdio-http",
-            MCP_RESIDENT_ATTACHMENT_FILE: attachmentFile
-          }
+          env: { ...backendEnvironment(), MCP_TRANSPORT: "stdio-http", MCP_RESIDENT_ATTACHMENT_FILE: attachmentFile }
         })
         const next = new Client(
           { name: "claude-code", version: "1.0" },
@@ -232,8 +245,8 @@ describe("manual adapters against the packaged native HTTP backend", { timeout: 
       ["claude-code", "codex-mcp-client"].map(async (host) => {
         const { stdout } = await runFile(
           process.execPath,
-          [join(dirname(bundle.path), "native-host.cjs"), bundle.path, attachmentFile, host, mode],
-          { timeout: PROCESS_BOUND, env: residentSelectionEnvironment() }
+          [join(dirname(bundle.path), "native-host.cjs"), bundle.path, attachmentFile, host, mode, profileUrl],
+          { timeout: PROCESS_BOUND, env: backendEnvironment() }
         )
         return Schema.decodeUnknownSync(Schema.fromJsonString(NativeHostObservation))(stdout)
       })
@@ -256,11 +269,7 @@ describe("manual adapters against the packaged native HTTP backend", { timeout: 
         command: process.execPath,
         args: [bundle.path],
         stderr: "pipe",
-        env: {
-          ...residentSelectionEnvironment(),
-          MCP_TRANSPORT: "stdio-http",
-          MCP_RESIDENT_ATTACHMENT_FILE: attachmentFile
-        }
+        env: { ...backendEnvironment(), MCP_TRANSPORT: "stdio-http", MCP_RESIDENT_ATTACHMENT_FILE: attachmentFile }
       })
       const client = new Client(
         { name, version: "1.0" },
