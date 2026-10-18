@@ -821,6 +821,13 @@ it, then truncates the response. This notification tests adapter forwarding; it
 does not demonstrate a native Huly progress producer. The receipt records the
 selected fault boundary. In the latter case, host stdout must contain exactly the
 progress notification and no terminal response.
+`renewal-loss` holds the downstream mutation response after the real managed
+backend confirms creation, then returns HTTP 403 to the next lease renewal.
+The fault endpoint supplies a one-second lease renewed every ten milliseconds;
+production lease defaults remain unchanged. The adapter must report uncertainty
+and exit without terminal output or replay. Phase evidence requires exactly one
+renewal refusal after creation. This tests the packaged adapter's heartbeat
+failure handling, not lease expiry or a crash of the native backend owner.
 Choose `upstreamProtocol` explicitly: `2026-07-28` uses modern request metadata;
 `2025-06-18` requires a checked initialize reply and initialized notification
 before the native mutation. The receipt names the upstream protocol. This selects

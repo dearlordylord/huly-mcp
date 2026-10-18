@@ -4,7 +4,7 @@ import { once } from "node:events"
 import { createInterface } from "node:readline"
 import * as fs from "node:fs/promises"
 import { join } from "node:path"
-import { Effect, Layer, Schema } from "effect"
+import { Deferred, Effect, Layer, Schema } from "effect"
 
 import { HulyConfigService } from "../src/config/config.js"
 import {
@@ -17,6 +17,7 @@ import { Diagnostics, makeDiagnosticsScope } from "../src/huly/diagnostics.js"
 import { deleteProject, getProject } from "../src/huly/operations/projects.js"
 import { ResidentPackagePath } from "../src/resident/managed-contract.js"
 import { ResidentDirectory } from "../src/resident/protected-path.js"
+import { LeasePolicy } from "../src/resident/admission-contract.js"
 import { KernelOwnedExit, ReapedEventsFd } from "../test/helpers/kernel-reaped-events.js"
 import { LiveProbeEnvironment, LiveReadProtocol } from "./resident-live-read-contract.js"
 import { withLiveManagedWrite } from "./resident-live-managed-write.js"
@@ -27,7 +28,10 @@ const REQUEST_ID = 41
 const RESPONSE_BOUND = 5_000
 const EXIT_BOUND = 7_000
 const HTTP_OK = 200
-const ResponseLoss = Schema.Literals(["before-headers", "after-progress"])
+const HTTP_FORBIDDEN = 403
+const FAULT_LEASE_MILLIS = 1_000
+const FAULT_RENEWAL_MILLIS = 10
+const ResponseLoss = Schema.Literals(["before-headers", "after-progress", "renewal-loss"])
 const Progress = Schema.Struct({
   jsonrpc: Schema.Literal("2.0"),
   method: Schema.Literal("notifications/progress"),
@@ -55,6 +59,16 @@ const Call = Schema.Struct({
 const Phase = Schema.Struct({
   responseLoss: ResponseLoss,
   progressObserved: Schema.Boolean,
+  renewalRefusals: Schema.Int,
+  proofStep: Schema.Literals([
+    "request-response",
+    "handlers",
+    "renewal-count",
+    "host-output",
+    "uncertainty-diagnostic",
+    "readback",
+    "complete"
+  ]),
   dispatches: Schema.Int,
   submitted: Schema.Boolean,
   created: Schema.Boolean,
@@ -114,6 +128,10 @@ const run = async (
   let handlerFailed = false
   let truncate: (() => void) | undefined
   let progressObserved = false
+  let renewalRefusals = 0
+  let proofStep: Schema.Schema.Type<typeof Phase>["proofStep"] = "request-response"
+  const committed = Effect.runSync(Deferred.make<void>())
+  const releaseResponse = Effect.runSync(Deferred.make<void>())
   const fixture = await startResidentFixture(
     (request, response) => {
       const chunks: Array<Buffer> = []
@@ -131,7 +149,11 @@ const run = async (
             "Creation did not confirm the owned fixture"
           )
           created = true
-          if (input.responseLoss === "after-progress") {
+          Effect.runSync(Deferred.succeed(committed, undefined))
+          if (input.responseLoss === "renewal-loss") {
+            await Effect.runPromise(Deferred.await(releaseResponse))
+            response.destroy()
+          } else if (input.responseLoss === "after-progress") {
             truncate = () => response.destroy()
             response.writeHead(HTTP_OK, { "content-type": "text/event-stream" })
             response.write(`data: ${progressLine}\n\n`)
@@ -145,7 +167,28 @@ const run = async (
       })
     },
     "live-uncertain-write-private",
-    await fixturePackageVersion()
+    await fixturePackageVersion(),
+    undefined,
+    input.responseLoss === "renewal-loss"
+      ? {
+          lease: Schema.decodeUnknownSync(LeasePolicy)({
+            durationMillis: FAULT_LEASE_MILLIS,
+            renewEveryMillis: FAULT_RENEWAL_MILLIS
+          }),
+          renew: (_request, response) => {
+            const renewal = Effect.runPromise(Deferred.await(committed)).then(() => {
+              requireFact(created, "Renewal refusal preceded mutation confirmation")
+              renewalRefusals++
+              response.writeHead(HTTP_FORBIDDEN).end()
+            })
+            handlers.push(renewal)
+            void renewal.catch(() => {
+              handlerFailed = true
+              response.destroy()
+            })
+          }
+        }
+      : undefined
   )
   const adapter = spawn(process.execPath, [input.bundle], {
     env: { ...testStdioEnvironment(), MCP_TRANSPORT: "stdio-http", MCP_RESIDENT_ATTACHMENT_FILE: fixture.file }
@@ -180,22 +223,32 @@ const run = async (
     }
     const exited = await bounded(closed, RESPONSE_BOUND)
     requireFact(exited[0] === 1 && exited[1] === null, "Adapter did not report failure")
+    Effect.runSync(Deferred.succeed(releaseResponse, undefined))
+    proofStep = "handlers"
     await bounded(Promise.all(handlers), RESPONSE_BOUND)
     requireFact(!handlerFailed && created && dispatches === 1, "One real mutation was not confirmed")
+    proofStep = "renewal-count"
+    requireFact(renewalRefusals === (input.responseLoss === "renewal-loss" ? 1 : 0), "Unexpected renewal refusal count")
+    proofStep = "host-output"
     requireFact(
       Buffer.concat(output).toString("utf8") === (input.responseLoss === "after-progress" ? `${progressLine}\n` : ""),
       "Host observed unexpected terminal output"
     )
     const diagnostic = Buffer.concat(diagnostics).toString("utf8")
+    proofStep = "uncertainty-diagnostic"
+    const noReplay =
+      input.responseLoss === "renewal-loss" ? "stopped without replaying a request" : "No request was replayed"
     requireFact(
-      diagnostic.includes("operation outcome may be unknown") && diagnostic.includes("No request was replayed"),
+      diagnostic.includes("operation outcome may be unknown") && diagnostic.includes(noReplay),
       "Adapter uncertainty diagnostic missing"
     )
+    proofStep = "readback"
     const readback = await live(getProject(target))
     requireFact(
       readback.identifier === input.project.identifier && readback.name === input.project.name,
       "Fresh readback did not match the owned fixture"
     )
+    proofStep = "complete"
   }
   try {
     await proveResponseLoss()
@@ -203,6 +256,8 @@ const run = async (
   } catch (error) {
     primary = { error }
   }
+  Effect.runSync(Deferred.succeed(committed, undefined))
+  Effect.runSync(Deferred.succeed(releaseResponse, undefined))
   const cleanup = await Promise.allSettled([
     (async () => {
       if (adapter.exitCode === null && adapter.signalCode === null) adapter.kill("SIGKILL")
@@ -231,6 +286,8 @@ const run = async (
       Schema.encodeSync(Schema.fromJsonString(Phase))({
         responseLoss: input.responseLoss,
         progressObserved,
+        renewalRefusals,
+        proofStep,
         dispatches,
         submitted,
         created,
