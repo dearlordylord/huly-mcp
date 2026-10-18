@@ -220,3 +220,14 @@ empty state. Original four physical packaged cases retained. Nine focused cases
 pass; five affected clock cases pass again after Redacted environment correction.
 No native Huly/physical timeout/all fence interleavings claim. All six issues
 remain incomplete.
+### Expired and fresh calls at idle boundary — 2026-10-18
+
+`test/resident/idle-new-call.test.ts` checks real native HTTPS: after lease expiry
+and session release, an old token at idle−1ms receives403 with zero dispatch;
+a previously captured owner also rejects work. Fresh admission protects two
+exact successful calls/completions across a full idle interval. Only confirmed
+release starts idle; at its deadline new calls receive403 without another
+dispatch. Two focused files/three tests pass in
+`/tmp/resident-idle-new-call-first.log`; scoped reviews accepted after preserving
+the schema-owned wire-ID type. This is controlled-clock HTTPS component
+evidence, not an OS-process race or complete326.4 qualification. No full gate.
