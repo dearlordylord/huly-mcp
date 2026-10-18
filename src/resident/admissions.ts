@@ -3,74 +3,88 @@ import { Clock, Duration, Effect, Exit, Redacted, Schedule, Schema, Scope, Semap
 import { observeHttpAdmission } from "../mcp/http-admission-observations.js"
 
 import { type AdmissionPolicy, AdmissionError, AttachmentAdmitted, AttachmentToken } from "./admission-contract.js"
+import { advanceAdmission } from "./admission-attempt-state.js"
+import { advanceMember } from "./admission-member-state.js"
+import { advanceLifetime } from "./admission-lifetime-state.js"
 import {
-  leaseIsEligible,
-  leaseWaitNanos,
-  makeAttachmentLease,
-  type AttachmentLease,
-  type MonotonicNanos
-} from "./attachment-lease.js"
-import { MANAGED_IDLE_MILLIS } from "./managed-contract.js"
+  admissionInventory,
+  admissionIsEligible,
+  admissionLeaseDelay,
+  lookupAdmissionMember,
+  makeAdmissionIdentity,
+  makeAdmissionsState,
+  type AttachmentDigest,
+  type AdmissionIdentity,
+  type AdmissionsState,
+  type AdmissionTransition,
+  type AdmissionProceed,
+  type AdmissionRefusal
+} from "./admissions-state.js"
 import { makeAttachmentOwner } from "./attachment-owner.js"
 import { makeResidentWorkStatus } from "./work-status.js"
 
 const TOKEN_BYTES = 32
 const DRAIN_POLL_MILLIS = 25
-// Internal resource inventory; raw secrets stay in the channel adapter.
-type AttachmentDigest = string
+// Internal resource capability; transition state owns the sole inventory.
 type AttachmentOwner = Effect.Success<ReturnType<typeof makeAttachmentOwner>>
-interface Member {
-  readonly owner: AttachmentOwner
-  readonly authority: { lease: AttachmentLease }
-  cleanupBlocked: boolean
-}
 const digest = (token: AttachmentToken): AttachmentDigest =>
   createHash("sha256").update(Redacted.value(token)).digest("hex")
 const unknownAttachment = () =>
   new AdmissionError({ kind: "unknown", message: "Resident attachment is unavailable or expired" })
 const generationClosing = () =>
   new AdmissionError({ kind: "closing", message: "Resident generation no longer admits attachments" })
+const refusalError = (kind: AdmissionRefusal["kind"]) => {
+  switch (kind) {
+    case "unknown":
+      return unknownAttachment()
+    case "closing":
+      return generationClosing()
+    case "capacity":
+      return new AdmissionError({ kind, message: "Resident attachment capacity reached" })
+  }
+}
+const requireProceed = (decision: AdmissionProceed | AdmissionRefusal) =>
+  decision._tag === "Refuse" ? Effect.fail(refusalError(decision.kind)) : Effect.void
 const randomToken = Effect.sync(() => randomBytes(TOKEN_BYTES).toString("hex")).pipe(
   Effect.flatMap(Schema.decodeUnknownEffect(AttachmentToken)),
   Effect.mapError(unknownAttachment)
 )
 
-// Internal entropy port permits deterministic collision tests without replacing node:crypto.
+// Internal entropy/resource ports preserve deterministic tests without module replacement.
 export const makeResidentAdmissions = Effect.fn("makeResidentAdmissions")(function* (
   policy: AdmissionPolicy,
   tokens: Effect.Effect<AttachmentToken, AdmissionError> = randomToken,
   createOwner: (eligible: Effect.Effect<boolean>) => ReturnType<typeof makeAttachmentOwner> = makeAttachmentOwner
 ) {
   const generationScope = yield* Effect.scope
-  const members = new Map<AttachmentDigest, Member>()
   const admission = yield* Semaphore.make(1)
-  let accepting = true
-  let pending = 0
-  let drainFailed = false
-  let idleSince = yield* Clock.monotonicTimeNanos
+  let state = makeAdmissionsState<AttachmentOwner>(yield* Clock.monotonicTimeNanos)
+  const update = <Decision>(
+    run: (current: AdmissionsState<AttachmentOwner>) => AdmissionTransition<AttachmentOwner, Decision>
+  ) => {
+    const next = run(state)
+    state = next.state
+    return next.decision
+  }
   const touch = Clock.clockWith((clock) =>
-    Effect.sync(() => {
-      idleSince = clock.monotonicTimeNanosUnsafe()
-    })
+    Effect.sync(() =>
+      update((current) => advanceLifetime(current, { _tag: "TouchIdle", now: clock.monotonicTimeNanosUnsafe() }))
+    )
   )
   const fence = Effect.sync(() => {
-    accepting = false
+    update((current) => advanceLifetime(current, { _tag: "Fence" }))
   })
-  const requireAccepting = Effect.suspend(() => (accepting ? Effect.void : Effect.fail(generationClosing())))
   yield* Effect.addFinalizer(() => fence)
-  const forget = (key: AttachmentDigest, member: Member) =>
+  const forget = (id: AdmissionIdentity) =>
     Clock.clockWith((clock) =>
       Effect.sync(() => {
-        if (members.get(key) !== member) return
-        members.delete(key)
-        idleSince = clock.monotonicTimeNanosUnsafe()
+        update((current) => advanceMember(current, { _tag: "Closed", id, now: clock.monotonicTimeNanosUnsafe() }))
       })
     )
-
-  const closeMember = (key: AttachmentDigest, member: Member) =>
+  const closeOwned = (id: AdmissionIdentity, owner: AttachmentOwner) =>
     Effect.gen(function* () {
-      member.authority.lease = { _tag: "Retired" }
-      yield* member.owner.close.pipe(
+      update((current) => advanceMember(current, { _tag: "Retire", target: { _tag: "Identity", id } }))
+      yield* owner.close.pipe(
         Effect.mapError(
           () => new AdmissionError({ kind: "cleanup", message: "Resident attachment cleanup is unverified" })
         ),
@@ -81,102 +95,122 @@ export const makeResidentAdmissions = Effect.fn("makeResidentAdmissions")(functi
         }),
         Effect.tapError(() =>
           Effect.sync(() => {
-            member.cleanupBlocked = true
+            update((current) => advanceMember(current, { _tag: "CleanupBlocked", id }))
           })
         )
       )
-      yield* forget(key, member)
+      yield* forget(id)
     })
-
-  const watch = (key: AttachmentDigest, member: Member) => {
+  const watch = (id: AdmissionIdentity, owner: AttachmentOwner) => {
     const expire = Effect.gen(function* () {
       const now = yield* Clock.monotonicTimeNanos
-      const remaining = leaseWaitNanos(member.authority.lease, now)
+      const remaining = admissionLeaseDelay(state, id, now)
       if (remaining > 0n) {
         yield* Effect.sleep(Duration.nanos(remaining))
         return false
       }
-      member.authority.lease = { _tag: "Retired" }
-      yield* member.owner.close
+      update((current) => advanceMember(current, { _tag: "Retire", target: { _tag: "Identity", id } }))
+      yield* owner.close
       return true
     }).pipe(Effect.repeat({ until: (closed) => closed }))
-    return Effect.exit(Effect.raceFirst(expire, member.owner.closed)).pipe(
-      Effect.flatMap((exit) => (Exit.isSuccess(exit) ? forget(key, member) : Effect.void))
+    return Effect.exit(Effect.raceFirst(expire, owner.closed)).pipe(
+      Effect.flatMap((exit) => (Exit.isSuccess(exit) ? forget(id) : Effect.void))
     )
   }
-
-  const admit = Effect.andThen(
-    requireAccepting,
-    Effect.acquireUseRelease(
-      Effect.sync(() => {
-        pending++
-      }).pipe(Effect.andThen(touch)),
-      () =>
-        admission.withPermits(1)(
-          Effect.gen(function* () {
-            yield* requireAccepting
-            if (members.size >= policy.capacity)
-              return yield* new AdmissionError({ kind: "capacity", message: "Resident attachment capacity reached" })
-            const token = yield* tokens
-            yield* requireAccepting
-            const key = digest(token)
-            if (members.has(key)) return yield* unknownAttachment()
-            const authority = {
-              lease: makeAttachmentLease(yield* Clock.monotonicTimeNanos, policy.lease.durationMillis)
-            }
-            const eligible = Clock.clockWith((clock) =>
-              Effect.sync(() => accepting && leaseIsEligible(authority.lease, clock.monotonicTimeNanosUnsafe()))
-            )
-            const owner = yield* createOwner(eligible).pipe(Scope.provide(generationScope))
-            const member: Member = { owner, authority, cleanupBlocked: false }
-            members.set(key, member)
-            if (!accepting) {
-              yield* closeMember(key, member)
-              return yield* generationClosing()
-            }
-            yield* watch(key, member).pipe(Effect.forkIn(generationScope))
-            return AttachmentAdmitted.make({ version: 1, token, lease: policy.lease })
-          }).pipe(Effect.uninterruptible)
-        ),
-      () =>
-        Effect.sync(() => {
-          pending--
-        }).pipe(Effect.andThen(touch))
-    )
+  const begin = Clock.clockWith((clock) =>
+    Effect.suspend(() => {
+      const id = makeAdmissionIdentity()
+      const decision = update((current) =>
+        advanceAdmission(current, { _tag: "Begin", id, now: clock.monotonicTimeNanosUnsafe() }, policy)
+      )
+      return requireProceed(decision).pipe(Effect.as(id))
+    })
   )
-
-  const withLiveMember = <A>(token: AttachmentToken, use: (member: Member, now: MonotonicNanos) => A) =>
+  const admit = Effect.acquireUseRelease(
+    begin,
+    (id) =>
+      admission.withPermits(1)(
+        Effect.gen(function* () {
+          yield* requireProceed(update((current) => advanceAdmission(current, { _tag: "CheckCapacity", id }, policy)))
+          const token = yield* tokens
+          const key = digest(token)
+          yield* Clock.clockWith((clock) =>
+            Effect.suspend(() =>
+              requireProceed(
+                update((current) =>
+                  advanceAdmission(
+                    current,
+                    { _tag: "PrepareOwner", id, key, now: clock.monotonicTimeNanosUnsafe() },
+                    policy
+                  )
+                )
+              )
+            )
+          )
+          const eligible = Clock.clockWith((clock) =>
+            Effect.sync(() => admissionIsEligible(state, id, clock.monotonicTimeNanosUnsafe()))
+          )
+          const owner = yield* createOwner(eligible).pipe(Scope.provide(generationScope))
+          const published = update((current) => advanceAdmission(current, { _tag: "PublishOwner", id, owner }, policy))
+          if (published._tag === "Close") {
+            yield* closeOwned(published.id, published.owner)
+            return yield* generationClosing()
+          }
+          yield* watch(id, owner).pipe(Effect.forkIn(generationScope))
+          return AttachmentAdmitted.make({ version: 1, token, lease: policy.lease })
+        }).pipe(Effect.uninterruptible)
+      ),
+    (id) =>
+      Clock.clockWith((clock) =>
+        Effect.sync(() => {
+          update((current) =>
+            advanceLifetime(current, { _tag: "FinishAttempt", id, now: clock.monotonicTimeNanosUnsafe() })
+          )
+        })
+      )
+  )
+  const access = (token: AttachmentToken, renew: boolean) =>
     Effect.gen(function* () {
-      const member = members.get(digest(token))
+      const key = digest(token)
+      const member = lookupAdmissionMember(state, key)
       if (member === undefined) return yield* unknownAttachment()
       const ownerAccepting = yield* member.owner.accepting
       return yield* Clock.clockWith((clock) =>
         Effect.suspend(() => {
-          const now = clock.monotonicTimeNanosUnsafe()
-          return accepting && ownerAccepting && leaseIsEligible(member.authority.lease, now)
-            ? Effect.succeed(use(member, now))
-            : Effect.fail(unknownAttachment())
+          const decision = update((current) =>
+            advanceMember(current, {
+              _tag: "Access",
+              id: member.id,
+              key,
+              now: clock.monotonicTimeNanosUnsafe(),
+              ownerAccepting,
+              renew,
+              durationMillis: policy.lease.durationMillis
+            })
+          )
+          return decision._tag === "Refuse" ? Effect.fail(unknownAttachment()) : Effect.succeed(decision.owner)
         })
       )
     })
-
-  const find = (token: AttachmentToken) => withLiveMember(token, (member) => member.owner)
-  const renew = (token: AttachmentToken) =>
-    withLiveMember(token, (member, now) => {
-      member.authority.lease = makeAttachmentLease(now, policy.lease.durationMillis)
-    })
+  const find = (token: AttachmentToken) => access(token, false)
+  const renew = (token: AttachmentToken) => access(token, true).pipe(Effect.asVoid)
   const release = Effect.fn("ResidentAdmissions.release")(function* (token: AttachmentToken) {
-    const key = digest(token)
-    const member = members.get(key)
-    if (member !== undefined) yield* closeMember(key, member)
+    const retired = update((current) =>
+      advanceMember(current, { _tag: "Retire", target: { _tag: "Digest", key: digest(token) } })
+    )
+    if (retired._tag === "Close") yield* closeOwned(retired.id, retired.owner)
   })
   const drain = Effect.gen(function* () {
     yield* fence
-    observeHttpAdmission("ResidentAdmissions_drainStarted", { attachments: members.size, pendingAdmissions: pending })
-    yield* Effect.sync(() => pending === 0).pipe(
+    const view = admissionInventory(state)
+    observeHttpAdmission("ResidentAdmissions_drainStarted", {
+      attachments: view.members.length,
+      pendingAdmissions: view.pending
+    })
+    yield* Effect.sync(() => admissionInventory(state).pending === 0).pipe(
       Effect.repeat({ until: (settled) => settled, schedule: Schedule.spaced(DRAIN_POLL_MILLIS) })
     )
-    yield* Effect.forEach([...members], ([key, member]) => closeMember(key, member), {
+    yield* Effect.forEach(admissionInventory(state).members, ({ id, owner }) => closeOwned(id, owner), {
       concurrency: "unbounded",
       discard: true
     })
@@ -193,39 +227,32 @@ export const makeResidentAdmissions = Effect.fn("makeResidentAdmissions")(functi
     }),
     Effect.tapError(() =>
       Effect.sync(() => {
-        drainFailed = true
+        update((current) => advanceLifetime(current, { _tag: "DrainFailed" }))
       })
     )
   )
-
   const awaitIdleAndFence = Effect.gen(function* () {
     yield* touch
-    const idleNanos = BigInt(MANAGED_IDLE_MILLIS) * 1_000_000n
-    const pollNanos = 250_000_000n
     while (true) {
-      const remaining = yield* Clock.clockWith((clock) =>
-        Effect.sync(() => {
-          if (!accepting) return 0n
-          if (members.size > 0 || pending > 0) return pollNanos
-          const wait = idleSince + idleNanos - clock.monotonicTimeNanosUnsafe()
-          if (wait <= 0n) {
-            accepting = false
-            return 0n
-          }
-          return wait < pollNanos ? wait : pollNanos
-        })
+      const decision = yield* Clock.clockWith((clock) =>
+        Effect.sync(() =>
+          update((current) => advanceLifetime(current, { _tag: "Idle", now: clock.monotonicTimeNanosUnsafe() }))
+        )
       )
-      if (remaining === 0n) return
-      yield* Effect.sleep(Duration.nanos(remaining))
+      if (decision._tag === "Done") return
+      yield* Effect.sleep(Duration.nanos(decision.nanos))
     }
   })
-
   const status = Effect.gen(function* () {
-    const owners = yield* Effect.forEach(members.values(), (member) =>
-      member.owner.status.pipe(Effect.map((owner) => ({ ...owner, blocked: member.cleanupBlocked })))
+    const owners = yield* Effect.forEach(admissionInventory(state).members, ({ blocked, owner }) =>
+      owner.status.pipe(Effect.map((observation) => ({ ...observation, blocked })))
     )
-    return makeResidentWorkStatus({ accepting, pending, drainFailed, owners })
+    return makeResidentWorkStatus({
+      accepting: state.accepting,
+      pending: admissionInventory(state).pending,
+      drainFailed: state.drainFailed,
+      owners
+    })
   })
-
   return { admit, find, renew, release, fence, drain, awaitIdleAndFence, status }
 })
