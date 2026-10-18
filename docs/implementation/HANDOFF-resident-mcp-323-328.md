@@ -17,7 +17,7 @@ Windows resident work is canceled under the scope amendment above. The unused
 native source and its dedicated CI workflow are removed; runtime startup remains
 unsupported there. Linux/macOS and all other qualification requirements remain.
 
-The latest full gate passes 480 files / 5734 tests at the unchanged 99% coverage
+The latest full gate passes 481 files / 5735 tests at the unchanged 99% coverage
 thresholds. Two new [cleanup/idle component schedules](issue-326.md#retained-cleanup-versus-idle-retirement--2026-10-18)
 verify slow/failed cleanup retention across lease expiry; negative mutations are
 rejected and production source is unchanged. Two synthetic SDK clients now pass the actual freshly listed context
@@ -27,6 +27,16 @@ CPU diagnosis, corrected process checks and frozen artifact hashes are recorded
 in [the current report](issue-328.md#repeated-catalog-validation-in-process-clients--2026-10-18).
 This does not certify actual host performance, live Huly or native macOS. The
 older milestones below remain historical and all six delivery issues stay open.
+
+The latest [delayed-commit process scenario](issue-327.md#adapter-loss-followed-by-a-delayed-remote-commit--2026-10-18)
+proves that a fresh adapter can read old state before an already dispatched
+remote fixture write commits. It joins the killed original adapter, reuses ID 1
+for a different fresh read, requires one write/two reads, and joins the fresh
+adapter's normal exit. Its exit bounds begin at shutdown waiting, following the
+resolved review finding. Runtime bundles are unchanged. The externally owned TLS
+fixture stays alive: delayed commit after verified backend-generation retirement
+and replacement remains a distinct required next schedule, alongside live Huly,
+native macOS and model/performance qualification.
 
 ## Latest resumed increment
 

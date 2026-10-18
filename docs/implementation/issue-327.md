@@ -860,3 +860,52 @@ and separate coordinator/host hashes. All deadlines and required earlier faults
 remain intact. This is synthetic Linux metadata-fault evidence, not real Huly
 mutation or native macOS/Windows qualification. The final combined gate and full
 six-ticket delivery remain pending; no operation journal or replay was added.
+
+
+## Adapter loss followed by a delayed remote commit — 2026-10-18
+
+`delayed-commit-process.test.ts` uses the packaged manual stdio adapter against an
+owned real TLS fixture. The remote operation reaches the fixture once, then its
+counter commit is held behind an explicit Deferred. The fixture counter is remote
+domain payload for this test, not resident ownership metadata or an operation
+journal. The host kills only its actual owned adapter process, joins its SIGKILL
+exit, confirms that the HTTP response disconnected, and observes no terminal
+stdout. No diagnostic is expected from an abruptly killed adapter.
+
+A different adapter then submits a read with the same request ID 1 and sees the
+old counter value 0. Only afterward does the original remote operation commit.
+The fresh adapter's continued read with ID 2 sees 1. The fixture records exactly
+one write dispatch and two read dispatches. The reader exits normally with code
+0; fixture operations are joined and the owned TLS listener is closed. This
+shows why an intervening ordinary read cannot establish that an old unconfirmed
+write failed. It does not add historical operation lookup, automatic replay or a
+new runtime reconciliation rule.
+
+The bounded-exit focused run passes both files / three tests, including the two
+existing before-headers/after-progress loss cases. Log:
+`/tmp/resident-delayed-remote-commit-bounded-exit-focused.log`, SHA-256 `bd4685982578f1bd8065b0d07358d14af69895fdfc86c7cabb82fcdef7656c76`.
+Standards review found that the first test version started its exit timer at
+spawn. The corrected test captures close events immediately but starts the same
+five-second bound only when awaiting shutdown. The readback resolves that finding;
+Spec review has no actionable scoped finding. The earlier full gate was
+intentionally interrupted during lint to apply this review fix, not reported as
+a completed gate: `/tmp/resident-delayed-remote-commit-check-all.log`, SHA-256 `4916c72a1aab308a571225f82d69aecdbd4f66de042d6bf9e4da9a44ef666cdb`.
+
+This is adapter-incarnation loss with a delayed fixture commit. The externally
+owned backend generation stays alive throughout. It does not cover late commit
+after verified backend retirement/replacement, actual host-process death, native
+Huly SDK mutation or live Huly behavior. Those extensions, complete lifecycle
+qualification and all six issue outcomes remain pending. No production source,
+existing timeout, coverage threshold or test was changed.
+
+
+The corrected candidate passes `GOMAXPROCS=2 pnpm check-all`: 481 files / 5735
+tests; statements 99.45% (29550/29713), branches 99% (12463/12588), functions
+99% (7996/8076), lines 99.55% (27159/27280). Every quality-gate stage passes
+with the original thresholds and bounds. Log `/tmp/resident-delayed-remote-commit-bounded-exit-check-all.log`, SHA-256
+`56f75e089d9c6f328c385af9dccb798dc93f0e35a8b693c9d77df8e0bbab895f`. Frozen artifacts, successful logs and the
+interrupted attempt are retained at `/tmp/resident-delayed-commit-gate-rafe398k`.
+MCP SHA-256: `7cc7b8c300354694118b08e2b39248e5ea08e1de1df7bae2ce56ecf7a43c8a12`;
+CLI SHA-256: `c957044a36f2559fbdf5230a0f37860911af276f800b1a37933539d7298f5697`.
+Runtime bundles match the preceding candidate. This test increment does not
+complete #327 or the full #323–328 delivery.

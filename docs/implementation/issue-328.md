@@ -794,3 +794,16 @@ and idle retirement, including temporary negative mutations and restored-source
 checks. The fresh full gate passes 480 files / 5734 tests at unchanged thresholds.
 This is component evidence only; native macOS, deferred live Huly, lifecycle model
 alignment and the rest of the six-ticket qualification remain pending.
+
+
+## Delayed remote commit after adapter death — 2026-10-18
+
+The [#327 report](issue-327.md#adapter-loss-followed-by-a-delayed-remote-commit--2026-10-18)
+records a packaged manual-adapter process test: one write remains uncommitted
+when its adapter is killed, a fresh adapter reads the old state, then the original
+remote fixture operation commits and a continued read observes it. Exactly one
+write and two reads are required. This qualifies that scoped uncertainty case,
+not live Huly or delayed commit after backend-generation retirement/replacement.
+The corrected full gate passes 481 files / 5735 tests at unchanged coverage
+thresholds. Earlier intentionally interrupted gate and review correction remain
+recorded. Complete native/live/model/performance qualification remains pending.
