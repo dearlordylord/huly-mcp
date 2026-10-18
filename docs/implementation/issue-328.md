@@ -1115,3 +1115,52 @@ changed together. No performance or general reliability claim follows.
 These are native modern-protocol direct child adapters under one harness parent,
 not full proxy/strict/legacy-policy, host-identity, backpressure, backend-crash or
 native macOS qualification. No Huly write was requested. All six issues remain open.
+
+## Comparative harness controls — 2026-10-18
+
+The alternating comparison remains pending. The
+[measurement protocol](resident-comparison-protocol.md) now fixes modes, workload,
+cache boundaries, resource scope, run ordering and existing deadlines. A private
+executable SDK harness at `/tmp/resident-comparison-harness-6ee05lbx/` exercises
+actual packaged processes, full modern discovery/catalog/resource templates and
+schema-parsed immediate/warm/delayed reads against an existing local-Huly project.
+No Huly writes were requested. Production MCP bytes remain unchanged. A fresh
+project TypeScript check and the corrected external composite harness check pass;
+earlier external configuration failures remain preserved.
+
+These are controls, excluded from comparative samples. One-client standalone,
+managed and HTTP controls each report three exact-target reads and the full
+606-tool/three-template inventory. The original HTTP controls used header-selected
+request-scoped Huly clients, so they do not establish the intended shared cache.
+Managed ten-client control reports 30 reads, all catalogs/templates, ten adapter
+exits 0, registry-correlated kernel backend exit 0 and empty state. Ordinary
+five-second response, seven-second exit and 25-second supervision bounds remain.
+
+Standalone ten-client control failed: nine clients failed during their first
+read around five seconds, one completed three reads, and the supervisor forced
+remaining cleanup. The original harness mixed nine client failures with one
+cleanup failure into `failedClients: 10`; this is not ten failed client reads.
+A named diagnostic separates these counts and records SDK error codes, with an
+untimed V8 profile for each server. That diagnostic reports 24 reads, two
+`REQUEST_TIMEOUT` first-read failures, ten server exits 0 and no cleanup failures;
+supervisor exit 1 reflects failed workload, with no forced-cleanup diagnostic.
+It is not a passing repeat or evidence of a resolved cause. Profiles show idle
+samples alongside SDK `extractJson`/JSON decoding, GC and model construction.
+`extractJson` maps to installed `@hcengineering/api-client/lib/rest/utils.js`.
+A single stable limiter is not established; no performance verdict follows.
+
+The header-selected ten-client HTTP control also failed all first reads with
+`REQUEST_TIMEOUT`, then retired normally (server exit 130). Source inspection of
+`createHttpClientLeaseResolver` identified the configuration error: `x-huly-*`
+overrides create a scoped client per request. The corrected environment-selected
+shared HTTP diagnostic reports 30 exact-target reads, full inventories, server
+exit 130 and supervisor exit 0 with empty state. Keep both attempts. This supports
+the corrected cache-boundary choice, not a general reliability or speed claim.
+
+`controls-summary.json` and `controls-manifest.json` retain eight outcomes and
+92 file hashes, including preserved harness source versions, unchanged product,
+raw phase/resource events and all ten profiler files. Resource samples remain
+observations of the supervisor tree, not an adapter-inclusive resource budget;
+complete final CPU attribution, independent evidence review and five alternating
+samples per mode/client-count cell are still pending. No timing distribution,
+RSS winner, complete performance qualification or overall completion is claimed.
