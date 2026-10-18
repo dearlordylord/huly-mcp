@@ -484,3 +484,14 @@ are retained; foreign listener survives without detected credential disclosure.
 One focused process test passes with supervisor0 and both scoped reviews
 accepted. This proves safe refusal, not repair or live-state destruction
 recovery. No full gate; all six issues remain incomplete.
+
+### Packaged idle retirement and fresh parent — 2026-10-18
+
+[Report](resident-packaged-idle-restart-2026-10-18.md): two actual packaged
+managed cycles with sequential independent parents. Each receives context and
+catalog, closes0, and waits for kernel-confirmed backend exit0 plus empty state
+before the next parent starts. Generation/parent/adapter identities differ;
+second retirement is also confirmed. Focused process test passes16.07s with
+existing5s request/7s retirement/25s supervisor bounds and scoped reviews
+accepted. No real Huly reads, overlap race or native macOS claim; all six issues
+remain incomplete.
