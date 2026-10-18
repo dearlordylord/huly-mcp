@@ -208,3 +208,56 @@ command's exit status, stdout receipt and stderr phases, including failure. The
 unobserved fixture remains the qualification path. Current focused Vitest,
 TypeScript/Effect diagnostics and read-only Standards/Spec reviews pass; the
 final combined gate and complete-contract qualification remain pending.
+
+## Actual Codex host discovery and shutdown diagnosis (2026-10-17)
+
+The installed `codex-cli 0.163.0` app-server was driven directly through its
+generated experimental JSON-RPC API, following the [app-server protocol](https://learn.chatgpt.com/docs/app-server).
+This is the actual host executable, not the programmatic MCP client labelled
+`codex-mcp-client` in earlier fixtures. Each attempt used its own temporary HOME,
+CODEX_HOME and working directory, an explicit synthetic token/workspace, the
+packaged managed adapter, and an unreachable loopback model provider. No model
+turn was started and no real Huly connection or message was requested. Global
+host configuration was not changed. Claude Code 2.1.296 is installed but was not
+exercised by these attempts.
+
+Initialization, an ephemeral thread, `mcpServerStatus/list`, and two consecutive
+`mcpServer/tool/call` requests for `get_huly_context` succeeded. Both structured
+results identify `actual-host-fixture` and the same backend port. Discovery
+contains `get_huly_context` and the proxy tool inventory. These are local context
+reads, not live-Huly reads or full catalog/resource qualification.
+
+The initial receipt is
+`/tmp/resident-actual-hosts-1wBgjp/codex.receipt.json`, SHA-256
+`8650b2dd8cce9324c91d094db6bb7b013c577d5cf4632f4d3c48d4383ff1899f`.
+The unmodified MCP artifact is the `46d6da18…` artifact recorded above. This run
+failed supervision during shutdown and required forced owned-descendant cleanup;
+it is not an end-to-end qualification pass. Ownership metadata remains retained.
+
+A separate observed repeat at `/tmp/resident-codex-cleanup-trace-MPA352`
+confirmed host exit code 0; its snapshots then contain the supervisor and backend
+without a live adapter. Receipt SHA-256
+`1be62717421369b0150982d97af1d35972362e017b7d6c5e69753fa9081d9741`;
+resource samples SHA-256
+`530db3a15aadc6548a42c6ee63249af1288c62f0dc25361b3be71e7ad0cae9b0`.
+It also exceeded the original supervision deadline. A scratch instrumented bundle
+at `/tmp/resident-codex-admission-trace-OB4ZJU` recorded one admission and no
+forget event before forced termination. Trace SHA-256
+`432bfb0eb2aa71e04622379f80c256d69ec087428adb1c7df206b112cf7e15ac`.
+Instrumentation is diagnostic evidence only.
+
+An explicit `thread/unsubscribe` attempt returned `unsubscribed`, completed both
+reads and exited the host with code 0, but still exceeded supervision. Its receipt
+at `/tmp/resident-codex-unsubscribe-u7KILW/codex.receipt.json` has SHA-256
+`143c827b3cf8283c388026949e824f42a4a9861ec850bc472afb436182e5516e`.
+The earlier script indentation failure in that directory is preserved separately
+from `corrected.stderr.log` and `resources-corrected.ndjson`; it started no host.
+
+The production lease is 30 seconds and the existing complete supervision bound
+is 25 seconds. Therefore these attempts cannot distinguish a leaked admission
+from expiry after abrupt adapter termination. Host exit alone is not evidence of
+graceful adapter release. No deadline or lease was changed, and this uncertainty
+must not be converted into either a leak diagnosis or a cleanup pass. Next work
+must establish the actual adapter shutdown signal/EOF behavior and test its
+bounded release path. Full real-host cleanup, Claude discovery, supported auth
+paths, live Huly and all native/platform requirements remain pending.
