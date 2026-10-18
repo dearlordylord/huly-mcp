@@ -1273,3 +1273,8 @@ behavior: the installed SDK retries HTTP failures, as preserved read-preparation
 failures demonstrate. Complete mutation/fault matrices, delayed remote commits,
 other operations, native macOS, model alignment and resource qualification remain
 pending. All six delivery issues remain open.
+
+
+### Cross-configuration adapter/backend fault isolation — 2026-10-18
+
+[Report](resident-config-fault-2026-10-18.md): two actual independent parents/configurations in same private namespace, BSDKquery held while AadapterSIGKILL then verifiedpidfd backendSIGKILL. Exact kernelA-9, Bsamegeneration/byte-identicalregistry/status1→1→0/exact41+42, Bactualadapter0/parent0/backend0, Aparent0 and Aregistryretained. Final2protocolcasesPASS18.30s; sourceTypeScript/Effect1430zeroerrorswarnings, local lint/format and both reviews accepted. Negativepidfdhelperguardprobespass. Finalroots modern /tmp/resident-config-faults-3QZkLV legacy /tmp/resident-config-faults-LjUr2h supervisor0/externalparentlineageverified. Earlier failures retained: outer-reaper impossible while liveadapter reapedbackend, separate unexplaineddiscoverreadiness. Sequentialstartupisnotlaunchraceproof. No production changes/fullgate. This advances327.9 but doesnotqualify backend-only crash, failedcleanup replacement, macOS/model/finalmovement; all six tickets remain incomplete.
