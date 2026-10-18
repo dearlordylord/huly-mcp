@@ -16,11 +16,12 @@ import { resolveManagedStartup } from "./startup-selection.js"
 import { makeStartupBudget } from "./startup-budget.js"
 import { BackendResponseError } from "./response-stream.js"
 import { withManagedStartupInput } from "./managed-startup-input.js"
+import { ProtectedFileError } from "./protected-path.js"
 
 const main = Effect.gen(function* () {
   const environment = { ...process.env }
   const startup = yield* makeStartupBudget
-  const selected = yield* startup.within(resolveManagedStartup(environment))
+  const selected = yield* startup.within(resolveManagedStartup(environment, process.platform))
   if (selected.kind === "local") {
     const { main: local } = yield* Effect.promise(() => import("../runtime/server-startup.js"))
     return yield* local
@@ -50,6 +51,7 @@ const main = Effect.gen(function* () {
   Effect.provide(NodeStdio.layer),
   Effect.mapError((error) =>
     error instanceof ManagedLaunchError ||
+    error instanceof ProtectedFileError ||
     error instanceof ConfigValidationError ||
     error instanceof McpProcessPolicyError ||
     error instanceof CliProfileStoreError ||

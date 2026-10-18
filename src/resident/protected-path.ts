@@ -15,8 +15,9 @@ export const ResidentDirectory = Schema.NonEmptyString.pipe(Schema.brand("Reside
 export type ResidentDirectory = Schema.Schema.Type<typeof ResidentDirectory>
 export const ResidentFilePath = Schema.NonEmptyString.pipe(Schema.brand("ResidentFilePath"))
 export type ResidentFilePath = Schema.Schema.Type<typeof ResidentFilePath>
+export const ResidentPlatform = Schema.Literals(["linux", "darwin"])
 const PosixOwner = Schema.Struct({
-  platform: Schema.Literals(["linux", "darwin"]),
+  platform: ResidentPlatform,
   userId: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 })
 export type PosixOwner = Schema.Schema.Type<typeof PosixOwner>
@@ -25,6 +26,12 @@ export class ProtectedFileError extends Schema.TaggedError<ProtectedFileError>()
   kind: Schema.Literals(["unsupported", "permission", "input", "io", "conflict"]),
   message: Schema.String
 }) {}
+
+export const unsupportedResidentProtection = () =>
+  new ProtectedFileError({
+    kind: "unsupported",
+    message: "Resident attachment file protection is not qualified on this OS"
+  })
 
 export const fileFailure = () =>
   new ProtectedFileError({ kind: "io", message: "Resident attachment file operation failed" })
@@ -36,13 +43,7 @@ const permissionFailure = () =>
 
 export const currentPosixOwner = Effect.suspend(() =>
   Schema.decodeUnknownEffect(PosixOwner)({ platform: process.platform, userId: process.getuid?.() }).pipe(
-    Effect.mapError(
-      () =>
-        new ProtectedFileError({
-          kind: "unsupported",
-          message: "Resident attachment file protection is not qualified on this OS"
-        })
-    )
+    Effect.mapError(unsupportedResidentProtection)
   )
 )
 

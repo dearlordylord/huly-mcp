@@ -1,10 +1,11 @@
-import { ConfigProvider, Effect } from "effect"
+import { ConfigProvider, Effect, Schema } from "effect"
 
 import { getLazyEnvs } from "../config/startup.js"
 import { ProfileEnvironmentSchema } from "../profiles/model.js"
 import type { CliProfileStore } from "../profiles/file-store.js"
 import type { ResidentStartupCapture } from "./managed-contract.js"
 import { captureResidentSelection } from "./selection-config.js"
+import { ResidentPlatform, unsupportedResidentProtection } from "./protected-path.js"
 
 // Internal launch decision; the capture schema owns the private IPC payload.
 type ManagedStartup =
@@ -13,8 +14,10 @@ type ManagedStartup =
 
 export const resolveManagedStartup = Effect.fn("resolveManagedStartup")(function* (
   environment: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform,
   store?: CliProfileStore
 ) {
+  yield* Schema.decodeUnknownEffect(ResidentPlatform)(platform).pipe(Effect.mapError(unsupportedResidentProtection))
   const snapshot = { ...environment }
   const lazy = yield* getLazyEnvs(snapshot).pipe(
     Effect.provide(ConfigProvider.layer(ConfigProvider.fromUnknown(snapshot)))
