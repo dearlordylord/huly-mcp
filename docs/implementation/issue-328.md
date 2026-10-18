@@ -337,3 +337,32 @@ find no actionable defect. This proves the scoped Linux managed last-adapter
 expiry path with legacy initialization and no active operation. It does not
 qualify actual Codex cleanup, all protocols, active work, another OS or the full
 contract. No production implementation changed; all six issues remain open.
+
+### Actual Codex host followed through lease expiry
+
+The separate expiry scenario was then exercised with actual Codex 0.163.0,
+temporary HOME/CODEX_HOME, synthetic authority, the same unmodified packaged MCP
+artifact and the existing direct app-server discovery/two-context-read probe.
+No model turn or live-Huly operation was started. The scratch supervisor adds
+kernel waitpid reporting and selects the explicit 45-second expiry allowance;
+ordinary qualification bounds and prior failed attempts are preserved.
+
+This attempt completed with supervisor exit code 0. The actual host exited 0;
+creator PID 1047475 was reaped with code -9. The selected backend PID 1047515 was
+later reaped with code 0 at monotonic 1027759.576, without forced cleanup, and
+the complete fixture namespace was empty. Times are reap observations, not
+signal-delivery times. The result supports eventual managed backend retirement
+after actual-host shutdown and expiry, not graceful adapter release or a shorter
+shutdown bound. The short-lived helper PIDs are not assigned application roles
+without further evidence.
+
+Evidence directory `/tmp/resident-codex-expiry-complete-gNSG7C` retains the probe,
+isolated host configuration, receipt and kernel observations. `exits.log`
+SHA-256 `89cd48e9248f765e58645d6ff92e5401c7610c0df5d900a9d3063ac85583ae23`;
+`codex.receipt.json` SHA-256
+`042278412f3f8aef7094a0de9246bf29d8d4d59aded91bdfe8184873fe642788`;
+scratch `reaper.py` SHA-256
+`74b235b6638600c8680087eec3f2544b20dae308bec60c43706acd51c8ec110a`.
+No runtime journal, replay, production timer or host global configuration changed.
+Claude, real Huly, complete protocols/auth/platform coverage and the final gate
+remain pending; this scoped host result does not close any ticket.
