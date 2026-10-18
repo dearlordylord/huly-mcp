@@ -108,7 +108,7 @@ const readBody = async (request: IncomingMessage) => {
 export const startDisposableRestFixture = async (
   options: {
     readonly onModelLoad?: () => Promise<void>
-    readonly onProjectRead?: () => Promise<void>
+    readonly onProjectRead?: (identifier: Schema.Schema.Type<typeof ProjectIdentifier> | undefined) => Promise<void>
     readonly afterProjectWrite?: () => Promise<void>
     readonly projects?: ReadonlyArray<Schema.Schema.Type<typeof DisposableRestProject>>
   } = {}
@@ -169,11 +169,11 @@ export const startDisposableRestFixture = async (
         url.searchParams.get("class") === "tracker:class:Project"
       ) {
         observed.projectReads++
-        await options.onProjectRead?.()
         const query = Schema.decodeUnknownSync(Schema.fromJsonString(ProjectQuery))(
           url.searchParams.get("query") ?? "{}"
         )
         if (query.identifier !== undefined) observed.projectQueries.push(query.identifier)
+        await options.onProjectRead?.(query.identifier)
         const projects = projectState.filter(
           (project) => query.identifier === undefined || project.identifier === query.identifier
         )
