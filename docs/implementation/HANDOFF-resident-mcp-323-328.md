@@ -606,3 +606,8 @@ Test-only after ee9be005: [report](resident-policy-modes-2026-10-18.md). Native/
 ### Idle/admission ordering — 2026-10-18
 
 [Report](resident-idle-admission-race-2026-10-18.md): real admissions shell/TestClock pending acquisition1ms predeadline protects across idle interval; resulting owner accepts work and holds lifetime, confirmed release grants full new interval; fence-first refuses without token acquisition. Three focused files8testsPASS, local lint/format and both scoped reviews accepted. Test-only, no full gate. Immediate work return does not prove held-work cleanup or packaged OS/HTTP concurrency; wider lifecycle/final qualification and all six issues remain incomplete.
+
+
+### Native HTTPS accepted work across fence — 2026-10-18
+
+[Report](resident-http-fence-work-2026-10-18.md): held nativeMCP call survives explicit generation fence with exact terminal reply; newadmission409/renewal403/newwork403, session retained until DELETE204. Shared HTTP test helper now exposes consumed body/contentType. Focused admission/context and neighboring session/shutdown/continuity checks pass; local lint/format and both reviews accepted. No production change/full gate. Explicit-fence component proof does not qualify automatic idle/processrace/full lifecycle; all six tickets remain incomplete.

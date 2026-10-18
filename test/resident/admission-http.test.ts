@@ -1,7 +1,13 @@
 import { NodeHttpClient } from "@effect/platform-node"
-import { Effect, Option, Redacted, Schema } from "effect"
+import { Context, Deferred, Effect, Fiber, Option, Redacted, Schema, Stream } from "effect"
+import { McpSchema, McpServer } from "effect/ai"
 import { HttpClientRequest } from "effect/http"
 import { expect, it } from "vitest"
+
+import { MAX_ADAPTER_RESPONSE_BYTES } from "../../src/resident/adapter-limits.js"
+import { decodeBackendMessages } from "../../src/resident/response-stream.js"
+
+import { HostMessage } from "../../src/resident/request-headers.js"
 
 import { requestContextMiddleware } from "../../src/mcp/http-request-context.js"
 import {
@@ -168,6 +174,92 @@ it("authenticates attachment membership before native MCP and fences foreign leg
             expect((yield* control(endpoint, identity, "POST")).status).toBe(HTTP_CONFLICT)
           }),
         { middleware: (app) => residentAdmissionMiddleware(admissions)(nativeContext(app)) }
+      )
+    }).pipe(Effect.scoped, Effect.timeout("5 seconds"))
+  )
+})
+
+it("preserves an accepted HTTP call across generation fencing while refusing new admission and work", async () => {
+  await Effect.runPromise(
+    Effect.gen(function* () {
+      const admissions = yield* makeResidentAdmissions(policy)
+      const entered = yield* Deferred.make<void>()
+      const resume = yield* Deferred.make<void>()
+      const completed = yield* Deferred.make<void>()
+      const nativeContext = requestContextMiddleware({
+        resolveClients: () => Promise.reject(new Error("Held fixture must not acquire Huly"))
+      })
+      const registration = Effect.gen(function* () {
+        const server = yield* McpServer.McpServer
+        yield* server.addTool({
+          tool: new McpSchema.Tool({ name: "held", inputSchema: McpSchema.ToolJson.make({ type: "object" }) }),
+          annotations: Context.empty(),
+          handle: () =>
+            Deferred.succeed(entered, undefined).pipe(
+              Effect.andThen(Deferred.await(resume)),
+              Effect.as({ content: [{ type: "text", text: "accepted-before-fence" }] })
+            )
+        })
+      })
+      yield* withNativeServer(
+        new Map<OwnerName, Owner>(),
+        (endpoint, identity) =>
+          Effect.gen(function* () {
+            const admitted = yield* control(endpoint, identity, "POST")
+            expect(admitted.status).toBe(HTTP_CREATED)
+            const { token } = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(AttachmentAdmitted))(
+              admitted.body
+            )
+            const owner = yield* admissions.find(token)
+            const initialized = yield* exchange(endpoint, identity, "first", initialize("first"), Option.none(), token)
+            expect(initialized.status).toBe(HTTP_OK)
+            if (Option.isNone(initialized.session)) return yield* Effect.die("Expected owned native session")
+            const sessionId = Redacted.value(initialized.session.value.id)
+            const request = yield* exchange(
+              endpoint,
+              identity,
+              "first",
+              HostMessage.make({
+                jsonrpc: "2.0",
+                id: 2,
+                method: "tools/call",
+                params: { name: "held", arguments: {} }
+              }),
+              initialized.session,
+              token
+            ).pipe(
+              Effect.tap(() => Deferred.succeed(completed, undefined)),
+              Effect.forkScoped
+            )
+            yield* Deferred.await(entered)
+            try {
+              yield* admissions.fence
+              expect((yield* control(endpoint, identity, "POST")).status).toBe(HTTP_CONFLICT)
+              expect((yield* control(endpoint, identity, "PUT", token)).status).toBe(HTTP_FORBIDDEN)
+              expect((yield* exchange(endpoint, identity, "first", ping, initialized.session, token)).status).toBe(
+                HTTP_FORBIDDEN
+              )
+              expect(yield* Deferred.isDone(completed)).toBe(false)
+              expect(yield* owner.ownsSession(sessionId)).toBe(true)
+            } finally {
+              yield* Deferred.succeed(resume, undefined)
+            }
+            const reply = yield* Fiber.join(request)
+            expect(reply.status).toBe(HTTP_OK)
+            const messages = yield* decodeBackendMessages({
+              body: Stream.make(new TextEncoder().encode(reply.body)),
+              contentType: reply.contentType,
+              maxBytes: MAX_ADAPTER_RESPONSE_BYTES
+            }).pipe(Stream.runCollect)
+            expect(messages).toEqual([
+              { jsonrpc: "2.0", id: 2, result: { content: [{ type: "text", text: "accepted-before-fence" }] } }
+            ])
+            expect(yield* owner.ownsSession(sessionId)).toBe(true)
+            expect((yield* control(endpoint, identity, "DELETE", token)).status).toBe(HTTP_NO_CONTENT)
+            expect(yield* owner.ownsSession(sessionId)).toBe(false)
+            yield* admissions.drain
+          }),
+        { registration, middleware: (app) => residentAdmissionMiddleware(admissions)(nativeContext(app)) }
       )
     }).pipe(Effect.scoped, Effect.timeout("5 seconds"))
   )

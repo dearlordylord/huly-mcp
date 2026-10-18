@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto"
 import { NodeHttpClient } from "@effect/platform-node"
-import { Deferred, Effect, Fiber, Layer, Option, Redacted, Schema, Stream } from "effect"
+import { Deferred, Effect, Fiber, Layer, Option, Redacted, Schema } from "effect"
 import { McpProtocol, McpSchema, McpServer } from "effect/ai"
 import { HttpClientRequest, HttpServerRequest } from "effect/http"
 import type { HttpMiddleware } from "effect/http/HttpMiddleware"
@@ -115,8 +115,13 @@ export const exchange = (
           HttpClientRequest.bodyText(body, "application/json")
         )
       )
-      yield* Stream.runDrain(response.stream)
-      return { status: response.status, session: yield* parseLegacyHttpSession(new Headers(response.headers)) }
+      const responseBody = yield* response.text
+      return {
+        status: response.status,
+        body: responseBody,
+        contentType: response.headers["content-type"] ?? "",
+        session: yield* parseLegacyHttpSession(new Headers(response.headers))
+      }
     })
   )
 
