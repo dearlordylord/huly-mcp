@@ -31,24 +31,31 @@ export const ResidentAttachment = Schema.Struct({
   authorization: Schema.RedactedFromValue(Schema.NonEmptyString)
 })
 export type ResidentAttachment = Schema.Schema.Type<typeof ResidentAttachment>
-const CompatibleResidentAttachment = ResidentAttachment.check(
-  Schema.makeFilter((attachment) => attachment.implementation.version === VERSION)
-)
+const isCurrentImplementation = (attachment: ResidentAttachment) => attachment.implementation.version === VERSION
+const CompatibleResidentAttachment = ResidentAttachment.check(Schema.makeFilter(isCurrentImplementation))
 
 const invalidAttachment = () =>
   new ProtectedFileError({ kind: "input", message: "Resident attachment is invalid or incompatible with this package" })
 const conflict = () =>
   new ProtectedFileError({ kind: "conflict", message: "Resident attachment ownership changed; cleanup refused" })
 
-export const readResidentAttachment = (selection: ResidentFilePath) =>
+/** Protected format-v1 metadata; implementation compatibility is checked by readResidentAttachment. */
+export const readResidentAttachmentEnvelope = (selection: ResidentFilePath) =>
   Effect.gen(function* () {
     const text = yield* readPrivateText(selection, MAX_ATTACHMENT_BYTES)
-    const descriptor = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(CompatibleResidentAttachment))(
-      text
-    ).pipe(Effect.mapError(invalidAttachment))
+    const descriptor = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(ResidentAttachment))(text).pipe(
+      Effect.mapError(invalidAttachment)
+    )
     if (path.basename(selection) !== `${descriptor.identity.generation}.json`) return yield* invalidAttachment()
     return descriptor
   })
+
+export const readResidentAttachment = (selection: ResidentFilePath) =>
+  readResidentAttachmentEnvelope(selection).pipe(
+    Effect.flatMap((descriptor) =>
+      isCurrentImplementation(descriptor) ? Effect.succeed(descriptor) : Effect.fail(invalidAttachment())
+    )
+  )
 
 export const withPublishedResidentAttachment = <A, E, R>(
   requestedDirectory: ResidentDirectory,

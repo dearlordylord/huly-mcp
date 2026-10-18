@@ -51,6 +51,9 @@ compatibility and the selected generation's TLS key before sending HTTP
 authorization or an operation. It does not follow redirects or replay requests.
 On connection loss, an operation's outcome may be unknown.
 
+For the final local Huly campaign, use the [two-reader qualification procedure](resident-read-qualification.md).
+Its receipt covers adapter and reader exits; backend retirement remains separately owned.
+
 ## Stop or restart
 
 Close an adapter to interrupt its owned requests. Stop the backend with SIGTERM

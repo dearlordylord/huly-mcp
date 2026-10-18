@@ -7,6 +7,7 @@ import { expect, it } from "vitest"
 
 import {
   readResidentAttachment,
+  readResidentAttachmentEnvelope,
   ResidentAttachment,
   withPublishedResidentAttachment
 } from "../../src/resident/attachment-file.js"
@@ -178,4 +179,26 @@ it("refuses oversized publication before creating generation state", async () =>
     )
     expect(Result.isFailure(outcome) && outcome.failure.kind).toBe("input")
     expect(await fs.readdir(directory)).toEqual([])
+  }))
+
+it("lets an observer parse protected foreign-version metadata without authorizing attachment", async () =>
+  withDirectory(async (directory) => {
+    await Effect.runPromise(
+      withPublishedResidentAttachment(directory, attachment(), (file) =>
+        Effect.gen(function* () {
+          const original = yield* readResidentAttachment(file)
+          const foreign = {
+            ...original,
+            implementation: { ...original.implementation, version: "foreign-observer-fixture" }
+          }
+          const encoded = yield* Schema.encodeEffect(Schema.fromJsonString(ResidentAttachment))(foreign)
+          yield* Effect.promise(() => fs.writeFile(file, encoded))
+          const observed = yield* readResidentAttachmentEnvelope(file)
+          expect(observed.implementation.version).toBe("foreign-observer-fixture")
+          expect(observed.identity.generation).toBe(original.identity.generation)
+          expect(Exit.isFailure(yield* Effect.exit(readResidentAttachment(file)))).toBe(true)
+          expect((yield* Effect.promise(() => fs.readFile(file, "utf8"))) === encoded).toBe(true)
+        })
+      )
+    )
   }))

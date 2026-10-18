@@ -643,3 +643,78 @@ An intermediate two-module coverage diagnostic ran the capability/deadline tests
 The complete gate with all four new behavioral cases passes: 477 files, 5723 tests, statements 99.45% (29521/29684), branches 99% (12452/12577), functions 99% (7988/8068), lines 99.55% (27131/27252). All build, TypeScript/Effect diagnostics, circular, complexity, metadata/schema, package, formatting, duplication and test stages pass. Duplication remains 0.91%. Command `GOMAXPROCS=2 pnpm check-all`, log `/tmp/resident-stop-config-complete-check-all.log`, SHA-256 `f93a1f67a971573e5cee48a358126b3220a3818bb92f098ef800e9aa8c091186`. No thresholds, diagnostic checks or deadlines changed. No speedup is attributed to GOMAXPROCS.
 
 The built MCP artifact SHA-256 is `e7467d4a4e65bd68c79c9661304fc31989ae1a3c30cb535ddbdd15a90e8fc172`; CLI artifact SHA-256 is `acc23767122f3527bf11eb85242a60d69287939547283f12f7bd24fb0a4e4aa1`. Copies of both artifacts and the gate log are retained privately at `/tmp/resident-coherent-gate-ekfrhay8`. Production sources were frozen throughout this gate; later changes in this increment are report-only. This establishes the current project gate, not complete native-platform, real-Huly, model/oracle or performance qualification. All six issues and parent remain open. The previously instructed final live campaign remains deferred until the complete implementation is integrated.
+
+### Author the supervised manual read-pair campaign probe
+
+The [two-reader procedure](../resident-read-qualification.md) now has an executable
+modern/native observer in `scripts/integration-resident-read-pair.ts`. Two real
+parent processes each own a packaged stdio adapter. Both use IDs 41 and 42 for
+first and continued `get_project` reads against distinct fixture identifiers and
+names. Discovery, native catalog and project resource templates are checked
+before reads. A success receipt requires separate parent/adapter PIDs, the
+selected generation, exact project replies, and joined zero exits. Backend
+retirement remains explicitly `not-requested` because its foreground owner is
+external. Live Huly execution is pending the complete integrated implementation.
+
+A new protected attachment-envelope reader permits an independently built
+observer to inspect format-v1 metadata without comparing its own development
+version. The normal adapter reader still requires current implementation
+compatibility. Actual private-file tests cover both paths with a foreign-version
+descriptor, preserving generation, size, encoding and permission checks.
+
+The deterministic native TLS process test forces both first reads to overlap.
+Its failure schedule returns the wrong project name to one reader while holding
+the other operation indefinitely. Coordinator EOF interrupts that reader's
+scope and finalizes its adapter. The test observes server operation cancellation,
+the original `read` diagnostic and no forced supervisor cleanup. The pair entry
+requires Linux and an inherited exit-observation pipe from the existing child
+subreaper; no supervisor or production deadline changed. This is synthetic
+process qualification of the probe, not live Huly or supported-platform evidence.
+
+An initial successful-read attempt after adding cancellation failed because the
+parent's control stdin remained open after its receipt while the coordinator
+waited for exit. A second attempt reproduced it. A phase diagnostic and then a
+sanitized error-tag-only diagnostic identified the five-second receipt-suffix
+timeout. The coordinator now closes control stdin immediately after validating
+the receipt. Temporary diagnostics were removed. Failure logs remain at
+`/tmp/resident-live-read-cancellation-tests.log`,
+`/tmp/resident-live-read-cancellation-repeat.log`,
+`/tmp/resident-live-read-cancellation-phases.log`, and
+`/tmp/resident-live-read-cancellation-error-type.log`.
+
+The corrected focused run passes both files and all 10 tests:
+`/tmp/resident-live-read-cancellation-fixed.log`, SHA-256
+`d683851382c5835852f04badfbee64c7c4aeef1bfeea1a5df6bf3a1df65830d8`.
+Fresh read-only Standards and Spec reviews found no actionable findings and
+confirmed the prior orphan finding resolved. TypeScript/Effect diagnostics and
+lint pass separately. The full gate for this increment is still pending. All
+six issues remain open, including native Windows ownership, other native OS
+qualification, live Huly, the complete model/oracle and performance campaign.
+
+The first complete gate for this increment passed all 478 files / 5726 tests
+but failed the unchanged branch threshold: 98.99% (12456/12582). Statements
+were 99.45%, functions 99%, and lines 99.55%. Log
+`/tmp/resident-live-read-complete-check-all.log`, SHA-256
+`ff1caa483089d0dc1d0857addd77d9451bbb63edd49c81a093e55a3385007b63`.
+The uncovered new contract branch refused matching project names. Additional
+boundary tests now reject both equal identifiers and equal names, since either
+would weaken the probe's response-routing check. The focused two-file run passes
+all 12 tests at `/tmp/resident-live-read-input-refusal-tests.log`. A fresh complete
+gate remains necessary; this failed gate is retained as evidence.
+
+The corrected complete candidate passes `GOMAXPROCS=2 pnpm check-all`:
+478 files / 5728 tests, statements 99.45% (29539/29702), branches 99%
+(12457/12582), functions 99% (7991/8071), and lines 99.55%
+(27148/27269). All build, diagnostics, circular, complexity, lint, package and
+schema checks pass. Duplication remains 0.91%. No thresholds or deadlines changed,
+and no performance conclusion is attributed to the compiler concurrency setting.
+
+Gate log `/tmp/resident-live-read-input-refusal-check-all.log`, SHA-256
+`f4b08538296fbc513ded1b31bd5a283121352e4adbc6fa80a4cd1153ef4ff7f2`.
+MCP artifact `530bf75a65e3befb3f534f481b19e0e7f4c9cb4fddd7c238c85b850c7eec7be4`;
+CLI artifact `c957044a36f2559fbdf5230a0f37860911af276f800b1a37933539d7298f5697`.
+Private copies and a hash manifest are at `/tmp/resident-read-pair-gate-el9o56n0`.
+Source remained fixed during this gate; subsequent edits only record the result.
+The additional input-refusal cases also received a fresh clean Standards review.
+This proves the project gate for this candidate, not the pending complete live,
+native-platform, model or performance qualification.
