@@ -188,3 +188,14 @@ release it survives4900ms then closes0 after100ms, leaving empty state. External
 5s/7s/25s bounds retained. Initial focused process test passes12.78s; both scoped
 reviews accepted. No physical-time, queued Huly work, fence-first process order
 or native macOS claim. All six issues remain incomplete.
+### Idle fence before packaged attachment — 2026-10-18
+
+[Report](resident-process-idle-fence-2026-10-18.md): automatic idle fence precedes
+held cleanup in a separately owned fixture backend. A new packaged adapter
+refuses within5s, exits1 with no output and preserves the original ownership
+bytes/inventories. Release permits original owned exit0/empty state before a
+fresh independent packaged host succeeds on a different generation, then exits
+with kernel-confirmed replacement cleanup. One focused process test passes
+11.16s; typecheck/lint and both scoped reviews accepted. Controlled-clock original
+backend fixture, not physical timeout or real Huly work qualification. All six
+issues remain incomplete.
