@@ -631,3 +631,8 @@ Test-only after ee9be005: [report](resident-policy-modes-2026-10-18.md). Native/
 ### Produced terminal lost before host observation — 2026-10-18
 
 [Report](resident-terminal-output-loss-2026-10-18.md): uncertain-write process fixture adds closedhoststdout withcommittedfile1/actualterminalHTTPfinish/adapteroutputfailureexit1/nohostbytes/dispatch1. Earlierheaders/progress uncertaintychecks retained; newmode uses actualcountsfornoreplay, notwrongstderrstring. Focused3casesPASS3.46s, local lint/format and both reviewsaccepted. Initialdiagnosticexpectationfailure retained; no productchange/fullgate. SyntheticTLS+packagedadapter boundaryscope only, notnativeHulyterminalqueue/delivery; all six issues remain incomplete.
+
+
+### Late old response versus fresh colliding ID — 2026-10-18
+
+[Report](resident-late-colliding-reply-2026-10-18.md): delayedcommit actualpackagedmanualadapter fixture adds freshreadID1held whiledeadoldadapterwriteID1 commits/attemptsterminalonclosedconnection. Operationdiscriminator rulesoutwrites1falsematch; entirefreshstdout aftercloseexactly ID1read/ID2read, one write/two reads/nohandlerfailures. Originalread0beforecommit preserved. Final2focusedfiles5testsPASS3.92s; local lint/format and reviews accepted. No productionchange/fullgate. Adapter-incarnation/syntheticTLSscope, notbackendgeneration replacement/liveHuly; all six tickets remain incomplete.

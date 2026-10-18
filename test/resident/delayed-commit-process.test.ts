@@ -20,13 +20,17 @@ const FixtureCall = Schema.Struct({
   params: Schema.Struct({ name: Schema.Literals(["fixture_increment", "fixture_read"]), arguments: Schema.Struct({}) })
 })
 const FixtureState = Schema.Struct({ writes: Schema.Natural })
-const FixtureReply = Schema.Struct({ jsonrpc: Schema.Literal("2.0"), id: FixtureCall.fields.id, result: FixtureState })
+const FixtureReply = Schema.Struct({
+  jsonrpc: Schema.Literal("2.0"),
+  id: FixtureCall.fields.id,
+  result: Schema.Struct({ ...FixtureState.fields, operation: FixtureCall.fields.params.fields.name })
+})
 const bounded = <A>(effect: Effect.Effect<A>) => Effect.runPromise(effect.pipe(Effect.timeout(RESPONSE_BOUND)))
 
-it(
-  "does not resolve or replay a lost write when a fresh adapter reads before its delayed remote commit",
+it.each(["read-before-commit", "colliding-read-held"])(
+  "does not replay or misroute a late write response with %s",
   { timeout: PROCESS_BOUND },
-  async () => {
+  async (mode) => {
     const bundle = await buildIsolatedStdioServer(PROCESS_BOUND)
     let passed = false
     try {
@@ -40,6 +44,9 @@ it(
         const allowCommit = Effect.runSync(Deferred.make<void>())
         const committed = Effect.runSync(Deferred.make<void>())
         const disconnected = Effect.runSync(Deferred.make<void>())
+        const readArrived = Effect.runSync(Deferred.make<void>())
+        const allowRead = Effect.runSync(Deferred.make<void>())
+        const oldTerminalAttempted = Effect.runSync(Deferred.make<void>())
         const pending = new Set<Promise<void>>()
         const failures: Array<unknown> = []
         let writeDispatches = 0
@@ -60,7 +67,13 @@ it(
                   await Effect.runPromise(Deferred.await(allowCommit))
                   await fs.writeFile(stateFile, Schema.encodeSync(Schema.fromJsonString(FixtureState))({ writes: 1 }))
                   await Effect.runPromise(Deferred.succeed(committed, undefined))
-                } else readDispatches++
+                } else {
+                  readDispatches++
+                  if (mode === "colliding-read-held" && readDispatches === 1) {
+                    Effect.runSync(Deferred.succeed(readArrived, undefined))
+                    await Effect.runPromise(Deferred.await(allowRead))
+                  }
+                }
                 const state = Schema.decodeUnknownSync(Schema.fromJsonString(FixtureState))(
                   await fs.readFile(stateFile, "utf8")
                 )
@@ -70,9 +83,11 @@ it(
                     Schema.encodeSync(Schema.fromJsonString(FixtureReply))({
                       jsonrpc: "2.0",
                       id: call.id,
-                      result: state
+                      result: { ...state, operation: call.params.name }
                     })
                   )
+                if (call.params.name === "fixture_increment")
+                  Effect.runSync(Deferred.succeed(oldTerminalAttempted, undefined))
               })()
               pending.add(operation)
               void operation.then(
@@ -119,6 +134,8 @@ it(
           expect(Buffer.concat(originalOutput).length).toBe(0)
           const reader = adapter()
           fresh = reader
+          const freshOutput: Array<Buffer> = []
+          reader.child.stdout.on("data", (bytes: Buffer) => freshOutput.push(bytes))
           expect(reader.child.pid === original.child.pid).toBe(false)
           lines = createInterface({ input: reader.child.stdout })
           const incoming = lines[Symbol.asyncIterator]()
@@ -135,20 +152,42 @@ it(
             expect(line.done).toBe(false)
             const reply = Schema.decodeUnknownSync(Schema.fromJsonString(FixtureReply))(line.value)
             expect(reply.id).toBe(id)
+            expect(reply.result.operation).toBe("fixture_read")
             return reply.result.writes
           }
-          expect(await read(1)).toBe(0)
-          await Effect.runPromise(Deferred.succeed(allowCommit, undefined))
-          await bounded(Deferred.await(committed))
+          if (mode === "colliding-read-held") {
+            const collidingRead = read(1)
+            void collidingRead.catch(() => {})
+            await bounded(Deferred.await(readArrived))
+            Effect.runSync(Deferred.succeed(allowCommit, undefined))
+            await bounded(Deferred.await(committed))
+            await bounded(Deferred.await(oldTerminalAttempted))
+            Effect.runSync(Deferred.succeed(allowRead, undefined))
+            expect(await collidingRead).toBe(1)
+          } else {
+            expect(await read(1)).toBe(0)
+            Effect.runSync(Deferred.succeed(allowCommit, undefined))
+            await bounded(Deferred.await(committed))
+          }
           expect(await read(2)).toBe(1)
           reader.child.stdin.end()
           expect(await bounded(Effect.promise(() => reader.closed))).toEqual([0, null])
+          const delivered = Buffer.concat(freshOutput)
+            .toString("utf8")
+            .trim()
+            .split("\n")
+            .map((line) => Schema.decodeUnknownSync(Schema.fromJsonString(FixtureReply))(line))
+          expect(delivered.map((reply) => [reply.id, reply.result.operation])).toEqual([
+            [1, "fixture_read"],
+            [2, "fixture_read"]
+          ])
           await bounded(Effect.promise(() => Promise.all([...pending])))
           expect(writeDispatches).toBe(1)
           expect(readDispatches).toBe(2)
           expect(failures).toEqual([])
         } finally {
           Effect.runSync(Deferred.succeed(allowCommit, undefined))
+          Effect.runSync(Deferred.succeed(allowRead, undefined))
           for (const owned of [original, fresh]) {
             if (owned !== undefined && owned.child.exitCode === null && owned.child.signalCode === null) {
               owned.child.kill("SIGKILL")
