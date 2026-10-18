@@ -1298,3 +1298,8 @@ pending. All six delivery issues remain open.
 ### Renewal loss during committed write — 2026-10-18
 
 [Report](resident-write-renewal-loss-2026-10-18.md): actualpackagedmanualadapter/privateTLS controlledrenewal403 onlyafterwritefilecommit, responseheld; adapterexit1/unknown/nooutput, exact1renewal/1dispatch/state1. Typedfixturelease seam retainsdefaultauth/tokenregistration; shorttestlease only, productboundsunchanged. Bothwrite+renewalpromises owned/joined, failuregatesreleased andprimaryerrorpreserved. Final3focusedfiles28testsPASS, local lint/format and reviewsaccepted. No productionchange/fullgate; nativeHuly/leaseexpiry/alluncertainty/platform/model/finalqualification remain open, all six issues incomplete.
+
+
+### Lifecycle model type reconciliation — 2026-10-18
+
+Proposed resident-launch.qnt types now key requests by InvocationId (sameasverificationwritehistory), separatecollidingwireId, representcleanupafterterminal/cancellation, ownercallerforresources and remoteeffectoracletruth distinctfromcallerknowledge. Scope/sketch notes updated. QuinttypecheckPASS /tmp/resident-launch-types-reconciled.log; both scoped typeproposalreviews accepted. Existing explicittypesketchapproval checkpoint retained perquint-modelingSKILLstep2; noinit/actions/invariants/run/proof added or claimed. This doesnotcomplete326.9/327.10/othergoals; independent implementation/qualification cancontinue. No fullgate.

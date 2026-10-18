@@ -5,6 +5,7 @@ module resident_launch {
   type GenerationId = int
   type CapabilityId = int
   type InvocationId = { adapter: CallerId, ordinal: int }
+  type WireRequestId = int
   type SelectionKey = { authority: int, policy: int, implementation: int }
   type CallerPhase = Selecting | LocalDiscovery | Prepared(BackendId)
     | StartAttempted(BackendId) | Attached(GenerationId) | Refused | CallerClosed
@@ -37,17 +38,20 @@ module resident_launch {
     | ReceiptOwned({ backend: BackendId, capability: CapabilityId }) | ReceiptLost
   type RetirementEvidence = RetirementUnverified | OwnedClosureConfirmed | OperatorRetirementVerified
   type Cleanup = Active | CleanupPending | CleanupFailed | CleanupConfirmed
-  type OwnedResource = { backend: BackendId, generation: GenerationId, cleanup: Cleanup, admitted: bool }
+  type OwnedResource = { caller: CallerId, backend: BackendId, generation: GenerationId, cleanup: Cleanup, admitted: bool }
   type StartMessage = { parent: CallerId, backend: BackendId, authenticated: bool }
   type AttachmentPhase = LeaseLive | LeaseExpired | LeaseReleased
   type Attachment = { caller: CallerId, generation: GenerationId, phase: AttachmentPhase, expires: int }
   type RequestPhase = Queued | WaitingForModel | Running | RequestCancelled | Terminal
-  type Request = { caller: CallerId, generation: GenerationId, phase: RequestPhase }
+  // The map key owns adapter identity; wire IDs may collide across incarnations.
+  type Request = { wireId: WireRequestId, generation: GenerationId, phase: RequestPhase, cleanup: Cleanup }
   type WriteOutcome = NotDispatched | DispatchAttempted(GenerationId)
     | Uncertain(GenerationId) | TerminalObserved(GenerationId) | Reconciled(GenerationId)
   type TerminalDelivery = NoTerminal | BackendTerminalProduced | AdapterTerminalReceived
     | AdapterTerminalQueued | HostTerminalObserved
-  type Write = { outcome: WriteOutcome, dispatches: int, delivery: TerminalDelivery }
+  // Remote effects are oracle facts, independent of what the original caller knows.
+  type RemoteEffect = RemoteNotSubmitted | RemotePending | RemoteCommitted | RemoteRejected
+  type Write = { outcome: WriteOutcome, dispatches: int, delivery: TerminalDelivery, remote: RemoteEffect }
 
   var callers: CallerId -> Caller
   var backends: BackendId -> Backend
@@ -58,7 +62,7 @@ module resident_launch {
   var resources: int -> OwnedResource
   var starts: Set[StartMessage]
   var attachments: int -> Attachment
-  var requests: int -> Request
+  var requests: InvocationId -> Request
   // Specification/oracle history only; this map is not persisted by the application.
   var writes: InvocationId -> Write
   var round: int

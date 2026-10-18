@@ -17,3 +17,6 @@ specification/oracle state, not persisted runtime data. Protected backend
 ownership inventory remains a separate requirement. Model logic still awaits
 explicit type-sketch approval. The authoritative contract remains GitHub #322
 and #323 through #328, including their explicit uncertainty-scope amendment.
+
+
+The 2026-10-18 type reconciliation links request and write history through invocation identity, separates colliding wire IDs, distinguishes remote effect truth from caller knowledge, and represents retained cleanup after terminal/cancellation. See the maintained scope note for details. This remains a type proposal awaiting the existing approval checkpoint; no executable lifecycle-model result is claimed.

@@ -173,3 +173,8 @@ substitute for remaining lifecycle, model and native platform requirements.
 ### Idle and accepted-work evidence reconciliation — 2026-10-18
 
 The [idle/admission tests](resident-idle-admission-race-2026-10-18.md) and [HTTPS accepted-work fence test](resident-http-fence-work-2026-10-18.md) apply primarily to this retirement slice, although their first implementation notes were also recorded under #324. They establish deterministic component orderings and explicit HTTP fencing, not the full packaged automatic-idle race. See [current evidence reconciliation](resident-audit-reconciliation-2026-10-18.md); #326 remains incomplete.
+
+
+### Lifecycle model type reconciliation — 2026-10-18
+
+Proposed resident-launch.qnt types now key requests by InvocationId (sameasverificationwritehistory), separatecollidingwireId, representcleanupafterterminal/cancellation, ownercallerforresources and remoteeffectoracletruth distinctfromcallerknowledge. Scope/sketch notes updated. QuinttypecheckPASS /tmp/resident-launch-types-reconciled.log; both scoped typeproposalreviews accepted. Existing explicittypesketchapproval checkpoint retained perquint-modelingSKILLstep2; noinit/actions/invariants/run/proof added or claimed. This doesnotcomplete326.9/327.10/othergoals; independent implementation/qualification cancontinue. No fullgate.

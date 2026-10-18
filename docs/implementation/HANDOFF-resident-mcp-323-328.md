@@ -646,3 +646,8 @@ Test-only after ee9be005: [report](resident-policy-modes-2026-10-18.md). Native/
 ### Concurrent incompatible configuration launch — 2026-10-18
 
 [Report](resident-concurrent-config-launch-2026-10-18.md): schema-owned launch seq/concurrent; both independentparents spawnedbeforeawaitready innewconcurrent/backend-only cases, same namespace/different effectiveURLs. Existing heldpeer/fault isolation retained. Final6casesPASS50.00s /tmp/resident-config-launch-fault-six-cases.log; local lint/format and reviewsaccepted. Postrunall6roots terminal0/parentlineage/onlyfailedAregistryretained/Brecordremoved independentlychecked. Originaldiscoverreadinessfailure not reproduced; cause remainsunknown, no timeoutrelaxed or productionfix claimed. No fullgate, all6issues incomplete; exactkillboundaries/macOS/model/finalqualification open.
+
+
+### Lifecycle model type reconciliation — 2026-10-18
+
+Proposed resident-launch.qnt types now key requests by InvocationId (sameasverificationwritehistory), separatecollidingwireId, representcleanupafterterminal/cancellation, ownercallerforresources and remoteeffectoracletruth distinctfromcallerknowledge. Scope/sketch notes updated. QuinttypecheckPASS /tmp/resident-launch-types-reconciled.log; both scoped typeproposalreviews accepted. Existing explicittypesketchapproval checkpoint retained perquint-modelingSKILLstep2; noinit/actions/invariants/run/proof added or claimed. This doesnotcomplete326.9/327.10/othergoals; independent implementation/qualification cancontinue. No fullgate.

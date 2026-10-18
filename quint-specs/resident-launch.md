@@ -80,3 +80,15 @@ retirement, local coordination and explicit scheduling assumptions. Native OS
 permissions, process identity/cleanup, Huly semantics, actual host behavior and
 resource measurements still need separate qualification. Typechecking alone
 establishes none of those properties.
+
+
+## Type reconciliation with observed fault schedules — 2026-10-18
+
+The proposed request map now uses the same `InvocationId` as verification-only write history. A wire JSON-RPC ID is a separate request field: two adapter incarnations may both use ID1 while their invocation identities remain different. The caller is derived from the map key instead of duplicated in the request record. This permits the late old-reply/fresh-read schedule without treating a reused wire ID as the same invocation.
+
+`RemoteEffect` records oracle truth separately from caller knowledge: a write can remain uncertain while its remote effect is pending, and can commit after local retirement. Neither a fresh read nor local cleanup changes that fact into known failure. Request cleanup is independent of its execution phase, so a terminal/canceled request may still retain protected local resources. An owned resource also records its caller, allowing foreign-attachment cleanup to be distinguished from generation cleanup.
+
+These are proposed type corrections only. They add no actions, invariants, initialization or proof. The existing explicit type-sketch approval checkpoint remains in effect; it has not been inferred from repeated implementation continuations. The bounded domain must include colliding wire IDs, at least two adapter incarnations and an old invocation retained in oracle history after adapter loss.
+
+
+The proposed coordination abstraction remains plain Quint: protected claims/registry are shared-state coordination, while `starts` represents explicitly scheduled delivery of startup messages. This keeps ownership/retirement interleavings in one bounded state model but requires explicit message-delivery actions rather than Choreo scaffolding. The choice and the grouping of per-caller/per-backend records are part of the existing type-sketch sign-off, not an approved transition design.
