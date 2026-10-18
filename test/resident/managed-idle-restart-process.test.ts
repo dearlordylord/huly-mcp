@@ -8,7 +8,7 @@ import { expect, it } from "vitest"
 
 import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
-import { IdleRestartObservation } from "./idle-restart-observation.js"
+import { IdleRestartObservation, REPLACEMENT_PARENT_COUNT } from "./idle-restart-observation.js"
 
 const BUILD_BOUND = 30_000
 const PROCESS_BOUND = 25_000
@@ -16,7 +16,7 @@ const runFile = promisify(execFile)
 const FixtureFailure = Schema.Struct({ stderr: Schema.String })
 
 it.skipIf(process.platform !== "linux")(
-  "starts a fresh packaged generation after the previous parent's managed backend retires from idle",
+  "converges ten fresh parents after the previous packaged managed backend retires from idle",
   { timeout: BUILD_BOUND },
   async () => {
     const bundle = await buildIsolatedStdioServer(BUILD_BOUND)
@@ -65,6 +65,7 @@ it.skipIf(process.platform !== "linux")(
       const receipt = Schema.decodeUnknownSync(Schema.fromJsonString(IdleRestartObservation))(result.stdout)
       expect(new Set(receipt.cycles.map((item) => item.generation)).size).toBe(receipt.cycles.length)
       expect(receipt.cycles.map((item) => item.backendExit.exitCode)).toEqual([0, 0])
+      expect(receipt.cycles.map((item) => item.parents.length)).toEqual([1, REPLACEMENT_PARENT_COUNT])
       expect(receipt.privateStateRemoved).toBe(true)
       expect(await fs.readdir(directory)).toEqual([])
       await fs.writeFile(

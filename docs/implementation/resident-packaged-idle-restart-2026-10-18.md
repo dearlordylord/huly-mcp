@@ -31,3 +31,8 @@ new attachment overlapping the idle fence, real Huly reads, adapter-specific
 exit codes, native macOS behavior or complete lifecycle qualification. No
 production change, legacy path, journal or full campaign was introduced.
 Issues323–328 remain incomplete.
+
+The maintained fixture is subsequently extended to ten concurrent replacement
+parents in [the follow-up report](resident-ten-parent-restart-2026-10-18.md).
+The single-parent receipt above remains historical evidence for its source
+revision; its schema is superseded by the current per-cycle parents array.

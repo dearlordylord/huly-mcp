@@ -7,7 +7,11 @@ import { ResidentPackagePath, ResidentRegistryEnvelope } from "../../../src/resi
 import { ResidentDirectory } from "../../../src/resident/protected-path.js"
 import { openKernelReapedEvents, ReapedEventsFd } from "../../helpers/kernel-reaped-events.js"
 import { spawnManagedNativeParent } from "../../helpers/managed-native-parent.js"
-import { IdleGenerationObservation, IdleRestartObservation } from "../idle-restart-observation.js"
+import {
+  IdleGenerationObservation,
+  IdleRestartObservation,
+  REPLACEMENT_PARENT_COUNT
+} from "../idle-restart-observation.js"
 import type { ManagedNativeHostObservation } from "../native-host-observation.js"
 
 const Input = Schema.Struct({
@@ -17,21 +21,32 @@ const Input = Schema.Struct({
   reapedFd: ReapedEventsFd
 })
 
-const cycle = async (input: Schema.Schema.Type<typeof Input>, kernel: ReturnType<typeof openKernelReapedEvents>) => {
-  const parent = spawnManagedNativeParent({ ...input, host: "claude-code", workspace: "fixture" })
+const cycle = async (
+  input: Schema.Schema.Type<typeof Input>,
+  kernel: ReturnType<typeof openKernelReapedEvents>,
+  count: 1 | typeof REPLACEMENT_PARENT_COUNT
+) => {
+  const parents = Array.from({ length: count }, () =>
+    spawnManagedNativeParent({ ...input, host: "claude-code", workspace: "fixture" })
+  )
   let observed:
     | {
         readonly record: ResidentRegistryEnvelope
-        readonly parent: Schema.Schema.Type<typeof ManagedNativeHostObservation>
+        readonly parents: ReadonlyArray<Schema.Schema.Type<typeof ManagedNativeHostObservation>>
       }
     | undefined
   let primary: { readonly error: unknown } | undefined
   try {
-    await parent.connected()
-    const initial = await parent.read()
-    assert.equal(initial.contextIsError, false)
-    assert.equal(initial.observedWorkspace, "fixture")
-    assert.ok(initial.tools.includes("list_projects"))
+    await Promise.all(parents.map((parent) => parent.connected()))
+    const initial = await Promise.all(parents.map((parent) => parent.read()))
+    assert.equal(new Set(initial.map((item) => item.parentPid)).size, count)
+    assert.equal(new Set(initial.map((item) => item.adapterPid)).size, count)
+    assert.equal(new Set(initial.map((item) => item.observedPort)).size, 1)
+    for (const item of initial) {
+      assert.equal(item.contextIsError, false)
+      assert.equal(item.observedWorkspace, "fixture")
+      assert.ok(item.tools.includes("list_projects"))
+    }
     const registry = join(input.directory, "generations")
     const names = await fs.readdir(registry)
     assert.equal(names.length, 1)
@@ -40,15 +55,16 @@ const cycle = async (input: Schema.Schema.Type<typeof Input>, kernel: ReturnType
     const record = Schema.decodeUnknownSync(Schema.fromJsonString(ResidentRegistryEnvelope))(
       await fs.readFile(join(registry, name), "utf8")
     )
-    observed = { record, parent: initial }
+    observed = { record, parents: initial }
   } catch (error) {
     primary = { error }
   }
-  const [closed] = await Promise.allSettled([parent.close()])
+  const closed = await Promise.allSettled(parents.map((parent) => parent.close()))
   if (primary !== undefined) throw primary.error
-  if (closed === undefined) throw new Error("Missing parent exit observation")
-  if (closed.status === "rejected") throw closed.reason
-  assert.deepEqual(closed.value, [0, null])
+  for (const outcome of closed) {
+    if (outcome.status === "rejected") throw outcome.reason
+    assert.deepEqual(outcome.value, [0, null])
+  }
   if (observed === undefined) throw new Error("Missing managed idle generation observation")
   process.stderr.write("Managed idle restart: parent exited; awaiting owned backend retirement\n")
   const backendExit = await kernel.wait(observed.record.diagnostics.processId)
@@ -57,7 +73,7 @@ const cycle = async (input: Schema.Schema.Type<typeof Input>, kernel: ReturnType
   return IdleGenerationObservation.make({
     generation: observed.record.generation,
     backendExit,
-    parent: observed.parent
+    parents: observed.parents
   })
 }
 
@@ -70,12 +86,16 @@ const main = async () => {
   })
   const kernel = openKernelReapedEvents(input.reapedFd)
   try {
-    const first = await cycle(input, kernel)
-    process.stderr.write("Managed idle restart: starting a fresh independent parent after confirmed retirement\n")
-    const second = await cycle(input, kernel)
+    const first = await cycle(input, kernel, 1)
+    process.stderr.write("Managed idle restart: starting ten independent parents after confirmed retirement\n")
+    const second = await cycle(input, kernel, REPLACEMENT_PARENT_COUNT)
     assert.notEqual(second.generation, first.generation)
-    assert.notEqual(second.parent.parentPid, first.parent.parentPid)
-    assert.notEqual(second.parent.adapterPid, first.parent.adapterPid)
+    const original = first.parents[0]
+    if (original === undefined) throw new Error("Missing original parent")
+    for (const parent of second.parents) {
+      assert.notEqual(parent.parentPid, original.parentPid)
+      assert.notEqual(parent.adapterPid, original.adapterPid)
+    }
     process.stdout.write(
       Schema.encodeSync(Schema.fromJsonString(IdleRestartObservation))({
         cycles: [first, second],

@@ -1308,3 +1308,13 @@ Proposed resident-launch.qnt types now key requests by InvocationId (sameasverif
 ### Unresolved owner fresh-start refusal with held peer — 2026-10-18
 
 [Report](resident-unresolved-start-refusal-2026-10-18.md): afterAbackendfault whileBheld, actualfreshmanagedadapter EXACTAURL/workspace/token/nativepolicy/namespace gets actualexit1/notobserverkilled/nosignal/emptystdout/nodispatchdiagnostic/tokenredacted. RetainedAbytesandexact2generationinventory unchanged; Bsamegeneration/registry/1held thenexact41+42, A0model/read/write. Reviewcaught auto/native mismatch, correctednative6casePASS51.66s /tmp/resident-config-unresolved-refusal-native.log. Bothreviewsaccepted, lint/formatpass; 6finalroots withterminal0/externalparentlineage/statecounts independentlychecked. Intermediatewrongpolicyrunsretained. No productchange/fullgate; noautomaticreplacement orfreshBattachmentclaim; all six tickets incomplete. Lifecyclelogiconlystillawaitsexistingtypesketchapproval; independentworkcontinued.
+### Concurrent fresh generation after confirmed idle retirement — 2026-10-18
+
+[Report](resident-ten-parent-restart-2026-10-18.md): the original packaged
+generation exits0 with kernel confirmation and empty private state before ten
+independent replacement parents spawn concurrently. They converge on one new
+generation/port, all observe successful context/catalog, and then close0 before
+kernel-confirmed replacement exit0 and empty state. Focused process test
+passes19.07s; existing deadlines retained. This is normal verified-retirement
+convergence, not transparent crash failover or real Huly reads. All six issues
+remain incomplete.
