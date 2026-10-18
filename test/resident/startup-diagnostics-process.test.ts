@@ -35,39 +35,44 @@ afterAll(async () => {
   if (!failed) await bundle?.cleanup()
 })
 
-it.each([
-  { field: "HULY_URL", value: "" },
-  { field: "HULY_CONNECTION_TIMEOUT", value: "not-a-number" },
-  { field: "HULY_TOOL_MODE", value: "not-a-mode" }
-])("preserves the $field startup diagnostic without publishing resident state", async ({ field, value }) => {
-  const root = await fs.mkdtemp(join(await fs.realpath(tmpdir()), "resident-startup-diagnostic-"))
-  const environment = residentSelectionEnvironment()
-  let passed = false
-  try {
-    const failure: unknown = await runFile(process.execPath, [bundle.path], {
-      timeout: RESPONSE_BOUND,
-      env: {
-        ...environment,
-        MCP_TRANSPORT: "stdio-resident",
-        MCP_RESIDENT_STATE_DIRECTORY: join(root, "state"),
-        HULY_PASSWORD: "private-unused-password-marker",
-        [field]: value
-      }
-    }).then(
-      () => undefined,
-      (error: unknown) => error
-    )
-    const result = Schema.decodeUnknownSync(RefusedProcess)(failure)
-    const output = result.stdout + result.stderr
-    expect(output.includes(environment.HULY_TOKEN)).toBe(false)
-    expect(output.includes("private-unused-password-marker")).toBe(false)
-    await fs.writeFile(`${root}.stderr.log`, result.stderr, { mode: 0o600, flag: "wx" })
-    expect(result.stdout).toBe("")
-    expect(result.stderr).toContain(field)
-    expect(result.stderr).not.toContain("inspect private startup state")
-    expect(await fs.readdir(root)).toEqual([])
-    passed = true
-  } finally {
-    if (passed) await fs.rmdir(root)
+it.each(
+  ["stdio-resident", "stdio-http"].flatMap((transport) => [
+    { transport, field: "HULY_URL", value: "" },
+    { transport, field: "HULY_CONNECTION_TIMEOUT", value: "not-a-number" },
+    { transport, field: "HULY_TOOL_MODE", value: "not-a-mode" }
+  ])
+)(
+  "preserves the $transport $field startup diagnostic without publishing resident state",
+  async ({ field, transport, value }) => {
+    const root = await fs.mkdtemp(join(await fs.realpath(tmpdir()), "resident-startup-diagnostic-"))
+    const environment = residentSelectionEnvironment()
+    let passed = false
+    try {
+      const failure: unknown = await runFile(process.execPath, [bundle.path], {
+        timeout: RESPONSE_BOUND,
+        env: {
+          ...environment,
+          MCP_TRANSPORT: transport,
+          MCP_RESIDENT_STATE_DIRECTORY: join(root, "state"),
+          HULY_PASSWORD: "private-unused-password-marker",
+          [field]: value
+        }
+      }).then(
+        () => undefined,
+        (error: unknown) => error
+      )
+      const result = Schema.decodeUnknownSync(RefusedProcess)(failure)
+      const output = result.stdout + result.stderr
+      expect(output.includes(environment.HULY_TOKEN)).toBe(false)
+      expect(output.includes("private-unused-password-marker")).toBe(false)
+      await fs.writeFile(`${root}.stderr.log`, result.stderr, { mode: 0o600, flag: "wx" })
+      expect(result.stdout).toBe("")
+      expect(result.stderr).toContain(field)
+      expect(result.stderr).not.toContain("inspect private startup state")
+      expect(await fs.readdir(root)).toEqual([])
+      passed = true
+    } finally {
+      if (passed) await fs.rmdir(root)
+    }
   }
-})
+)

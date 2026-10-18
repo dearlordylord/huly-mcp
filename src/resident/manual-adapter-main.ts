@@ -2,10 +2,13 @@ import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
 import * as NodeStdio from "@effect/platform-node/NodeStdio"
 import { Effect } from "effect"
 
+import { ConfigValidationError } from "../config/config.js"
+import { McpProcessPolicyError } from "../mcp/process-policy.js"
 import { CliProfileStoreError } from "../profiles/model.js"
 import { runManualAdapter } from "./manual-adapter.js"
 import { captureManualResidentSelection } from "./selection-config.js"
 import { BackendResponseError } from "./response-stream.js"
+import { ProtectedFileError } from "./protected-path.js"
 
 NodeRuntime.runMain(
   Effect.gen(function* () {
@@ -15,7 +18,11 @@ NodeRuntime.runMain(
   }).pipe(
     Effect.provide(NodeStdio.layer),
     Effect.mapError((error) =>
-      error instanceof BackendResponseError || error instanceof CliProfileStoreError
+      error instanceof BackendResponseError ||
+      error instanceof CliProfileStoreError ||
+      error instanceof ConfigValidationError ||
+      error instanceof McpProcessPolicyError ||
+      error instanceof ProtectedFileError
         ? error
         : new BackendResponseError({
             message:
