@@ -6,7 +6,7 @@
  * authentication, and the lifetime of the layer scope in which the protocol
  * is mounted.
  */
-import { NodeHttpServer } from "@effect/platform-node"
+import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer"
 import { timingSafeEqual } from "node:crypto"
 import { createServer as createNodeServer } from "node:http"
 import { Cause, Context, Effect, Exit, Fiber, Layer, Redacted, Schema, Scope, type Duration } from "effect"

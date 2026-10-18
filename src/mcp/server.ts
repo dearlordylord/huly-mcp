@@ -5,7 +5,7 @@
  * transport layer composition, process lifecycle, and Huly runtime wiring.
  */
 import type { MovementStageObserver } from "./movement-stage-observer.js"
-import { NodeStdio } from "@effect/platform-node"
+import * as NodeStdio from "@effect/platform-node/NodeStdio"
 import { Context, Deferred, type Duration, Effect, Exit, Fiber, Layer, type Redacted, Ref, Schema, Scope } from "effect"
 import * as Stdio from "effect/Stdio"
 import * as Stream from "effect/Stream"
