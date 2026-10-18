@@ -17,7 +17,7 @@ import { deleteProject, getProject } from "../src/huly/operations/projects.js"
 import { ResidentPackagePath } from "../src/resident/managed-contract.js"
 import { ResidentDirectory } from "../src/resident/protected-path.js"
 import { KernelOwnedExit, ReapedEventsFd } from "../test/helpers/kernel-reaped-events.js"
-import { LiveProbeEnvironment } from "./resident-live-read-contract.js"
+import { LiveProbeEnvironment, LiveReadProtocol } from "./resident-live-read-contract.js"
 import { withLiveManagedWrite } from "./resident-live-managed-write.js"
 import { fixturePackageVersion, startResidentFixture } from "../test/helpers/resident-fixture.js"
 import { testStdioEnvironment } from "../test/helpers/stdio-environment.js"
@@ -28,6 +28,7 @@ const EXIT_BOUND = 7_000
 
 const Input = Schema.Struct({
   bundle: ResidentPackagePath,
+  upstreamProtocol: LiveReadProtocol,
   evidence: ResidentDirectory,
   project: CreateProjectParamsSchema
 })
@@ -46,6 +47,7 @@ const Phase = Schema.Struct({
 })
 const Observation = Schema.Struct({
   boundary: Schema.Literal("packaged-adapter-test-tls-packaged-managed-backend"),
+  upstreamProtocol: LiveReadProtocol,
   project: CreateProjectParamsSchema.fields.identifier,
   dispatches: Schema.Literal(1),
   created: Schema.Literal(true),
@@ -205,6 +207,7 @@ const run = async (
   requireFact(proved && deleted, "Fixture evidence incomplete")
   return Observation.make({
     boundary: "packaged-adapter-test-tls-packaged-managed-backend",
+    upstreamProtocol: input.upstreamProtocol,
     project: input.project.identifier,
     dispatches: 1,
     created: true,
@@ -226,7 +229,12 @@ const main = async () => {
   const target = Schema.decodeUnknownSync(GetProjectParamsSchema)({ project: input.project.identifier })
   requireFact(await absent(target), "Fixture identifier already exists")
   const result = await withLiveManagedWrite(
-    { bundle: input.bundle, directory: ResidentDirectory.make(join(input.evidence, "managed")), reapedFd },
+    {
+      bundle: input.bundle,
+      directory: ResidentDirectory.make(join(input.evidence, "managed")),
+      reapedFd,
+      protocol: input.upstreamProtocol
+    },
     environment,
     (submit) => run(input, submit)
   )

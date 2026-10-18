@@ -7,37 +7,26 @@ import { Effect, Redacted, Schema } from "effect"
 
 import { CreateProjectParamsSchema, CreateProjectResultSchema } from "../src/domain/schemas/projects.js"
 import { type ResidentPackagePath, ResidentRegistryEnvelope } from "../src/resident/managed-contract.js"
+import { HostMessage } from "../src/resident/request-headers.js"
+import { BackendMessage } from "../src/resident/response-stream.js"
 import type { ResidentDirectory } from "../src/resident/protected-path.js"
 import { openKernelReapedEvents, type ReapedEventsFd } from "../test/helpers/kernel-reaped-events.js"
-import type { LiveProbeEnvironment } from "./resident-live-read-contract.js"
+import {
+  type LiveProbeEnvironment,
+  type LiveReadProtocol,
+  type LiveReadHostInput,
+  LiveReadProbeError
+} from "./resident-live-read-contract.js"
+
+import { discoverLiveReadProtocol, liveReadMetadata } from "./resident-live-protocol.js"
+import { probeIo } from "./resident-live-read-process.js"
 
 const RESPONSE_BOUND = 5_000
 const EXIT_BOUND = 7_000
 const REQUEST_ID = 41
-const NativeCall = Schema.Struct({
-  jsonrpc: Schema.Literal("2.0"),
-  id: Schema.Literal(REQUEST_ID),
-  method: Schema.Literal("tools/call"),
-  params: Schema.Struct({
-    name: Schema.Literal("create_project"),
-    arguments: CreateProjectParamsSchema,
-    _meta: Schema.Struct({
-      "io.modelcontextprotocol/protocolVersion": Schema.Literal("2026-07-28"),
-      "io.modelcontextprotocol/clientCapabilities": Schema.Struct({}),
-      "io.modelcontextprotocol/clientInfo": Schema.Struct({
-        name: Schema.Literal("resident-live-write"),
-        version: Schema.Literal("1.0")
-      })
-    })
-  })
-})
-const NativeReply = Schema.Struct({
-  jsonrpc: Schema.Literal("2.0"),
-  id: NativeCall.fields.id,
-  result: Schema.Struct({
-    isError: Schema.optionalKey(Schema.Literal(false)),
-    structuredContent: Schema.Struct({ result: CreateProjectResultSchema })
-  })
+const NativeResult = Schema.Struct({
+  isError: Schema.optionalKey(Schema.Literal(false)),
+  structuredContent: Schema.Struct({ result: CreateProjectResultSchema })
 })
 const bounded = <A>(pending: Promise<A>, millis: number) =>
   Effect.runPromise(Effect.promise(() => pending).pipe(Effect.timeout(millis)))
@@ -57,6 +46,7 @@ export const withLiveManagedWrite = async <A>(
     readonly bundle: Schema.Schema.Type<typeof ResidentPackagePath>
     readonly directory: ResidentDirectory
     readonly reapedFd: ReapedEventsFd
+    readonly protocol: LiveReadProtocol
   },
   environment: LiveProbeEnvironment,
   use: (
@@ -81,26 +71,53 @@ export const withLiveManagedWrite = async <A>(
   child.stdin.on("error", () => {})
   const lines = createInterface({ input: child.stdout })
   const incoming = lines[Symbol.asyncIterator]()
-  const submit = async (project: Schema.Schema.Type<typeof CreateProjectParamsSchema>) => {
-    child.stdin.write(
-      `${Schema.encodeSync(Schema.fromJsonString(NativeCall))({
-        jsonrpc: "2.0",
-        id: REQUEST_ID,
-        method: "tools/call",
-        params: {
-          name: "create_project",
-          arguments: project,
-          _meta: {
-            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
-            "io.modelcontextprotocol/clientCapabilities": {},
-            "io.modelcontextprotocol/clientInfo": { name: "resident-live-write", version: "1.0" }
-          }
-        }
-      })}\n`
+  const protocolInput: Pick<LiveReadHostInput, "protocol" | "host" | "client"> = {
+    protocol: input.protocol,
+    host: "first",
+    client: { name: "resident-live-write", configuredMode: "native", exposure: "native" }
+  }
+  const send = (frame: string) =>
+    probeIo(
+      "send",
+      () =>
+        new Promise<void>((resolve, reject) => {
+          child.stdin.write(`${frame}\n`, (error) =>
+            error === null || error === undefined ? resolve() : reject(error)
+          )
+        })
     )
-    const next = await bounded(incoming.next(), RESPONSE_BOUND)
-    if (next.done) throw new Error("Managed write adapter ended before its response")
-    return Schema.decodeUnknownSync(Schema.fromJsonString(NativeReply))(next.value).result.structuredContent.result
+  const request = (
+    id: NonNullable<HostMessage["id"]>,
+    method: "initialize" | "server/discover" | "tools/call",
+    params: Readonly<Record<string, Schema.Json>>
+  ) =>
+    Effect.gen(function* () {
+      const frame = yield* Schema.encodeEffect(Schema.fromJsonString(HostMessage))({
+        jsonrpc: "2.0",
+        id,
+        method,
+        params: { ...params, ...liveReadMetadata(protocolInput) }
+      }).pipe(Effect.mapError(() => new LiveReadProbeError({ phase: "send" })))
+      yield* send(frame)
+      const next = yield* probeIo("response", () => incoming.next())
+      if (next.done) return yield* new LiveReadProbeError({ phase: "response" })
+      const reply = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(BackendMessage))(next.value).pipe(
+        Effect.mapError(() => new LiveReadProbeError({ phase: "response" }))
+      )
+      if (!("id" in reply) || reply.id !== id || "error" in reply)
+        return yield* new LiveReadProbeError({ phase: "response" })
+      return reply.result
+    }).pipe(
+      Effect.timeout(RESPONSE_BOUND),
+      Effect.mapError(() => new LiveReadProbeError({ phase: "response" }))
+    )
+  const submit = async (project: Schema.Schema.Type<typeof CreateProjectParamsSchema>) => {
+    await Effect.runPromise(discoverLiveReadProtocol(protocolInput, request, send))
+    const args = Schema.decodeUnknownSync(Schema.Json)(Schema.encodeSync(CreateProjectParamsSchema)(project))
+    const result = await Effect.runPromise(
+      request(REQUEST_ID, "tools/call", { name: "create_project", arguments: args })
+    )
+    return Schema.decodeUnknownSync(NativeResult)(result).structuredContent.result
   }
   const outcome = await (async (): Promise<
     { readonly value: A; readonly record: ResidentRegistryEnvelope } | { readonly error: unknown }

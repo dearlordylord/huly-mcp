@@ -813,7 +813,11 @@ general exactly-once claim.
 
 Compile the probe with the candidate's version define and external `ws`, then run
 it under `test/resident/fixtures/reap-descendants.py --report-reaped` with one JSON argument:
-`{"bundle":"/absolute/candidate/index.cjs","evidence":"/absolute/new/private/evidence","project":{"identifier":"RTEST","name":"Unique disposable resident fixture","private":true}}`.
+`{"bundle":"/absolute/candidate/index.cjs","upstreamProtocol":"2026-07-28","evidence":"/absolute/new/private/evidence","project":{"identifier":"RTEST","name":"Unique disposable resident fixture","private":true}}`.
+Choose `upstreamProtocol` explicitly: `2026-07-28` uses modern request metadata;
+`2025-06-18` requires a checked initialize reply and initialized notification
+before the native mutation. The receipt names the upstream protocol. This selects
+the real managed hop; the outer fault endpoint remains synthetic.
 Use an unused identifier and a unique name for each attempt. The probe currently
 requires the container's local `host.docker.internal` Huly URL; authentication
 stays in the usual environment/config boundary. Do not pass credentials in JSON.
