@@ -5,6 +5,9 @@ import { Client } from "@modelcontextprotocol/client"
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"
 import { Deferred, Effect, Schema } from "effect"
 
+import { GetProjectResultSchema } from "../../../src/domain/schemas/projects.js"
+import { DisposableRestProject, startDisposableRestFixture } from "../disposable-rest-fixture.js"
+
 import { GetHulyContextResultSchema } from "../../../src/domain/schemas/huly-context.js"
 import { McpErrorCode } from "../../../src/mcp/tool-responses.js"
 import { ResidentPackagePath, ResidentRegistryEnvelope } from "../../../src/resident/managed-contract.js"
@@ -35,6 +38,17 @@ const main = async () => {
     reapedFd: process.env.HULY_TEST_REAPED_FD,
     scenario: process.argv[4]
   })
+  const project = Schema.decodeUnknownSync(DisposableRestProject)({
+    _id: "fixture-PROXY",
+    _class: "tracker:class:Project",
+    space: "fixture-space",
+    modifiedOn: 1,
+    modifiedBy: "fixture-owner",
+    identifier: "PROXY",
+    name: "Proxy 日本語",
+    archived: false
+  })
+  const rest = await startDisposableRestFixture({ projects: [project] })
   const sessions = [
     { allowed: "list_projects", forbidden: "list_issues", toolset: "projects" },
     { allowed: "list_issues", forbidden: "list_projects", toolset: "issues" }
@@ -45,6 +59,7 @@ const main = async () => {
       stderr: "pipe",
       env: {
         ...residentSelectionEnvironment(),
+        HULY_URL: rest.endpoint,
         MCP_TRANSPORT: "stdio-resident",
         MCP_RESIDENT_STATE_DIRECTORY: input.directory,
         ...(input.scenario === "native"
@@ -67,6 +82,7 @@ const main = async () => {
   })
   const kernel = openKernelReapedEvents(input.reapedFd)
   const ports = []
+  let cleanupFailed = false
   try {
     try {
       for (const session of sessions) {
@@ -89,6 +105,46 @@ const main = async () => {
               definition.structuredContent
             ).result.name,
             session.allowed
+          )
+        }
+        if (input.scenario !== "native" && session.toolset === "projects") {
+          process.stderr.write("Managed policy: invoking project read\n")
+          const invoked = await session.client.callTool(
+            { name: "invoke_tool", arguments: { toolName: "get_project", arguments: { project: project.identifier } } },
+            { timeout: RESPONSE_BOUND }
+          )
+          assert.notEqual(invoked.isError, true)
+          const actual = Schema.decodeUnknownSync(
+            Schema.Struct({
+              result: Schema.Struct({ toolName: Schema.Literal("get_project"), result: GetProjectResultSchema })
+            })
+          )(invoked.structuredContent).result.result
+          assert.equal(actual.identifier, project.identifier)
+          assert.equal(actual.name, project.name)
+          assert.equal(actual.archived, false)
+          process.stderr.write("Managed policy: reading project resource\n")
+          const resource = await session.client.readResource(
+            { uri: `huly://projects/${project.identifier}` },
+            { timeout: RESPONSE_BOUND }
+          )
+          const parsed = Schema.decodeUnknownSync(
+            Schema.Struct({ contents: Schema.Array(Schema.Struct({ uri: Schema.String, text: Schema.String })) })
+          )(resource)
+          assert.equal(parsed.contents.length, 1)
+          const content = parsed.contents[0]
+          assert.ok(content !== undefined)
+          assert.equal(content.uri, `huly://projects/${project.identifier}`)
+          assert.deepEqual(
+            Schema.decodeUnknownSync(
+              Schema.fromJsonString(
+                Schema.Struct({
+                  type: Schema.Literal("huly.project"),
+                  uri: Schema.Literal("huly://projects/PROXY"),
+                  project: GetProjectResultSchema
+                })
+              )
+            )(content.text).project,
+            actual
           )
         }
         process.stderr.write("Managed policy: reading context\n")
@@ -161,6 +217,14 @@ const main = async () => {
         backendExits.push(exit)
       }
       assert.deepEqual(await fs.readdir(input.directory), [])
+      assert.equal(rest.observed.modelRequests, input.scenario === "native" ? 0 : 1)
+      assert.deepEqual(
+        rest.observed.projectQueries,
+        input.scenario === "native" ? [] : [project.identifier, project.identifier]
+      )
+      assert.equal(rest.observed.projectReads, input.scenario === "native" ? 0 : POLICY_COUNT)
+      assert.equal(rest.observed.projectWrites, 0)
+      assert.equal(rest.observed.invalidRequests, 0)
       process.stdout.write(
         Schema.encodeSync(Schema.fromJsonString(ManagedPolicyObservation))(
           Schema.decodeUnknownSync(ManagedPolicyObservation)({
@@ -177,8 +241,11 @@ const main = async () => {
       await Promise.all(sessions.map(({ transport }) => transport.close()))
     }
   } finally {
-    kernel.close()
+    const cleanup = await Promise.allSettled([Promise.resolve().then(() => kernel.close()), rest.close()])
+    cleanupFailed = cleanup.some((result) => result.status === "rejected")
+    if (cleanupFailed) process.stderr.write("Managed policy resource cleanup failed\n")
   }
+  if (cleanupFailed) throw new Error("Managed policy resource cleanup failed")
 }
 
 void main().catch(() => {

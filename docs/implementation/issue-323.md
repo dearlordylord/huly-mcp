@@ -684,3 +684,8 @@ The [focused error-routing increment](resident-error-routing-2026-10-18.md) adds
 ### Scoped capability transport boundary — 2026-10-18
 
 [Transport report](resident-capability-boundary-2026-10-18.md): two concurrent in-process adapters over real TLS preserve exact capabilities/metadata and isolate legacy sessions across both supported protocols. Three focused files pass19tests; changed-file lint/format and Standards/Spec reviews accepted after schema correction. Production unchanged; no full gate. Synthetic negotiation replies and no interactive/progress producers mean native negotiation, progress, continuations and wider #323.4/.5 remain open. All six issues remain incomplete.
+
+
+### Successful proxy tool/resource project reads — 2026-10-18
+
+[Report](resident-proxy-project-reads-2026-10-18.md): strict/non-strict actual packaged managed adapters invoke get_project and read its MCP resource through disposableREST, comparing typed exact project payloads including Unicode. Post-kernel1model2exactreads0writesinvalid; native baseline0reads. Three focused cases pass final-cleanup log; local lint/format and reviews accepted. No production changes/full gate. Modern SDK subprocess scope only; shared-independent-parent proxy/malformed-output/legacy/macOS/final qualification remain open. All six tickets incomplete.

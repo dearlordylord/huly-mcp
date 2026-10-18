@@ -591,3 +591,8 @@ Focused20287 terminalPASS2protocols /tmp/resident-error-routing-first.log; local
 ### Managed policy three-mode matrix — 2026-10-18
 
 Test-only after ee9be005: [report](resident-policy-modes-2026-10-18.md). Native/strict actual cross-policy refusals retained; non-strict verifies intended scoped native catalog plus full proxy schema visibility, without claiming Huly invocation success. Discriminated receipt prevents mixed evidence. Final focused three cases pass /tmp/resident-policy-three-modes-union.log; local lint/format and both reviews accepted. Initial incorrect strict-only expectation retained in first log. No full gate, no production change; all six tickets remain incomplete.
+
+
+### Successful proxy tool/resource project reads — 2026-10-18
+
+[Report](resident-proxy-project-reads-2026-10-18.md): strict/non-strict actual packaged managed adapters invoke get_project and read its MCP resource through disposableREST, comparing typed exact project payloads including Unicode. Post-kernel1model2exactreads0writesinvalid; native baseline0reads. Three focused cases pass final-cleanup log; local lint/format and reviews accepted. No production changes/full gate. Modern SDK subprocess scope only; shared-independent-parent proxy/malformed-output/legacy/macOS/final qualification remain open. All six tickets incomplete.
