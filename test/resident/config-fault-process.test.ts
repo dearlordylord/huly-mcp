@@ -109,6 +109,7 @@ describe.skipIf(process.platform !== "linux")("packaged configuration fault isol
         expect(receipt.fault.signal.closed).toBe(true)
         expect(receipt.survivorBackendExit.exitCode).toBe(0)
         expect(receipt.survivorAdapterExit.code).toBe(0)
+        expect(receipt.freshStartRefused).toBe(true)
         expect(receipt.survivorRegistryUnchanged).toBe(true)
         expect(receipt.failedRegistryRetained).toBe(true)
       } catch (error) {

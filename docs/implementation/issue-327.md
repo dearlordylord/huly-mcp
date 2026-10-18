@@ -1303,3 +1303,8 @@ pending. All six delivery issues remain open.
 ### Lifecycle model type reconciliation — 2026-10-18
 
 Proposed resident-launch.qnt types now key requests by InvocationId (sameasverificationwritehistory), separatecollidingwireId, representcleanupafterterminal/cancellation, ownercallerforresources and remoteeffectoracletruth distinctfromcallerknowledge. Scope/sketch notes updated. QuinttypecheckPASS /tmp/resident-launch-types-reconciled.log; both scoped typeproposalreviews accepted. Existing explicittypesketchapproval checkpoint retained perquint-modelingSKILLstep2; noinit/actions/invariants/run/proof added or claimed. This doesnotcomplete326.9/327.10/othergoals; independent implementation/qualification cancontinue. No fullgate.
+
+
+### Unresolved owner fresh-start refusal with held peer — 2026-10-18
+
+[Report](resident-unresolved-start-refusal-2026-10-18.md): afterAbackendfault whileBheld, actualfreshmanagedadapter EXACTAURL/workspace/token/nativepolicy/namespace gets actualexit1/notobserverkilled/nosignal/emptystdout/nodispatchdiagnostic/tokenredacted. RetainedAbytesandexact2generationinventory unchanged; Bsamegeneration/registry/1held thenexact41+42, A0model/read/write. Reviewcaught auto/native mismatch, correctednative6casePASS51.66s /tmp/resident-config-unresolved-refusal-native.log. Bothreviewsaccepted, lint/formatpass; 6finalroots withterminal0/externalparentlineage/statecounts independentlychecked. Intermediatewrongpolicyrunsretained. No productchange/fullgate; noautomaticreplacement orfreshBattachmentclaim; all six tickets incomplete. Lifecyclelogiconlystillawaitsexistingtypesketchapproval; independentworkcontinued.
