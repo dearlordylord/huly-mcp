@@ -1165,3 +1165,111 @@ independently demonstrated the allowed partial removal, not successful retiremen
 All six issues remain open; no live/native/measurement/model requirement is
 considered complete by this increment. No merge, publication or prototype cleanup
 was performed.
+
+## Live Huly held-query response and exact backend death — 2026-10-18
+
+Qualification remains incomplete. One Linux schedule now forwards the actual
+SDK config/account/model/project request path to local Huly through a bounded
+loopback HTTP intermediary. Production MCP artifact remains
+`908e121f7d9fd4ab49b931b1ee349a448feec5a6db10d616ac3b0267dfe47416`.
+After Huly returns the selected project's query response, the intermediary
+holds it before delivery. The harness correlates the protected registry and
+context endpoint, checks the backend's live ancestry reaches its actual kernel
+supervisor, verifies start-time stability and acquires a pidfd. It signals only
+that exact backend through the pidfd and observes its kernel exit -9.
+
+The original adapter closes without a successful tool result and exits 1. Its
+retained diagnostic explicitly states that the operation outcome may be unknown
+and no request was replayed. A fresh adapter exits 1 with zero stdout and the
+specific no-Huly-dispatch refusal. The passing schedule has one model request,
+one project query/response and zero intermediary errors; the fresh attempt adds
+no upstream requests. The before/after ownership file hashes match and the
+private namespace remains deliberately retained. Supervisor exit 0 with empty
+diagnostics confirms its descendants retired; it does not mean the killed
+backend exited normally or that ownership metadata was removed.
+
+Private evidence `/tmp/resident-live-query-loss-phases-6deo4c_h/` retains the
+probe, redacted upstream phases, held query/raw project response, pidfd/ancestry
+observation, kernel exit, original/fresh diagnostics and ownership hashes.
+`verify.mts` schema-parses the project selector and returned row/projection,
+registry, outcome/counters, ownership and exit evidence. It compares exact target,
+PID, ordered fault phases, retained file hashes and unchanged artifact, and
+requires the known uncertainty/no-replay diagnostic plus fresh refusal.
+Two initial verifier attempts required the wrong specific diagnostic path;
+the retained final verifier accepts only the known connection/response/stream
+loss messages. Verification was corrected without another Huly invocation.
+
+Preparation failures remain separate and are not passes. The first fault
+attempt misread the saved endpoint representation and dispatched no Huly call.
+The next expected a query-implied identifier in the raw REST row: the installed
+SDK restores missing primitive query fields, while the intermediary returned
+errors and SDK retried the read three times. A separate normal-read wire control
+established that format. The corrected-selector attempt then failed before a
+project query with a model-path intermediary error; its cause is still unproven.
+The successful named diagnostic added upstream family/status/error-class phases.
+Do not infer that instrumentation fixed an application fault or that all prior
+failures have a common cause. Full roots and manifests remain in the handoff.
+
+Response and proxy/held-response waits retain five-second bounds; backend exit
+observation seven seconds; the existing kernel supervisor 25 seconds. All Huly
+requests in this increment are reads. The retained namespace is not automatically
+recovered or deleted. This is one direct-adapter query-loss case on Linux
+(aarch64, Node 24.20.0), not live mutation no-replay/reconciliation, complete fault
+coverage, native macOS or overall #323–328 qualification.
+
+## Live project rename committed before lost response — 2026-10-18
+
+Qualification remains incomplete. A separate Linux schedule now exercises one
+actual Huly mutation. Fixture preparation creates one uniquely named disposable
+project, schema-verifies `created: true`, and independently reads its exact
+identifier/name/ownership marker before enabling a write. The bounded local
+intermediary permits only `TxUpdateDoc` for that observed project's object ID
+and object space with exactly one `name` operation. Other payloads and a second
+mutation attempt are refused before forwarding.
+
+The packaged managed adapter sends `update_project` once. After actual Huly
+returns the transaction response, the intermediary holds it before delivery.
+The same supervised-ancestry/start-time/pidfd checks used by the live read-loss
+schedule identify the exact backend; its kernel exit is -9. The original adapter
+closes without success, exits 1 and states the outcome may be unknown. A fresh
+adapter exits 1, emits zero stdout and refuses before any Huly dispatch. Its
+attempt leaves upstream counters and retained ownership hashes unchanged.
+The successful schedule records one model request, one project query/response,
+one transaction/response and zero intermediary errors. Supervisor exit 0 and
+empty diagnostics establish owned-process cleanup; ownership files intentionally
+remain preserved after the crash.
+
+A separate standalone CLI read against the original Huly endpoint then confirms
+the exact intended new name and original fixture marker. The verifier ties the
+sent transaction's object ID to the project returned before the write, requires
+only the intended name operation, and compares the before/after values. This is
+explicit operation-specific reconciliation of this one rename; no mutation was
+replayed and no runtime historical operation-status lookup was introduced.
+It does not turn an arbitrary fresh read into resolution of another operation.
+
+Fixture cleanup initially failed locally with `INVALID_INPUT` because `--yes`
+was omitted. The installed runner checks confirmation before acquiring its Huly
+client, and a retained read confirms the renamed fixture still existed. The
+separate authorized cleanup command adds `--yes`, returns `deleted: true`, and
+an independent read returns exit 5 / `NOT_FOUND` for that exact project. The
+created fixture is absent. Both cleanup attempts and reads remain preserved;
+no preexisting project was changed or deleted.
+
+Private evidence `/tmp/resident-live-write-loss-_cpbcg7t/` retains 53 hashed files,
+including schema-owned fixture intent, creation/preflight, actual transaction,
+held response, process evidence, original/fresh diagnostics, before/after
+ownership hashes, reconciliation and cleanup. Receipt SHA-256:
+`62a1248fda6b83d41f651b25a45ef1ebf546fed4541415e899875b6ca1ae90d4`.
+`verify.mts` checks the complete chain using existing domain schemas and the
+explicit transaction/receipt schemas. Production MCP/CLI hashes remain
+`908e121f7d9fd4ab49b931b1ee349a448feec5a6db10d616ac3b0267dfe47416` /
+`e15d82af60d32f63fdc573bb306fcfde905ae5c1c194c42f58416d940503ed71`.
+The fault exchange/hold bounds are five seconds, backend observation seven,
+supervisor 25. Separate fixture creation/read/cleanup commands are also bounded.
+
+This is one successful native modern-protocol direct-adapter project rename on
+Linux aarch64 / Node 24.20.0. It does not establish general SDK exactly-once
+behavior: the installed SDK retries HTTP failures, as preserved read-preparation
+failures demonstrate. Complete mutation/fault matrices, delayed remote commits,
+other operations, native macOS, model alignment and resource qualification remain
+pending. All six delivery issues remain open.
