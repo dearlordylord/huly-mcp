@@ -3,6 +3,8 @@ import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
 import * as NodeStdio from "@effect/platform-node/NodeStdio"
 import { Effect, Schema } from "effect"
 
+import { ConfigValidationError } from "../config/config.js"
+import { McpProcessPolicyError } from "../mcp/process-policy.js"
 import { CliProfileStoreError } from "../profiles/model.js"
 import { type AdapterExchange, withAdapterAttachment } from "./adapter-attachment.js"
 import { readResidentAttachment } from "./attachment-file.js"
@@ -48,6 +50,8 @@ const main = Effect.gen(function* () {
   Effect.provide(NodeStdio.layer),
   Effect.mapError((error) =>
     error instanceof ManagedLaunchError ||
+    error instanceof ConfigValidationError ||
+    error instanceof McpProcessPolicyError ||
     error instanceof CliProfileStoreError ||
     error instanceof BackendResponseError
       ? error
