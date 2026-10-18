@@ -89,3 +89,19 @@ it("keeps a foreign implementation's registry and locator payloads opaque", asyn
     expect(snapshot.currentDescriptors).toEqual([])
     expect(await fs.readFile(locator, "utf8")).toBe("opaque future locator bytes")
   }))
+
+it("refuses equally sized registry and locator inventories for different generations", async () =>
+  withPublishedResidentState(async (directory, record, attachment) => {
+    const original = join(directory, `${attachment.identity.generation}.json`)
+    const misplaced = join(directory, `${randomUUID()}.json`)
+    const registry = await fs.readFile(record, "utf8")
+    const locator = await fs.readFile(original, "utf8")
+    await fs.rename(original, misplaced)
+    try {
+      expect(Exit.isFailure(await Effect.runPromiseExit(readResidentNamespace(directory)))).toBe(true)
+      expect((await fs.readFile(record, "utf8")) === registry).toBe(true)
+      expect((await fs.readFile(misplaced, "utf8")) === locator).toBe(true)
+    } finally {
+      await fs.rename(misplaced, original)
+    }
+  }))

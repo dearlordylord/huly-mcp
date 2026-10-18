@@ -1,8 +1,26 @@
 # Issue 325: resident configuration isolation
 
-Status: incomplete. Production profile selection is not wired yet. The transport
-modules support private comparison before admission, but the standalone and
-manual entrypoints retain their current configuration behavior.
+Status: incomplete. Managed and manual adapters resolve selected profile or
+environment authority before private compatibility comparison and admission.
+The [current qualification report](issue-328.md) records scoped profile, rotation,
+removal and policy process evidence; complete live/native qualification remains
+pending. Earlier foundation sections below describe their historical checkpoints.
+
+## Refuse unavailable proxy targets before client acquisition
+
+The strict-proxy managed policy scenario exposed a shared-dispatch ordering bug:
+`invoke_tool` acquired Huly clients before looking up its target. A forbidden
+target with unavailable Huly therefore returned a connection error instead of
+the specific unknown-tool refusal. A focused regression reproduced this with an
+injected resolver and requires zero resolver calls for an unavailable target.
+
+Proxy invocation now receives a lazy typed client-resolution effect and runs it
+only after proxy parameter parsing, target lookup and local argument guards.
+Client-acquisition failures still map to the existing MCP error response for
+eligible targets. All callers of the concrete-client API were migrated in the
+same increment; no compatibility API or new replay behavior remains. The shared
+path also serves standalone stdio and direct HTTP, so affected MCP regressions
+are included in verification. Full qualification is tracked separately in #328.
 
 ## Implemented foundation
 

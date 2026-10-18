@@ -56,11 +56,13 @@ const main = async () => {
     HULY_URL: rest.endpoint,
     MCP_RESIDENT_STATE_DIRECTORY: state
   }
-  const probeFile = join(state, "permission-probe.json")
+  const probeFile = join(input.directory, "permission-probe.json")
   const backend = spawn(
     process.execPath,
     [
-      ...(input.mode === "restricted" ? ["--permission", "--allow-fs-read=*", `--allow-fs-write=${state}`] : []),
+      ...(input.mode === "restricted"
+        ? ["--permission", "--allow-fs-read=*", `--allow-fs-write=${state}`, `--allow-fs-write=${probeFile}`]
+        : []),
       "--no-addons",
       "--import",
       pathToFileURL(input.preload).href,

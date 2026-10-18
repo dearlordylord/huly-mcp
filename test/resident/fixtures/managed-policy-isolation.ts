@@ -11,11 +11,16 @@ import { ResidentPackagePath, ResidentRegistryEnvelope } from "../../../src/resi
 import { ResidentDirectory } from "../../../src/resident/protected-path.js"
 import { openKernelReapedEvents, ReapedEventsFd } from "../../helpers/kernel-reaped-events.js"
 import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
-import { ManagedPolicyObservation } from "../managed-policy-observation.js"
+import { ManagedPolicyObservation, ManagedPolicyScenario } from "../managed-policy-observation.js"
 
 const RESPONSE_BOUND = 5_000
 const POLICY_COUNT = 2
-const Input = Schema.Struct({ bundle: ResidentPackagePath, directory: ResidentDirectory, reapedFd: ReapedEventsFd })
+const Input = Schema.Struct({
+  bundle: ResidentPackagePath,
+  directory: ResidentDirectory,
+  reapedFd: ReapedEventsFd,
+  scenario: ManagedPolicyScenario
+})
 const ContextReply = Schema.Struct({ result: GetHulyContextResultSchema })
 const ToolRefusal = Schema.Struct({
   isError: Schema.Literal(true),
@@ -27,11 +32,12 @@ const main = async () => {
   const input = Schema.decodeUnknownSync(Input)({
     bundle: process.argv[2],
     directory: process.argv[3],
-    reapedFd: process.env.HULY_TEST_REAPED_FD
+    reapedFd: process.env.HULY_TEST_REAPED_FD,
+    scenario: process.argv[4]
   })
   const sessions = [
-    { allowed: "list_projects", forbidden: "list_issues" },
-    { allowed: "list_issues", forbidden: "list_projects" }
+    { allowed: "list_projects", forbidden: "list_issues", toolset: "projects" },
+    { allowed: "list_issues", forbidden: "list_projects", toolset: "issues" }
   ].map((policy) => {
     const transport = new StdioClientTransport({
       command: process.execPath,
@@ -41,8 +47,9 @@ const main = async () => {
         ...residentSelectionEnvironment(),
         MCP_TRANSPORT: "stdio-resident",
         MCP_RESIDENT_STATE_DIRECTORY: input.directory,
-        HULY_TOOL_MODE: "native",
-        TOOLS: policy.allowed
+        ...(input.scenario === "native"
+          ? { HULY_TOOL_MODE: "native", TOOLS: policy.allowed }
+          : { HULY_TOOL_MODE: "proxy", TOOLSETS: policy.toolset, PROXY_OUTPUT_STRICT: "true" })
       }
     })
     const client = new Client(
@@ -64,8 +71,22 @@ const main = async () => {
         process.stderr.write("Managed policy: reading catalog\n")
         const catalog = await session.client.listTools(undefined, { timeout: RESPONSE_BOUND })
         const names = catalog.tools.map((tool) => tool.name)
-        assert.equal(names.includes(session.allowed), true)
+        assert.equal(names.includes(session.allowed), input.scenario === "native")
         assert.equal(names.includes(session.forbidden), false)
+        if (input.scenario === "proxy-strict") {
+          assert.equal(names.includes("invoke_tool"), true)
+          const definition = await session.client.callTool(
+            { name: "get_tool_schema", arguments: { toolName: session.allowed } },
+            { timeout: RESPONSE_BOUND }
+          )
+          assert.notEqual(definition.isError, true)
+          assert.equal(
+            Schema.decodeUnknownSync(Schema.Struct({ result: Schema.Struct({ name: Schema.String }) }))(
+              definition.structuredContent
+            ).result.name,
+            session.allowed
+          )
+        }
         process.stderr.write("Managed policy: reading context\n")
         const context = await session.client.callTool(
           { name: "get_huly_context", arguments: {} },
@@ -74,21 +95,28 @@ const main = async () => {
         assert.notEqual(context.isError, true)
         ports.push(Schema.decodeUnknownSync(ContextReply)(context.structuredContent).result.transport.http?.port)
         process.stderr.write("Managed policy: attempting cross-policy call\n")
-        await session.client.callTool({ name: session.forbidden, arguments: {} }, { timeout: RESPONSE_BOUND }).then(
-          (reply) => {
-            process.stderr.write(`Managed policy: returned tool error ${reply.isError === true}\n`)
-            const refusal = Schema.decodeUnknownSync(ToolRefusal)(reply)
-            assert.equal(
-              refusal.content.some((item) => item.text.includes(`Unknown tool: ${session.forbidden}`)),
-              true
-            )
-          },
-          (error: unknown) => {
-            const refusal = Schema.decodeUnknownSync(ProtocolRefusal)(error)
-            process.stderr.write(`Managed policy: returned protocol code ${refusal.code}\n`)
-            assert.equal(refusal.message.includes(`Tool '${session.forbidden}' not found`), true)
-          }
-        )
+        await session.client
+          .callTool(
+            input.scenario === "native"
+              ? { name: session.forbidden, arguments: {} }
+              : { name: "invoke_tool", arguments: { toolName: session.forbidden, arguments: {} } },
+            { timeout: RESPONSE_BOUND }
+          )
+          .then(
+            (reply) => {
+              process.stderr.write(`Managed policy: returned tool error ${reply.isError === true}\n`)
+              const refusal = Schema.decodeUnknownSync(ToolRefusal)(reply)
+              assert.equal(
+                refusal.content.some((item) => item.text.includes(`Unknown tool: ${session.forbidden}`)),
+                true
+              )
+            },
+            (error: unknown) => {
+              const refusal = Schema.decodeUnknownSync(ProtocolRefusal)(error)
+              process.stderr.write(`Managed policy: returned protocol code ${refusal.code}\n`)
+              assert.equal(refusal.message.includes(`Tool '${session.forbidden}' not found`), true)
+            }
+          )
       }
       const [projectPort, issuePort] = ports
       assert.notEqual(projectPort, issuePort)
@@ -120,6 +148,7 @@ const main = async () => {
           Schema.decodeUnknownSync(ManagedPolicyObservation)({
             projectPort,
             issuePort,
+            scenario: input.scenario,
             crossPolicyCallsRefused: true,
             backendExits,
             privateStateRemoved: true

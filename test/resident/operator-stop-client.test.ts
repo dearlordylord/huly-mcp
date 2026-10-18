@@ -37,7 +37,10 @@ const policy = Schema.decodeUnknownSync(AdmissionPolicy)({
   lease: DEFAULT_LEASE_POLICY
 })
 
-const invokeCli = (schedule: "cli-accepted" | "cli-ack-lost", target: ResidentStopTarget) =>
+const invokeCli = (
+  schedule: "cli-accepted" | "cli-accepted-text" | "cli-ack-lost" | "cli-unsupported",
+  target: ResidentStopTarget
+) =>
   Effect.gen(function* () {
     const run = Command.runWith(residentCommand, { version: "different-cli-version", renderErrors: false })([
       "stop",
@@ -45,8 +48,19 @@ const invokeCli = (schedule: "cli-accepted" | "cli-ack-lost", target: ResidentSt
       target.generation,
       "--state-directory",
       target.directory,
-      "--json"
+      ...(schedule === "cli-accepted-text" ? [] : ["--json"])
     ]).pipe(Effect.provide(NodeServices.layer))
+    if (schedule === "cli-unsupported") {
+      const error = yield* run.pipe(Effect.flip)
+      expect(error).toBeInstanceOf(CliRuntimeError)
+      if (error instanceof CliRuntimeError) {
+        expect(error.kind).toBe("input")
+        expect(error.retryable).toBe(false)
+        expect(error.message).toContain("unsupported")
+      }
+      expect(yield* TestConsole.logLines).toEqual([])
+      return yield* error
+    }
     if (schedule === "cli-ack-lost") {
       const error = yield* run.pipe(Effect.flip)
       expect(error).toBeInstanceOf(CliRuntimeError)
@@ -64,6 +78,12 @@ const invokeCli = (schedule: "cli-accepted" | "cli-ack-lost", target: ResidentSt
       } satisfies ResidentStopReport
     }
     yield* run
+    if (schedule === "cli-accepted-text") {
+      expect((yield* TestConsole.logLines).join("\n")).toBe(
+        `Stop accepted for generation ${target.generation}; retirement is unconfirmed.`
+      )
+      return { kind: "accepted", generation: target.generation, retirement: "unconfirmed" } satisfies ResidentStopReport
+    }
     return yield* Schema.decodeUnknownEffect(Schema.fromJsonString(ResidentStopReport))(
       (yield* TestConsole.logLines).join("\n")
     )
@@ -73,12 +93,15 @@ it.each([
   "accepted",
   "ack-lost",
   "invalid-ack",
+  "unexpected-status",
   "unsupported",
   "wrong-capability",
   "wrong-bearer",
   "explicit-refusal",
   "wrong-ack-generation",
   "cli-accepted",
+  "cli-accepted-text",
+  "cli-unsupported",
   "cli-ack-lost"
 ] as const)(
   "submits at most once and preserves state for %s through actual protected files and TLS",
@@ -93,7 +116,7 @@ it.each([
             new Map<OwnerName, Owner>(),
             (endpoint, identity) =>
               Effect.gen(function* () {
-                if (schedule !== "unsupported")
+                if (schedule !== "unsupported" && schedule !== "cli-unsupported")
                   yield* Ref.set(support, {
                     kind: "managed",
                     generation: schedule === "wrong-capability" ? OTHER_GENERATION : identity.generation,
@@ -142,11 +165,15 @@ it.each([
                             ResidentStopReport,
                             Effect.Error<ReturnType<typeof invokeCli>> | ResidentStopRefused
                           > =
-                            schedule === "cli-accepted" || schedule === "cli-ack-lost"
+                            schedule === "cli-accepted" ||
+                            schedule === "cli-accepted-text" ||
+                            schedule === "cli-ack-lost" ||
+                            schedule === "cli-unsupported"
                               ? yield* Effect.exit(invokeCli(schedule, target))
                               : yield* Effect.exit(requestResidentStop(target))
                           if (
                             schedule === "unsupported" ||
+                            schedule === "cli-unsupported" ||
                             schedule === "wrong-capability" ||
                             schedule === "wrong-bearer" ||
                             schedule === "explicit-refusal"
@@ -158,7 +185,9 @@ it.each([
                             expect(Exit.isSuccess(result)).toBe(true)
                             if (Exit.isSuccess(result))
                               expect(result.value).toEqual(
-                                schedule === "accepted" || schedule === "cli-accepted"
+                                schedule === "accepted" ||
+                                  schedule === "cli-accepted" ||
+                                  schedule === "cli-accepted-text"
                                   ? { kind: "accepted", generation: identity.generation, retirement: "unconfirmed" }
                                   : {
                                       kind: "unconfirmed",
@@ -195,19 +224,21 @@ it.each([
                       return yield* Effect.die("Expected native request fixture")
                     request.source.socket.destroy()
                   }
-                  return request.method === "POST" && schedule === "invalid-ack"
-                    ? HttpServerResponse.jsonUnsafe({}, { status: 202 })
-                    : request.method === "POST" && schedule === "wrong-ack-generation"
-                      ? HttpServerResponse.jsonUnsafe(
-                          {
-                            stopWire: 1,
-                            generation: OTHER_GENERATION,
-                            accepted: "admission-fenced",
-                            retirement: "unconfirmed"
-                          },
-                          { status: 202 }
-                        )
-                      : response
+                  return request.method === "POST" && schedule === "unexpected-status"
+                    ? HttpServerResponse.empty({ status: 503 })
+                    : request.method === "POST" && schedule === "invalid-ack"
+                      ? HttpServerResponse.jsonUnsafe({}, { status: 202 })
+                      : request.method === "POST" && schedule === "wrong-ack-generation"
+                        ? HttpServerResponse.jsonUnsafe(
+                            {
+                              stopWire: 1,
+                              generation: OTHER_GENERATION,
+                              accepted: "admission-fenced",
+                              retirement: "unconfirmed"
+                            },
+                            { status: 202 }
+                          )
+                        : response
                 })
             }
           )
@@ -226,4 +257,18 @@ it("refuses an absent target without creating a namespace or claiming retirement
     expect(error.reason).toBe("target-missing")
     expect(error.message).toContain("not retirement evidence")
     expect(await fs.readdir(root)).toEqual([])
+  }))
+
+it("preserves an unverified namespace and refuses before submitting stop", async () =>
+  withRegistryDirectory(async (directory) => {
+    const unexpected = join(directory, "unrecognized-owner-state")
+    await fs.writeFile(unexpected, "preserve this unresolved evidence", { mode: 0o600 })
+    const error = await Effect.runPromise(
+      requestResidentStop({ directory, generation: OTHER_GENERATION }).pipe(Effect.flip)
+    )
+    expect(error).toBeInstanceOf(ResidentStopRefused)
+    expect(error.reason).toBe("namespace-unverified")
+    expect(error.message).toContain("No stop was submitted")
+    expect(await fs.readdir(directory)).toEqual(["unrecognized-owner-state"])
+    expect(await fs.readFile(unexpected, "utf8")).toBe("preserve this unresolved evidence")
   }))

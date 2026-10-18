@@ -526,3 +526,87 @@ Successful fixture state and its isolated bundle were removed; private evidence
 remains. TypeScript/Effect diagnostics, focused lint and read-only Standards/Spec
 reviews pass. No production code changed. The inconsistent connection attempts,
 full combined gate, real Huly and remaining platform/policy coverage stay pending.
+
+### Strict proxy TOOLSETS and client-acquisition ordering
+
+The policy fixture now has explicit `native` and `proxy-strict` scenarios. The
+latter uses `TOOLSETS=projects` versus `TOOLSETS=issues`, proxy exposure and
+`PROXY_OUTPUT_STRICT=true`. Each caller discovers proxy tools without the hidden
+native names and obtains its allowed target's schema through `get_tool_schema`.
+Actual `invoke_tool` calls for the other scope must return unknown-tool refusals.
+Each scenario retains two distinct backend ports, actual kernel-owned exit-code-0
+events and empty managed state, under the unchanged deadlines.
+
+The first proxy attempt reached the forbidden call but returned a Huly connection
+error because shared dispatch acquired clients before target lookup. Preserved
+process log `/tmp/resident-proxy-policy-red.log`, SHA-256
+`a192533d5d32bca46a335f67106727138701426000fc198f6f8c0d476b2b5d74`.
+A cheap injected-resolver regression independently reproduced the bug:
+`/tmp/resident-proxy-no-acquisition-red.log`, SHA-256
+`9188650fa060d4708c17740892d85e065206770387223fbd08d795a826d3c702`.
+The [shared-dispatch fix](issue-325.md#refuse-unavailable-proxy-targets-before-client-acquisition)
+makes client acquisition lazy, after local target eligibility. The regression
+now checks both the exact unknown-tool result and zero client-resolution calls.
+
+Both packaged scenarios subsequently passed in
+`/tmp/resident-proxy-policy-green.log`, SHA-256
+`f3482f3c258f21dfef8dcf1342d62ca622ef63dc47e97c8f7930fc896be0551a`.
+Native receipt `/tmp/resident-managed-policy-native-agOGUz.receipt.json`, SHA-256
+`214b30e681e9d19bedc32a1e0609dee3042bc522911317807c09116c06662dcf`;
+strict-proxy receipt `/tmp/resident-managed-policy-proxy-strict-M82BGQ.receipt.json`,
+SHA-256 `af15eaf61c0983e46ed22366e2d5b52c73249b975e6a569a7a79cb0fc3a77c9c`.
+The receipts now identify their scenario explicitly. This proves scoped catalog
+and forbidden-target isolation with strict mode configured; successful remote
+tool-result strictness, real Huly auth and full policy/platform qualification
+remain pending. No production timer, journal or automatic retry changed.
+
+Focused dispatch/property checks pass 17 tests; affected MCP regressions pass
+71 files/508 tests. TypeScript/Effect, circular, complexity and full lint checks
+pass. Fresh Standards/Spec source reviews report no actionable defect. The full
+coherent quality gate is being assessed separately; these focused passes do not
+stand in for that gate or six-ticket completion.
+
+### Full-gate findings and protected-namespace corrections
+
+The first frozen-candidate `GOMAXPROCS=2 pnpm check-all` failed: 475 test files
+and 5,709 tests passed, while two process cases failed. The complete 477-file /
+5,711-test inventory still ran. Preserved log
+`/tmp/resident-proxy-preflight-check-all.log`, SHA-256
+`abcee83130b57a1866322aa3298084124a91c1a8f510efec3a125deedd131609`.
+Neither failure is counted as a proxy-preflight qualification pass.
+
+The failed-cleanup stop fixture reached the expected replacement refusal, but
+the earlier namespace-consistency work introduced an earlier ownership refusal
+without the expected non-dispatch/no-replay diagnostic. A raw start against the
+retained failed state confirmed exit 1, empty stdout and that specific missing
+diagnostic. The fix maps namespace inspection errors only before the selection's
+existing/launch callbacks can run, preserving the original message and adding
+truthful non-dispatch/no-replay context for this adapter. It does not classify
+any operation belonging to another caller.
+
+The restricted-runtime experiment wrote its probe receipt inside the production
+ownership namespace. The protected inventory correctly rejects that unrelated
+file, preventing readiness. The receipt now lives outside the namespace, with
+an exact additional write grant for that single file. Every child/worker/addon/
+WASI/inspector/guardian write/rename/remove assertion and the unrestricted
+negative control remain. The experiment still does not impose a mandatory
+restricted-worker architecture on production.
+
+Both affected files then passed all four tests in
+`/tmp/resident-proxy-gate-corrections.log`, SHA-256
+`11afa4f0bb6778943a892361f0314c5c3a8992dc73e76c58b37694244e78ca23`. No deadlines, inventory or coverage threshold
+changed. Fresh read-only Standards/Spec reviews find no actionable defect in the
+corrections. A fresh full gate is assessed separately on the corrected source;
+the initial failure remains retained.
+
+
+### Coverage gate failure and stop refusal checks
+
+The corrected full gate passed all 477 files and 5711 tests, but failed the unchanged 99% coverage thresholds: branches 98.91% (12441/12577), functions 98.98% (7986/8068). Statements were 99.42% and lines 99.53%. This is a failed gate, not final certification. Log `/tmp/resident-proxy-preflight-check-all-corrected.log`, SHA-256 `4369e6d88b243fe01d76b58b8c3c394eef908fea59101f8e1d09d2b94b68933b`.
+
+Additional actual-filesystem/TLS checks cover stop returning HTTP 503 after fencing (one POST, unconfirmed submission and retirement, metadata unchanged), an unverified namespace refusing stop while retaining evidence, and equally sized registry/locator inventories naming different generations refusing selection while preserving both copies. The two focused files passed 21 tests; log `/tmp/resident-stop-coverage-behaviors.log`, SHA-256 `cb868da701facfd0f33efb6b8e57bc5e92824e5a52cb9912c18977f635240779`. CLI checks additionally prove nonretryable lookup/conflict errors for missing/unverified owners and preservation of unresolved files: seven tests passed in `/tmp/resident-cli-stop-refusals.log`, SHA-256 `7d3e0d42f07a39fd29385077dd7ab279dd6670c6f697d0b753523f6ddaf27d8f`. These focused checks do not establish aggregate coverage; another full gate is required.
+
+
+The next complete gate passed all 477 files / 5716 tests and all preceding build, type, circular, complexity, package and lint checks, but still failed branch coverage: 98.95% (12446/12577). Functions reached 99% (7988/8068); statements 99.44%, lines 99.54%. Six additional covered branches would be required at that denominator. Log `/tmp/resident-stop-behavior-check-all.log`, SHA-256 `07848f406934f17d7a017b3e333f25e0b4c58d5cac57e2141812dbd82dbfbbf4`. The gate remains failed.
+
+Read-only Standards review found one secret-diagnostic issue in the new equal-count inventory test: direct string matchers could print private serialized metadata on failure. Those assertions now compare byte equality through booleans. Read-only Spec review found no actionable findings in that increment. Subsequent focused coverage additions verify that an ENOTDIR ancestor is a typed failure rather than absent state, unsupported managed stop produces a nonretryable CLI input error with no POST, and successful text output still explicitly leaves retirement unconfirmed. The state/namespace files passed 18 tests (`/tmp/resident-state-evidence-preservation.log`, SHA-256 `1f0ed7d696ccd4a4e5edd970101d0a4d0419c1dbd33daac10035f58dc380c9cd`); stop TLS/CLI schedules passed 15 tests (`/tmp/resident-cli-stop-wire.log`, SHA-256 `141780713c771c98892eb55b4463be6455a6416a62eff8621887e40ee36367cd`). Focused lint/format and TypeScript/Effect diagnostics passed (1353 files, zero diagnostics). These later tests have not yet received a full aggregate coverage run; do not infer a passing gate from focused results.

@@ -274,6 +274,23 @@ describe("Effect AI MCP dispatch", () => {
     expect(malformed.isError).toBe(true)
   })
 
+  it("refuses an unknown proxy target before acquiring Huly clients", async () => {
+    let resolutions = 0
+    const resolver: ClientResolver = async () => {
+      resolutions++
+      return failedResolver()
+    }
+    const result = await dispatch(
+      definitionNamed("invoke_tool"),
+      { toolName: "missing_tool", arguments: {} },
+      proxyExposure(),
+      resolver
+    )
+    expect(result.isError).toBe(true)
+    expect(result.content).toContainEqual({ type: "text", text: "Unknown tool: missing_tool" })
+    expect(resolutions).toBe(0)
+  })
+
   it("preserves every proxy target response shape and deferred argument form", async () => {
     const services = await Effect.runPromise(
       Layer.build(
@@ -313,7 +330,7 @@ describe("Effect AI MCP dispatch", () => {
         toolName: makeToolName("invoke_tool"),
         args: { toolName: "list_projects", arguments: argumentsValue },
         proxyCandidateRegistry: registry,
-        clients
+        resolveClients: Effect.succeed(clients)
       })
 
     const warned = await invoke({ structured: true })
@@ -323,13 +340,13 @@ describe("Effect AI MCP dispatch", () => {
       toolName: makeToolName("invoke_tool"),
       args: { toolName: "missing_target", arguments: {} },
       proxyCandidateRegistry: registry,
-      clients
+      resolveClients: Effect.succeed(clients)
     })
     const invalidInvoke = await handleProxyToolCall({
       toolName: makeToolName("invoke_tool"),
       args: {},
       proxyCandidateRegistry: registry,
-      clients
+      resolveClients: Effect.succeed(clients)
     })
     const missingClients = await handleProxyToolCall({
       toolName: makeToolName("invoke_tool"),
@@ -360,13 +377,13 @@ describe("Effect AI MCP dispatch", () => {
       toolName: makeToolName("invoke_tool"),
       args: { toolName: "get_global_space_admins", arguments: { extra: true } },
       proxyCandidateRegistry: registry,
-      clients
+      resolveClients: Effect.succeed(clients)
     })
     const missingRequiredInput = await handleProxyToolCall({
       toolName: makeToolName("invoke_tool"),
       args: { toolName: "get_issue" },
       proxyCandidateRegistry: registry,
-      clients
+      resolveClients: Effect.succeed(clients)
     })
     const failingTool = {
       ...baseTool,
@@ -381,7 +398,7 @@ describe("Effect AI MCP dispatch", () => {
       toolName: makeToolName("invoke_tool"),
       args: { toolName: "list_projects", arguments: {} },
       proxyCandidateRegistry: failingRegistry,
-      clients
+      resolveClients: Effect.succeed(clients)
     })
     const noArgumentBase = toolRegistry.tools.get("get_global_space_admins")
     if (noArgumentBase === undefined) throw new Error("Expected get_global_space_admins")
@@ -397,7 +414,7 @@ describe("Effect AI MCP dispatch", () => {
       toolName: makeToolName("invoke_tool"),
       args: { toolName: "get_global_space_admins" },
       proxyCandidateRegistry: noArgumentRegistry,
-      clients
+      resolveClients: Effect.succeed(clients)
     })
     const invalidSummaryTool = {
       ...baseTool,
@@ -418,13 +435,13 @@ describe("Effect AI MCP dispatch", () => {
       toolName: makeToolName("invoke_tool"),
       args: { toolName: "create_funnel", arguments: { name: "Coverage Funnel" } },
       proxyCandidateRegistry: registry,
-      clients
+      resolveClients: Effect.succeed(clients)
     })
     const suppliedWorkspaceClient = await handleProxyToolCall({
       toolName: makeToolName("invoke_tool"),
       args: { toolName: "create_funnel", arguments: { name: "Coverage Funnel" } },
       proxyCandidateRegistry: registry,
-      clients: { ...clients, workspaceClient }
+      resolveClients: Effect.succeed({ ...clients, workspaceClient })
     })
 
     expect(warned.structuredContent?.warnings).toEqual([warning])

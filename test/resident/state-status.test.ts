@@ -155,3 +155,13 @@ it("bounds inspection of an overfull root and preserves every entry", async () =
     expect(Exit.isFailure(await Effect.runPromiseExit(inspectResidentState(directory)))).toBe(true)
     expect((await fs.readdir(directory)).sort()).toEqual(names.sort())
   }))
+
+it("does not mistake a non-directory ancestor for absent ownership state", async () =>
+  withRegistryDirectory(async (directory) => {
+    const ancestor = join(directory, "owner-state-file")
+    await fs.writeFile(ancestor, "preserve unresolved ancestor", { mode: 0o600 })
+    const result = await Effect.runPromiseExit(inspectResidentState(ResidentDirectory.make(join(ancestor, "resident"))))
+    expect(Exit.isFailure(result)).toBe(true)
+    expect(await fs.readFile(ancestor, "utf8")).toBe("preserve unresolved ancestor")
+    expect(await fs.readdir(directory)).toEqual(["owner-state-file"])
+  }))

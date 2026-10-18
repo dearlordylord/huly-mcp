@@ -22,6 +22,7 @@ import {
   ToolSearchQuery
 } from "./proxy-tool-catalog.js"
 import { createToolOutputSchema } from "./tool-output-schema.js"
+import type { McpErrorResponseWithMeta } from "./tool-responses.js"
 import type { ToolRegistry } from "./tools/index.js"
 import { resolveAnnotations } from "./tools/index.js"
 import type { ToolAnnotations } from "./tools/tool-annotations.js"
@@ -301,7 +302,7 @@ const successfulInvokeResponse = (toolName: ToolName, response: SuccessfulToolCa
 const invokeTool = (
   registry: ToolRegistry,
   args: unknown,
-  clients: InvokeToolClients
+  resolveClients: Effect.Effect<InvokeToolClients, McpErrorResponseWithMeta>
 ): Effect.Effect<McpToolResponse> => {
   const decoded = decodeOrError(InvokeToolParamsSchema, args, INVOKE_TOOL_TOOL_NAME)
   if (decoded._tag === "error") return Effect.succeed(decoded.response)
@@ -326,16 +327,20 @@ const invokeTool = (
       )
     )
   }
-  return executeRegisteredOperation(
-    tool.operation,
-    normalizedArguments ?? {},
-    clients.hulyClient,
-    clients.storageClient,
-    clients.workspaceClient
-  ).pipe(
+  return resolveClients.pipe(
+    Effect.flatMap((clients) =>
+      executeRegisteredOperation(
+        tool.operation,
+        normalizedArguments ?? {},
+        clients.hulyClient,
+        clients.storageClient,
+        clients.workspaceClient
+      )
+    ),
     Effect.map((response) =>
       response.isError === true ? response : successfulInvokeResponse(params.toolName, response)
-    )
+    ),
+    Effect.catch((response) => Effect.succeed(response))
   )
 }
 
@@ -343,7 +348,7 @@ interface ProxyToolCallInput {
   readonly toolName: ToolName
   readonly args: unknown
   readonly proxyCandidateRegistry: ToolRegistry
-  readonly clients?: InvokeToolClients
+  readonly resolveClients?: Effect.Effect<InvokeToolClients, McpErrorResponseWithMeta>
 }
 
 const listProxyCategories = (registry: ToolRegistry, args: unknown): McpToolResponse => {
@@ -352,12 +357,12 @@ const listProxyCategories = (registry: ToolRegistry, args: unknown): McpToolResp
 }
 
 const invokeProxyTool = (input: ProxyToolCallInput): Effect.Effect<McpToolResponse> => {
-  if (input.clients === undefined) {
+  if (input.resolveClients === undefined) {
     return Effect.succeed(
       createInvalidParamsError("invoke_tool requires initialized Huly clients.", "ProxyClientsMissing")
     )
   }
-  return invokeTool(input.proxyCandidateRegistry, input.args, input.clients)
+  return invokeTool(input.proxyCandidateRegistry, input.args, input.resolveClients)
 }
 
 export const handleProxyToolCallEffect = (input: ProxyToolCallInput): Effect.Effect<McpToolResponse> => {

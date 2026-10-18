@@ -124,7 +124,15 @@ export const withResidentSelection = <A, E, R, B, F, S>(options: {
         (claim) =>
           Effect.gen(function* () {
             const { currentDescriptors, records } = yield* options.startup.within(
-              readResidentNamespace(options.directory)
+              readResidentNamespace(options.directory).pipe(
+                Effect.mapError(
+                  (error) =>
+                    new ManagedLaunchError({
+                      reason: "ownership",
+                      message: `${error.message}; this adapter refused startup: no Huly request was dispatched. No request was replayed.`
+                    })
+                )
+              )
             )
             const registry = yield* options.startup.within(openGenerationRegistry(options.directory))
             const matched = yield* withCompatibleCandidate(

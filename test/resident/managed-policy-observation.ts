@@ -3,7 +3,9 @@ import { Schema } from "effect"
 import { HttpPort } from "../../src/mcp/http-transport.js"
 import { KernelOwnedExit } from "../helpers/kernel-reaped-events.js"
 
+export const ManagedPolicyScenario = Schema.Literals(["native", "proxy-strict"])
 export const ManagedPolicyObservation = Schema.Struct({
+  scenario: ManagedPolicyScenario,
   projectPort: HttpPort.check(Schema.isGreaterThan(0)),
   issuePort: HttpPort.check(Schema.isGreaterThan(0)),
   crossPolicyCallsRefused: Schema.Literal(true),

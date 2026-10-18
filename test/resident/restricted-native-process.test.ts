@@ -77,7 +77,7 @@ it
         if (Result.isFailure(parsed)) throw new Error("Expected policy control to refuse before startup")
         expect(parsed.success.stdout).toBe("")
         const attempt = Schema.decodeUnknownSync(Schema.fromJsonString(RestrictedProbeAttempt))(
-          await fs.readFile(join(root, "state", "permission-probe.json"), "utf8")
+          await fs.readFile(join(root, "permission-probe.json"), "utf8")
         )
         expect(attempt.nodeVersion).toBe(process.versions.node)
         expect(attempt.denied).toEqual({
@@ -90,7 +90,7 @@ it
           ownershipRename: false,
           ownershipRemove: false
         })
-        expect(await fs.readdir(join(root, "state"))).toEqual(["permission-probe.json"])
+        expect(await fs.readdir(join(root, "state"))).toEqual([])
         expect(await fs.readdir(join(root, "guardian"))).toEqual(["renamed", "write"])
         expect(await fs.readFile(join(root, "guardian", "write"), "utf8")).toBe("changed")
         expect(await fs.readFile(join(root, "guardian", "renamed"), "utf8")).toBe("owned")

@@ -6,6 +6,7 @@ import { TestConsole } from "effect/testing"
 import { Command } from "effect/cli"
 import { expect, it } from "vitest"
 
+import { CliRuntimeError } from "../../packages/huly-cli/src/render.js"
 import { residentCommand } from "../../packages/huly-cli/src/resident-commands.js"
 import { withSelectionClaim } from "../../src/resident/selection-claim.js"
 import { ResidentStateStatus } from "../../src/resident/state-status.js"
@@ -88,3 +89,30 @@ it("requires an exact generation before submitting a stop", async () =>
     ).rejects.toThrow("exact generation UUID")
     expect(await fs.readdir(directory)).toEqual([])
   }))
+
+it.each([
+  { corrupted: false, kind: "lookup", message: "exact resident generation was not observed" },
+  { corrupted: true, kind: "conflict", message: "ownership namespace is unverified" }
+])("reports a nonretryable $kind when stop cannot select an owner", async ({ corrupted, kind, message }) =>
+  withRegistryDirectory(async (directory) => {
+    const unexpected = join(directory, "unrecognized-state")
+    if (corrupted) await fs.writeFile(unexpected, "preserve unresolved state", { mode: 0o600 })
+    const error = await Effect.runPromise(
+      runCommand([
+        "stop",
+        "--generation",
+        "00000000-0000-4000-8000-000000000000",
+        "--state-directory",
+        directory,
+        "--json"
+      ]).pipe(Effect.flip)
+    )
+    expect(error).toBeInstanceOf(CliRuntimeError)
+    if (!(error instanceof CliRuntimeError)) throw new Error("Expected typed CLI failure")
+    expect(error.kind).toBe(kind)
+    expect(error.retryable).toBe(false)
+    expect(error.message).toContain(message)
+    expect(await fs.readdir(directory)).toEqual(corrupted ? ["unrecognized-state"] : [])
+    if (corrupted) expect(await fs.readFile(unexpected, "utf8")).toBe("preserve unresolved state")
+  })
+)

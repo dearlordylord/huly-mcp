@@ -16,12 +16,12 @@ const TEST_BOUND = BUILD_BOUND + POLICY_PROCESS_BOUND
 const ProcessFailure = Schema.Struct({ stderr: Schema.String })
 const runFile = promisify(execFile)
 
-it.skipIf(process.platform !== "linux")(
-  "isolates managed tool policies in catalogs and actual cross-policy calls",
+it.skipIf(process.platform !== "linux").each(["native", "proxy-strict"])(
+  "isolates managed %s tool policies in catalogs and actual cross-policy calls",
   { timeout: TEST_BOUND },
-  async () => {
+  async (scenario) => {
     const bundle = await buildIsolatedStdioServer(BUILD_BOUND)
-    const root = await fs.mkdtemp(join(await fs.realpath(tmpdir()), "resident-managed-policy-"))
+    const root = await fs.mkdtemp(join(await fs.realpath(tmpdir()), `resident-managed-policy-${scenario}-`))
     const fixture = join(dirname(bundle.path), "managed-policy-isolation.cjs")
     let passed = false
     try {
@@ -40,7 +40,15 @@ it.skipIf(process.platform !== "linux")(
       )
       const { stderr, stdout } = await runFile(
         "python3",
-        ["test/resident/fixtures/reap-descendants.py", "--report-reaped", process.execPath, fixture, bundle.path, root],
+        [
+          "test/resident/fixtures/reap-descendants.py",
+          "--report-reaped",
+          process.execPath,
+          fixture,
+          bundle.path,
+          root,
+          scenario
+        ],
         { timeout: POLICY_PROCESS_BOUND, env: testStdioEnvironment() }
       ).catch(async (error: unknown) => {
         if (Schema.is(ProcessFailure)(error))
@@ -51,6 +59,7 @@ it.skipIf(process.platform !== "linux")(
       })
       await fs.writeFile(`${root}.phases.log`, stderr, { mode: 0o600, flag: "wx" })
       const observation = Schema.decodeUnknownSync(Schema.fromJsonString(ManagedPolicyObservation))(stdout)
+      expect(observation.scenario).toBe(scenario)
       expect(observation.backendExits).toHaveLength(2)
       expect(observation.backendExits.every((exit) => exit.exitCode === 0)).toBe(true)
       expect(observation.projectPort).not.toBe(observation.issuePort)

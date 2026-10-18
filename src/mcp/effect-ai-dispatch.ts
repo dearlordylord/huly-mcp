@@ -148,19 +148,17 @@ const callProxyWithClients = (
   exposure: ReturnType<typeof resolveProtocolExposure>,
   resolveClients: ClientResolver
 ): Effect.Effect<McpToolResponse, never> =>
-  Effect.gen(function* () {
-    const clients = yield* clientResolutionEffect(resolveClients)
-    if (Exit.isFailure(clients)) return mapClientResolutionCauseToMcp(clients.cause)
-    return yield* handleProxyToolCallEffect({
-      toolName: name,
-      args,
-      proxyCandidateRegistry: exposure.proxyCandidateRegistry,
-      clients: {
-        hulyClient: clients.value.hulyClient,
-        storageClient: clients.value.storageClient,
-        ...(clients.value.workspaceClient === undefined ? {} : { workspaceClient: clients.value.workspaceClient })
-      }
-    })
+  handleProxyToolCallEffect({
+    toolName: name,
+    args,
+    proxyCandidateRegistry: exposure.proxyCandidateRegistry,
+    resolveClients: clientResolutionEffect(resolveClients).pipe(
+      Effect.flatMap((clients) =>
+        Exit.isFailure(clients)
+          ? Effect.fail(mapClientResolutionCauseToMcp(clients.cause))
+          : Effect.succeed(clients.value)
+      )
+    )
   })
 
 const callProxyTool = (
