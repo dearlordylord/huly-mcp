@@ -9,7 +9,7 @@ import { LegacyHttpSession } from "../../src/resident/protocol-session.js"
 import { HostMessage } from "../../src/resident/request-headers.js"
 import { startResidentFixture } from "../helpers/resident-fixture.js"
 
-it("redacts attachment and native session capability headers in real HTTP client spans", async () => {
+it("redacts daemon authorization, attachment and native session headers in real HTTP client spans", async () => {
   const spans: Array<Tracer.Span> = []
   const tracer = Tracer.make({
     span: (options) => {
@@ -40,16 +40,16 @@ it("redacts attachment and native session capability headers in real HTTP client
         Effect.provideService(HttpClient.TracerHeaderFilter, () => true)
       )
     )
-    const capability = spans
-      .flatMap((span) => [...span.attributes])
-      .filter(([key]) => key === `http.request.header.${RESIDENT_ATTACHMENT_HEADER}`)
-    const legacy = spans
-      .flatMap((span) => [...span.attributes])
-      .filter(([key]) => key === "http.request.header.mcp-session-id")
-    expect(capability.length).toBeGreaterThan(0)
-    expect(legacy.length).toBeGreaterThan(0)
-    expect(capability.every(([, value]) => value === "<redacted>")).toBe(true)
-    expect(legacy.every(([, value]) => value === "<redacted>")).toBe(true)
+    for (const header of ["authorization", RESIDENT_ATTACHMENT_HEADER, "mcp-session-id"]) {
+      const values = spans
+        .flatMap((span) => [...span.attributes])
+        .filter(([key]) => key === `http.request.header.${header}`)
+      expect(values.length, header).toBeGreaterThan(0)
+      expect(
+        values.every(([, value]) => value === "<redacted>"),
+        header
+      ).toBe(true)
+    }
   } finally {
     await fixture.cleanup()
   }

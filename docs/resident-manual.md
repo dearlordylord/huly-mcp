@@ -92,6 +92,35 @@ Unexpected owner loss retains evidence and requires verified local retirement
 before replacement. Native platform and final local-Huly qualification of the
 combined managed path remain pending.
 
+## Managed identity and credential handoff
+
+A configured managed backend captures the effective Huly URL, workspace,
+authentication method, credential values, connection timeout, tool policy and
+`LAZY_ENVS` setting. A profile name alone does not identify a compatible backend.
+
+For a new backend, the launcher removes inherited Huly credential and profile
+settings from the child environment. It sends the captured configuration through
+private, versioned Start IPC after the prepared child's nonce and package version
+match. Huly credentials do not enter the child's command arguments.
+
+For an existing backend, the adapter authenticates the expected TLS generation
+and requests a single-use comparison challenge. The adapter sends an HMAC of the
+captured selection and challenge, using a key derived from the private daemon
+authorization. The comparison binds the package version and backend generation.
+It does not send Huly credentials to the existing backend or publish a stable credential
+fingerprint. Resident ownership records contain local TLS and daemon
+authorization secrets, protected by the private file checks. They contain no
+Huly credentials or credential hashes.
+
+Local TLS and daemon authorization grant access to the resident protocol.
+Huly credentials authenticate the captured Huly connection separately. Configured
+residents reject `x-huly-*` override headers before creating request clients,
+except for `x-huly-resident-attachment`. They do not select Huly authority
+through token headers on each invocation. Existing profile credential stores
+retain their own storage and selection rules.
+Resident HTTP spans redact all `x-huly-*` header values, including rejected
+override headers.
+
 ## Managed package versions
 
 Automatic attachment requires an exact implementation-version match as well as

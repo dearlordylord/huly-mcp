@@ -1,5 +1,5 @@
 import { NodeHttpClient } from "@effect/platform-node"
-import { Deferred, Effect, Option, Redacted, Schema } from "effect"
+import { Deferred, Effect, Option, Redacted, Schema, Tracer } from "effect"
 import { HttpClientRequest } from "effect/http"
 import { expect, it } from "vitest"
 
@@ -24,6 +24,7 @@ import {
   RESIDENT_COMPATIBILITY_PATH
 } from "../../src/resident/compatibility-contract.js"
 import { makeCompatibilityProof } from "../../src/resident/compatibility-crypto.js"
+import { withResidentHeaderRedaction } from "../../src/resident/private-http.js"
 import { withResidentHttpsAgent } from "../../src/resident/tls-channel.js"
 import { VERSION } from "../../src/version.js"
 import {
@@ -269,6 +270,42 @@ it("returns bounded challenge capacity refusal without falling back to unverifie
       })
     )
   )
+})
+
+it("redacts rejected Huly override headers in real server spans", async () => {
+  const spans: Array<Tracer.Span> = []
+  const tracer = Tracer.make({
+    span: (options) => {
+      const span = Tracer.nativeTracer.span(options)
+      spans.push(span)
+      return span
+    }
+  })
+  const headers = {
+    "x-huly-url": "https://private-user:private-password@other.invalid/private?token=private-query",
+    "x-huly-workspace": "private-workspace",
+    "x-huly-token": "private-override-token",
+    "x-huly-password": "private-unsupported-password"
+  }
+  await Effect.runPromise(
+    withCompatibleServer((attachment) =>
+      Effect.gen(function* () {
+        const response = yield* request(attachment, "POST", "/mcp", "{}", headers)
+        expect(response.status).toBe(400)
+      })
+    ).pipe(withResidentHeaderRedaction, Effect.withTracer(tracer))
+  )
+  for (const header of ["authorization", ...Object.keys(headers)]) {
+    const values = spans
+      .filter((span) => span.kind === "server")
+      .flatMap((span) => [...span.attributes])
+      .filter(([key]) => key === `http.request.header.${header}`)
+    expect(values.length, header).toBeGreaterThan(0)
+    expect(
+      values.every(([, value]) => value === "<redacted>"),
+      header
+    ).toBe(true)
+  }
 })
 
 it("rejects configured resident Huly overrides before entering request client middleware", async () => {
