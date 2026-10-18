@@ -59,3 +59,9 @@ macOS access are not inferred from automatic goal continuations.
 Windows is excluded under the explicit amendment, not deferred as unfinished
 supported-platform work. There is no new operation journal, legacy behavior or
 production-default change. All six issues and final qualification remain open.
+
+Subsequent scoped evidence: [shared model waiting across idle](resident-model-wait-idle-2026-10-18.md)
+adds controlled-clock process coverage for real SDK waiters before/after one
+caller's cancellation, with one model acquisition and exact continued reads.
+It advances the queued-work portion above without completing all new-call and
+completion orders at the fence or changing the frozen audit's classifications.

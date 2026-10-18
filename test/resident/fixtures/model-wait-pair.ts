@@ -4,10 +4,14 @@ import * as fs from "node:fs/promises"
 import { join } from "node:path"
 import { Deferred, Effect, Result, Schema } from "effect"
 
+import { LiveProbeEnvironment } from "../../../scripts/resident-live-read-contract.js"
+
 import { readResidentNamespace } from "../../../src/resident/namespace-inventory.js"
 import { readResidentLiveStatus } from "../../../src/resident/status-client.js"
 import { type ResidentLiveStatus } from "../../../src/resident/status-contract.js"
-import { openKernelReapedEvents, ReapedEventsFd } from "../../helpers/kernel-reaped-events.js"
+import { KernelOwnedExit, openKernelReapedEvents, ReapedEventsFd } from "../../helpers/kernel-reaped-events.js"
+import { spawnIdleClockBackend } from "../../helpers/idle-clock-backend.js"
+import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
 import { boundModelWait, spawnModelWaitParent } from "../../helpers/model-wait-parent.js"
 import { DisposableRestProject, startDisposableRestFixture } from "../disposable-rest-fixture.js"
 import {
@@ -47,14 +51,21 @@ const main = async () => {
       await Effect.runPromise(Deferred.await(release))
     }
   })
-  const parents = ["creator", "joiner"].map((role) =>
-    spawnModelWaitParent(
-      input.host,
-      Schema.decodeUnknownSync(ModelWaitHostInput)({ ...input, endpoint: rest.endpoint, role })
-    )
-  )
-  const [creator, joiner] = parents
-  assert.ok(creator !== undefined && joiner !== undefined)
+  const clock =
+    input.clockBackend === undefined
+      ? undefined
+      : await spawnIdleClockBackend({
+          backend: input.clockBackend,
+          directory: input.directory,
+          environment: Schema.decodeUnknownSync(LiveProbeEnvironment)({
+            ...residentSelectionEnvironment(),
+            HULY_URL: rest.endpoint,
+            HULY_TOOL_MODE: "native",
+            LAZY_ENVS: "true",
+            HULY_MCP_TELEMETRY: "0"
+          })
+        })
+  const parents: Array<ReturnType<typeof spawnModelWaitParent>> = []
   const readStatus = Effect.gen(function* () {
     const { statusDescriptors } = yield* readResidentNamespace(input.directory)
     assert.equal(statusDescriptors.length, 1)
@@ -75,12 +86,12 @@ const main = async () => {
         }
       }).pipe(Effect.timeout(RESPONSE_BOUND))
     )
-  const start = async (parent: typeof creator, identifier: string) => {
+  const start = async (parent: ReturnType<typeof spawnModelWaitParent>, identifier: string) => {
     const command = Schema.decodeUnknownSync(ModelWaitCommand.cases.read)({ _tag: "read", project: identifier })
     parent.send(command)
     assert.deepEqual(await parent.next(), { _tag: "started", project: identifier })
   }
-  const result = async (parent: typeof creator, identifier: string) => {
+  const result = async (parent: ReturnType<typeof spawnModelWaitParent>, identifier: string) => {
     const reply = await parent.next()
     assert.ok(reply._tag === "result")
     assert.equal(reply.project, identifier)
@@ -88,6 +99,17 @@ const main = async () => {
     assert.equal(reply.result.name, `Project ${identifier}`)
   }
   const run = async () => {
+    if (clock !== undefined) await clock.ready()
+    parents.push(
+      ...["creator", "joiner"].map((role) =>
+        spawnModelWaitParent(
+          input.host,
+          Schema.decodeUnknownSync(ModelWaitHostInput)({ ...input, endpoint: rest.endpoint, role })
+        )
+      )
+    )
+    const [creator, joiner] = parents
+    assert.ok(creator !== undefined && joiner !== undefined)
     phase("await two independent parents")
     const ready = await Promise.all(
       parents.map(async (parent) => {
@@ -123,6 +145,13 @@ const main = async () => {
     phase("model response held; start second caller")
     await start(joiner, cancelled === joiner ? "CANCEL" : "SURVIVE")
     const waiting = await untilStatus((status) => status.work.retainedRequests === TWO_PARENTS)
+    if (clock !== undefined) {
+      await clock.advance("near")
+      await clock.advance("protected")
+      const stillWaiting = await untilStatus((status) => status.work.retainedRequests === TWO_PARENTS)
+      assert.equal(stillWaiting.generation, idle.generation)
+      assert.equal(stillWaiting.work.admission, "accepting")
+    }
     phase("both requests retained before cancellation")
     assert.equal(rest.observed.modelRequests, 1)
     assert.equal(rest.observed.projectReads, 0)
@@ -133,6 +162,14 @@ const main = async () => {
     assert.equal(afterCancel.work.attachments, TWO_PARENTS)
     assert.equal(rest.observed.projectReads, 0)
     assert.equal(rest.observed.modelRequests, 1)
+    if (clock !== undefined) {
+      await clock.advance("protected")
+      const queued = await untilStatus((status) => status.work.retainedRequests === 1)
+      assert.equal(queued.generation, idle.generation)
+      assert.equal(queued.work.admission, "accepting")
+      assert.equal(rest.observed.modelRequests, 1)
+      assert.equal(rest.observed.projectReads, 0)
+    }
     phase("only survivor retained; release model response")
     Effect.runSync(Deferred.succeed(release, undefined))
     await result(survivor, "SURVIVE")
@@ -163,7 +200,15 @@ const main = async () => {
       [0, null],
       [0, null]
     ])
-    const backendExit = await kernel.wait(record.envelope.diagnostics.processId)
+    const backendExit = await (async () => {
+      if (clock === undefined) return kernel.wait(record.envelope.diagnostics.processId)
+      assert.equal(clock.child.pid, record.envelope.diagnostics.processId)
+      await clock.advance("released")
+      assert.equal(await fs.readFile(recordFile, "utf8"), original)
+      assert.equal(clock.child.exitCode, null)
+      assert.deepEqual(await clock.retire(), [0, null])
+      return KernelOwnedExit.make({ processId: record.envelope.diagnostics.processId, exitCode: 0 })
+    })()
     assert.equal(backendExit.exitCode, 0)
     phase("owned backend idle exit joined")
     assert.deepEqual(await fs.readdir(input.directory), [])
@@ -179,6 +224,7 @@ const main = async () => {
     )(rest.observed)
     process.stdout.write(
       Schema.encodeSync(Schema.fromJsonString(ModelWaitReceipt))({
+        clockControlled: clock !== undefined,
         mcpSha256: createHash("sha256")
           .update(await fs.readFile(input.bundle))
           .digest("hex"),
@@ -203,7 +249,11 @@ const main = async () => {
   )
   Effect.runSync(Deferred.succeed(release, undefined))
   const parentCleanup = await Promise.allSettled(parents.map((parent) => parent.close()))
-  const resourceCleanup = await Promise.allSettled([rest.close(), Promise.resolve().then(() => kernel.close())])
+  const resourceCleanup = await Promise.allSettled([
+    rest.close(),
+    clock?.cleanup(),
+    Promise.resolve().then(() => kernel.close())
+  ])
   const cleanupFailure = [...parentCleanup, ...resourceCleanup].find((result) => result.status === "rejected")
   if (Result.isFailure(outcome)) throw outcome.failure
   if (cleanupFailure !== undefined) throw cleanupFailure.reason

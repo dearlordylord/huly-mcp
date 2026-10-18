@@ -7,6 +7,7 @@ import { promisify } from "node:util"
 import { Schema } from "effect"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
+import { fixturePackageVersion } from "../helpers/resident-fixture.js"
 import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
 import { residentSelectionEnvironment } from "../helpers/resident-selection-environment.js"
 import { ModelWaitPairInput, ModelWaitReceipt } from "./model-wait-contract.js"
@@ -15,22 +16,28 @@ const PROCESS_BOUND = 30_000
 const TWO_PARENTS = 2
 const runFile = promisify(execFile)
 const scenarios = ["2026-07-28", "2025-06-18"].flatMap((protocol) =>
-  ["creator", "joiner"].map((cancelledRole) => ({ protocol, cancelledRole }))
+  ["creator", "joiner"].flatMap((cancelledRole) =>
+    [false, true].map((clockControlled) => ({ protocol, cancelledRole, clockControlled }))
+  )
 )
 
 describe.skipIf(process.platform !== "linux")("packaged shared model waiter isolation", () => {
   let bundle: Awaited<ReturnType<typeof buildIsolatedStdioServer>>
   let host: string
   let driver: string
+  let clockBackend: string
   let failed = false
   beforeAll(async () => {
     bundle = await buildIsolatedStdioServer(PROCESS_BOUND)
     const directory = dirname(bundle.path)
     host = join(directory, "model-wait-host.cjs")
     driver = join(directory, "model-wait-pair.cjs")
+    clockBackend = join(directory, "managed-idle-clock-backend.cjs")
+    const version = await fixturePackageVersion()
     for (const [source, output] of [
       ["model-wait-host", host],
-      ["model-wait-pair", driver]
+      ["model-wait-pair", driver],
+      ["managed-idle-clock-backend", clockBackend]
     ])
       await runFile(
         "pnpm",
@@ -42,6 +49,7 @@ describe.skipIf(process.platform !== "linux")("packaged shared model waiter isol
           "--platform=node",
           "--format=cjs",
           "--external:ws",
+          `--define:PKG_VERSION=${JSON.stringify(version)}`,
           `--outfile=${output}`
         ],
         { timeout: PROCESS_BOUND }
@@ -52,9 +60,9 @@ describe.skipIf(process.platform !== "linux")("packaged shared model waiter isol
   })
 
   it.each(scenarios)(
-    "cancels $cancelledRole while preserving shared initialization with $protocol",
+    "cancels $cancelledRole while preserving shared initialization with $protocol (clock=$clockControlled)",
     { timeout: PROCESS_BOUND },
-    async ({ cancelledRole, protocol }) => {
+    async ({ cancelledRole, clockControlled, protocol }) => {
       const root = await fs.mkdtemp(join(await fs.realpath(tmpdir()), "resident-model-wait-"))
       const directory = join(root, "state")
       await fs.mkdir(directory, { mode: 0o700 })
@@ -63,7 +71,8 @@ describe.skipIf(process.platform !== "linux")("packaged shared model waiter isol
         host,
         directory,
         protocol,
-        cancelledRole
+        cancelledRole,
+        ...(clockControlled ? { clockBackend } : {})
       })
       try {
         const result = await runFile(
@@ -87,6 +96,7 @@ describe.skipIf(process.platform !== "linux")("packaged shared model waiter isol
             .update(await fs.readFile(bundle.path))
             .digest("hex")
         )
+        expect(receipt.clockControlled).toBe(clockControlled)
         expect(receipt.protocol).toBe(protocol)
         expect(receipt.cancelledRole).toBe(cancelledRole)
         expect(new Set(receipt.parents.map((parent) => parent.parentPid)).size).toBe(TWO_PARENTS)

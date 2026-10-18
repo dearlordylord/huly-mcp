@@ -209,3 +209,14 @@ new idle interval before backend close0/empty state; dispatches exactly1.
 Controlled-clock fixture, not Huly mutation/physical timing or queued fairness
 proof. Initial process test passes3.36s; scoped reviews accepted after removal
 of an unreachable controller branch. All six issues remain incomplete.
+### Queued shared-model work across idle intervals — 2026-10-18
+
+[Report](resident-model-wait-idle-2026-10-18.md): four added clock-controlled
+protocol/creator-joiner cases retain actual SDK model waiters across idle
+intervals. Cancellation removes only one request; survivor remains on one model
+acquisition with no early project dispatch, then exact survivor/fresh/continued
+results. Parents close0; full new idle interval precedes owned backend exit0 and
+empty state. Original four physical packaged cases retained. Nine focused cases
+pass; five affected clock cases pass again after Redacted environment correction.
+No native Huly/physical timeout/all fence interleavings claim. All six issues
+remain incomplete.

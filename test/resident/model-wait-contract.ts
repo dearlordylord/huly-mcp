@@ -25,7 +25,8 @@ export const ModelWaitPairInput = Schema.Struct({
   host: ResidentPackagePath,
   directory: ResidentDirectory,
   protocol: ModelWaitProtocol,
-  cancelledRole: ModelWaitRole
+  cancelledRole: ModelWaitRole,
+  clockBackend: Schema.optionalKey(ResidentPackagePath)
 })
 export const ModelWaitCommand = Schema.TaggedUnion({ read: { project: ProjectIdentifier }, cancel: {}, close: {} })
 export type ModelWaitCommand = Schema.Schema.Type<typeof ModelWaitCommand>
@@ -43,6 +44,7 @@ export const ModelWaitEvent = Schema.TaggedUnion({
 })
 export type ModelWaitEvent = Schema.Schema.Type<typeof ModelWaitEvent>
 export const ModelWaitReceipt = Schema.Struct({
+  clockControlled: Schema.Boolean,
   mcpSha256: Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/u)),
   protocol: ModelWaitProtocol,
   cancelledRole: ModelWaitRole,
