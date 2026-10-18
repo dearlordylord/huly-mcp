@@ -6,19 +6,26 @@ import {
   LiveProbeEnvironment,
   LiveReadHostInput,
   LiveReadHostReceipt,
+  AnyLiveReadHostReceipt,
+  ManagedLiveReadHostInput,
+  ManagedLiveReadPairInput,
+  ManagedLiveReadPairReceipt,
   LiveReadPairInput,
   LiveReadPairReceipt,
   LiveReadProbeError,
   LiveReadProbeDiagnostic
 } from "./resident-live-read-contract.js"
 import { observeLiveResidentReads } from "./resident-live-read-host.js"
+import { observeManagedLiveReadPair } from "./resident-live-managed-pair.js"
 import { observeLiveReadPair } from "./resident-live-read-pair.js"
 import { openKernelReapedEvents, ReapedEventsFd } from "../test/helpers/kernel-reaped-events.js"
 
 const NODE_ARGUMENT_OFFSET = 2
 const Input = Schema.Union([
   Schema.Tuple([Schema.Literal("pair"), Schema.fromJsonString(LiveReadPairInput)]),
-  Schema.Tuple([Schema.Literal("parent"), Schema.fromJsonString(LiveReadHostInput)])
+  Schema.Tuple([Schema.Literal("parent"), Schema.fromJsonString(LiveReadHostInput)]),
+  Schema.Tuple([Schema.Literal("managed-pair"), Schema.fromJsonString(ManagedLiveReadPairInput)]),
+  Schema.Tuple([Schema.Literal("managed-parent"), Schema.fromJsonString(ManagedLiveReadHostInput)])
 ])
 NodeRuntime.runMain(
   Effect.gen(function* () {
@@ -29,7 +36,7 @@ NodeRuntime.runMain(
     )
     const input = yield* Schema.decodeUnknownEffect(Input)(process.argv.slice(NODE_ARGUMENT_OFFSET))
     const output =
-      input[0] === "parent"
+      input[0] === "parent" || input[0] === "managed-parent"
         ? yield* Effect.raceFirst(
             observeLiveResidentReads(
               input[1],
@@ -41,7 +48,7 @@ NodeRuntime.runMain(
             )
           ).pipe(
             Effect.flatMap((receipt) =>
-              Schema.encodeEffect(Schema.fromJsonString(LiveReadHostReceipt))(receipt).pipe(
+              Schema.encodeEffect(Schema.fromJsonString(AnyLiveReadHostReceipt))(receipt).pipe(
                 Effect.mapError(() => new LiveReadProbeError({ phase: "response" }))
               )
             )
@@ -56,14 +63,19 @@ NodeRuntime.runMain(
                 try: () => openKernelReapedEvents(supervision.descriptor),
                 catch: () => new LiveReadProbeError({ phase: "input" })
               }),
-              () => observeLiveReadPair(input[1], environment, executable),
+              (observer) =>
+                Effect.gen(function* () {
+                  if (input[0] === "managed-pair")
+                    return yield* observeManagedLiveReadPair(input[1], environment, executable, observer)
+                  return yield* observeLiveReadPair(input[1], environment, executable)
+                }),
               (observer) => Effect.sync(() => observer.close())
             )
           }).pipe(
             Effect.flatMap((receipt) =>
-              Schema.encodeEffect(Schema.fromJsonString(LiveReadPairReceipt))(receipt).pipe(
-                Effect.mapError(() => new LiveReadProbeError({ phase: "pair" }))
-              )
+              Schema.encodeEffect(
+                Schema.fromJsonString(Schema.Union([LiveReadPairReceipt, ManagedLiveReadPairReceipt]))
+              )(receipt).pipe(Effect.mapError(() => new LiveReadProbeError({ phase: "pair" })))
             )
           )
     yield* Effect.sync(() => process.stdout.write(`${output}\n`))

@@ -17,7 +17,7 @@ Windows resident work is canceled under the scope amendment above. The unused
 native source and its dedicated CI workflow are removed; runtime startup remains
 unsupported there. Linux/macOS and all other qualification requirements remain.
 
-The latest full gate passes 482 files / 5736 tests at the unchanged 99% coverage
+The latest full gate passes 483 files / 5739 tests at the unchanged 99% coverage
 thresholds. Two new [cleanup/idle component schedules](issue-326.md#retained-cleanup-versus-idle-retirement--2026-10-18)
 verify slow/failed cleanup retention across lease expiry; negative mutations are
 rejected and production source is unchanged. Two synthetic SDK clients now pass the actual freshly listed context
@@ -47,6 +47,19 @@ automatic launch under that fault, unexpected crash, native Huly SDK mutation or
 live Huly. Native macOS, live, model/oracle and performance qualification remain.
 
 ## Latest resumed increment
+
+The managed read-pair campaign probe now launches two actual packaged adapters
+under separate reader parents, verifies one backend generation through context
+and protected ownership records, checks first/continued project reads through
+the real SDK, and joins the supervisor-observed normal idle exit plus empty
+state. Its disposable REST fixture supplies the minimal class model required
+for nonempty projects. Wrong-name and occupied-namespace cases refuse; failed
+cases retain their isolated bundle. Manual mode remains independently tested.
+See [probe instructions](../resident-read-qualification.md) and the latest
+[qualification evidence](issue-328.md#managed-read-pair-probe-preparation-2026-10-18).
+Both review axes are clean; the full gate passed. One earlier response-phase
+failure remains preserved and unexplained. Live Huly, native macOS, remaining
+lifecycle/model scenarios and adapter-inclusive measurements are still pending.
 
 The latest server-only increment adds the authenticated exact-generation managed
 stop-request route. It reuses admissions fencing and the existing cleanup owner;

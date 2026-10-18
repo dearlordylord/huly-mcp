@@ -17,10 +17,8 @@ import { readResidentAttachment } from "./attachment-file.js"
 import { type AdapterExchange, withAdapterAttachment } from "./adapter-attachment.js"
 import { ResidentFilePath } from "./protected-path.js"
 import type { ResidentSelection } from "./compatibility-contract.js"
-import { MAX_ADAPTER_REQUESTS } from "./adapter-limits.js"
+import { MAX_ADAPTER_REQUESTS, MAX_ADAPTER_RESPONSE_BYTES } from "./adapter-limits.js"
 
-const MAX_RESPONSE_MIB = 128
-const MAX_RESPONSE_BYTES = MAX_RESPONSE_MIB * 1024 * 1024
 const MAX_INPUT_BYTES = 1024 * 1024
 const OUTPUT_CAPACITY = 16
 const ACCEPTED = 202
@@ -86,7 +84,7 @@ const forward = (
             )
           ),
           contentType: response.headers["content-type"] ?? "",
-          maxBytes: MAX_RESPONSE_BYTES
+          maxBytes: MAX_ADAPTER_RESPONSE_BYTES
         }).pipe(
           Stream.runForEach((reply) =>
             Effect.gen(function* () {

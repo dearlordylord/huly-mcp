@@ -6,7 +6,8 @@ import {
   type LiveProbeEnvironment,
   type LiveReadPairInput,
   LiveReadHostInput,
-  LiveReadHostReceipt,
+  AnyLiveReadHostReceipt,
+  type LiveReadHostReceipt,
   LiveReadPairReceipt,
   LiveReadProbeError,
   LiveReadProbeDiagnostic
@@ -16,7 +17,7 @@ import { withLiveProbeChild, type LiveProbeChild } from "./resident-live-read-pr
 const PARENT_REPORT_BOUND = "40 seconds"
 const MAX_RECEIPT_KIB = 64
 const MAX_RECEIPT_BYTES = MAX_RECEIPT_KIB * 1024
-const receive = (owned: LiveProbeChild) =>
+export const receiveLiveReader = (owned: LiveProbeChild) =>
   Effect.acquireUseRelease(
     Effect.sync(() => {
       const output = createInterface({ input: owned.process.stdout })
@@ -41,9 +42,9 @@ const receive = (owned: LiveProbeChild) =>
           return yield* new LiveReadProbeError({ phase: streams.failure()?.phase ?? "pair" })
         }
         if (Buffer.byteLength(next.value) > MAX_RECEIPT_BYTES) return yield* new LiveReadProbeError({ phase: "pair" })
-        const receipt = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(LiveReadHostReceipt))(next.value).pipe(
-          Effect.mapError(() => new LiveReadProbeError({ phase: "response" }))
-        )
+        const receipt = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(AnyLiveReadHostReceipt))(
+          next.value
+        ).pipe(Effect.mapError(() => new LiveReadProbeError({ phase: "response" })))
         if (receipt.parentPid !== owned.process.pid) return yield* new LiveReadProbeError({ phase: "pair" })
         owned.process.stdin.end()
         const suffix = yield* Effect.tryPromise({
@@ -79,9 +80,18 @@ export const observeLiveReadPair = Effect.fn("observeLiveReadPair")(function* (
   return yield* withLiveProbeChild([executable, "parent", first], environment, (left) =>
     withLiveProbeChild([executable, "parent", second], environment, (right) =>
       Effect.gen(function* () {
-        const readers = yield* Effect.all([receive(left), receive(right)], { concurrency: "unbounded" })
+        const readers = yield* Effect.all([receiveLiveReader(left), receiveLiveReader(right)], {
+          concurrency: "unbounded"
+        })
         const [a, b] = readers
-        if (a.host !== "first" || b.host !== "second" || a.parentPid === b.parentPid || a.adapterPid === b.adapterPid)
+        if (
+          a.mode !== "manual" ||
+          b.mode !== "manual" ||
+          a.host !== "first" ||
+          b.host !== "second" ||
+          a.parentPid === b.parentPid ||
+          a.adapterPid === b.adapterPid
+        )
           return yield* new LiveReadProbeError({ phase: "pair" })
         for (const [receipt, target] of [
           [a, input.targets[0]],
@@ -97,7 +107,7 @@ export const observeLiveReadPair = Effect.fn("observeLiveReadPair")(function* (
         return LiveReadPairReceipt.make({
           mode: "manual",
           protocol: "2026-07-28",
-          readers,
+          readers: [a, b],
           parentExits: [0, 0],
           backendRetirement: "not-requested"
         })

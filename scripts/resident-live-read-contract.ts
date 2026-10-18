@@ -1,8 +1,8 @@
 import { Schema } from "effect"
 
 import { ProjectIdentifier } from "../src/domain/schemas/shared.js"
-import { ResidentPackagePath } from "../src/resident/managed-contract.js"
-import { ResidentFilePath } from "../src/resident/protected-path.js"
+import { ResidentPackagePath, ResidentRegistryEnvelope } from "../src/resident/managed-contract.js"
+import { ResidentDirectory, ResidentFilePath } from "../src/resident/protected-path.js"
 import { ResidentTlsIdentity } from "../src/resident/tls-channel.js"
 
 export const LIVE_FIRST_READ_ID = 41
@@ -12,17 +12,24 @@ export const LIVE_PROBE_HOST_BOUND = "30 seconds"
 export const LiveProbeEnvironment = Schema.Record(Schema.String, Schema.RedactedFromValue(Schema.String))
 export type LiveProbeEnvironment = Schema.Schema.Type<typeof LiveProbeEnvironment>
 export const LiveProjectTarget = Schema.Struct({ project: ProjectIdentifier, name: Schema.NonEmptyString })
-export const LiveReadPairInput = Schema.Struct({
-  bundle: ResidentPackagePath,
-  attachment: ResidentFilePath,
-  targets: Schema.Tuple([LiveProjectTarget, LiveProjectTarget])
-}).check(
+export const LiveReadTargets = Schema.Tuple([LiveProjectTarget, LiveProjectTarget]).check(
   Schema.makeFilter(
-    ({ targets }) =>
+    (targets) =>
       (targets[0].project !== targets[1].project && targets[0].name !== targets[1].name) ||
       "Use two fixture projects with different identifiers and names"
   )
 )
+export const LiveReadPairInput = Schema.Struct({
+  bundle: ResidentPackagePath,
+  attachment: ResidentFilePath,
+  targets: LiveReadTargets
+})
+export const ManagedLiveReadPairInput = Schema.Struct({
+  bundle: ResidentPackagePath,
+  directory: ResidentDirectory,
+  targets: LiveReadTargets
+})
+export type ManagedLiveReadPairInput = Schema.Schema.Type<typeof ManagedLiveReadPairInput>
 export type LiveReadPairInput = Schema.Schema.Type<typeof LiveReadPairInput>
 export const LiveReadHostInput = Schema.Struct({
   bundle: ResidentPackagePath,
@@ -32,8 +39,16 @@ export const LiveReadHostInput = Schema.Struct({
   generation: ResidentTlsIdentity.fields.generation
 })
 export type LiveReadHostInput = Schema.Schema.Type<typeof LiveReadHostInput>
+export const ManagedLiveReadHostInput = Schema.Struct({
+  bundle: LiveReadHostInput.fields.bundle,
+  directory: ResidentDirectory,
+  target: LiveProjectTarget,
+  host: LiveReadHostInput.fields.host
+})
+export type ManagedLiveReadHostInput = Schema.Schema.Type<typeof ManagedLiveReadHostInput>
 const ProcessId = Schema.Int.check(Schema.isGreaterThan(0))
 export const LiveReadHostReceipt = Schema.Struct({
+  mode: Schema.Literal("manual"),
   host: LiveReadHostInput.fields.host,
   parentPid: ProcessId,
   adapterPid: ProcessId,
@@ -44,12 +59,31 @@ export const LiveReadHostReceipt = Schema.Struct({
   adapterExit: Schema.Literal(0)
 })
 export type LiveReadHostReceipt = Schema.Schema.Type<typeof LiveReadHostReceipt>
+export const ManagedLiveReadHostReceipt = Schema.Struct({
+  ...LiveReadHostReceipt.fields,
+  mode: Schema.Literal("managed"),
+  backendProcessId: ResidentRegistryEnvelope.fields.diagnostics.fields.processId
+})
+export type ManagedLiveReadHostReceipt = Schema.Schema.Type<typeof ManagedLiveReadHostReceipt>
+export const AnyLiveReadHostReceipt = Schema.Union([LiveReadHostReceipt, ManagedLiveReadHostReceipt])
 export const LiveReadPairReceipt = Schema.Struct({
   mode: Schema.Literal("manual"),
   protocol: Schema.Literal("2026-07-28"),
   readers: Schema.Tuple([LiveReadHostReceipt, LiveReadHostReceipt]),
   parentExits: Schema.Tuple([Schema.Literal(0), Schema.Literal(0)]),
   backendRetirement: Schema.Literal("not-requested")
+})
+export const ManagedLiveReadPairReceipt = Schema.Struct({
+  mode: Schema.Literal("managed"),
+  protocol: Schema.Literal("2026-07-28"),
+  readers: Schema.Tuple([ManagedLiveReadHostReceipt, ManagedLiveReadHostReceipt]),
+  parentExits: LiveReadPairReceipt.fields.parentExits,
+  backendRetirement: Schema.Literal("confirmed"),
+  backendExit: Schema.Struct({
+    processId: ResidentRegistryEnvelope.fields.diagnostics.fields.processId,
+    exitCode: Schema.Literal(0)
+  }),
+  privateStateRemoved: Schema.Literal(true)
 })
 export const LiveReadProbePhase = Schema.Literals([
   "input",
@@ -62,7 +96,9 @@ export const LiveReadProbePhase = Schema.Literals([
   "read",
   "exit",
   "cleanup",
-  "pair"
+  "pair",
+  "ownership",
+  "retirement"
 ])
 export const LiveReadProbeDiagnostic = Schema.Struct({
   kind: Schema.Literal("resident-live-read-failure"),

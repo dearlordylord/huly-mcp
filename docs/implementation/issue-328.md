@@ -823,3 +823,65 @@ not production automatic launch, unexpected crash, Huly SDK or live Huly.
 Existing normal/failed stop-fault behavior remains under the shared shell helper.
 The fresh full gate passes 482 files / 5736 tests at unchanged thresholds.
 Remaining platform, live, model/oracle and performance requirements stay open.
+
+### Managed read-pair probe preparation (2026-10-18)
+
+The uncommitted campaign probe now supports `managed-pair` and `managed-parent`.
+Two actual packaged adapters automatically select one backend; protected identity
+records are correlated with the backend context response. The Linux supervisor
+observes the backend's real exit after idle retirement, and the probe requires
+exit zero and an empty private namespace. Occupied namespaces refuse before
+launch. Manual externally owned mode remains separately exercised.
+
+The disposable REST fixture needed class-model transactions for nonempty project
+results: the real SDK constructs its hierarchy before mapping those results.
+Adding the Class and Project definitions fixed the read failure without replacing
+production startup or tool execution. The process test requires four project
+reads and one full-model acquisition shared by both readers. The probe also now
+uses the existing production 128 MiB response cap: the real catalog is 2,586,921
+bytes and exceeded its former 1 MiB probe-only cap. Production bounds are unchanged.
+
+Focused confirmation: `/tmp/resident-managed-read-model-confirmed-test.log`, two
+files/six tests passed, including the original manual cases. Latest TypeScript
+and Effect diagnostics are running in `/tmp/resident-managed-read-model-typecheck.log`;
+no full-gate or fresh review claim is made for this candidate yet. Live Huly and
+native macOS remain pending. No Windows work is required.
+
+Follow-up: fresh Standards and Spec reviews found one artifact-retention defect:
+failed process cases deleted their isolated bundle. The test now retains it after
+any nonpassing case. Both reviewers confirmed the correction with no residual
+actionable findings. A new negative case requires a real SDK project request and
+read-phase rejection of a wrong expected name, then verifies empty state without
+forced supervision cleanup.
+
+TypeScript and Effect diagnostics passed 1372 files with zero errors/warnings
+(`/tmp/resident-managed-read-model-typecheck.log`); focused Oxlint passed. One
+repeat failed positive and negative cases at response phase
+(`/tmp/resident-managed-read-negative-test.log`). No cause or timing conclusion is
+claimed. A temporary method-only diagnostic run passed all three managed cases
+(`/tmp/resident-managed-read-method-diagnostic.log`); instrumentation was removed.
+The next uninstrumented manual+managed run passed two files/seven tests
+(`/tmp/resident-managed-read-repeat-test.log`). These passes do not explain the
+preserved intermittent failure. All deadlines remain unchanged.
+
+The coherent full gate is now running as `GOMAXPROCS=2 pnpm check-all`, log
+`/tmp/resident-managed-read-check-all.log`. Its result is pending; it is not
+interchangeable with the previous 482-file/5736-test accepted baseline.
+
+The full gate completed successfully: **483 files / 5739 tests**. Coverage:
+statements 99.45% (29556/29719), branches 99% (12463/12588), functions 99%
+(7996/8076), lines 99.55% (27165/27286). All build, TypeScript/Effect diagnostics,
+schema, circular, complexity, package, synchronization and lint gates passed;
+duplication is 0.91%. Existing thresholds, test inventory and deadlines were not
+weakened. The gate emitted 200/300 allowed successful output lines.
+
+Log SHA-256: `6d9cbf7eb1dedfeb23ad8c58c34cd4a4ba17444a39687184dcff884221faff9a`.
+Frozen artifacts and source hashes: `/tmp/resident-managed-read-gate-hx2owr_c/`.
+MCP SHA-256: `7e2fff84adb7b4544173e316f98bcea30cef289bdee878e4a4b4f1aa1816a780`;
+CLI SHA-256: `c957044a36f2559fbdf5230a0f37860911af276f800b1a37933539d7298f5697`.
+Post-gate comparison confirmed all ten changed source/test files and both built
+artifacts match the frozen hashes. Only documentation was updated afterward.
+The failed repeat remains unexplained; the full-gate pass does not establish its
+cause or certify real host performance. All six issues remain open. Live Huly,
+native macOS, the remaining lifecycle/fault/model and measurement requirements
+are not replaced by this local campaign preparation.

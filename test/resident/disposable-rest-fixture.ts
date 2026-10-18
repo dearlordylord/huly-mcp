@@ -1,6 +1,9 @@
 import { once } from "node:events"
 import { createServer } from "node:http"
+import { ClassifierKind } from "@hcengineering/core"
 import { Schema } from "effect"
+import { ProjectIdentifier } from "../../src/domain/schemas/shared.js"
+import { core } from "../../src/huly/huly-plugins.js"
 
 const TOKEN = "fixture-huly-token"
 const RESOLVED_TOKEN = "fixture-rest-token"
@@ -25,7 +28,48 @@ const Account = Schema.Struct({
   primarySocialId: Schema.String,
   socialIds: Schema.Array(Schema.String)
 })
-const FindResult = Schema.Struct({ dataType: Schema.Literal("TotalArray"), value: Empty, total: Schema.Literal(0) })
+export const DisposableRestProject = Schema.Struct({
+  _id: Schema.NonEmptyString,
+  _class: Schema.Literal("tracker:class:Project"),
+  space: Schema.NonEmptyString,
+  modifiedOn: Schema.Number,
+  modifiedBy: Schema.NonEmptyString,
+  identifier: ProjectIdentifier,
+  name: Schema.NonEmptyString,
+  archived: Schema.Boolean
+})
+const ProjectQuery = Schema.Struct({ identifier: Schema.optionalKey(ProjectIdentifier) })
+// The SDK builds both its hierarchy and model database from these wire transactions.
+const ModelClassTransaction = Schema.Struct({
+  _id: Schema.NonEmptyString,
+  _class: Schema.Literal(core.class.TxCreateDoc),
+  space: Schema.Literal(core.space.Tx),
+  objectId: Schema.NonEmptyString,
+  objectClass: Schema.Literal(core.class.Class),
+  objectSpace: Schema.Literal(core.space.Model),
+  modifiedOn: Schema.Number,
+  modifiedBy: Schema.NonEmptyString,
+  attributes: Schema.Struct({ kind: Schema.Literal(ClassifierKind.CLASS), domain: Schema.NonEmptyString })
+})
+const ProjectModel = Schema.Array(ModelClassTransaction)
+const projectModel = Schema.decodeUnknownSync(ProjectModel)(
+  [core.class.Class, "tracker:class:Project"].map((objectId) => ({
+    _id: `fixture-model-${objectId}`,
+    _class: core.class.TxCreateDoc,
+    space: core.space.Tx,
+    objectId,
+    objectClass: core.class.Class,
+    objectSpace: core.space.Model,
+    modifiedOn: 1,
+    modifiedBy: "fixture-owner",
+    attributes: { kind: ClassifierKind.CLASS, domain: "model" }
+  }))
+)
+const FindResult = Schema.Struct({
+  dataType: Schema.Literal("TotalArray"),
+  value: Schema.Array(DisposableRestProject),
+  total: Schema.Natural
+})
 const Select = Schema.Struct({
   method: Schema.Literal("selectWorkspace"),
   params: Schema.Struct({
@@ -37,7 +81,12 @@ const Select = Schema.Struct({
 const MAX_REQUEST_BYTES = 8_192
 const HTTP_BAD_REQUEST = 400
 
-export const startDisposableRestFixture = async (options: { readonly onProjectRead?: () => Promise<void> } = {}) => {
+export const startDisposableRestFixture = async (
+  options: {
+    readonly onProjectRead?: () => Promise<void>
+    readonly projects?: ReadonlyArray<Schema.Schema.Type<typeof DisposableRestProject>>
+  } = {}
+) => {
   const observed = { modelRequests: 0, projectReads: 0, fullModelRequested: true, invalidRequests: 0 }
   const server = createServer((request, response) => {
     const handle = async () => {
@@ -86,15 +135,25 @@ export const startDisposableRestFixture = async (options: { readonly onProjectRe
       } else if (url.pathname === `/api/v1/load-model/${WORKSPACE}`) {
         observed.modelRequests++
         observed.fullModelRequested &&= url.searchParams.get("full") === "true"
-        response.end(Schema.encodeSync(Schema.fromJsonString(Empty))([]))
+        response.end(Schema.encodeSync(Schema.fromJsonString(ProjectModel))(options.projects ? projectModel : []))
       } else if (
         url.pathname === `/api/v1/find-all/${WORKSPACE}` &&
         url.searchParams.get("class") === "tracker:class:Project"
       ) {
         observed.projectReads++
         await options.onProjectRead?.()
+        const query = Schema.decodeUnknownSync(Schema.fromJsonString(ProjectQuery))(
+          url.searchParams.get("query") ?? "{}"
+        )
+        const projects = (options.projects ?? []).filter(
+          (project) => query.identifier === undefined || project.identifier === query.identifier
+        )
         response.end(
-          Schema.encodeSync(Schema.fromJsonString(FindResult))({ dataType: "TotalArray", value: [], total: 0 })
+          Schema.encodeSync(Schema.fromJsonString(FindResult))({
+            dataType: "TotalArray",
+            value: projects,
+            total: projects.length
+          })
         )
       } else throw new Error("Unexpected disposable REST route")
     }

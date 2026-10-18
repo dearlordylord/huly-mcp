@@ -81,8 +81,32 @@ owned backend through its original foreground owner and verify its exit and
 owned descriptor cleanup separately. Do not infer retirement from a missing
 PID, file, or listener.
 
-This probe does not qualify actual Claude or Codex hosts, managed startup,
+The manual mode does not qualify actual Claude or Codex hosts, managed startup,
 direct HTTP, performance, mutation uncertainty, or other operating systems.
 The automated process test uses a local native TLS server with deterministic
 project operations. Its development-version bundle tests the probe itself;
 it provides no live Huly or release-artifact qualification evidence.
+
+## Check automatic managed startup and idle retirement
+
+Use the same built probe, candidate, Huly environment, and two project targets.
+Replace `attachment` in the private input file with `directory`, naming an
+existing empty directory owned by the current user with mode 0700. The probe
+refuses an occupied directory and does not remove existing ownership evidence.
+
+Run the same supervised command with `managed-pair` in place of `pair`. Require
+exit zero and a decoded `ManagedLiveReadPairReceipt`. Both readers must report
+the same generation and backend PID, correlated with their actual context
+response and protected registry/attachment records. Their parent and adapter
+PIDs must differ. Each reader checks both project responses before disconnecting.
+
+The managed probe waits for the supervisor's actual child-exit observation after
+the backend's normal idle shutdown. It requires exit zero and an empty private
+directory, recording `backendRetirement: "confirmed"`. Missing files alone do
+not satisfy this check. Forced supervisor cleanup fails the campaign.
+
+The managed process test launches the packaged production backend against a
+disposable REST fixture through the real Huly SDK. It requires four project
+reads and one shared full-model acquisition. This proves the local process
+schedule; live Huly, real client hosts, and native macOS qualification remain
+separate campaign requirements.
