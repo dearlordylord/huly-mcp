@@ -5,6 +5,8 @@ import { Client } from "@modelcontextprotocol/client"
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"
 import { Deferred, Effect, Schema } from "effect"
 
+import { LiveReadProtocol } from "../../../scripts/resident-live-read-contract.js"
+
 import { GetProjectResultSchema } from "../../../src/domain/schemas/projects.js"
 import { DisposableRestProject, startDisposableRestFixture } from "../disposable-rest-fixture.js"
 
@@ -22,7 +24,8 @@ const Input = Schema.Struct({
   bundle: ResidentPackagePath,
   directory: ResidentDirectory,
   reapedFd: ReapedEventsFd,
-  scenario: ManagedPolicyScenario
+  scenario: ManagedPolicyScenario,
+  protocol: LiveReadProtocol
 })
 const ContextReply = Schema.Struct({ result: GetHulyContextResultSchema })
 const ToolRefusal = Schema.Struct({
@@ -36,7 +39,8 @@ const main = async () => {
     bundle: process.argv[2],
     directory: process.argv[3],
     reapedFd: process.env.HULY_TEST_REAPED_FD,
-    scenario: process.argv[4]
+    scenario: process.argv[4],
+    protocol: process.argv[5]
   })
   const project = Schema.decodeUnknownSync(DisposableRestProject)({
     _id: "fixture-PROXY",
@@ -73,7 +77,10 @@ const main = async () => {
     })
     const client = new Client(
       { name: "claude-code", version: "1" },
-      { versionNegotiation: { mode: { pin: "2026-07-28" } } }
+      {
+        supportedProtocolVersions: [input.protocol],
+        versionNegotiation: { mode: input.protocol === "2025-06-18" ? "legacy" : { pin: input.protocol } }
+      }
     )
     const closed = Effect.runSync(Deferred.make<void>())
     client.onclose = () => Effect.runSync(Deferred.succeed(closed, undefined))
@@ -88,6 +95,7 @@ const main = async () => {
       for (const session of sessions) {
         process.stderr.write(`Managed policy: connecting ${session.allowed}\n`)
         await session.client.connect(session.transport, { timeout: RESPONSE_BOUND })
+        assert.equal(session.client.getNegotiatedProtocolVersion(), input.protocol)
         process.stderr.write("Managed policy: reading catalog\n")
         const catalog = await session.client.listTools(undefined, { timeout: RESPONSE_BOUND })
         const names = catalog.tools.map((tool) => tool.name)
@@ -231,6 +239,7 @@ const main = async () => {
             projectPort,
             issuePort,
             scenario: input.scenario,
+            protocol: input.protocol,
             crossPolicyEvidence: input.scenario === "proxy-non-strict" ? "schema-visible" : "call-refused",
             backendExits,
             privateStateRemoved: true

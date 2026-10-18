@@ -6,6 +6,8 @@ import { promisify } from "node:util"
 import { Schema } from "effect"
 import { expect, it } from "vitest"
 
+import { LiveReadProtocol } from "../../scripts/resident-live-read-contract.js"
+
 import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { ManagedPolicyObservation, ManagedPolicyScenario } from "./managed-policy-observation.js"
@@ -16,10 +18,16 @@ const TEST_BOUND = BUILD_BOUND + POLICY_PROCESS_BOUND
 const ProcessFailure = Schema.Struct({ stderr: Schema.String })
 const runFile = promisify(execFile)
 
-it.skipIf(process.platform !== "linux").each(ManagedPolicyScenario.literals)(
-  "isolates managed %s tool policies in catalogs and actual cross-policy calls",
+it
+  .skipIf(process.platform !== "linux")
+  .each(
+    LiveReadProtocol.literals.flatMap((protocol) =>
+      ManagedPolicyScenario.literals.map((scenario) => ({ protocol, scenario }))
+    )
+  )(
+  "isolates managed $scenario tool policies with $protocol",
   { timeout: TEST_BOUND },
-  async (scenario) => {
+  async ({ protocol, scenario }) => {
     const bundle = await buildIsolatedStdioServer(BUILD_BOUND)
     const root = await fs.mkdtemp(join(await fs.realpath(tmpdir()), `resident-managed-policy-${scenario}-`))
     const fixture = join(dirname(bundle.path), "managed-policy-isolation.cjs")
@@ -47,7 +55,8 @@ it.skipIf(process.platform !== "linux").each(ManagedPolicyScenario.literals)(
           fixture,
           bundle.path,
           root,
-          scenario
+          scenario,
+          protocol
         ],
         { timeout: POLICY_PROCESS_BOUND, env: testStdioEnvironment() }
       ).catch(async (error: unknown) => {
@@ -60,6 +69,7 @@ it.skipIf(process.platform !== "linux").each(ManagedPolicyScenario.literals)(
       await fs.writeFile(`${root}.phases.log`, stderr, { mode: 0o600, flag: "wx" })
       const observation = Schema.decodeUnknownSync(Schema.fromJsonString(ManagedPolicyObservation))(stdout)
       expect(observation.scenario).toBe(scenario)
+      expect(observation.protocol).toBe(protocol)
       expect(observation.backendExits).toHaveLength(2)
       expect(observation.backendExits.every((exit) => exit.exitCode === 0)).toBe(true)
       expect(observation.projectPort).not.toBe(observation.issuePort)

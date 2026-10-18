@@ -689,3 +689,8 @@ The [focused error-routing increment](resident-error-routing-2026-10-18.md) adds
 ### Successful proxy tool/resource project reads — 2026-10-18
 
 [Report](resident-proxy-project-reads-2026-10-18.md): strict/non-strict actual packaged managed adapters invoke get_project and read its MCP resource through disposableREST, comparing typed exact project payloads including Unicode. Post-kernel1model2exactreads0writesinvalid; native baseline0reads. Three focused cases pass final-cleanup log; local lint/format and reviews accepted. No production changes/full gate. Modern SDK subprocess scope only; shared-independent-parent proxy/malformed-output/legacy/macOS/final qualification remain open. All six tickets incomplete.
+
+
+### Negotiated proxy protocol matrix — 2026-10-18
+
+[Report](resident-proxy-protocols-2026-10-18.md): existing native/strict/non-strict policy and successful proxy/resource fixture now runs modern2026-07-28 and initialize2025-06-18; actual negotiated version checked for each connection. Shared protocol schema, no production compatibility code. Focused six cases pass59.81s /tmp/resident-policy-protocol-matrix.log; local lint/format and both reviews accepted. Initial unsupported SDK pin and transient duplicate import failures retained. No full gate. All six issues remain incomplete; actual hosts/shared independent proxy parents/macOS/lifecycle/final qualification remain open.
