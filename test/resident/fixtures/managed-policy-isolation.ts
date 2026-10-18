@@ -13,6 +13,7 @@ import { DisposableRestProject, startDisposableRestFixture } from "../disposable
 import { GetHulyContextResultSchema } from "../../../src/domain/schemas/huly-context.js"
 import { McpErrorCode } from "../../../src/mcp/tool-responses.js"
 import { ResidentPackagePath, ResidentRegistryEnvelope } from "../../../src/resident/managed-contract.js"
+import { requestResidentStop } from "../../../src/resident/operator-stop.js"
 import { ResidentDirectory } from "../../../src/resident/protected-path.js"
 import { openKernelReapedEvents, ReapedEventsFd } from "../../helpers/kernel-reaped-events.js"
 import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
@@ -220,6 +221,12 @@ const main = async () => {
       )
       const backendExits = []
       for (const owner of owners) {
+        const stop = await Effect.runPromise(
+          requestResidentStop({ directory: input.directory, generation: owner.generation }).pipe(
+            Effect.timeout(RESPONSE_BOUND)
+          )
+        )
+        assert.equal(stop.kind, "accepted")
         const exit = await kernel.wait(owner.diagnostics.processId)
         assert.equal(exit.exitCode, 0)
         backendExits.push(exit)
