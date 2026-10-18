@@ -366,3 +366,47 @@ scratch `reaper.py` SHA-256
 No runtime journal, replay, production timer or host global configuration changed.
 Claude, real Huly, complete protocols/auth/platform coverage and the final gate
 remain pending; this scoped host result does not close any ticket.
+
+### Actual Claude Code discovery without a model turn
+
+The installed Claude Code 2.1.296 executable was driven through its streaming
+control protocol, using the initialization and MCP-status sequence described by
+the [official Agent SDK implementation](https://github.com/anthropics/claude-agent-sdk-python/blob/main/src/claude_agent_sdk/_internal/query.py).
+The probe supplied no user message or model turn. It used temporary HOME,
+CLAUDE_CONFIG_DIR and working directory, bare mode, empty settings sources,
+strict explicit MCP configuration, disabled built-in tools and synthetic Huly
+authority. The model endpoint was unreachable loopback and no model credentials
+were supplied. No global host settings were changed.
+
+The initial probe at `/tmp/resident-claude-discovery-GGfrvB` asked status
+immediately, observed `pending`, and exited without creating managed state.
+That is preserved as an incomplete observation, not successful discovery.
+The subsequent probe at `/tmp/resident-claude-connected-5AdcHF` polled status
+within its five-second discovery allowance. The final control response reports
+`connected`, server `huly-mcp` version `0.53.1`, and the actual discovered
+`get_version` and `get_huly_context` tools with read-only annotations. This uses
+the unmodified packaged `46d6da18…` artifact recorded above, not an SDK client
+merely named after Claude Code.
+
+The driver and supervisor completed with code 0, host exit was 0, stderr was
+empty, and the fixture's complete managed state directory was empty afterward.
+The existing supervisor joins its actual owned descendants; no metadata-derived
+PID kill was used. This attempt does not retain a separate per-backend exit-code
+receipt, so it must not be described as independently proving backend code 0.
+The explicit expiry supervisor allowance was available, but no shorter runtime
+or graceful-release claim is made.
+
+The evidence directory retains `probe.py`, temporary configuration, raw protocol
+responses, receipt, host exit and stderr. The synthetic token is only in the
+private configuration, not the adopted status receipt. No Huly request or
+`get_huly_context` tool call was submitted through Claude Code. First/continued
+reads through this host therefore remain pending, as do full catalog/resource,
+auth, live-Huly and native-platform coverage. This successful discovery increment
+does not complete #328 or any other ticket.
+
+Receipt SHA-256:
+`c4248b3937dde681b9f4883fa61d81462aa69ad78d4774732d7f603be7909592`;
+raw `protocol.ndjson` SHA-256:
+`1fb78e5eced3cc25a3ff491a560ba505365ef08a6e86aced979d332b9599b058`;
+`probe.py` SHA-256:
+`0a419278c61673a5158ca1459893534bfce754d68a6fdd1cd820e0ca367bff70`.
