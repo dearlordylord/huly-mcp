@@ -17,7 +17,7 @@ Windows resident work is canceled under the scope amendment above. The unused
 native source and its dedicated CI workflow are removed; runtime startup remains
 unsupported there. Linux/macOS and all other qualification requirements remain.
 
-The latest full gate passes 483 files / 5740 tests at the unchanged 99% coverage
+The latest full gate passes 483 files / 5742 tests at the unchanged 99% coverage
 thresholds. Two new [cleanup/idle component schedules](issue-326.md#retained-cleanup-versus-idle-retirement--2026-10-18)
 verify slow/failed cleanup retention across lease expiry; negative mutations are
 rejected and production source is unchanged. Two synthetic SDK clients now pass the actual freshly listed context
@@ -47,6 +47,19 @@ automatic launch under that fault, unexpected crash, native Huly SDK mutation or
 live Huly. Native macOS, live, model/oracle and performance qualification remain.
 
 ## Latest resumed increment
+
+The [SDK write/drain fault increment](issue-327.md#sdk-mutation-loss-and-death-during-observed-drain--2026-10-18)
+now commits a disposable project rename once through the actual SDK, then kills
+the owned backend before the REST response. Drain additionally requires an
+authenticated stop acknowledgment and an observed entry into admissions drain
+with a retained attachment. Its backend is a harness-launched production managed
+runtime; the other fault cases use the packaged backend. Renewal/heartbeat loss
+now warns about unknown in-flight outcomes. Partial drain may remove only the
+owned locator; registry bytes and remaining state stay protected and fresh
+selection refuses. Seventeen focused tests, both review axes and the complete
+5742-test gate pass. Preserved preparation failures and exact artifact hashes
+remain in the report. Live Huly, native macOS, remaining complete-contract
+scenarios, lifecycle/model alignment and measurements remain pending.
 
 The packaged request-loss fixture now kills its owned backend at either actual
 SDK model loading or project querying. Receipts require one model request and

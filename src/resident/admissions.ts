@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto"
 import { Clock, Duration, Effect, Exit, Redacted, Schedule, Schema, Scope, Semaphore } from "effect"
+import { observeHttpAdmission } from "../mcp/http-admission-observations.js"
 
 import { type AdmissionPolicy, AdmissionError, AttachmentAdmitted, AttachmentToken } from "./admission-contract.js"
 import {
@@ -163,6 +164,7 @@ export const makeResidentAdmissions = Effect.fn("makeResidentAdmissions")(functi
   })
   const drain = Effect.gen(function* () {
     yield* fence
+    observeHttpAdmission("ResidentAdmissions_drainStarted", { attachments: members.size, pendingAdmissions: pending })
     yield* Effect.sync(() => pending === 0).pipe(
       Effect.repeat({ until: (settled) => settled, schedule: Schedule.spaced(DRAIN_POLL_MILLIS) })
     )

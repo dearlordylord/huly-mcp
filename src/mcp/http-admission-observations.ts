@@ -11,6 +11,7 @@ const LifecycleObservationSchema = Schema.TaggedUnion({
   RequestAdmission_enter: { admitted: Schema.Boolean },
   RequestLease_release: { active: Count },
   RequestAdmission_quiesce: { drained: Schema.Boolean },
+  ResidentAdmissions_drainStarted: { attachments: Count, pendingAdmissions: Count },
   createRequestClientLifecycle: {},
   RequestClientLifecycle_resolve: { closed: Schema.Boolean },
   RequestClientLifecycle_acquireSettles: { rejected: Schema.Boolean },

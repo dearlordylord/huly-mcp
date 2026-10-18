@@ -68,6 +68,7 @@ effectIt.effect.each(["success", "reject", "stall"])(
         expect(result._tag).toBe(mode === "success" ? "Success" : "Failure")
         if (result._tag === "Failure") {
           expect(Cause.pretty(result.cause)).toContain("Resident renewal failed")
+          expect(Cause.pretty(result.cause)).toContain("operation outcome may be unknown")
           expect(Cause.pretty(result.cause)).not.toContain(PRIVATE_PAYLOAD)
         }
         expect(admissions).toBe(1)

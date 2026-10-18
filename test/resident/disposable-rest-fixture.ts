@@ -1,5 +1,5 @@
 import { once } from "node:events"
-import { createServer } from "node:http"
+import { createServer, type IncomingMessage } from "node:http"
 import { ClassifierKind } from "@hcengineering/core"
 import { Schema } from "effect"
 import { ProjectIdentifier } from "../../src/domain/schemas/shared.js"
@@ -39,6 +39,18 @@ export const DisposableRestProject = Schema.Struct({
   archived: Schema.Boolean
 })
 const ProjectQuery = Schema.Struct({ identifier: Schema.optionalKey(ProjectIdentifier) })
+const ProjectUpdate = Schema.Struct({
+  _id: Schema.NonEmptyString,
+  _class: Schema.Literal("core:class:TxUpdateDoc"),
+  space: Schema.NonEmptyString,
+  objectId: Schema.NonEmptyString,
+  objectClass: DisposableRestProject.fields._class,
+  objectSpace: Schema.NonEmptyString,
+  modifiedOn: Schema.Number,
+  modifiedBy: Schema.NonEmptyString,
+  operations: Schema.Struct({ name: DisposableRestProject.fields.name }),
+  retrieve: Schema.optionalKey(Schema.Boolean)
+})
 // The SDK builds both its hierarchy and model database from these wire transactions.
 const ModelClassTransaction = Schema.Struct({
   _id: Schema.NonEmptyString,
@@ -81,15 +93,35 @@ const Select = Schema.Struct({
 })
 const MAX_REQUEST_BYTES = 8_192
 const HTTP_BAD_REQUEST = 400
+const readBody = async (request: IncomingMessage) => {
+  const chunks: Array<Buffer> = []
+  let size = 0
+  for await (const chunk of request) {
+    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(Schema.decodeUnknownSync(Schema.String)(chunk))
+    size += bytes.length
+    if (size > MAX_REQUEST_BYTES) throw new Error("Fixture request frame exceeded its bound")
+    chunks.push(bytes)
+  }
+  return Buffer.concat(chunks).toString("utf8")
+}
 
 export const startDisposableRestFixture = async (
   options: {
     readonly onModelLoad?: () => Promise<void>
     readonly onProjectRead?: () => Promise<void>
+    readonly afterProjectWrite?: () => Promise<void>
     readonly projects?: ReadonlyArray<Schema.Schema.Type<typeof DisposableRestProject>>
   } = {}
 ) => {
-  const observed = { modelRequests: 0, projectReads: 0, fullModelRequested: true, invalidRequests: 0 }
+  const observed = {
+    modelRequests: 0,
+    projectReads: 0,
+    projectWrites: 0,
+    committedProjectWrites: 0,
+    fullModelRequested: true,
+    invalidRequests: 0
+  }
+  let projectState = [...(options.projects ?? [])]
   const server = createServer((request, response) => {
     const handle = async () => {
       const endpoint = readEndpoint()
@@ -108,15 +140,7 @@ export const startDisposableRestFixture = async (
       }
       if (url.pathname === "/accounts") {
         if (request.headers.authorization !== `Bearer ${TOKEN}`) throw new Error("Fixture account authorization failed")
-        const chunks: Array<Buffer> = []
-        let size = 0
-        for await (const chunk of request) {
-          const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(Schema.decodeUnknownSync(Schema.String)(chunk))
-          size += bytes.length
-          if (size > MAX_REQUEST_BYTES) throw new Error("Fixture account frame exceeded its bound")
-          chunks.push(bytes)
-        }
-        Schema.decodeUnknownSync(Schema.fromJsonString(Select))(Buffer.concat(chunks).toString("utf8"))
+        Schema.decodeUnknownSync(Schema.fromJsonString(Select))(await readBody(request))
         response.end(
           Schema.encodeSync(Schema.fromJsonString(Workspace))({
             result: { endpoint, token: RESOLVED_TOKEN, workspace: WORKSPACE, workspaceUrl: "fixture" }
@@ -148,7 +172,7 @@ export const startDisposableRestFixture = async (
         const query = Schema.decodeUnknownSync(Schema.fromJsonString(ProjectQuery))(
           url.searchParams.get("query") ?? "{}"
         )
-        const projects = (options.projects ?? []).filter(
+        const projects = projectState.filter(
           (project) => query.identifier === undefined || project.identifier === query.identifier
         )
         response.end(
@@ -158,6 +182,18 @@ export const startDisposableRestFixture = async (
             total: projects.length
           })
         )
+      } else if (url.pathname === `/api/v1/tx/${WORKSPACE}` && request.method === "POST") {
+        const tx = Schema.decodeUnknownSync(Schema.fromJsonString(ProjectUpdate))(await readBody(request))
+        const target = projectState.find((project) => project._id === tx.objectId)
+        if (target === undefined || tx.objectSpace !== target._id)
+          throw new Error("Fixture write targeted another project")
+        observed.projectWrites++
+        projectState = projectState.map((project) =>
+          project._id === tx.objectId ? { ...project, name: tx.operations.name } : project
+        )
+        observed.committedProjectWrites++
+        await options.afterProjectWrite?.()
+        response.end(Schema.encodeSync(Schema.fromJsonString(Schema.Struct({})))({}))
       } else throw new Error("Unexpected disposable REST route")
     }
     void handle().catch(() => {
@@ -175,6 +211,7 @@ export const startDisposableRestFixture = async (
   return {
     endpoint: readEndpoint(),
     observed,
+    projects: () => projectState,
     close: async () => {
       server.closeAllConnections()
       await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))

@@ -6,20 +6,28 @@ import { join } from "node:path"
 import { createInterface } from "node:readline"
 import { Client } from "@modelcontextprotocol/client"
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"
-import { Deferred, Effect, Schema } from "effect"
+import { Deferred, Effect, Result, Schema } from "effect"
+import { HttpAdmissionObservationSchema } from "../../../src/mcp/http-admission-observations.js"
 
-import { ResidentPackagePath } from "../../../src/resident/managed-contract.js"
+import { ResidentPackagePath, ResidentRegistryEnvelope } from "../../../src/resident/managed-contract.js"
+import { requestResidentStop } from "../../../src/resident/operator-stop.js"
 import { ResidentDirectory, ResidentFilePath } from "../../../src/resident/protected-path.js"
 import { HostMessage } from "../../../src/resident/request-headers.js"
 import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
-import { startDisposableRestFixture } from "../disposable-rest-fixture.js"
-import { ManagedRequestLossObservation, ManagedRequestLossPoint } from "../managed-request-loss-observation.js"
+import { DisposableRestProject, startDisposableRestFixture } from "../disposable-rest-fixture.js"
+import {
+  ManagedRequestLossObservation,
+  ManagedRequestLossPoint,
+  RequestLossProjectName,
+  RequestLossUpdatedName
+} from "../managed-request-loss-observation.js"
 
 const RESPONSE_BOUND = 5_000
 const ANNOUNCEMENT = "Resident attachment: "
 const Input = Schema.Struct({
   bundle: ResidentPackagePath,
   directory: ResidentDirectory,
+  backendProgram: ResidentPackagePath,
   point: ManagedRequestLossPoint
 })
 const bounded = <A>(promise: Promise<A>) =>
@@ -29,10 +37,31 @@ const main = async () => {
   const input = Schema.decodeUnknownSync(Input)({
     bundle: process.argv[2],
     directory: process.argv[3],
-    point: process.argv[4]
+    point: process.argv[4],
+    backendProgram: process.argv[5]
   })
+  let stopAcknowledgment: Schema.Schema.Type<typeof ManagedRequestLossObservation>["stopAcknowledgment"] =
+    "not-requested"
+  const drainEntered = Effect.runSync(Deferred.make<void>())
+  let drainEntry: Schema.Schema.Type<typeof ManagedRequestLossObservation>["drainEntry"] = "not-requested"
+  let locatorAfterLoss: Schema.Schema.Type<typeof ManagedRequestLossObservation>["locatorAfterLoss"] = "retained"
   const loseBackend = async () => {
     process.stderr.write(`Managed loss: reached ${input.point} boundary\n`)
+    if (input.point === "drain") {
+      const [name] = await fs.readdir(join(input.directory, "generations"))
+      if (name === undefined) throw new Error("Drain target registry absent")
+      const envelope = Schema.decodeUnknownSync(Schema.fromJsonString(ResidentRegistryEnvelope))(
+        await fs.readFile(join(input.directory, "generations", name), "utf8")
+      )
+      const stop = await Effect.runPromise(
+        requestResidentStop({ directory: input.directory, generation: envelope.generation })
+      )
+      assert.equal(stop.kind, "accepted")
+      stopAcknowledgment = "admission-fenced"
+      await Effect.runPromise(Deferred.await(drainEntered).pipe(Effect.timeout(RESPONSE_BOUND)))
+      drainEntry = "observed-with-attachment"
+      process.stderr.write("Managed loss: authenticated drain accepted before owned backend kill\n")
+    }
     if (backend.pid === undefined) throw new Error("Owned backend did not spawn")
     const tasks = await fs.readdir(`/proc/${backend.pid}/task`)
     assert.ok(tasks.length > 0)
@@ -42,28 +71,53 @@ const main = async () => {
     for (const list of children) assert.equal(list.trim(), "")
     assert.equal(backend.kill("SIGKILL"), true)
     assert.deepEqual(await bounded(backendClosed), [null, "SIGKILL"])
+    process.stderr.write("Managed loss: owned backend SIGKILL exit joined\n")
   }
   const rest = await startDisposableRestFixture({
-    ...(input.point === "model" ? { onModelLoad: loseBackend } : { onProjectRead: loseBackend })
+    projects: [
+      Schema.decodeUnknownSync(DisposableRestProject)({
+        _id: "fixture-loss-project",
+        _class: "tracker:class:Project",
+        space: "fixture-space",
+        modifiedOn: 1,
+        modifiedBy: "fixture-owner",
+        identifier: "LOSS",
+        name: RequestLossProjectName,
+        archived: false
+      })
+    ],
+    ...(input.point === "model"
+      ? { onModelLoad: loseBackend }
+      : input.point === "query"
+        ? { onProjectRead: loseBackend }
+        : { afterProjectWrite: loseBackend })
   })
   const environment = {
     ...residentSelectionEnvironment(),
     HULY_URL: rest.endpoint,
     MCP_RESIDENT_STATE_DIRECTORY: input.directory
   }
-  const backend = spawn(process.execPath, [input.bundle], {
+  const backend = spawn(process.execPath, [input.backendProgram], {
     env: { ...environment, MCP_TRANSPORT: "resident-http" },
     stdio: ["ignore", "ignore", "pipe"]
   })
   const backendClosed = once(backend, "close")
   void backendClosed.catch(() => {})
   const lines = createInterface({ input: backend.stderr })
-  const ready = (async () => {
-    for await (const line of lines)
+  const ready = new Promise<ResidentFilePath>((resolve, reject) => {
+    lines.on("line", (line) => {
       if (line.startsWith(ANNOUNCEMENT))
-        return Schema.decodeUnknownSync(ResidentFilePath)(line.slice(ANNOUNCEMENT.length))
-    throw new Error("Owned backend exited before publication")
-  })()
+        resolve(Schema.decodeUnknownSync(ResidentFilePath)(line.slice(ANNOUNCEMENT.length)))
+      const event = Schema.decodeUnknownResult(Schema.fromJsonString(HttpAdmissionObservationSchema))(line)
+      if (
+        Result.isSuccess(event) &&
+        event.success._tag === "ResidentAdmissions_drainStarted" &&
+        event.success.attachments > 0
+      )
+        Effect.runSync(Deferred.succeed(drainEntered, undefined))
+    })
+    backend.once("close", () => reject(new Error("Owned backend exited before publication")))
+  })
   const client = new Client(
     { name: "claude-code", version: "1" },
     { versionNegotiation: { mode: { pin: "2026-07-28" } } }
@@ -85,18 +139,28 @@ const main = async () => {
     if (name === undefined) throw new Error("Owned registry entry is absent")
     const registryFile = join(input.directory, "generations", name)
     const original = await fs.readFile(registryFile, "utf8")
+    const originalEnvelope = Schema.decodeUnknownSync(Schema.fromJsonString(ResidentRegistryEnvelope))(original)
+    assert.equal(originalEnvelope.diagnostics.processId, backend.pid)
     const originalInventory = (await fs.readdir(input.directory)).sort()
     process.stderr.write("Managed loss: connect adapter\n")
     await client.connect(transport, { timeout: RESPONSE_BOUND })
+    assert.deepEqual(await fs.readdir(join(input.directory, "generations")), [name])
     process.stderr.write("Managed loss: discover tools\n")
-    assert.ok(
-      (await client.listTools(undefined, { timeout: RESPONSE_BOUND })).tools.some(
-        (tool) => tool.name === "list_projects"
+    const writing = input.point === "write" || input.point === "drain"
+    const toolName = writing ? "update_project" : "list_projects"
+    const definition = (await client.listTools(undefined, { timeout: RESPONSE_BOUND })).tools.find(
+      (tool) => tool.name === toolName
+    )
+    assert.ok(definition)
+    process.stderr.write("Managed loss: begin request\n")
+    await assert.rejects(
+      client.callTool(
+        { name: toolName, arguments: writing ? { project: "LOSS", name: RequestLossUpdatedName } : {} },
+        { timeout: RESPONSE_BOUND, toolDefinition: definition }
       )
     )
-    process.stderr.write("Managed loss: begin request\n")
-    await assert.rejects(client.callTool({ name: "list_projects", arguments: {} }, { timeout: RESPONSE_BOUND }))
     await Effect.runPromise(Deferred.await(adapterClosed).pipe(Effect.timeout(RESPONSE_BOUND)))
+    process.stderr.write("Managed loss: original adapter closed\n")
     const replacement = spawn(process.execPath, [input.bundle], {
       env: { ...environment, MCP_TRANSPORT: "stdio-resident" }
     })
@@ -122,9 +186,18 @@ const main = async () => {
       })
       replacement.stdin.end(`${discovery}\n`)
       assert.deepEqual(await bounded(replacementClosed), [1, null])
+      process.stderr.write("Managed loss: replacement refused\n")
       assert.equal(Buffer.concat(replacementOutput).length, 0)
       assert.ok(Buffer.concat(replacementDiagnostics).toString("utf8").includes("no Huly request was dispatched"))
-      assert.deepEqual((await fs.readdir(input.directory)).sort(), originalInventory)
+      const afterInventory = (await fs.readdir(input.directory)).sort()
+      const locator = `${originalEnvelope.generation}.json`
+      if (input.point === "drain") {
+        assert.deepEqual(
+          afterInventory.filter((file) => file !== locator),
+          originalInventory.filter((file) => file !== locator)
+        )
+        locatorAfterLoss = afterInventory.includes(locator) ? "retained" : "removed-during-drain"
+      } else assert.deepEqual(afterInventory, originalInventory)
       assert.deepEqual(await fs.readdir(join(input.directory, "generations")), [name])
     } finally {
       if (replacement.exitCode === null && replacement.signalCode === null) {
@@ -135,8 +208,14 @@ const main = async () => {
     assert.equal(rest.observed.invalidRequests, 0)
     const observation = Schema.decodeUnknownSync(ManagedRequestLossObservation)({
       point: input.point,
+      stopAcknowledgment,
+      drainEntry,
+      locatorAfterLoss,
       modelRequests: rest.observed.modelRequests,
       queryDispatches: rest.observed.projectReads,
+      writeDispatches: rest.observed.projectWrites,
+      committedWrites: rest.observed.committedProjectWrites,
+      projectName: rest.projects()[0]?.name,
       backendClosed: true,
       adapterClosed: true,
       unknownOutcome: /operation outcome may be unknown/iu.test(Buffer.concat(diagnostics).toString("utf8")),

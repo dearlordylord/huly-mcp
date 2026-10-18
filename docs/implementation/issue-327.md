@@ -1070,3 +1070,98 @@ This validates the scoped model/query-loss increment, not all #327/#328 criteria
 Live Huly, native macOS, remaining write/drain/model schedules and measurements
 remain pending. No publication, merge, service installation or prototype cleanup
 occurred.
+
+## SDK mutation loss and death during observed drain — 2026-10-18
+
+The disposable REST fixture now parses bounded `TxUpdateDoc` project-name
+transactions, applies them to its own project state and counts received and
+committed writes. The `write` schedule uses the packaged production backend and
+its actual Huly SDK `update_project` path. It commits a name change once, kills
+and joins the owned backend before returning the REST result, requires the
+original adapter's uncertainty diagnostic, and requires fresh-client refusal
+without replay or registry replacement. The existing model/query schedules now
+also require zero writes and unchanged project names.
+
+The `drain` schedule uses a separately bundled entrypoint that calls the real
+`runConfiguredResidentServer` with managed lifetime, production resource
+ownership and the real SDK. It injects no tool/client stub. This is a
+harness-launched production runtime, not automatic-launch evidence. The helper
+is built with the parsed package version used by packaged adapters. The fixture
+checks the original registry PID against its owned ChildProcess and requires
+only one generation after adapter connection.
+
+After committing the SDK rename, drain submits the authenticated production
+stop operation. Acceptance proves admission fencing only. A fresh Spec review
+caught that SIGKILL immediately after acceptance did not prove drain entry.
+The production diagnostics channel now exposes `ResidentAdmissions_drainStarted`
+with attachment/pending-admission counts, emitted inside admissions drain after
+fencing. A scoped helper subscriber forwards only this schema-parsed observation.
+The coordinator keeps its line observer alive and waits for drain entry with a
+retained attachment before killing its owned backend. The receipt independently
+requires stop acceptance and observed drain entry.
+
+This schedule exposed a missing uncertainty warning: renewal failure during drain
+closed the original adapter with no warning about the already committed mutation.
+Renewal and heartbeat-end diagnostics now explicitly warn that an in-flight
+operation outcome may be unknown. Control flow, retry behavior, known completed
+results and resource deadlines are unchanged. The renewal regression test checks
+this warning; the process schedule requires it after the real SDK write.
+
+An actual drain can remove its own root locator before later cleanup finishes.
+The first exact-whole-namespace assertion consequently failed while the protected
+registry remained byte-identical. Drain now permits removal only of the exact
+original generation's root locator, records `locatorAfterLoss`, and requires
+all other entries plus the registry inventory/bytes to remain unchanged. Fresh
+selection still refuses before Huly dispatch. This partial cleanup is not
+retirement evidence. Model/query/write cases keep exact whole-inventory checks.
+Both independent review axes accepted this narrow lifecycle distinction.
+
+Preserved attempts:
+- `/tmp/resident-sdk-write-loss-focused.log`: three initial fault schedules pass;
+  the first TypeScript check caught an unparsed branded project identifier, then
+  the fixture switched to schema parsing and source typechecking passed.
+- `/tmp/resident-sdk-write-drain-loss-focused.log`,
+  `/tmp/resident-sdk-drain-refusal-diagnostic.log` and
+  `/tmp/resident-sdk-drain-capability-diagnostic.log`: explicit foreground backend
+  correctly refused managed stop. The callback returned an HTTP error, and the
+  SDK retried it; these failed preparations do not establish no-replay success.
+- `/tmp/resident-sdk-managed-drain-first.log`: development-version helper did not
+  match the package; the corrected helper uses the actual parsed package version.
+  Matching-version and phase probes passed but did not yet prove drain entry.
+- `/tmp/resident-sdk-drain-entered.log`, terminal/classification/adapter-cause
+  diagnostics: real drain entry exposed missing renewal uncertainty. Temporary
+  classifications logged booleans only and were removed.
+- `/tmp/resident-sdk-write-drain-final-focused.log` and
+  `/tmp/resident-sdk-drain-retention-diagnostic.log`: whole-root-inventory checks
+  failed because only the owned locator had been removed during drain. Failed
+  bundles/namespaces remain retained for inspection.
+
+Final focused evidence: `/tmp/resident-sdk-drain-locator-evidence.log` passes
+three files / 17 tests, including all four process fault points, renewal behavior
+and shared first/continued reads. TypeScript source checking and focused Oxlint
+pass. Fresh Standards and Spec readbacks have no residual actionable findings.
+The coherent full gate is running in `/tmp/resident-sdk-write-drain-check-all.log`;
+its result is pending. This synthetic REST-backed SDK evidence does not certify
+live Huly, general SDK retry semantics, arbitrary late descendants, automatic
+backend launch during drain, native macOS or the full six-ticket delivery.
+
+The coherent full gate completed successfully: **483 files / 5742 tests**.
+Coverage: statements 99.45% (29557/29720), branches 99% (12463/12588), functions
+99% (7996/8076), lines 99.55% (27166/27287). All other build, diagnostic,
+schema, circular, complexity, synchronization, package and lint stages passed;
+the output budget is 200/300 lines. No threshold, timeout or inventory was
+weakened. The accepted candidate includes the original regression requirements,
+the readback-corrected actual drain observation and the explicit locator lifetime.
+
+Gate log SHA-256: `dc47bbd0f9749a5aff6f2802b9040f0ee644b2c78947575924b442079c67d592`.
+Frozen source/artifacts and all four focused fault receipts:
+`/tmp/resident-sdk-write-drain-gate-vlvidi8o/`. MCP SHA-256:
+`908e121f7d9fd4ab49b931b1ee349a448feec5a6db10d616ac3b0267dfe47416`;
+CLI SHA-256: `e15d82af60d32f63fdc573bb306fcfde905ae5c1c194c42f58416d940503ed71`.
+Post-gate checks found no source hash mismatch and confirmed both artifact hashes.
+Final focused receipts include all four points and truthful uncertainty. The
+last focused drain attempt retained its locator; earlier retained failures
+independently demonstrated the allowed partial removal, not successful retirement.
+All six issues remain open; no live/native/measurement/model requirement is
+considered complete by this increment. No merge, publication or prototype cleanup
+was performed.

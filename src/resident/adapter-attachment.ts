@@ -164,7 +164,8 @@ const runAttached = <A, E, R>(
         Effect.mapError(
           () =>
             new BackendResponseError({
-              message: "Resident renewal failed; this adapter stopped without replaying a request"
+              message:
+                "Resident renewal failed; an in-flight operation outcome may be unknown. This adapter stopped without replaying a request."
             })
         )
       )
@@ -177,7 +178,12 @@ const runAttached = <A, E, R>(
         use(adapterExchange(attachment, admitted.token)),
         Fiber.join(heartbeat).pipe(
           Effect.andThen(
-            Effect.fail(new BackendResponseError({ message: "Resident heartbeat ended; no request was replayed" }))
+            Effect.fail(
+              new BackendResponseError({
+                message:
+                  "Resident heartbeat ended; an in-flight operation outcome may be unknown. No request was replayed."
+              })
+            )
           )
         )
       )
