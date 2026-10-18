@@ -4,7 +4,7 @@ import * as NodeStdio from "@effect/platform-node/NodeStdio"
 import { Effect, Schema } from "effect"
 
 import { CliProfileStoreError } from "../profiles/model.js"
-import { withAdapterAttachment } from "./adapter-attachment.js"
+import { type AdapterExchange, withAdapterAttachment } from "./adapter-attachment.js"
 import { readResidentAttachment } from "./attachment-file.js"
 import { ManagedExecutable, ManagedLaunchError } from "./managed-contract.js"
 import { runAdapterBridge } from "./manual-adapter.js"
@@ -13,6 +13,7 @@ import { prepareManagedDirectory, withResidentSelection } from "./managed-select
 import { resolveManagedStartup } from "./startup-selection.js"
 import { makeStartupBudget } from "./startup-budget.js"
 import { BackendResponseError } from "./response-stream.js"
+import { withManagedStartupInput } from "./managed-startup-input.js"
 
 const main = Effect.gen(function* () {
   const environment = { ...process.env }
@@ -28,24 +29,27 @@ const main = Effect.gen(function* () {
     executable: process.execPath,
     packageFile: process.argv[1]
   })
-  yield* withResidentSelection({
-    directory,
-    capture,
-    startup,
-    existing: (_file, exchange) => runAdapterBridge(exchange),
-    absent: (ownership) =>
-      Effect.gen(function* () {
-        const file = yield* launchManagedChild({
-          executable,
-          capture,
-          directory,
-          environment,
-          startup,
-          authorize: ownership.release
+  yield* withManagedStartupInput(process.stdin, (handoff) => {
+    const bridge = (exchange: AdapterExchange) => handoff(runAdapterBridge(exchange))
+    return withResidentSelection({
+      directory,
+      capture,
+      startup,
+      existing: (_file, exchange) => bridge(exchange),
+      absent: (ownership) =>
+        Effect.gen(function* () {
+          const file = yield* launchManagedChild({
+            executable,
+            capture,
+            directory,
+            environment,
+            startup,
+            authorize: ownership.release
+          })
+          const attachment = yield* startup.within(readResidentAttachment(file))
+          yield* withAdapterAttachment(attachment, bridge, capture.selection, startup)
         })
-        const attachment = yield* startup.within(readResidentAttachment(file))
-        yield* withAdapterAttachment(attachment, runAdapterBridge, capture.selection, startup)
-      })
+    })
   })
 }).pipe(
   Effect.provide(NodeStdio.layer),
