@@ -338,3 +338,48 @@ live-Huly certification.
 The managed child previously imported the complete server runtime before sending its prepared frame. Runtime loading now occurs inside the absent-selection `runOwnedGeneration` callback, after Start authorization and ownership selection. A redundant child that finds an existing compatible generation keeps the existing notify path and does not initialize the server runtime. Captured configuration, authorization, publication, cleanup brackets and deadlines are unchanged. This defers module initialization; it does not prove a specific startup limiter or a speedup.
 
 The first ten-parent process run after this change passed with the original callers and deadlines, including creator loss, survivor context read, matching kernel-owned backend exit code 0 and private-state removal. Log `/tmp/resident-child-owner-load-ten-parent.log`, SHA-256 `d46e15f8787330866de78f0de0823b65d35c0578900881865c754af17433dcd6`; receipt `/tmp/resident-managed-parents-PkH7Ya.receipt.json`, SHA-256 `70d27e848e2d2a4f51fe36eb4ef81f17a234e628b30521f3a47e7aa8b7787548`. One successful attempt does not resolve the preserved inconsistent launch results. TypeScript/Effect diagnostics pass for 1353 files with zero diagnostics. Fresh scoped Standards and Spec reviews found no actionable findings. A coherent full gate and complete qualification remain required.
+
+## Windows child environment and storage design
+
+The [Windows implementation design](resident-windows-design.md) selects an
+in-process native protected-storage module while retaining the existing Node
+ChildProcess and authenticated bootstrap. It preserves full private creation,
+identity, inventory and cleanup requirements. Native storage, binaries and native
+execution remain unimplemented/unqualified, rather than replaced with a platform
+refusal or POSIX permission claim.
+
+One concrete launcher correction is implemented: child environment construction
+now parses inherited values through a schema into Redacted values and strips all
+Windows case variants of inherited profile, authentication, transport and nonce
+keys. POSIX keys remain case-sensitive. Only the spawn adapter unwraps values;
+canonical child transport and fresh nonce are supplied once. Undefined values are
+omitted; unrelated and empty values remain. `windowsHide` is set on the existing
+owned detached child. Invalid environment payloads fail through a typed generic
+launch error before spawn, without reporting the payload.
+
+Four boundary tests pass, and the unchanged actual ten-parent packaged process
+fixture also passes in the final two-file run: five tests total at
+`/tmp/resident-windows-environment-final-process-tests.log`. This provides Linux
+process regression evidence and platform-parameterized environment semantics;
+it does not prove native Windows launch, job independence or ACLs.
+TypeScript/Effect diagnostics pass for 1361 files with zero diagnostics, focused
+lint passes, and fresh Standards/Spec reviews report no actionable findings.
+An earlier typecheck caught readonly dictionary mutation and a test's inferred
+property access; immutable dictionary construction and an entry-based assertion
+fixed both. The failed log is retained at
+`/tmp/resident-windows-environment-typecheck.log`.
+The full gate for this candidate remains pending.
+
+The complete candidate passes `GOMAXPROCS=2 pnpm check-all`: 479 files /
+5732 tests, statements 99.45% (29550/29713), branches 99% (12463/12588),
+functions 99% (7996/8076), and lines 99.55% (27159/27280). All preceding
+build, diagnostics, circular, complexity, package/schema and lint stages pass.
+No threshold, inventory or deadline changed. No performance claim is made.
+Log `/tmp/resident-windows-environment-check-all.log`, SHA-256
+`1029379259bd6aeb60acdf3ed62ad82013dda25572208a58c2ba6a55e7a1a112`.
+MCP artifact `7cc7b8c300354694118b08e2b39248e5ea08e1de1df7bae2ce56ecf7a43c8a12`;
+CLI artifact `c957044a36f2559fbdf5230a0f37860911af276f800b1a37933539d7298f5697`.
+Private copies are at `/tmp/resident-windows-env-gate-qjec35y6`. Sources remained
+fixed during this gate; later report text records its result. Windows native
+storage and qualification, other native platforms and the deferred complete
+live-Huly campaign remain pending. No issue is closed by this result.

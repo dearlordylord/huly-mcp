@@ -2,7 +2,6 @@ import { spawn, type ChildProcess } from "node:child_process"
 import { randomBytes } from "node:crypto"
 import { Effect, Redacted, Schema } from "effect"
 
-import { ProfileEnvironmentSchema } from "../profiles/model.js"
 import { VERSION } from "../version.js"
 import { encodeChildStart, parseChildReply } from "./bootstrap-codec.js"
 import {
@@ -14,6 +13,7 @@ import {
   type ResidentStartupCapture
 } from "./managed-contract.js"
 import type { ResidentDirectory } from "./protected-path.js"
+import { parseManagedChildEnvironment } from "./managed-child-environment.js"
 import type { SelectionClaimError } from "./selection-claim.js"
 import type { StartupBudget } from "./startup-budget.js"
 
@@ -76,18 +76,15 @@ export const launchManagedChild = Effect.fn("launchManagedChild")(function* (opt
     directory: options.directory,
     capture: options.capture
   })
-  const environment = { ...options.environment }
-  for (const key of Object.keys(ProfileEnvironmentSchema.fields)) delete environment[key]
-  delete environment["MCP_AUTH_TOKEN"]
-  environment["MCP_TRANSPORT"] = "resident-child"
-  environment["MCP_RESIDENT_BOOTSTRAP_NONCE"] = Redacted.value(nonce)
+  const environment = yield* parseManagedChildEnvironment(options.environment, process.platform, nonce)
   return yield* Effect.acquireUseRelease(
     Effect.try({
       try: () => ({
         child: spawn(options.executable.executable, [options.executable.packageFile], {
           detached: true,
+          windowsHide: true,
           stdio: ["ignore", "ignore", "ignore", "ipc"],
-          env: environment
+          env: Object.fromEntries(Object.entries(environment).map(([key, value]) => [key, Redacted.value(value)]))
         }),
         startAttempted: false
       }),
