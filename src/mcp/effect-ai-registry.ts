@@ -27,6 +27,7 @@ import {
   normalizeRegistries,
   type ProtocolExposureOptions,
   type ProtocolToolRegistries,
+  resolveNativeRegistrationRegistry,
   resolveProtocolExposure,
   toListedHulyTool
 } from "./protocol-tool-exposure.js"
@@ -262,8 +263,18 @@ const registerAll = (
 ): Effect.Effect<void, never, McpServer> =>
   Effect.gen(function* () {
     const server = yield* McpServer
-    yield* server.setUnknownToolHandler((call) =>
-      Effect.acquireUseRelease(
+    yield* server.setUnknownToolHandler((call) => {
+      const definition = registries.fullRegistry.tools.get(call.name)
+      if (definition !== undefined)
+        return makeToolHandler(
+          options,
+          registries,
+          exposureOptions,
+          definition,
+          admission,
+          fetchLatestVersion
+        )(call.arguments)
+      return Effect.acquireUseRelease(
         Effect.sync(() => admission.enter()),
         (lease) =>
           Effect.succeed(
@@ -271,7 +282,7 @@ const registerAll = (
           ),
         (lease) => Effect.sync(() => lease?.release())
       )
-    )
+    })
     for (const [index, definition] of builtinToolDefinitions.entries()) {
       yield* registerTool(
         server,
@@ -297,7 +308,7 @@ const registerAll = (
         effectMcpRegisteredToolCallable
       )
     }
-    for (const definition of registries.fullRegistry.definitions) {
+    for (const definition of resolveNativeRegistrationRegistry(registries, exposureOptions).definitions) {
       yield* registerTool(
         server,
         options,

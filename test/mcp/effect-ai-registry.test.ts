@@ -23,8 +23,8 @@ import { dispatchEffectMcpTool, fetchLatestNpmVersion } from "../../src/mcp/effe
 import { getHulyContextToolDefinition, versionToolDefinition } from "../../src/mcp/huly-context-tool.js"
 import { defaultExposureOptions, resolveProtocolExposure } from "../../src/mcp/protocol-tool-exposure.js"
 import { PROXY_TOOL_NAMES } from "../../src/mcp/proxy-tools.js"
-import { toolRegistry } from "../../src/mcp/tools/index.js"
-import { makeToolCategory } from "../../src/mcp/tools/registry.js"
+import { createScopedRegistry, toolRegistry } from "../../src/mcp/tools/index.js"
+import { makeToolCategory, makeToolName, type ToolCategory } from "../../src/mcp/tools/registry.js"
 import type { TelemetryOperations } from "../../src/telemetry/telemetry.js"
 
 const telemetry: TelemetryOperations = {
@@ -67,6 +67,66 @@ const clientService = (name: string) =>
   })
 
 describe("Effect AI MCP registry", () => {
+  it.effect.each(
+    (["native", "proxy", "auto"] as const).flatMap((configuredMode) =>
+      [false, true].map((proxyOutputStrict) => ({ configuredMode, proxyOutputStrict }))
+    )
+  )("preserves scoped call permission and telemetry for %j", ({ configuredMode, proxyOutputStrict }) =>
+    Effect.gen(function* () {
+      const calls: Array<Parameters<TelemetryOperations["toolCalled"]>[0]> = []
+      const resolutions = { count: 0 }
+      const scopedNativeRegistry = createScopedRegistry({
+        filteringActive: true,
+        categories: new Set<ToolCategory>(),
+        toolNames: new Set([makeToolName("list_projects")])
+      })
+      const adapter = makeEffectMcpRegistry({
+        resolveClients: async () => {
+          resolutions.count++
+          return failedResolver()
+        },
+        discoverConcreteResources: false,
+        telemetry: { ...telemetry, toolCalled: (call) => calls.push(call) },
+        registry: { fullRegistry: toolRegistry, scopedNativeRegistry },
+        exposureOptions: { exposureConfig: { configuredMode, proxyOutputStrict }, toolScopeFilteringActive: true },
+        getHulyContext: () => Effect.die("not used")
+      })
+      yield* adapter.registration
+      const server = yield* McpServer
+      for (const host of ["claude-code", "claude-ai"]) {
+        const response = yield* server
+          .callTool({ name: "list_issues", arguments: {} })
+          .pipe(Effect.provideService(McpSchema.McpServerClient, clientService(host)))
+        expect(response.isError).toBe(true)
+        const proxy = configuredMode === "proxy" || (configuredMode === "auto" && host === "claude-ai")
+        expect(response.content).toEqual([
+          {
+            type: "text",
+            text:
+              proxy && !proxyOutputStrict
+                ? expect.stringContaining("Connection error while communicating with Huly.")
+                : "Unknown tool: list_issues"
+          }
+        ])
+      }
+      expect(resolutions.count).toBe(
+        configuredMode === "native" || proxyOutputStrict ? 0 : configuredMode === "proxy" ? 2 : 1
+      )
+      expect(calls.map(({ status, toolName }) => ({ toolName, status }))).toEqual([
+        { toolName: "list_issues", status: "error" },
+        { toolName: "list_issues", status: "error" }
+      ])
+      yield* Effect.promise(adapter.quiesce)
+      const stopped = yield* server
+        .callTool({ name: "list_issues", arguments: {} })
+        .pipe(Effect.provideService(McpSchema.McpServerClient, clientService("claude-code")))
+      expect(stopped.content).toEqual([
+        { type: "text", text: "Huly MCP is shutting down; start a new connection before retrying" }
+      ])
+      expect(calls).toHaveLength(2)
+    }).pipe(Effect.provide(McpServer.layer))
+  )
+
   it("normalizes successful, malformed, and unavailable npm version responses", async () => {
     await expect(fetchLatestNpmVersion(async () => new Response(JSON.stringify({ version: "9.9.9" })))).resolves.toBe(
       "9.9.9"

@@ -124,6 +124,14 @@ const resolveProxyCandidateRegistry = (
   return options.toolScopeFilteringActive ? registries.scopedNativeRegistry : registries.fullRegistry
 }
 
+export const resolveNativeRegistrationRegistry = (
+  registries: ProtocolToolRegistries,
+  options: ProtocolExposureOptions
+): ToolRegistry =>
+  options.exposureConfig.configuredMode === "native"
+    ? registries.scopedNativeRegistry
+    : resolveProxyCandidateRegistry(registries, options)
+
 export const resolveProtocolExposure = (
   registries: ProtocolToolRegistries,
   options: ProtocolExposureOptions
