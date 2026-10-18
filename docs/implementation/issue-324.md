@@ -456,3 +456,9 @@ The [focused ten-reader increment](resident-ten-readers-2026-10-18.md) adds ten 
 ### Configured HTTPS late attachment — 2026-10-18
 
 [Report](resident-late-http-idle-2026-10-18.md): actual configured managed HTTPS server selected at virtual4900ms accepts exact successful ping replies before and after a retained5000ms attachment. Confirmed release starts a full new idle interval; retirement joins, state is empty, and later selection acquires absent ownership. Original no-client retirement test retained. Two focused files/seven tests pass; no production change/full gate. Single-process controlled-clock proof does not certify OS-process races or replacement startup; all six issues remain incomplete.
+
+The same report now records actual replacement startup after joined retirement:
+distinct generation publication, fresh selection of its exact path, successful
+HTTPS ping, and joined replacement idle cleanup. Two files/seven tests pass in
+`/tmp/resident-idle-replacement-final.log`. This closes the replacement-startup
+limitation of this scoped test; OS-process races and full qualification remain.

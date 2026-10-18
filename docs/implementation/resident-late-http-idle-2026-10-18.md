@@ -23,3 +23,19 @@ server with controlled Effect time in one process. It does not prove separate
 OS-process races, replacement backend startup, or physical timeout duration.
 No production code, legacy behavior, journal, or timeout changed. No full gate
 or live Huly campaign was run. Issues323–328 remain incomplete.
+
+## Replacement startup extension
+
+After the original owner joins and its state is empty, the test now runs an
+actual replacement through `runOwnedGeneration` and
+`runConfiguredResidentServer`. Its published generation path must differ from
+the original. A fresh caller must select precisely that path and receive the
+exact successful ping reply through HTTPS. After its release, the replacement
+also completes managed idle retirement and leaves the directory empty.
+
+This supersedes the earlier absent-ownership-only observation: replacement
+startup and fresh attachment are now exercised. It still does not establish an
+OS-process race or physical timeout duration. The publication signals preserve
+the parsed `ResidentFilePath` type. Evidence:
+`/tmp/resident-idle-replacement-final.log`, two files/seven tests pass; scoped
+Spec review accepted, Standards path-type finding corrected. No full gate.

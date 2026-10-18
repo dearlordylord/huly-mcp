@@ -12,7 +12,7 @@ import { decodeBackendMessages } from "../../src/resident/response-stream.js"
 import { AdmissionPolicy, AttachmentToken, DEFAULT_LEASE_POLICY } from "../../src/resident/admission-contract.js"
 import { makeResidentAdmissions } from "../../src/resident/admissions.js"
 import { runOwnedGeneration, withResidentSelection } from "../../src/resident/managed-selection.js"
-import { ResidentDirectory } from "../../src/resident/protected-path.js"
+import { ResidentDirectory, type ResidentFilePath } from "../../src/resident/protected-path.js"
 import { captureResidentSelection } from "../../src/resident/selection-config.js"
 import { makeStartupBudget } from "../../src/resident/startup-budget.js"
 import { runConfiguredResidentServer } from "../../src/runtime/server-startup.js"
@@ -55,7 +55,7 @@ it.effect("keeps a late HTTP attachment alive and retires its configured owner o
         }
         const capture = yield* captureResidentSelection(environment)
         const startup = yield* makeStartupBudget
-        const published = yield* Deferred.make<void>()
+        const published = yield* Deferred.make<ResidentFilePath>()
         const done = yield* Deferred.make<void>()
         const running = yield* withResidentSelection({
           directory,
@@ -70,14 +70,14 @@ it.effect("keeps a late HTTP attachment alive and retires its configured owner o
                 environment,
                 lifetime: "managed",
                 startup,
-                report: (file) => ready(file).pipe(Effect.andThen(Deferred.succeed(published, undefined)))
+                report: (file) => ready(file).pipe(Effect.andThen(Deferred.succeed(published, file)))
               })
             )
         }).pipe(
           Effect.tap(() => Deferred.succeed(done, undefined)),
           Effect.forkScoped
         )
-        yield* Deferred.await(published)
+        const originalFile = yield* Deferred.await(published)
         yield* TestClock.adjust("4900 millis")
         expect(yield* Deferred.isDone(done)).toBe(false)
         const connected = yield* Deferred.make<void>()
@@ -108,14 +108,40 @@ it.effect("keeps a late HTTP attachment alive and retires its configured owner o
         yield* TestClock.adjust("100 millis")
         yield* Fiber.join(running)
         expect(yield* Effect.promise(() => fs.readdir(directory))).toEqual([])
-        const selectedFresh = yield* withResidentSelection({
+        const replacementPublished = yield* Deferred.make<ResidentFilePath>()
+        const replacementStartup = yield* makeStartupBudget
+        const replacement = yield* withResidentSelection({
+          directory,
+          capture,
+          startup: replacementStartup,
+          existing: () => Effect.die("A retired descriptor must not be reused"),
+          absent: (ownership) =>
+            runOwnedGeneration(ownership, (ready) =>
+              runConfiguredResidentServer({
+                capture,
+                directory,
+                environment,
+                lifetime: "managed",
+                startup: replacementStartup,
+                report: (file) => ready(file).pipe(Effect.andThen(Deferred.succeed(replacementPublished, file)))
+              })
+            )
+        }).pipe(Effect.forkScoped)
+        const replacementFile = yield* Deferred.await(replacementPublished)
+        expect(replacementFile).not.toBe(originalFile)
+        yield* withResidentSelection({
           directory,
           capture,
           startup: yield* makeStartupBudget,
-          existing: () => Effect.die("A retired descriptor must not be reused"),
-          absent: () => Effect.succeed(true)
+          existing: (file, exchange) => {
+            expect(file).toBe(replacementFile)
+            return exchange(ping, Option.none(), successfulPing)
+          },
+          absent: () => Effect.die("The replacement must accept a fresh caller")
         })
-        expect(selectedFresh).toBe(true)
+        yield* TestClock.adjust("5 seconds")
+        yield* Fiber.join(replacement)
+        expect(yield* Effect.promise(() => fs.readdir(directory))).toEqual([])
       }).pipe(Effect.scoped),
     (directory) => Effect.promise(() => fs.rm(directory, { recursive: true, force: true }))
   )
