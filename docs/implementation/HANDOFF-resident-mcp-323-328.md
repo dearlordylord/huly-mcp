@@ -601,3 +601,8 @@ Test-only after ee9be005: [report](resident-policy-modes-2026-10-18.md). Native/
 ### Negotiated proxy protocol matrix — 2026-10-18
 
 [Report](resident-proxy-protocols-2026-10-18.md): existing native/strict/non-strict policy and successful proxy/resource fixture now runs modern2026-07-28 and initialize2025-06-18; actual negotiated version checked for each connection. Shared protocol schema, no production compatibility code. Focused six cases pass59.81s /tmp/resident-policy-protocol-matrix.log; local lint/format and both reviews accepted. Initial unsupported SDK pin and transient duplicate import failures retained. No full gate. All six issues remain incomplete; actual hosts/shared independent proxy parents/macOS/lifecycle/final qualification remain open.
+
+
+### Idle/admission ordering — 2026-10-18
+
+[Report](resident-idle-admission-race-2026-10-18.md): real admissions shell/TestClock pending acquisition1ms predeadline protects across idle interval; resulting owner accepts work and holds lifetime, confirmed release grants full new interval; fence-first refuses without token acquisition. Three focused files8testsPASS, local lint/format and both scoped reviews accepted. Test-only, no full gate. Immediate work return does not prove held-work cleanup or packaged OS/HTTP concurrency; wider lifecycle/final qualification and all six issues remain incomplete.

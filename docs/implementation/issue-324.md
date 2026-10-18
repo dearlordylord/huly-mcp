@@ -437,3 +437,8 @@ The [selection transition increment](resident-selection-transitions-2026-10-18.m
 ## Ten independent SDK readers — 2026-10-18
 
 The [focused ten-reader increment](resident-ten-readers-2026-10-18.md) adds ten actual packaged adapters under independent parents, held single-flight full-model acquisition, distinct/colliding-ID project reads and continued reads through every adapter. Both protocols pass with explicit adapter/parent exits and kernel-owned backend retirement. Production bytes are unchanged; focused checks replace routine full gates per user instruction. The initial legacy-readiness failure remains unexplained and retained. This does not certify ten actual hosts/live-Huly readers or complete #324.
+
+
+### Idle/admission ordering — 2026-10-18
+
+[Report](resident-idle-admission-race-2026-10-18.md): real admissions shell/TestClock pending acquisition1ms predeadline protects across idle interval; resulting owner accepts work and holds lifetime, confirmed release grants full new interval; fence-first refuses without token acquisition. Three focused files8testsPASS, local lint/format and both scoped reviews accepted. Test-only, no full gate. Immediate work return does not prove held-work cleanup or packaged OS/HTTP concurrency; wider lifecycle/final qualification and all six issues remain incomplete.
