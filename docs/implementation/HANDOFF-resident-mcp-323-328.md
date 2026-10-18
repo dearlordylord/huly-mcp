@@ -17,7 +17,7 @@ Windows resident work is canceled under the scope amendment above. The unused
 native source and its dedicated CI workflow are removed; runtime startup remains
 unsupported there. Linux/macOS and all other qualification requirements remain.
 
-The latest full gate passes 483 files / 5739 tests at the unchanged 99% coverage
+The latest full gate passes 483 files / 5740 tests at the unchanged 99% coverage
 thresholds. Two new [cleanup/idle component schedules](issue-326.md#retained-cleanup-versus-idle-retirement--2026-10-18)
 verify slow/failed cleanup retention across lease expiry; negative mutations are
 rejected and production source is unchanged. Two synthetic SDK clients now pass the actual freshly listed context
@@ -47,6 +47,18 @@ automatic launch under that fault, unexpected crash, native Huly SDK mutation or
 live Huly. Native macOS, live, model/oracle and performance qualification remain.
 
 ## Latest resumed increment
+
+The packaged request-loss fixture now kills its owned backend at either actual
+SDK model loading or project querying. Receipts require one model request and
+zero/one project queries respectively, the original adapter's uncertainty
+diagnostic, and a fresh adapter's bounded refusal with no stdout or changed
+ownership records. Both fault points and the shared read probe pass together.
+The first full gate hit the unchanged diagnostics deadline: a stack dump located
+recursive SDK Ref traversal inside the typed-schema-decoder rule. Parsing wire
+strings instead preserves SDK-value checks and all diagnostics; the corrected
+full gate passes. See [the scoped report](issue-327.md#backend-loss-during-actual-sdk-model-acquisition--2026-10-18).
+Write/drain crashes, complete lifecycle/model alignment and native/live
+qualification remain unfinished.
 
 The managed read-pair campaign probe now launches two actual packaged adapters
 under separate reader parents, verifies one backend generation through context

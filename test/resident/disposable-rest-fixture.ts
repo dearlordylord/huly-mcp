@@ -42,24 +42,25 @@ const ProjectQuery = Schema.Struct({ identifier: Schema.optionalKey(ProjectIdent
 // The SDK builds both its hierarchy and model database from these wire transactions.
 const ModelClassTransaction = Schema.Struct({
   _id: Schema.NonEmptyString,
-  _class: Schema.Literal(core.class.TxCreateDoc),
-  space: Schema.Literal(core.space.Tx),
+  _class: Schema.Literal("core:class:TxCreateDoc"),
+  space: Schema.Literal("core:space:Tx"),
   objectId: Schema.NonEmptyString,
-  objectClass: Schema.Literal(core.class.Class),
-  objectSpace: Schema.Literal(core.space.Model),
+  objectClass: Schema.Literal("core:class:Class"),
+  objectSpace: Schema.Literal("core:space:Model"),
   modifiedOn: Schema.Number,
   modifiedBy: Schema.NonEmptyString,
   attributes: Schema.Struct({ kind: Schema.Literal(ClassifierKind.CLASS), domain: Schema.NonEmptyString })
 })
 const ProjectModel = Schema.Array(ModelClassTransaction)
+// Decode wire strings rather than recursively branded SDK model-reference types.
 const projectModel = Schema.decodeUnknownSync(ProjectModel)(
-  [core.class.Class, "tracker:class:Project"].map((objectId) => ({
+  [String(core.class.Class), "tracker:class:Project"].map((objectId) => ({
     _id: `fixture-model-${objectId}`,
-    _class: core.class.TxCreateDoc,
-    space: core.space.Tx,
+    _class: String(core.class.TxCreateDoc),
+    space: String(core.space.Tx),
     objectId,
-    objectClass: core.class.Class,
-    objectSpace: core.space.Model,
+    objectClass: String(core.class.Class),
+    objectSpace: String(core.space.Model),
     modifiedOn: 1,
     modifiedBy: "fixture-owner",
     attributes: { kind: ClassifierKind.CLASS, domain: "model" }
@@ -83,6 +84,7 @@ const HTTP_BAD_REQUEST = 400
 
 export const startDisposableRestFixture = async (
   options: {
+    readonly onModelLoad?: () => Promise<void>
     readonly onProjectRead?: () => Promise<void>
     readonly projects?: ReadonlyArray<Schema.Schema.Type<typeof DisposableRestProject>>
   } = {}
@@ -135,6 +137,7 @@ export const startDisposableRestFixture = async (
       } else if (url.pathname === `/api/v1/load-model/${WORKSPACE}`) {
         observed.modelRequests++
         observed.fullModelRequested &&= url.searchParams.get("full") === "true"
+        await options.onModelLoad?.()
         response.end(Schema.encodeSync(Schema.fromJsonString(ProjectModel))(options.projects ? projectModel : []))
       } else if (
         url.pathname === `/api/v1/find-all/${WORKSPACE}` &&

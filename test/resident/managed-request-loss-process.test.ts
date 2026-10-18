@@ -8,15 +8,15 @@ import { expect, it } from "vitest"
 
 import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
-import { ManagedRequestLossObservation } from "./managed-request-loss-observation.js"
+import { ManagedRequestLossObservation, ManagedRequestLossPoint } from "./managed-request-loss-observation.js"
 
 const PROCESS_BOUND = 30_000
 const runFile = promisify(execFile)
 
-it.skipIf(process.platform !== "linux")(
-  "keeps managed request outcome uncertainty after backend loss without replay or registry retirement",
+it.skipIf(process.platform !== "linux").each(ManagedRequestLossPoint.literals)(
+  "keeps managed request outcome uncertainty after backend loss at %s without replay or registry retirement",
   { timeout: PROCESS_BOUND },
-  async () => {
+  async (point) => {
     const bundle = await buildIsolatedStdioServer(PROCESS_BOUND)
     const root = await fs.mkdtemp(join(await fs.realpath(tmpdir()), "resident-managed-request-loss-"))
     const fixture = join(dirname(bundle.path), "managed-request-loss.cjs")
@@ -37,7 +37,7 @@ it.skipIf(process.platform !== "linux")(
       )
       const { stderr, stdout } = await runFile(
         "python3",
-        ["test/resident/fixtures/reap-descendants.py", process.execPath, fixture, bundle.path, root],
+        ["test/resident/fixtures/reap-descendants.py", process.execPath, fixture, bundle.path, root, point],
         { timeout: PROCESS_BOUND, env: testStdioEnvironment() }
       )
       const receipt = Schema.decodeUnknownSync(Schema.fromJsonString(ManagedRequestLossObservation))(stdout)
@@ -47,7 +47,11 @@ it.skipIf(process.platform !== "linux")(
         { mode: 0o600, flag: "wx" }
       )
       await fs.writeFile(`${root}.phases.log`, stderr, { mode: 0o600, flag: "wx" })
-      expect(receipt.queryDispatches).toBe(1)
+      expect(receipt.point).toBe(point)
+      expect(receipt.modelRequests).toBe(1)
+      expect(receipt.queryDispatches).toBe(point === "model" ? 0 : 1)
+      expect(receipt.replacementExitCode).toBe(1)
+      expect(receipt.replacementStdoutBytes).toBe(0)
       expect(receipt.registryRetained).toBe(true)
       expect(receipt.unknownOutcome).toBe(true)
       passed = true

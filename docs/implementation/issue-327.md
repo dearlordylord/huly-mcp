@@ -985,3 +985,88 @@ MCP SHA-256 `7cc7b8c300354694118b08e2b39248e5ea08e1de1df7bae2ce56ecf7a43c8a12` a
 `c957044a36f2559fbdf5230a0f37860911af276f800b1a37933539d7298f5697` match the preceding runtime candidate.
 Only executable fixture/test/report code changed. This is not complete native,
 live-Huly, model/oracle or six-ticket delivery certification.
+
+## Backend loss during actual SDK model acquisition — 2026-10-18
+
+The existing packaged request-loss fixture now has two explicit fault points:
+`model` pauses at the disposable REST model-load boundary before returning its
+payload, while `query` retains the existing project-query fault. Each callback
+checks all current backend threads for children, kills only the original owned
+ChildProcess handle and joins its SIGKILL exit. This is a pre-kill descendant
+snapshot, not a general late-descendant proof.
+
+The original adapter closes with its existing uncertain-outcome diagnostic.
+The schema-owned receipt distinguishes one model acquisition and zero project
+queries for `model` from one model acquisition and one query for `query`.
+A new managed adapter is then sent discovery: it must exit 1, emit no stdout,
+report no Huly request dispatch, leave both namespace inventories unchanged and
+preserve the original registry bytes. Remote fixture counters are checked after
+this refusal, so replacement cannot silently reacquire the model or replay the
+query. No operation journal, retry or ownership reset is introduced.
+
+Focused checks: `/tmp/resident-model-loss-focused.log` passes both fault points;
+`/tmp/resident-model-loss-with-reads.log` passes two files/five tests including the
+managed first/continued-read probe. TypeScript source checking and focused
+Oxlint pass. Fresh independent Standards and Spec reviews have no actionable
+findings. Full gate is running in `/tmp/resident-model-loss-check-all.log`;
+no fresh complete-gate claim is made yet.
+
+Latest focused receipts:
+`/tmp/resident-managed-request-loss-2saVeO.receipt.json` (model) and
+`/tmp/resident-managed-request-loss-YexskM.receipt.json` (query), with sibling
+`.phases.log` files. This is synthetic local REST/real SDK and packaged process
+evidence. It does not qualify live Huly, write/drain crash schedules, native
+macOS, all late acquisitions, or complete recovery. All six issues remain open.
+
+The first full-gate attempt for this increment failed: TypeScript/Effect
+stage exceeded its unchanged 120-second deadline. Log:
+`/tmp/resident-model-loss-check-all.log`. The bounded process group terminated;
+no compiler remained afterward. No diagnostic error result or full-gate pass is
+inferred from this timeout. A separate progress-enabled diagnostic investigation
+is running; the gate deadline and all diagnostic checks remain unchanged.
+Frozen source hashes, packaged artifacts and focused receipts are retained in
+`/tmp/resident-model-loss-gate-c3h4bo16/`. The production MCP and CLI hashes remain
+identical to the preceding accepted milestone because this increment changes
+only fault fixtures and observations.
+
+The progress-enabled diagnostic stopped advancing at file 1236,
+`test/resident/disposable-rest-fixture.ts`, while the owned compiler reached
+about 17 GB RSS. A verified pidfd-targeted SIGQUIT captured its stack in
+`/tmp/resident-model-loss-diagnostics-progress.log`: repeated
+`prefer_typed_schema_decoder.containsUnresolvedTypeVariable` calls traversed
+checker properties/intersections. This diagnostic experiment was intentionally
+terminated and supplies no success result.
+
+Replacing SDK-branded reference schema literals with exact wire literals alone
+still stalled on that file (`/tmp/resident-model-loss-wire-literal-diagnostics.log`);
+that owned experiment was terminated after identity verification. The remaining
+SDK reference inputs to `decodeUnknownSync` are now projected with `String(...)`
+at serialization, so the decoder receives wire primitives rather than recursive
+SDK model-reference types. Exact SDK values are still checked by the wire schema;
+there are no casts, suppressions, disabled diagnostics or changed deadlines.
+With both changes, `/tmp/resident-model-loss-wire-input-diagnostics.log` completes
+all 1372 files with zero errors/warnings/messages. This is diagnostic evidence,
+not a claimed general compiler speedup. The first literal-only candidate's five
+focused process tests also passed; final source checking and lint pass.
+
+The corrected full candidate is running in
+`/tmp/resident-model-loss-corrected-check-all.log`. The original failed gate and
+all diagnostic attempts remain preserved; no complete-gate result is assumed.
+
+The corrected full gate passes **483 files / 5740 tests**. Coverage remains
+99.45% statements (29556/29719), 99% branches (12463/12588), 99% functions
+(7996/8076), and 99.55% lines (27165/27286). Every diagnostic, threshold and
+existing deadline remains; all other quality stages passed. The gate emitted
+200/300 allowed successful output lines. Fresh Standards/Spec readbacks accepted
+the wire-string projection without residual findings.
+
+Log SHA-256: `17acc643011b85a5d118907ea2cc7ab3199371bba2ebd7f40eb3e5002b8ceb7e`.
+The corrected frozen source/artifact receipt is
+`/tmp/resident-model-loss-corrected-gate-fjq083mq/receipt.json`. Post-gate checks
+confirmed all four source files and both packaged artifacts still match it.
+MCP SHA-256 remains `7e2fff84adb7b4544173e316f98bcea30cef289bdee878e4a4b4f1aa1816a780`;
+CLI remains `c957044a36f2559fbdf5230a0f37860911af276f800b1a37933539d7298f5697`.
+This validates the scoped model/query-loss increment, not all #327/#328 criteria.
+Live Huly, native macOS, remaining write/drain/model schedules and measurements
+remain pending. No publication, merge, service installation or prototype cleanup
+occurred.
