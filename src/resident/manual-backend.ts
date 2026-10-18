@@ -14,6 +14,7 @@ import { makeCompatibilityAuthority } from "./compatibility-authority.js"
 import type { StartupBudget } from "./startup-budget.js"
 import type { ResidentSelection } from "./compatibility-contract.js"
 import { withResidentHeaderRedaction } from "./private-http.js"
+import { ResidentLiveStatus } from "./status-contract.js"
 
 const SECRET_BYTES = 32
 const STARTUP_ALLOWANCE = "5 seconds"
@@ -57,6 +58,7 @@ export const makeManualResidentBackend = Effect.fn("makeManualResidentBackend")(
       : yield* makeCompatibilityAuthority(selection, identity.generation, authorization)
   const claimed = yield* Ref.make(false)
   const bound = yield* Deferred.make<ResidentEndpoint>()
+  const ready = yield* Deferred.make<void>()
   const nativeFactory = makeResidentHttpServerFactory(identity)
   const factory: HttpServerFactory = {
     ...nativeFactory,
@@ -94,6 +96,7 @@ export const makeManualResidentBackend = Effect.fn("makeManualResidentBackend")(
             const readiness = Effect.gen(function* () {
               const endpoint = yield* Deferred.await(bound)
               yield* server.awaitReady()
+              yield* Deferred.succeed(ready, undefined)
               return endpoint
             }).pipe(
               Effect.timeoutOrElse({
@@ -146,7 +149,16 @@ export const makeManualResidentBackend = Effect.fn("makeManualResidentBackend")(
         authority,
         configuration.mode === "configured" && configuration.lifetime === "managed"
           ? { kind: "managed", generation: identity.generation, fence: admissions.fence }
-          : { kind: "unsupported" }
+          : { kind: "unsupported" },
+        Effect.gen(function* () {
+          return ResidentLiveStatus.make({
+            statusWire: 1,
+            generation: identity.generation,
+            readiness: (yield* Deferred.isDone(ready)) ? "ready" : "starting",
+            work: yield* admissions.status,
+            retirement: "unconfirmed"
+          })
+        })
       ),
       beforeHttpShutdown: admissions.fence,
       ...(selection === undefined ? {} : { processPolicy: selection.policy })

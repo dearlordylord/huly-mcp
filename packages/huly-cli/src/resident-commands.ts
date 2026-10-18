@@ -4,15 +4,22 @@ import { Command, Flag } from "effect/cli"
 import { readManagedDirectoryForOwner } from "../../../src/resident/managed-directory-config.js"
 import { ManagedLaunchError } from "../../../src/resident/managed-contract.js"
 import { currentPosixOwner, ProtectedFileError, ResidentDirectory } from "../../../src/resident/protected-path.js"
-import { inspectResidentState, ResidentStateStatus } from "../../../src/resident/state-status.js"
+import { observeResidentState, ResidentStateStatus } from "../../../src/resident/state-status.js"
 import { requestResidentStop, ResidentStopReport, ResidentStopTarget } from "../../../src/resident/operator-stop.js"
 import { CliRuntimeError } from "./render.js"
+import type { ResidentStatusObservation } from "../../../src/resident/status-contract.js"
+
+const renderObservation = (observation: ResidentStatusObservation | undefined) => {
+  if (observation?.kind !== "authenticated") return "observation=unavailable recovery=unverified"
+  const { readiness, work } = observation.status
+  return `observation=authenticated readiness=${readiness} admission=${work.admission} attachments=${work.attachments} pendingAdmissions=${work.pendingAdmissions} retainedRequests=${work.retainedRequests} blockedRequests=${work.blockedRequests} drain=${work.drain} retirement=unconfirmed`
+}
 
 const STATE_DIRECTORY_FLAG = "state-directory"
 type ResidentStatusFailure =
   | Effect.Error<ReturnType<typeof readManagedDirectoryForOwner>>
   | Effect.Error<typeof currentPosixOwner>
-  | Effect.Error<ReturnType<typeof inspectResidentState>>
+  | Effect.Error<ReturnType<typeof observeResidentState>>
   | Schema.SchemaError
 const statusFailure = (error: ResidentStatusFailure) =>
   new CliRuntimeError({
@@ -41,7 +48,7 @@ const statusCommand = Command.make(
   ({ directory, json }) =>
     Effect.gen(function* () {
       const selected = yield* selectDirectory(directory)
-      const status = yield* inspectResidentState(selected).pipe(Effect.mapError(statusFailure))
+      const status = yield* observeResidentState(selected).pipe(Effect.mapError(statusFailure))
       if (json)
         return yield* Console.log(
           yield* Schema.encodeEffect(Schema.fromJsonString(ResidentStateStatus))(status).pipe(Effect.orDie)
@@ -54,14 +61,14 @@ const statusCommand = Command.make(
               `Selection claim: ${status.claim}`,
               ...status.generations.map(
                 (generation) =>
-                  `${generation.implementation.name}@${generation.implementation.version} generation=${generation.generation} pid=${generation.diagnostics.processId} liveness=${generation.liveness}`
+                  `${generation.implementation.name}@${generation.implementation.version} generation=${generation.generation} pid=${generation.diagnostics.processId} liveness=${generation.liveness} ${renderObservation(generation.observation)}`
               )
             ]
       yield* Console.log([...lines, status.guidance].join("\n"))
     })
 ).pipe(
   Command.withDescription(
-    "Show redacted resident ownership records and unresolved claims. Liveness and retirement remain unverified."
+    "Show redacted ownership and authenticated generation readiness/work counts when available. Never starts or attaches a client; unavailable observations do not prove retirement or permit recovery."
   )
 )
 

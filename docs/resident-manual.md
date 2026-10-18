@@ -139,8 +139,20 @@ starting a backend, acquiring a selection claim or changing records.
 
 JSON reports `absent` or `observed`. An observed snapshot includes implementation
 versions, generation IDs, diagnostic PIDs and whether a selection claim is
-present. Liveness is always `unverified`. A PID is diagnostic information, not
-process ownership evidence. No endpoint, authorization value, channel key,
+present. PID liveness remains `unverified`: a PID is diagnostic information, not
+process ownership evidence. For each generation with a recognized protected descriptor format, the command also
+makes one authenticated, generation-bound TLS/bearer status request. An
+`authenticated` observation reports MCP readiness, admission fencing, adapter and
+pending-admission counts, retained/blocked request counts and drain state. Requests
+remain counted until their cleanup finishes. A blocked drain means cleanup has
+failed or exceeded its allowance while work remains; preserve ownership.
+
+Status does not acquire an adapter or Huly client. All generation probes run within
+individual five-second bounds, concurrently under the 16-record inventory limit,
+with response bodies capped at 4 KiB and no retry. Package versions may differ; status has its own versioned wire contract. An
+unrecognized descriptor format, unsupported endpoint, connection loss, invalid response or generation mismatch
+produces `unavailable` with recovery `unverified`. Private response fields are
+omitted from encoded output. No endpoint, authorization value, channel key,
 attachment payload or operation history is returned.
 
 Inspection accepts at most 16 generation records of 65,536 bytes each. Root
@@ -153,8 +165,9 @@ invalidate the snapshot; preserve the state and inspect again after that
 transition finishes. The command leaves all evidence in place.
 
 Neither an empty snapshot nor an absent directory proves that an old backend
-and its resources retired. Status does not authenticate a live backend or
-interpret opaque implementation-specific attachment payloads. It cannot
+and its resources retired. A live status observation describes that generation
+at the time of its reply and reports retirement as `unconfirmed`; it does not
+interpret opaque attachment payloads from other implementation versions. It cannot
 authorize killing a PID, deleting ownership state or replaying an unconfirmed
 operation. Verified local retirement and safe recovery remain separate work;
 this command supplies no force-stop or reset action. Linux executable evidence

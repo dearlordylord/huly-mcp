@@ -104,6 +104,11 @@ export const makeAttachmentOwner = Effect.fn("makeAttachmentOwner")(function* (e
     close,
     closed: Fiber.join(drain),
     accepting: Effect.sync(() => accepting),
+    status: Effect.sync(() => ({
+      retainedRequests: work.size,
+      blockedRequests: [...work].filter((ticket) => ticket.status === "blocked").length,
+      closing: !accepting
+    })),
     ownsSession: (id: string) => Effect.sync(() => sessions.has(id))
   }
 })

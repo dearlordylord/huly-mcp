@@ -158,3 +158,13 @@ MCP SHA-256: `7cc7b8c300354694118b08e2b39248e5ea08e1de1df7bae2ce56ecf7a43c8a12`.
 CLI SHA-256: `c957044a36f2559fbdf5230a0f37860911af276f800b1a37933539d7298f5697`.
 The runtime artifacts match the preceding candidate; this increment adds one
 fast test file with two behavioral cases. No live certification is claimed.
+
+## Operational status follow-up — 2026-10-18
+
+The parent D36 filesystem-only status gap is addressed by the protected live
+generation endpoint and CLI observation described in
+[the status implementation record](resident-status-linux-2026-10-18.md).
+Packaged CLI counts and one read-only local-Huly scenario pass. The combined
+`pnpm check-all` passes (492 files / 5767 tests; 1389 diagnostic files, no errors
+or warnings), and both scoped reviews are clean. This does not close #326 or
+substitute for remaining lifecycle, model and native platform requirements.

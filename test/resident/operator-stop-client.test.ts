@@ -194,7 +194,7 @@ it.each([
                                     Cause.isFailReason(reason) &&
                                     reason.error instanceof ResidentStopRefused &&
                                     reason.error.reason === "namespace-unverified" &&
-                                    reason.error.message.includes("no stop was submitted")
+                                    reason.error.message.toLowerCase().includes("no stop was submitted")
                                 )
                               ).toBe(true)
                             }

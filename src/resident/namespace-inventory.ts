@@ -3,9 +3,9 @@ import type { Dirent } from "node:fs"
 import { join } from "node:path"
 import { Effect, Schema } from "effect"
 
-import { RESIDENT_PUBLICATION_FILENAME, ResidentAttachment, readResidentAttachment } from "./attachment-file.js"
+import { RESIDENT_PUBLICATION_FILENAME, ResidentAttachment, readResidentAttachmentEnvelope } from "./attachment-file.js"
 import { decodeCurrentRegistryAttachment } from "./generation-registry.js"
-import { MAX_REGISTRY_RECORDS } from "./managed-contract.js"
+import { MAX_REGISTRY_RECORDS, type ResidentRegistryEnvelope } from "./managed-contract.js"
 import {
   closePrivateFile,
   currentPosixOwner,
@@ -17,6 +17,7 @@ import {
 } from "./protected-path.js"
 import { openRegistryInventory, registryFailure, registryIo } from "./registry-inventory.js"
 import { ResidentTlsIdentity } from "./tls-channel.js"
+import { parseResidentStatusDescriptor } from "./status-descriptor.js"
 
 const GENERATION_ROOT_ENTRIES = 2
 const SHARED_ROOT_ENTRIES = 2
@@ -83,6 +84,32 @@ const inspectNamespace = (directory: ResidentDirectory) =>
     (entries) => registryIo(() => entries.close())
   )
 
+const readNamespaceDescriptors = Effect.fn("readNamespaceDescriptors")(function* (
+  descriptors: ReadonlyMap<ResidentAttachment["identity"]["generation"], ResidentFilePath>,
+  records: ReadonlyArray<ResidentRegistryEnvelope>
+) {
+  const currentDescriptors: ResidentAttachment[] = []
+  const statusDescriptors: ResidentAttachment[] = []
+  for (const envelope of records) {
+    const file = descriptors.get(envelope.generation)
+    if (file === undefined) return yield* registryFailure()
+    const registered = yield* decodeCurrentRegistryAttachment(envelope)
+    const observable = registered ?? (yield* parseResidentStatusDescriptor(envelope))
+    if (observable === undefined) continue
+    const published = yield* readResidentAttachmentEnvelope(file).pipe(Effect.mapError(registryFailure))
+    if (
+      !sameDescriptorFields(
+        { ...observable, endpoint: observable.endpoint.href },
+        { ...published, endpoint: published.endpoint.href }
+      )
+    )
+      return yield* registryFailure()
+    if (registered !== undefined) currentDescriptors.push(published)
+    statusDescriptors.push(published)
+  }
+  return { currentDescriptors, statusDescriptors }
+})
+
 export const readResidentNamespace = Effect.fn("readResidentNamespace")(function* (requested: ResidentDirectory) {
   const owner = yield* currentPosixOwner
   const directory = yield* inspectPrivateDirectory(requested, owner)
@@ -106,21 +133,9 @@ export const readResidentNamespace = Effect.fn("readResidentNamespace")(function
       )
     : []
   if (namespace.descriptors.size !== records.length) return yield* registryFailure()
-  const currentDescriptors: ResidentAttachment[] = []
-  for (const { envelope } of records) {
-    const file = namespace.descriptors.get(envelope.generation)
-    if (file === undefined) return yield* registryFailure()
-    const registered = yield* decodeCurrentRegistryAttachment(envelope)
-    if (registered === undefined) continue
-    const published = yield* readResidentAttachment(file).pipe(Effect.mapError(registryFailure))
-    if (
-      !sameDescriptorFields(
-        { ...registered, endpoint: registered.endpoint.href },
-        { ...published, endpoint: published.endpoint.href }
-      )
-    )
-      return yield* registryFailure()
-    currentDescriptors.push(published)
-  }
-  return { claimPresent: namespace.claimPresent, records, currentDescriptors }
+  const { currentDescriptors, statusDescriptors } = yield* readNamespaceDescriptors(
+    namespace.descriptors,
+    records.map(({ envelope }) => envelope)
+  )
+  return { claimPresent: namespace.claimPresent, records, currentDescriptors, statusDescriptors }
 })

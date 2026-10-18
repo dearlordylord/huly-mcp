@@ -7,7 +7,7 @@ import { expect, it } from "vitest"
 import { ResidentRegistryEnvelope } from "../../src/resident/managed-contract.js"
 import { ResidentDirectory } from "../../src/resident/protected-path.js"
 import { withSelectionClaim } from "../../src/resident/selection-claim.js"
-import { inspectResidentState, ResidentStateStatus } from "../../src/resident/state-status.js"
+import { inspectResidentState, observeResidentState, ResidentStateStatus } from "../../src/resident/state-status.js"
 import { withRegistryDirectory } from "../helpers/resident-registry-fixture.js"
 
 import { withPublishedResidentState } from "../helpers/resident-status-fixture.js"
@@ -70,10 +70,16 @@ it("keeps another implementation version opaque and does not claim it is healthy
         descriptor: Redacted.make({ privateFuturePayload: "must-not-escape" })
       })
     )
-    const status = await Effect.runPromise(inspectResidentState(directory))
+    const status = await Effect.runPromise(observeResidentState(directory))
     expect(status).toMatchObject({
       state: "observed",
-      generations: [{ implementation: { version: "other-implementation" }, liveness: "unverified" }]
+      generations: [
+        {
+          observation: { kind: "unavailable", recovery: "unverified" },
+          implementation: { version: "other-implementation" },
+          liveness: "unverified"
+        }
+      ]
     })
     expect(Schema.encodeSync(Schema.fromJsonString(ResidentStateStatus))(status)).not.toContain("must-not-escape")
   }))

@@ -9,6 +9,7 @@ import { Schema } from "effect"
 import { CLI_FAILURE_CONTRACT, CliFailureSchema } from "../../../packages/huly-cli/src/failures.js"
 import { ResidentPackagePath, ResidentRegistryEnvelope } from "../../../src/resident/managed-contract.js"
 import { ResidentStopReport } from "../../../src/resident/operator-stop.js"
+import { ResidentStateStatus } from "../../../src/resident/state-status.js"
 import { ResidentDirectory } from "../../../src/resident/protected-path.js"
 import { openKernelReapedEvents, ReapedEventsFd } from "../../helpers/kernel-reaped-events.js"
 import { spawnManagedNativeParent } from "../../helpers/managed-native-parent.js"
@@ -17,6 +18,7 @@ import { ManagedStopObservation } from "../managed-stop-observation.js"
 
 const RESPONSE_BOUND = 5_000
 const CONFIGURATION_COUNT = 2
+const INITIAL_ATTACHMENT_COUNT = 2
 const runFile = promisify(execFile)
 const Input = Schema.Struct({
   bundle: ResidentPackagePath,
@@ -67,6 +69,31 @@ const main = async () => {
     const attached = await start("fixture", "codex-mcp-client")
     assert.equal(attached.observation.observedPort, creator.observation.observedPort)
     assert.equal((await records()).length, 1)
+    const status = async () => {
+      const result = await runFile(
+        process.execPath,
+        [input.cli, "resident", "status", "--state-directory", input.directory, "--json"],
+        { env: testStdioEnvironment(), timeout: RESPONSE_BOUND }
+      )
+      assert.equal(result.stderr, "")
+      const report = Schema.decodeUnknownSync(Schema.fromJsonString(ResidentStateStatus))(result.stdout)
+      assert.equal(report.state, "observed")
+      if (report.state !== "observed") throw new Error("Expected observed resident namespace")
+      const observation = report.generations.find(
+        (generation) => generation.generation === original.generation
+      )?.observation
+      assert.equal(observation?.kind, "authenticated")
+      if (observation?.kind !== "authenticated") throw new Error("Expected authenticated resident status")
+      process.stderr.write(`Managed status: ${JSON.stringify(observation.status)}\n`)
+      assert.equal(observation.status.generation, original.generation)
+      assert.equal(observation.status.readiness, "ready")
+      assert.equal(observation.status.work.admission, "accepting")
+      assert.equal(observation.status.work.retainedRequests, 0)
+      assert.equal(observation.status.retirement, "unconfirmed")
+      return observation.status
+    }
+    const bothAttached = await status()
+    assert.equal(bothAttached.work.attachments, INITIAL_ATTACHMENT_COUNT)
     process.stderr.write("Managed operator stop: connect unrelated configuration\n")
     const unrelated = await start("other-fixture", "claude-code")
     assert.notEqual(unrelated.observation.observedPort, creator.observation.observedPort)
@@ -78,6 +105,8 @@ const main = async () => {
     const otherText = await fs.readFile(otherFile, "utf8")
     // Reparent the original backend to the kernel subreaper while its attached caller remains live.
     assert.deepEqual(await creator.parent.close(), [0, null])
+    const survivorAttached = await status()
+    assert.equal(survivorAttached.work.attachments, 1)
     attached.parent.child.stdin.write("read\n")
     assert.equal((await attached.parent.read()).adapterPid, attached.observation.adapterPid)
     process.stderr.write("Managed operator stop: submit through packaged CLI\n")
@@ -157,6 +186,7 @@ const main = async () => {
             .digest("hex")
         },
         stop,
+        liveStatuses: [bothAttached, survivorAttached],
         originalGeneration: original.generation,
         replacementGeneration: replaced.generation,
         replacementCallers: [replacement.observation, replacementPeer.observation],

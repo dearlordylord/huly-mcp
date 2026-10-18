@@ -67,9 +67,11 @@ ${Object.values(localCommandSkillSurfaces)
 
 Use \`huly resident status --json\` to inspect protected local ownership records.
 Add \`--state-directory <path>\` to inspect an explicit namespace. This command
-does not start a backend or change records. Its snapshot proves neither
-readiness nor retirement; never infer permission to kill a PID, delete state or
-replay an operation from this output.
+does not start a backend, acquire an adapter or change records. Authenticated
+generation observations report MCP readiness, admission, adapter/request counts
+and drain state. Unavailable observations leave recovery unverified. Neither
+live observations nor filesystem snapshots prove retirement; never infer
+permission to kill a PID, delete state or replay an operation from this output.
 
 Use \`huly resident stop --generation <uuid> --json\` to request graceful stop of
 one exact managed generation. Exit zero means admission was fenced, with
@@ -117,7 +119,7 @@ const requiredLocalSurface = [
     documentedSurface: localCommandSkillSurfaces.residentStatus,
     descriptionSource: commandDescription(residentCommand, "status"),
     command: "resident status",
-    description: "Liveness and retirement remain unverified"
+    description: "authenticated generation readiness/work counts"
   },
   {
     documentedSurface: localCommandSkillSurfaces.authLogin,

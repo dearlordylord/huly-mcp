@@ -11,6 +11,7 @@ import { withAdapterAttachment } from "../../src/resident/adapter-attachment.js"
 import { HostMessage } from "../../src/resident/request-headers.js"
 import { readResidentAttachment } from "../../src/resident/attachment-file.js"
 import { makeManualResidentBackend } from "../../src/resident/manual-backend.js"
+import { readResidentLiveStatus } from "../../src/resident/status-client.js"
 import type { ResidentFilePath } from "../../src/resident/protected-path.js"
 import { ResidentEndpoint, withResidentHttpsAgent } from "../../src/resident/tls-channel.js"
 import { NodeHttpClient } from "@effect/platform-node"
@@ -131,6 +132,10 @@ it.each(["stop", "interrupt"])("publishes after native application readiness and
           expect(yield* Effect.promise(() => fs.readdir(directory))).toEqual([])
           yield* Deferred.succeed(releaseReady, undefined)
           const descriptor = yield* readResidentAttachment(yield* Deferred.await(published))
+          expect(yield* readResidentLiveStatus(descriptor)).toMatchObject({
+            kind: "authenticated",
+            status: { readiness: "ready", work: { attachments: 0, retainedRequests: 0 } }
+          })
           const status = yield* withAdapterAttachment(descriptor, (exchange) =>
             exchange(HostMessage.make({ jsonrpc: "2.0", id: 1, method: "ping" }), Option.none(), (response) =>
               response.text.pipe(Effect.as(response.status))

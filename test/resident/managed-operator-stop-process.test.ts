@@ -82,6 +82,8 @@ describe.skipIf(process.platform !== "linux")("packaged managed operator stop", 
           .size
       ).toBe(3)
       expect(receipt.unrelatedRecordUnchanged).toBe(true)
+      expect(receipt.liveStatuses.map((status) => status.work.attachments)).toEqual([2, 1])
+      expect(receipt.liveStatuses.every((status) => status.generation === receipt.originalGeneration)).toBe(true)
       expect(new Set(receipt.replacementCallers.map((caller) => caller.adapterPid)).size).toBe(2)
       expect(new Set(receipt.replacementCallers.map((caller) => caller.parentPid)).size).toBe(2)
       expect(receipt.privateStateRemoved).toBe(true)

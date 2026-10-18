@@ -5,6 +5,8 @@ import { ResidentRegistryEnvelope } from "./managed-contract.js"
 import type { ResidentDirectory } from "./protected-path.js"
 import { registryFailure } from "./registry-inventory.js"
 import { readResidentNamespace } from "./namespace-inventory.js"
+import { ResidentStatusObservation } from "./status-contract.js"
+import { readResidentLiveStatus } from "./status-client.js"
 
 const ABSENT_GUIDANCE = "No state directory was observed. Absence does not prove previous resources retired."
 const OBSERVED_GUIDANCE =
@@ -18,10 +20,32 @@ const Observed = Schema.Struct({
       implementation: ResidentRegistryEnvelope.fields.implementation,
       generation: ResidentRegistryEnvelope.fields.generation,
       diagnostics: ResidentRegistryEnvelope.fields.diagnostics,
-      liveness: Schema.Literal("unverified")
+      liveness: Schema.Literal("unverified"),
+      observation: Schema.optionalKey(ResidentStatusObservation)
     })
   ),
   guidance: Schema.Literal(OBSERVED_GUIDANCE)
+})
+
+/** A live observation is generation-scoped and never certifies namespace retirement. */
+export const observeResidentState = Effect.fn("observeResidentState")(function* (requested: ResidentDirectory) {
+  const snapshot = yield* inspectResidentState(requested)
+  if (snapshot.state === "absent") return snapshot
+  const { statusDescriptors } = yield* readResidentNamespace(requested)
+  const generations = yield* Effect.forEach(
+    snapshot.generations,
+    (generation) =>
+      Effect.gen(function* () {
+        const descriptor = statusDescriptors.find((item) => item.identity.generation === generation.generation)
+        const observation =
+          descriptor === undefined
+            ? ResidentStatusObservation.make({ kind: "unavailable", recovery: "unverified" })
+            : yield* readResidentLiveStatus(descriptor)
+        return { ...generation, observation }
+      }),
+    { concurrency: "unbounded" }
+  )
+  return Observed.make({ ...snapshot, generations })
 })
 export const ResidentStateStatus = Schema.Union([Absent, Observed])
 export type ResidentStateStatus = Schema.Schema.Type<typeof ResidentStateStatus>

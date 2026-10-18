@@ -58,6 +58,7 @@ it.effect("keeps timed-out cleanup owned and reclaims its slot when cleanup late
     try {
       const outcome = yield* Fiber.join(closing)
       expect(Result.isFailure(outcome) && outcome.failure.kind).toBe("pending")
+      expect(yield* registry.status).toMatchObject({ attachments: 1, retainedRequests: 1, drain: "blocked" })
       expect((yield* Effect.result(registry.admit))._tag).toBe("Failure")
       expect((yield* Effect.result(registry.find(admitted.token)))._tag).toBe("Failure")
       expect(yield* owner.ownsSession("held")).toBe(true)

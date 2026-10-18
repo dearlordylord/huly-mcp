@@ -12,6 +12,7 @@ import {
 } from "./attachment-lease.js"
 import { MANAGED_IDLE_MILLIS } from "./managed-contract.js"
 import { makeAttachmentOwner } from "./attachment-owner.js"
+import { makeResidentWorkStatus } from "./work-status.js"
 
 const TOKEN_BYTES = 32
 const DRAIN_POLL_MILLIS = 25
@@ -21,6 +22,7 @@ type AttachmentOwner = Effect.Success<ReturnType<typeof makeAttachmentOwner>>
 interface Member {
   readonly owner: AttachmentOwner
   readonly authority: { lease: AttachmentLease }
+  cleanupBlocked: boolean
 }
 const digest = (token: AttachmentToken): AttachmentDigest =>
   createHash("sha256").update(Redacted.value(token)).digest("hex")
@@ -44,6 +46,7 @@ export const makeResidentAdmissions = Effect.fn("makeResidentAdmissions")(functi
   const admission = yield* Semaphore.make(1)
   let accepting = true
   let pending = 0
+  let drainFailed = false
   let idleSince = yield* Clock.monotonicTimeNanos
   const touch = Clock.clockWith((clock) =>
     Effect.sync(() => {
@@ -75,7 +78,12 @@ export const makeResidentAdmissions = Effect.fn("makeResidentAdmissions")(functi
           duration: policy.closeAllowanceMillis,
           orElse: () =>
             Effect.fail(new AdmissionError({ kind: "pending", message: "Resident attachment cleanup remains pending" }))
-        })
+        }),
+        Effect.tapError(() =>
+          Effect.sync(() => {
+            member.cleanupBlocked = true
+          })
+        )
       )
       yield* forget(key, member)
     })
@@ -120,7 +128,7 @@ export const makeResidentAdmissions = Effect.fn("makeResidentAdmissions")(functi
               Effect.sync(() => accepting && leaseIsEligible(authority.lease, clock.monotonicTimeNanosUnsafe()))
             )
             const owner = yield* createOwner(eligible).pipe(Scope.provide(generationScope))
-            const member: Member = { owner, authority }
+            const member: Member = { owner, authority, cleanupBlocked: false }
             members.set(key, member)
             if (!accepting) {
               yield* closeMember(key, member)
@@ -182,7 +190,12 @@ export const makeResidentAdmissions = Effect.fn("makeResidentAdmissions")(functi
             message: "Resident generation cleanup remains pending; replacement is blocked"
           })
         )
-    })
+    }),
+    Effect.tapError(() =>
+      Effect.sync(() => {
+        drainFailed = true
+      })
+    )
   )
 
   const awaitIdleAndFence = Effect.gen(function* () {
@@ -207,5 +220,12 @@ export const makeResidentAdmissions = Effect.fn("makeResidentAdmissions")(functi
     }
   })
 
-  return { admit, find, renew, release, fence, drain, awaitIdleAndFence }
+  const status = Effect.gen(function* () {
+    const owners = yield* Effect.forEach(members.values(), (member) =>
+      member.owner.status.pipe(Effect.map((owner) => ({ ...owner, blocked: member.cleanupBlocked })))
+    )
+    return makeResidentWorkStatus({ accepting, pending, drainFailed, owners })
+  })
+
+  return { admit, find, renew, release, fence, drain, awaitIdleAndFence, status }
 })

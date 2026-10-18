@@ -13,6 +13,8 @@ import type { makeResidentAdmissions } from "./admissions.js"
 import { attachmentRequestOwner } from "./attachment-http-context.js"
 import type { makeCompatibilityAuthority } from "./compatibility-authority.js"
 import { renderResidentStop, RESIDENT_STOP_PATH, type ResidentStopSupport } from "./operator-stop.js"
+import { RESIDENT_STATUS_PATH, type ResidentLiveStatus } from "./status-contract.js"
+import { renderResidentStatus } from "./status-http.js"
 import {
   CompatibilityChallenge,
   CompatibilityError,
@@ -105,9 +107,28 @@ const renderAttachmentControl = (
     return HttpServerResponse.empty({ status: HTTP_NO_CONTENT })
   })
 
+const renderControl = (
+  request: HttpServerRequest.HttpServerRequest,
+  admissions: Admissions,
+  authority: CompatibilityAuthority | undefined,
+  stop: ResidentStopSupport | undefined,
+  status: Effect.Effect<ResidentLiveStatus> | undefined
+) => {
+  if (request.url === RESIDENT_STOP_PATH) return renderResidentStop(stop)
+  if (request.url === RESIDENT_STATUS_PATH) return renderResidentStatus(status)
+  if (request.url === RESIDENT_COMPATIBILITY_PATH && authority !== undefined) return renderChallenge(request, authority)
+  if (request.url === RESIDENT_ATTACHMENTS_PATH) return renderAttachmentControl(request, admissions, authority)
+  return undefined
+}
+
 /** Must run inside the generation's TLS/bearer policy, outside request-client acquisition. */
 export const residentAdmissionMiddleware =
-  (admissions: Admissions, authority?: CompatibilityAuthority, stop?: ResidentStopSupport) =>
+  (
+    admissions: Admissions,
+    authority?: CompatibilityAuthority,
+    stop?: ResidentStopSupport,
+    status?: Effect.Effect<ResidentLiveStatus>
+  ) =>
   <E, R>(httpEffect: Effect.Effect<HttpServerResponse.HttpServerResponse, E, R>) =>
     Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest
@@ -116,11 +137,8 @@ export const residentAdmissionMiddleware =
           "Configured residents do not accept Huly override headers; select a compatible resident instead",
           { status: HTTP_BAD_REQUEST }
         )
-      if (request.url === RESIDENT_STOP_PATH) return yield* renderResidentStop(stop)
-      if (request.url === RESIDENT_COMPATIBILITY_PATH && authority !== undefined)
-        return yield* renderChallenge(request, authority)
-      if (request.url === RESIDENT_ATTACHMENTS_PATH)
-        return yield* renderAttachmentControl(request, admissions, authority)
+      const control = renderControl(request, admissions, authority, stop, status)
+      if (control !== undefined) return yield* control
       const owner = yield* admissions.find(yield* parseToken(request.headers[RESIDENT_ATTACHMENT_HEADER]))
       const session = request.headers["mcp-session-id"]
       if (session !== undefined) {
