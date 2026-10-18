@@ -6,6 +6,8 @@ import { ProjectIdentifier } from "../../src/domain/schemas/shared.js"
 
 export const ACTIVE_FIRST_ID = 41
 export const ACTIVE_CONTINUED_ID = 42
+export const OUTPUT_EXIT_BOUND = 15_000
+export const BlockedOutput = Schema.Literals(["closed", "unread"])
 export const AdapterLoss = Schema.Literals(["eof", "kill"])
 export const ActiveQueryHostInput = Schema.Struct({
   ...ModelWaitHostInput.fields,
@@ -22,6 +24,7 @@ export const ActiveQueryPairInput = Schema.Struct({
 export const ActiveQueryCommand = Schema.TaggedUnion({
   read: { project: ProjectIdentifier },
   lose: { mode: AdapterLoss },
+  stall: { project: ProjectIdentifier, mode: BlockedOutput },
   close: {}
 })
 export type ActiveQueryCommand = Schema.Schema.Type<typeof ActiveQueryCommand>
@@ -37,6 +40,8 @@ export const ActiveQueryEvent = Schema.TaggedUnion({
   result: { project: ProjectIdentifier, id: Schema.Int, result: GetProjectResultSchema },
   interrupted: { project: ProjectIdentifier, id: Schema.Int },
   loss: { mode: AdapterLoss },
+  stalled: { project: ProjectIdentifier, id: Schema.Int, mode: BlockedOutput },
+  outputExit: { ...AdapterExit.fields, outputFailure: Schema.Literal(true) },
   exit: AdapterExit.fields
 })
 export type ActiveQueryEvent = Schema.Schema.Type<typeof ActiveQueryEvent>

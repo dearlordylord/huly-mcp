@@ -12,11 +12,19 @@ import { LiveReadProbeError } from "../../../scripts/resident-live-read-contract
 import { discoverLiveReadProtocol, liveReadMetadata } from "../../../scripts/resident-live-protocol.js"
 import { boundModelWait } from "../../helpers/model-wait-parent.js"
 import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
-import { ActiveQueryCommand, ActiveQueryEvent, ActiveQueryHostInput, AdapterExit } from "../active-query-contract.js"
+import {
+  ActiveQueryCommand,
+  ActiveQueryEvent,
+  ActiveQueryHostInput,
+  AdapterExit,
+  OUTPUT_EXIT_BOUND
+} from "../active-query-contract.js"
 
 const MAX_NOTIFICATIONS = 64
 const FIRST_ID = 41
 const CONTEXT_ID = 2
+const MAX_DIAGNOSTIC_BYTES = 8_192
+const OUTPUT_FAILURE = "Stdio output failed or exceeded its 10 second write allowance"
 const ContextReply = Schema.Struct({ structuredContent: Schema.Struct({ result: GetHulyContextResultSchema }) })
 const ProjectReply = Schema.Struct({
   isError: Schema.optionalKey(Schema.Literal(false)),
@@ -40,9 +48,15 @@ const main = async () => {
       MCP_RESIDENT_STATE_DIRECTORY: input.directory
     }
   })
+  const exited = once(child, "exit").then(([code, signal]) => Schema.decodeUnknownSync(AdapterExit)({ code, signal }))
+  void exited.catch(() => {})
   const closed = once(child, "close").then(([code, signal]) => Schema.decodeUnknownSync(AdapterExit)({ code, signal }))
   void closed.catch(() => {})
-  child.stderr.on("data", (bytes: Buffer) => process.stderr.write(bytes))
+  let diagnostics = ""
+  child.stderr.on("data", (bytes: Buffer) => {
+    diagnostics = (diagnostics + bytes.toString("utf8")).slice(-MAX_DIAGNOSTIC_BYTES)
+    process.stderr.write(bytes)
+  })
   child.stdin.on("error", () => process.stderr.write("Active query adapter input closed\n"))
   const lines = createInterface({ input: child.stdout })
   const incoming = lines[Symbol.asyncIterator]()
@@ -115,6 +129,34 @@ const main = async () => {
         continue
       }
       if (active !== undefined || losing) throw new Error("Adapter request already active or closed")
+      if (command._tag === "stall") {
+        losing = true
+        const id = nextId++
+        lines.pause()
+        if (command.mode === "closed") child.stdout.destroy()
+        else child.stdout.pause()
+        await send(
+          Schema.encodeSync(Schema.fromJsonString(HostMessage))({
+            jsonrpc: "2.0",
+            id,
+            method: "tools/call",
+            params: { name: "get_project", arguments: { project: command.project }, ...liveReadMetadata(protocol) }
+          })
+        )
+        emit({ _tag: "stalled", project: command.project, id, mode: command.mode })
+        const exit = await Effect.runPromise(Effect.promise(() => exited).pipe(Effect.timeout(OUTPUT_EXIT_BOUND)))
+        // Unread pipe bytes can delay close after the actual owned process has exited.
+        child.stdout.destroy()
+        await boundModelWait(closed)
+        emit(
+          Schema.decodeUnknownSync(ActiveQueryEvent.cases.outputExit)({
+            _tag: "outputExit",
+            ...exit,
+            outputFailure: diagnostics.includes(OUTPUT_FAILURE)
+          })
+        )
+        continue
+      }
       const id = nextId++
       active = boundModelWait(
         request(id, "tools/call", { name: "get_project", arguments: { project: command.project } })
