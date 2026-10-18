@@ -656,3 +656,8 @@ Proposed resident-launch.qnt types now key requests by InvocationId (sameasverif
 ### Unresolved owner fresh-start refusal with held peer — 2026-10-18
 
 [Report](resident-unresolved-start-refusal-2026-10-18.md): afterAbackendfault whileBheld, actualfreshmanagedadapter EXACTAURL/workspace/token/nativepolicy/namespace gets actualexit1/notobserverkilled/nosignal/emptystdout/nodispatchdiagnostic/tokenredacted. RetainedAbytesandexact2generationinventory unchanged; Bsamegeneration/registry/1held thenexact41+42, A0model/read/write. Reviewcaught auto/native mismatch, correctednative6casePASS51.66s /tmp/resident-config-unresolved-refusal-native.log. Bothreviewsaccepted, lint/formatpass; 6finalroots withterminal0/externalparentlineage/statecounts independentlychecked. Intermediatewrongpolicyrunsretained. No productchange/fullgate; noautomaticreplacement orfreshBattachmentclaim; all six tickets incomplete. Lifecyclelogiconlystillawaitsexistingtypesketchapproval; independentworkcontinued.
+
+
+### Native server output validation — 2026-10-18
+
+[Report](resident-native-output-validation-2026-10-18.md): productionregistry/defineTool/nativeHTTPS injectedoperation returnsinvalidnegativecount, rawHTTP(native/proxystrict/nonstrict) receivesexactinvalidoutputerror/no structuredsuccess; nextvalidcall exactcount1/operationcalls2. NoSDKclientvalidationconfound. Final2focusedfiles19testsPASS, local lint/format and bothreviewsaccepted. No productionchange/fullgate; packagedadapter/nativeHuly/allresulttypes/platform/lifecycle stillseparate, all six tickets incomplete.

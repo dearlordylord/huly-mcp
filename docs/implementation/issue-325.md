@@ -263,3 +263,8 @@ checks the real host-reported client kind and selected native/proxy mode with
 TOOLS=get_project and strict proxy output. Both pass actual project reads and
 owned retirement. It adds no complete credential-invalidation, concurrent
 actual-host sharing, capability or platform claim.
+
+
+### Native server output validation — 2026-10-18
+
+[Report](resident-native-output-validation-2026-10-18.md): productionregistry/defineTool/nativeHTTPS injectedoperation returnsinvalidnegativecount, rawHTTP(native/proxystrict/nonstrict) receivesexactinvalidoutputerror/no structuredsuccess; nextvalidcall exactcount1/operationcalls2. NoSDKclientvalidationconfound. Final2focusedfiles19testsPASS, local lint/format and bothreviewsaccepted. No productionchange/fullgate; packagedadapter/nativeHuly/allresulttypes/platform/lifecycle stillseparate, all six tickets incomplete.
