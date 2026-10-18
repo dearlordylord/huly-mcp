@@ -86,16 +86,6 @@ permission checks. An explicit `MCP_RESIDENT_STATE_DIRECTORY` still selects a
 separate namespace, including a disposable test directory. It must be shared by
 all launchers that are meant to share that backend.
 
-Earlier experimental builds defaulted to the OS temporary directory's
-`huly-mcp-<uid>` child. Before upgrading those builds, stop their launchers and
-verify retirement of their actual owned backend processes and resources. The
-new default refuses an occupied legacy directory rather than starting a second
-backend or deleting old evidence. It also refuses when that directory cannot
-be inspected. An empty or absent legacy directory permits the new location.
-This check does not coordinate with an older executable concurrently launching
-into its old namespace; keep those launchers stopped during migration. No
-records are migrated or reset automatically.
-
 Ownership records contain discovery and authorization state, not an operation
 journal. Do not delete live state or infer retirement from a missing PID.
 Unexpected owner loss retains evidence and requires verified local retirement
@@ -132,9 +122,8 @@ huly resident status --json
 huly resident status --state-directory /absolute/private/namespace --json
 ```
 
-The default uses the same directory configuration as managed startup, including
-its legacy-directory upgrade guard. An explicit path can inspect the old
-namespace. The command reads existing state without creating directories,
+The default uses the same directory configuration as managed startup. An explicit
+path selects the namespace to inspect. The command reads existing state without creating directories,
 starting a backend, acquiring a selection claim or changing records.
 
 JSON reports `absent` or `observed`. An observed snapshot includes implementation

@@ -1,7 +1,7 @@
 import { Console, Effect, Option, Schema } from "effect"
 import { Command, Flag } from "effect/cli"
 
-import { readManagedDirectoryForOwner } from "../../../src/resident/managed-directory-config.js"
+import { readManagedDirectory } from "../../../src/resident/managed-directory-config.js"
 import { ManagedLaunchError } from "../../../src/resident/managed-contract.js"
 import { currentPosixOwner, ProtectedFileError, ResidentDirectory } from "../../../src/resident/protected-path.js"
 import { observeResidentState, ResidentStateStatus } from "../../../src/resident/state-status.js"
@@ -17,7 +17,7 @@ const renderObservation = (observation: ResidentStatusObservation | undefined) =
 
 const STATE_DIRECTORY_FLAG = "state-directory"
 type ResidentStatusFailure =
-  | Effect.Error<ReturnType<typeof readManagedDirectoryForOwner>>
+  | Effect.Error<ReturnType<typeof readManagedDirectory>>
   | Effect.Error<typeof currentPosixOwner>
   | Effect.Error<ReturnType<typeof observeResidentState>>
   | Schema.SchemaError
@@ -33,7 +33,7 @@ const statusFailure = (error: ResidentStatusFailure) =>
 const selectDirectory = Effect.fn("Resident.selectDirectory")(function* (requested: Option.Option<string>) {
   if (Option.isSome(requested)) return yield* Schema.decodeUnknownEffect(ResidentDirectory)(requested.value)
   const owner = yield* currentPosixOwner
-  return yield* readManagedDirectoryForOwner(owner)
+  return yield* readManagedDirectory(owner.platform)
 }, Effect.mapError(statusFailure))
 
 const statusCommand = Command.make(

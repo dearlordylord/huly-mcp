@@ -32,7 +32,7 @@ import {
 import type { BackendResponseError } from "./response-stream.js"
 import type { StartupBudget } from "./startup-budget.js"
 import { readResidentNamespace } from "./namespace-inventory.js"
-import { readManagedDirectoryForOwner } from "./managed-directory-config.js"
+import { readManagedDirectory } from "./managed-directory-config.js"
 import { advanceCandidateSelection, type CandidateSelection } from "./candidate-selection-state.js"
 import { advancePublication, makePublicationState, publicationIsReady } from "./publication-state.js"
 
@@ -64,7 +64,7 @@ const withSelectionOwnership = <A, E, R>(
 
 export const prepareManagedDirectory = Effect.gen(function* () {
   const owner = yield* currentPosixOwner
-  const requested = yield* readManagedDirectoryForOwner(owner)
+  const requested = yield* readManagedDirectory(owner.platform)
   const directory = ResidentDirectory.make(resolve(requested))
   yield* Effect.tryPromise({
     try: () => fs.mkdir(directory, { mode: PRIVATE_DIRECTORY_MODE, recursive: true }),
