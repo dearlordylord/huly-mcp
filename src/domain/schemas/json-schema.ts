@@ -9,9 +9,13 @@ const restoreMcpDefinitionRef = (ref: string): string =>
     : ref
 
 const JsonSchemaObjectSchema = Schema.Record(Schema.String, Schema.Json)
-const JsonArraySchema = Schema.Array(Schema.Json)
 
 type JsonSchemaObject = Schema.Schema.Type<typeof JsonSchemaObjectSchema>
+
+const isJsonArray = (value: Schema.Json | undefined): value is Schema.JsonArray => Array.isArray(value)
+
+const jsonObject = (value: Schema.Json): JsonSchemaObject | undefined =>
+  typeof value === "object" && value !== null && !isJsonArray(value) ? value : undefined
 
 const parseJsonObject = (value: unknown): JsonSchemaObject | undefined => {
   try {
@@ -22,8 +26,8 @@ const parseJsonObject = (value: unknown): JsonSchemaObject | undefined => {
 }
 
 const restoreMcpDefinitionRefsInJson = (value: Schema.Json): Schema.Json => {
-  if (Array.isArray(value)) {
-    return Schema.decodeUnknownSync(JsonArraySchema)(value).map(restoreMcpDefinitionRefsInJson)
+  if (isJsonArray(value)) {
+    return value.map(restoreMcpDefinitionRefsInJson)
   }
   if (typeof value !== "object" || value === null) return value
 
@@ -67,15 +71,15 @@ const FLATTENABLE_ALLOF_KEYS = new Set([
 ])
 
 const flattenScalarAllOf = (value: Schema.Json): Schema.Json => {
-  if (Array.isArray(value)) return Schema.decodeUnknownSync(JsonArraySchema)(value).map(flattenScalarAllOf)
+  if (isJsonArray(value)) return value.map(flattenScalarAllOf)
   if (typeof value !== "object" || value === null) return value
-  const record = Schema.decodeUnknownSync(JsonSchemaObjectSchema)(value)
+  const record = value
   const recursivelyNormalized = Object.fromEntries(
     Object.entries(record).map(([key, nested]) => [key, flattenScalarAllOf(nested)])
   )
   const allOf = recursivelyNormalized.allOf
-  if (!Array.isArray(allOf)) return recursivelyNormalized
-  const members = Schema.decodeUnknownSync(JsonArraySchema)(allOf).map(parseJsonObject)
+  if (!isJsonArray(allOf)) return recursivelyNormalized
+  const members = allOf.map(jsonObject)
   if (
     members.some(
       (member) => member === undefined || Object.keys(member).some((key) => !FLATTENABLE_ALLOF_KEYS.has(key))
@@ -129,9 +133,9 @@ const astAuthoredJsonSchema = (ast: SchemaAST.AST): JsonSchemaObject | undefined
 }
 
 const restoreUnionDescriptions = (ast: SchemaAST.Union, record: JsonSchemaObject): Schema.Json => {
-  if (!Array.isArray(record.anyOf)) return record
+  if (!isJsonArray(record.anyOf)) return record
   const members = ast.types.filter((member) => !SchemaAST.isUndefined(member))
-  const anyOf = Schema.decodeUnknownSync(JsonArraySchema)(record.anyOf)
+  const anyOf = record.anyOf
   return {
     ...record,
     anyOf: anyOf.map((member, index) => {
@@ -143,7 +147,7 @@ const restoreUnionDescriptions = (ast: SchemaAST.Union, record: JsonSchemaObject
 
 const restorePropertyDescription = (propertyAst: SchemaAST.AST, property: Schema.Json): Schema.Json => {
   const restored = restoreAstPropertyDescriptions(propertyAst, property)
-  const record = parseJsonObject(restored)
+  const record = jsonObject(restored)
   const description = astDescription(propertyAst)
   if (description === undefined || record === undefined) return restored
   return record.$ref === undefined
@@ -152,7 +156,7 @@ const restorePropertyDescription = (propertyAst: SchemaAST.AST, property: Schema
 }
 
 const restoreObjectDescriptions = (ast: SchemaAST.Objects, record: JsonSchemaObject): Schema.Json => {
-  const properties = record.properties === undefined ? undefined : parseJsonObject(record.properties)
+  const properties = record.properties === undefined ? undefined : jsonObject(record.properties)
   if (properties === undefined) return record
   const signatures = new Map(ast.propertySignatures.map((signature) => [signature.name, signature.type]))
   return {
@@ -175,7 +179,7 @@ const restoreArrayDescriptions = (ast: SchemaAST.Arrays, record: JsonSchemaObjec
 }
 
 const restoreAstPropertyDescriptions = (ast: SchemaAST.AST, jsonSchema: Schema.Json): Schema.Json => {
-  const record = parseJsonObject(jsonSchema)
+  const record = jsonObject(jsonSchema)
   if (record === undefined) return jsonSchema
   const authored = astAuthoredJsonSchema(ast)
   const restoredRecord = authored === undefined ? record : { ...record, ...authored }

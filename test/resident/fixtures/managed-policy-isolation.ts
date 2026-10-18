@@ -35,6 +35,31 @@ const ToolRefusal = Schema.Struct({
 })
 const ProtocolRefusal = Schema.Struct({ code: Schema.Literal(McpErrorCode.InvalidParams), message: Schema.String })
 
+const readProject = async (
+  client: Client,
+  project: Schema.Schema.Type<typeof DisposableRestProject>,
+  route: "direct" | "proxy"
+) => {
+  const reply = await client.callTool(
+    route === "direct"
+      ? { name: "get_project", arguments: { project: project.identifier } }
+      : { name: "invoke_tool", arguments: { toolName: "get_project", arguments: { project: project.identifier } } },
+    { timeout: RESPONSE_BOUND }
+  )
+  assert.notEqual(reply.isError, true)
+  const result = Schema.decodeUnknownSync(Schema.Struct({ result: Schema.Unknown }))(reply.structuredContent).result
+  const actual =
+    route === "direct"
+      ? Schema.decodeUnknownSync(GetProjectResultSchema)(result)
+      : Schema.decodeUnknownSync(
+          Schema.Struct({ toolName: Schema.Literal("get_project"), result: GetProjectResultSchema })
+        )(result).result
+  assert.equal(actual.identifier, project.identifier)
+  assert.equal(actual.name, project.name)
+  assert.equal(actual.archived, false)
+  return actual
+}
+
 const main = async () => {
   const input = Schema.decodeUnknownSync(Input)({
     bundle: process.argv[2],
@@ -118,19 +143,7 @@ const main = async () => {
         }
         if (input.scenario !== "native" && session.toolset === "projects") {
           process.stderr.write("Managed policy: invoking project read\n")
-          const invoked = await session.client.callTool(
-            { name: "invoke_tool", arguments: { toolName: "get_project", arguments: { project: project.identifier } } },
-            { timeout: RESPONSE_BOUND }
-          )
-          assert.notEqual(invoked.isError, true)
-          const actual = Schema.decodeUnknownSync(
-            Schema.Struct({
-              result: Schema.Struct({ toolName: Schema.Literal("get_project"), result: GetProjectResultSchema })
-            })
-          )(invoked.structuredContent).result.result
-          assert.equal(actual.identifier, project.identifier)
-          assert.equal(actual.name, project.name)
-          assert.equal(actual.archived, false)
+          const actual = await readProject(session.client, project, "proxy")
           process.stderr.write("Managed policy: reading project resource\n")
           const resource = await session.client.readResource(
             { uri: `huly://projects/${project.identifier}` },
@@ -162,7 +175,22 @@ const main = async () => {
           { timeout: RESPONSE_BOUND }
         )
         assert.notEqual(context.isError, true)
-        ports.push(Schema.decodeUnknownSync(ContextReply)(context.structuredContent).result.transport.http?.port)
+        const captured = Schema.decodeUnknownSync(ContextReply)(context.structuredContent).result
+        ports.push(captured.transport.http?.port)
+        const mode = input.scenario === "native" ? "native" : "proxy"
+        assert.equal(captured.toolExposure.configuredMode, mode)
+        assert.equal(captured.toolExposure.resolvedMode, mode)
+        assert.equal(captured.toolExposure.clientKind, "claude-code")
+        assert.equal(captured.toolExposure.proxyOutputStrict, input.scenario === "proxy-strict")
+        assert.equal(captured.toolExposure.visibleToolCount, names.length)
+        assert.deepEqual(captured.toolScope.requestedTools, input.scenario === "native" ? [session.allowed] : [])
+        assert.deepEqual(captured.toolScope.requestedToolsets, input.scenario === "native" ? [] : [session.toolset])
+        assert.equal(
+          captured.toolExposure.proxyCandidateToolCount,
+          input.scenario === "proxy-strict"
+            ? captured.toolScope.visibleRegisteredToolCount
+            : captured.toolScope.totalRegisteredToolCount
+        )
         if (input.scenario === "proxy-non-strict") {
           const crossSchema = await session.client.callTool(
             { name: "get_tool_schema", arguments: { toolName: session.forbidden } },
@@ -175,6 +203,12 @@ const main = async () => {
             ).result.name,
             session.forbidden
           )
+          if (session.toolset === "issues") {
+            assert.equal(names.includes("get_project"), false)
+            process.stderr.write("Managed policy: invoking hidden project through direct and proxy calls\n")
+            await readProject(session.client, project, "direct")
+            await readProject(session.client, project, "proxy")
+          }
           continue
         }
         process.stderr.write("Managed policy: attempting cross-policy call\n")
@@ -232,12 +266,17 @@ const main = async () => {
         backendExits.push(exit)
       }
       assert.deepEqual(await fs.readdir(input.directory), [])
-      assert.equal(rest.observed.modelRequests, input.scenario === "native" ? 0 : 1)
+      const expected = {
+        native: { models: 0, reads: 0 },
+        "proxy-strict": { models: 1, reads: 2 },
+        "proxy-non-strict": { models: 2, reads: 4 }
+      }[input.scenario]
+      assert.equal(rest.observed.modelRequests, expected.models)
       assert.deepEqual(
         rest.observed.projectQueries,
-        input.scenario === "native" ? [] : [project.identifier, project.identifier]
+        Array.from({ length: expected.reads }, () => project.identifier)
       )
-      assert.equal(rest.observed.projectReads, input.scenario === "native" ? 0 : POLICY_COUNT)
+      assert.equal(rest.observed.projectReads, expected.reads)
       assert.equal(rest.observed.projectWrites, 0)
       assert.equal(rest.observed.invalidRequests, 0)
       process.stdout.write(
@@ -247,7 +286,8 @@ const main = async () => {
             issuePort,
             scenario: input.scenario,
             protocol: input.protocol,
-            crossPolicyEvidence: input.scenario === "proxy-non-strict" ? "schema-visible" : "call-refused",
+            crossPolicyEvidence: input.scenario === "proxy-non-strict" ? "calls-allowed" : "call-refused",
+            ...(input.scenario === "proxy-non-strict" ? { crossPolicyRoutes: ["direct", "proxy"] } : {}),
             backendExits,
             privateStateRemoved: true
           })
@@ -264,7 +304,14 @@ const main = async () => {
   if (cleanupFailed) throw new Error("Managed policy resource cleanup failed")
 }
 
-void main().catch(() => {
-  process.stderr.write("Managed policy isolation fixture failed\n")
+void main().catch((error: unknown) => {
+  // Report fixed categories only: protocol errors can contain connection credentials.
+  const category =
+    error instanceof Error && /timed out|timeout/i.test(error.message)
+      ? "request timeout"
+      : error instanceof assert.AssertionError
+        ? "assertion failure"
+        : "unclassified failure"
+  process.stderr.write(`Managed policy isolation fixture failed: ${category}\n`)
   process.exitCode = 1
 })

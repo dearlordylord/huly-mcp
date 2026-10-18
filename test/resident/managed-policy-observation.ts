@@ -22,6 +22,7 @@ export const ManagedPolicyObservation = Schema.Union([
   Schema.Struct({
     ...receiptFields,
     scenario: Schema.Literal("proxy-non-strict"),
-    crossPolicyEvidence: Schema.Literal("schema-visible")
+    crossPolicyEvidence: Schema.Literal("calls-allowed"),
+    crossPolicyRoutes: Schema.Tuple([Schema.Literal("direct"), Schema.Literal("proxy")])
   })
 ])

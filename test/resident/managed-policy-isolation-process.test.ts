@@ -86,9 +86,9 @@ describe.skipIf(process.platform !== "linux")("packaged managed policy isolation
         expect(observation.backendExits).toHaveLength(2)
         expect(observation.backendExits.every((exit) => exit.exitCode === 0)).toBe(true)
         expect(observation.projectPort).not.toBe(observation.issuePort)
-        expect(observation.crossPolicyEvidence).toBe(
-          scenario === "proxy-non-strict" ? "schema-visible" : "call-refused"
-        )
+        expect(observation.crossPolicyEvidence).toBe(scenario === "proxy-non-strict" ? "calls-allowed" : "call-refused")
+        if (observation.scenario === "proxy-non-strict")
+          expect(observation.crossPolicyRoutes).toEqual(["direct", "proxy"])
         expect(await fs.readdir(root)).toEqual([])
         await fs.writeFile(
           `${root}.receipt.json`,
