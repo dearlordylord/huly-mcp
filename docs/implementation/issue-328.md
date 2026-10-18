@@ -146,3 +146,65 @@ repeatable improvement or a complete resource comparison. No production timer,
 lease, validation or protocol behavior was changed from these observations.
 Further diagnosis needs phase-aligned per-process evidence, including actual
 adapters/clients. All qualification criteria remain required.
+
+## Optional whole-tree resource observer (2026-10-17)
+
+`test/resident/fixtures/reap-descendants.py` now accepts optional `--resources
+<new-file>`. Its separate `process_resources.py` observer records the supervisor
+and observed descendants every 100 ms, using all process threads' Linux child
+inventories. Rows contain PID, parent PID, process start ticks, state, cumulative
+user/system CPU ticks and RSS bytes. They omit command lines, process names and
+environment values. The file is exclusively created with mode 0600. Traversal is
+bounded to 1,024 identities; parent changes, disappearance and changed start
+identity discard that observation. A handled sampling error makes the attempt
+fail but does not abandon the supervisor's owned-child cleanup.
+
+The existing response, idle, retirement and supervision deadlines are unchanged.
+Without the option, no resource observer is imported or run. Three executable
+Python checks cover stat parsing (including parentheses in process names), actual
+child observation, private/exclusive output and owned completion after a supplied
+sampling failure. A Linux-only Vitest entry runs those checks in the regular test
+inventory. This diagnostic observer supplies no native macOS/Windows evidence.
+
+The declared diagnostic purpose is to observe per-process work during the
+ten-parent schedule, including client parents, rather than infer a limiter from
+backend-only CPU. A first observer attempt completed but predates the reviewed
+parent-identity correction; it is retained at
+`/tmp/resident-tree-resources-qEYDxz` and is not adopted as corrected evidence.
+The corrected observer attempt at
+`/tmp/resident-tree-resources-verified-ePaPcn` used the unmodified production MCP
+artifact with SHA-256
+`46d6da1873caab884f407e205a809db70cbc9904cf85fdf39317d70f82b49db6`.
+All ten clients reached their connection deadline; no initial observations were
+completed. The observer retained 108 snapshots, with up to 25 processes present
+in a snapshot. This is a failed diagnostic attempt, not qualification. The reaper
+finished without its forced-cleanup warning, the final snapshot contained only
+the supervisor, and the fixture state directory was empty. No successful backend
+operation or complete per-process CPU accounting is inferred from that cleanup.
+
+Retained raw resources SHA-256:
+`6f9ff9fc7dff8a525f198e81b321a71194b623af304c35172e908c8387c992fe`;
+`phases.log` SHA-256:
+`4853c524cfd3cd1df21ae2f1be4338b963dc7b59c630e1d8c3cf9690ff65132c`.
+The observer source used for that attempt has SHA-256
+`a2711fd09c9f24f88baadb43e72a5ee49795dee2d240ee12e4833fa2ad939d7b`;
+the reaper source has SHA-256
+`b4e3597776a137779383dcdec5051a755a94f542a0d853658014777bb61174b0`.
+
+The metadata retains load average, effective affinity, page size and clock-tick
+units. CPU values are observed lower bounds: a process may disappear before its
+last sample or be born and exit between samples. RSS sums include shared pages
+repeatedly, plus the coordinator/client load generator and supervisor overhead;
+they are neither physical memory nor PSS. Sampling adds overhead. Unknown
+descendants are not labelled as a specific backend/adapter merely from their
+PID. The preserved mixture of successful and failed schedules, changing host
+load and incomplete CPU attribution still makes the performance verdict
+inconclusive. No optimization or production budget is selected from this run.
+
+To reproduce the observer against an isolated packaged fixture bundle, allocate
+a fresh private evidence directory and run the existing supervisor command with
+`--resources <directory>/resources.ndjson` before `--report-reaped`. Preserve the
+command's exit status, stdout receipt and stderr phases, including failure. The
+unobserved fixture remains the qualification path. Current focused Vitest,
+TypeScript/Effect diagnostics and read-only Standards/Spec reviews pass; the
+final combined gate and complete-contract qualification remain pending.

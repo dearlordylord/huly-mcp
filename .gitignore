@@ -23,3 +23,4 @@ CLAUDE.local.md
 .movement-certification/
 
 .movement-certification.lock/
+__pycache__/

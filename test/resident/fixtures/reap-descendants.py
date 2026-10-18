@@ -1,5 +1,6 @@
 """Run one Linux fixture under a bounded, kernel-owned child subreaper."""
 import ctypes
+import argparse
 import json
 import os
 import signal
@@ -13,7 +14,7 @@ CLEANUP_SECONDS = 4
 POLL_SECONDS = 0.02
 
 
-def supervise(arguments, clock, sleep, report_reaped=False):
+def supervise(arguments, clock, sleep, report_reaped=False, resources=None):
     libc = ctypes.CDLL(None, use_errno=True)
     if libc.prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) != 0:
         raise OSError(ctypes.get_errno(), "Cannot establish fixture child ownership")
@@ -41,6 +42,7 @@ def supervise(arguments, clock, sleep, report_reaped=False):
             os.close(events_read)
     result = None
     forced = False
+    sampling_failed = False
 
     def reaped(pid, status):
         nonlocal result
@@ -55,6 +57,12 @@ def supervise(arguments, clock, sleep, report_reaped=False):
                 pass
 
     while True:
+        if resources is not None and not sampling_failed:
+            try:
+                resources.sample()
+            except (OSError, ValueError, IndexError):
+                sampling_failed = True
+                sys.stderr.write("Diagnostic resource sampling failed; owned cleanup continues\n")
         try:
             pid, status = os.waitpid(-1, os.WNOHANG)
         except ChildProcessError:
@@ -85,10 +93,25 @@ def supervise(arguments, clock, sleep, report_reaped=False):
     if forced:
         sys.stderr.write("Fixture supervision deadline exceeded; owned descendants terminated\n")
         return 1
-    return 1 if result is None else result
+    return 1 if result is None or sampling_failed else result
 
 
 if __name__ == "__main__":
-    report_reaped = len(sys.argv) > 1 and sys.argv[1] == "--report-reaped"
-    arguments = sys.argv[2:] if report_reaped else sys.argv[1:]
-    sys.exit(supervise(arguments, time.monotonic, time.sleep, report_reaped))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--report-reaped", action="store_true")
+    parser.add_argument("--resources", help="Exclusive new private Linux diagnostic NDJSON file")
+    parser.add_argument("command", nargs=argparse.REMAINDER)
+    options = parser.parse_args()
+    if not options.command:
+        parser.error("A fixture command is required")
+    samples = None
+    if options.resources is not None:
+        from process_resources import ResourceSamples
+        samples = ResourceSamples(options.resources, os.getpid(), time.monotonic)
+    outcome = 1
+    try:
+        outcome = supervise(options.command, time.monotonic, time.sleep, options.report_reaped, samples)
+    finally:
+        if samples is not None:
+            samples.close(outcome)
+    sys.exit(outcome)

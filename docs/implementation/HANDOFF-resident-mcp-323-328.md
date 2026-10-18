@@ -246,3 +246,14 @@ with actual kernel-owned exit; it is diagnostic, not a production pass. See the
 No production code, deadline or validation changed. Backend-only profiling and a
 single instrumented pass are insufficient to choose an optimization or claim
 reliable performance. Per-process phase evidence remains the next diagnostic need.
+
+## Whole-tree diagnostic observer
+
+The reaper has an optional private `--resources <new-file>` Linux CPU/RSS
+observer with executable checks. It does not change the ordinary qualification
+path or any deadline. The corrected diagnostic run captured the client parents
+and observed descendants but failed all ten connections; its retained raw data,
+scope and cleanup are in the [qualification report](issue-328.md#optional-whole-tree-resource-observer-2026-10-17).
+Short-lived processes/final CPU may be missed, RSS sums are not physical memory,
+and sampling adds overhead. No stable limiter or performance budget is established.
+All six tickets remain incomplete.
