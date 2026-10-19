@@ -294,3 +294,33 @@ failures. The original failed logs remain preserved.
 The affected-file Oxlint and dprint checks passed. `pnpm typecheck` checked all
 1477 files with zero errors or warnings. These focused checks do not replace the
 required final coherent `check-all` run.
+
+### Coherent gate attempt 60fc4c1b
+
+`GOMAXPROCS=2 pnpm check-all` passed every stage before tests and coverage,
+including the strict TypeScript/Effect diagnostics over 1477 files, build,
+schema checks, dependency checks, CLI checks, lint and duplication. The SDK
+parity stage retained its existing optional partial note because the reference
+platform model directory is absent. Tests and coverage exceeded the unchanged
+300-second bound. Vitest was terminated before printing a final test count or
+coverage summary, so this run proves neither a test pass nor the 99% coverage
+threshold. The complete log, partial coverage chunks and hash manifest are
+retained under `/tmp/resident-launch-model-a2935a11`.
+
+Eight process-fixture failures were recoverable from their retained roots:
+six shared-model-wait cases and both ten-reader protocol cases. The ten-reader
+logs show clients waiting beyond the existing five-second discovery or
+initialization allowance; most did not proceed to a business read. The
+model-wait roots stopped while awaiting the initial parents or a second caller,
+and their captured parent output does not identify the exact cause. Reaper
+resource samples during those cases recorded one-minute host load averages from
+14.3 through 31.4. That host pressure is relevant context, but the receipts do
+not prove it was the sole cause. Other `x` markers appeared in Vitest's progress
+output, but the timeout prevented identification of all affected tests. No
+deadlines, worker count, grouping, coverage threshold, or behavioral assertion
+was changed.
+
+The built MCP artifact hash remained
+`22f5655a8a2b04483efa3ff628b64b1dc32d58a06171730707a276c522fd9a13`; the
+runtime sources were unchanged by this fixture cleanup. The gate remains failed
+and local-Huly read/write qualification is still pending.
