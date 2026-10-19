@@ -340,3 +340,23 @@ state. The selected run's exact receipts are indexed in
 `model-wait-six-after-gate.json`. These focused results support a host-load
 sensitivity explanation for those process failures, but do not establish one
 exclusive cause or convert the timed-out coherent gate into a pass.
+
+### Coherent gate pass after focused fixture coverage
+
+The current candidate's `GOMAXPROCS=2 pnpm check-all` exited successfully.
+Vitest completed all 5891 tests in 223.89 seconds across 524 passing files.
+Coverage passed the unchanged global thresholds: statements 99.44% (29940/30107),
+branches 99.00% (12678/12806), functions 99.02% (8121/8201), and lines 99.55%
+(27482/27605). TypeScript and Effect diagnostics checked 1478 files with zero
+errors or warnings. Build, schema boundaries, circular dependency detection,
+complexity, lint, duplication, registry/README/CLI verification also passed.
+SDK parity retained its existing optional partial result because
+`.reference/platform/models` is absent.
+
+The passing candidate adds real-stream coverage for buffered stdin bytes,
+pre-existing EOF, delayed stdin failure, and single-use handoff. It also adds
+real-child coverage for probe error sanitization, child reaping after caller
+failure, nonzero exit, stdin error, invalid spawn arguments, and killing a child
+that remains alive after EOF. The five-second process probe bound and all global
+coverage thresholds remain unchanged. These tests do not replace the still
+pending local-Huly read/write certification.
