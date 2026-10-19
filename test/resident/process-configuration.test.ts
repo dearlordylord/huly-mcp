@@ -45,22 +45,48 @@ it.skipIf(process.platform !== "linux")("reads a Linux XDG stdio profile through
   })
 )
 
-it("uses captured authority and context even when ambient profile and credentials differ", async () => {
-  await Effect.runPromise(
-    Effect.gen(function* () {
-      const captured = yield* captureResidentSelection(environment)
-      const selected = yield* resolveProcessConfiguration(
-        "stdio",
-        { HULY_PROFILE: "missing", HULY_TOKEN: "other" },
-        captured
-      )
-      const config = yield* HulyConfigService.pipe(Effect.provide(selected.configLayer))
-      expect(config.workspace).toBe("process")
-      expect(selected.lazyEnvs).toBe(true)
-      expect(selected.runtimeConfigContext()).toBe(captured.runtimeContext)
-    }).pipe(Effect.provide(provideEnvironment))
-  )
-})
+it.each(["token", "password"] as const)(
+  "uses captured %s authority and context even when ambient profile and credentials differ",
+  async (method) => {
+    const input =
+      method === "token"
+        ? environment
+        : {
+            HULY_URL: environment.HULY_URL,
+            HULY_WORKSPACE: environment.HULY_WORKSPACE,
+            HULY_EMAIL: "captured-fixture-email",
+            HULY_PASSWORD: " captured-private-password ",
+            LAZY_ENVS: "true"
+          }
+    const ambient = {
+      ...environment,
+      HULY_URL: "https://ambient.invalid",
+      HULY_WORKSPACE: "ambient",
+      HULY_TOKEN: "ambient-fixture-token",
+      HULY_PROFILE: "missing"
+    }
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const captured = yield* captureResidentSelection(input)
+        const selected = yield* resolveProcessConfiguration("http", ambient, captured)
+        const config = yield* HulyConfigService.pipe(Effect.provide(selected.configLayer))
+        expect(config.url).toBe(environment.HULY_URL)
+        expect(config.workspace).toBe("process")
+        expect(config.auth._tag).toBe(method)
+        expect(selected.authMethod).toBe(method)
+        if (config.auth._tag === "token")
+          expect(Redacted.value(config.auth.token) === environment.HULY_TOKEN).toBe(true)
+        else {
+          expect(config.auth.email).toBe("captured-fixture-email")
+          expect(Redacted.value(config.auth.password) === " captured-private-password ").toBe(true)
+        }
+        expect(selected.lazyEnvs).toBe(true)
+        expect(selected.runtimeConfigContext()).toBe(captured.runtimeContext)
+        expect(JSON.stringify(selected.runtimeConfigContext()).includes("captured-private-password")).toBe(false)
+      }).pipe(Effect.provide(ConfigProvider.layer(ConfigProvider.fromUnknown(ambient))))
+    )
+  }
+)
 
 it("preserves lazy environment configuration for both token and password authentication", async () => {
   for (const auth of [
