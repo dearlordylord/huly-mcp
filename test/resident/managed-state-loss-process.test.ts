@@ -6,7 +6,7 @@ import { promisify } from "node:util"
 import { Schema } from "effect"
 import { afterAll, beforeAll, expect, it } from "vitest"
 
-import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, ESBUILD_EXECUTABLE, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { StateLossObservation } from "./state-loss-observation.js"
 
@@ -26,10 +26,8 @@ beforeAll(async () => {
     ["managed-native-host", host]
   ])
     await runFile(
-      "pnpm",
+      ESBUILD_EXECUTABLE,
       [
-        "exec",
-        "esbuild",
         `test/resident/fixtures/${source}.ts`,
         "--bundle",
         "--platform=node",

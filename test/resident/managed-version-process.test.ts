@@ -7,7 +7,7 @@ import { Schema } from "effect"
 import { expect, it } from "vitest"
 
 import { MANAGED_PACKAGE_NAME } from "../../src/resident/managed-contract.js"
-import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, ESBUILD_EXECUTABLE, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { VersionCoexistenceObservation } from "./version-coexistence-observation.js"
 
@@ -64,10 +64,8 @@ it.skipIf(process.platform !== "linux")(
         ["managed-version-coexistence", fixture]
       ])
         await runFile(
-          "pnpm",
+          ESBUILD_EXECUTABLE,
           [
-            "exec",
-            "esbuild",
             `test/resident/fixtures/${source}.ts`,
             "--bundle",
             "--platform=node",

@@ -6,7 +6,7 @@ import { promisify } from "node:util"
 import { Result, Schema } from "effect"
 import { expect, it } from "vitest"
 
-import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, ESBUILD_EXECUTABLE, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import {
   PROJECT_READS,
@@ -37,10 +37,8 @@ it
     let passed = false
     try {
       await runFile(
-        "pnpm",
+        ESBUILD_EXECUTABLE,
         [
-          "exec",
-          "esbuild",
           "test/resident/fixtures/restricted-native.ts",
           "--bundle",
           "--platform=node",
@@ -51,10 +49,8 @@ it
         { timeout: PROCESS_BOUND }
       )
       await runFile(
-        "pnpm",
+        ESBUILD_EXECUTABLE,
         [
-          "exec",
-          "esbuild",
           "test/resident/fixtures/restricted-preload.ts",
           "--bundle",
           "--platform=node",

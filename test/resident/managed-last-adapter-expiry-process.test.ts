@@ -6,7 +6,7 @@ import { promisify } from "node:util"
 import { Schema } from "effect"
 import { expect, it } from "vitest"
 
-import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, ESBUILD_EXECUTABLE, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { ManagedExpiryObservation } from "./managed-expiry-observation.js"
 
@@ -26,10 +26,8 @@ it.skipIf(process.platform !== "linux")(
     let passed = false
     try {
       await runFile(
-        "pnpm",
+        ESBUILD_EXECUTABLE,
         [
-          "exec",
-          "esbuild",
           "test/resident/fixtures/managed-last-adapter-expiry.ts",
           "--bundle",
           "--platform=node",

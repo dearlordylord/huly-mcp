@@ -6,7 +6,7 @@ import { dirname, join } from "node:path"
 import { Schema } from "effect"
 import { afterAll, beforeAll, expect, it } from "vitest"
 
-import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, ESBUILD_EXECUTABLE, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { LiveReadProtocol } from "../../scripts/resident-live-read-contract.js"
 import { CrashedCommitObservation } from "./crashed-commit-observation.js"
@@ -35,10 +35,8 @@ beforeAll(async () => {
     ["retired-commit-backend", backend]
   ]) {
     await runFile(
-      "pnpm",
+      ESBUILD_EXECUTABLE,
       [
-        "exec",
-        "esbuild",
         `test/resident/fixtures/${name}.ts`,
         "--bundle",
         "--platform=node",

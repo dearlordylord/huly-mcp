@@ -6,7 +6,7 @@ import { promisify } from "node:util"
 import { Schema } from "effect"
 import { expect, it } from "vitest"
 
-import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, ESBUILD_EXECUTABLE, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { AuthorizedParentLossObservation } from "./authorized-parent-loss-contract.js"
 
@@ -35,10 +35,8 @@ it.skipIf(process.platform !== "linux")(
         ["authorized-launch-parent", parent]
       ])
         await runFile(
-          "pnpm",
+          ESBUILD_EXECUTABLE,
           [
-            "exec",
-            "esbuild",
             `test/resident/fixtures/${source}.ts`,
             "--bundle",
             "--platform=node",

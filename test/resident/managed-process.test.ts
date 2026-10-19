@@ -1,4 +1,4 @@
-import { NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
+import { ESBUILD_EXECUTABLE, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { execFile } from "node:child_process"
 import * as fs from "node:fs/promises"
 import { join } from "node:path"
@@ -34,10 +34,8 @@ beforeAll(async () => {
   fixtureDirectory = await fs.mkdtemp(join(process.cwd(), "dist", "managed-bootstrap-peer-"))
   const file = join(fixtureDirectory, "peer.cjs")
   await runFile(
-    "pnpm",
+    ESBUILD_EXECUTABLE,
     [
-      "exec",
-      "esbuild",
       "test/resident/fixtures/managed-bootstrap-peer.ts",
       "--bundle",
       "--platform=node",

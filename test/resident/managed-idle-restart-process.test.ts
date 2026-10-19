@@ -8,7 +8,7 @@ import { Schema } from "effect"
 import { expect, it } from "vitest"
 
 import { ResidentPackagePath } from "../../src/resident/managed-contract.js"
-import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, ESBUILD_EXECUTABLE, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { IdleRestartObservation, REPLACEMENT_PARENT_COUNT } from "./idle-restart-observation.js"
 
@@ -36,10 +36,8 @@ it.skipIf(process.platform !== "linux")(
         ["managed-native-host", host]
       ])
         await runFile(
-          "pnpm",
+          ESBUILD_EXECUTABLE,
           [
-            "exec",
-            "esbuild",
             `test/resident/fixtures/${source}.ts`,
             "--bundle",
             "--platform=node",

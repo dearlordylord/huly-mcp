@@ -1,11 +1,13 @@
 import { execFile } from "node:child_process"
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { isAbsolute, join } from "node:path"
+import { createRequire } from "node:module"
 import { promisify } from "node:util"
 import { createHash } from "node:crypto"
 import { Schema } from "effect"
 
 const runFile = promisify(execFile)
+export const ESBUILD_EXECUTABLE = createRequire(import.meta.url).resolve("esbuild/bin/esbuild")
 export const NATIVE_RUNTIME_EXTERNALS = ["--external:ws", "--external:@napi-rs/keyring", "--external:dbus-next"]
 export const StdioBundleGrant = Schema.Struct({
   path: Schema.NonEmptyString.check(Schema.makeFilter(isAbsolute)),

@@ -7,7 +7,7 @@ import { promisify } from "node:util"
 import { Schema } from "effect"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
-import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, ESBUILD_EXECUTABLE, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { residentSelectionEnvironment } from "../helpers/resident-selection-environment.js"
 import { ErrorRoutingInput, ErrorRoutingReceipt } from "./error-routing-contract.js"
 
@@ -30,10 +30,8 @@ describe.skipIf(process.platform !== "linux")("packaged shared backend error rou
       ["error-routing-pair", driver]
     ])
       await runFile(
-        "pnpm",
+        ESBUILD_EXECUTABLE,
         [
-          "exec",
-          "esbuild",
           `test/resident/fixtures/${source}.ts`,
           "--bundle",
           "--platform=node",

@@ -8,7 +8,7 @@ import { Schema } from "effect"
 import { expect, it } from "vitest"
 
 import { ResidentPackagePath } from "../../src/resident/managed-contract.js"
-import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, ESBUILD_EXECUTABLE, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import {
   ManagedRequestLossObservation,
@@ -39,10 +39,8 @@ it.skipIf(process.platform !== "linux").each(ManagedRequestLossPoint.literals)(
       )(await fs.readFile("package.json", "utf8")).version
       if (point === "drain")
         await runFile(
-          "pnpm",
+          ESBUILD_EXECUTABLE,
           [
-            "exec",
-            "esbuild",
             "test/resident/fixtures/managed-sdk-drain-backend.ts",
             "--bundle",
             "--platform=node",
@@ -54,10 +52,8 @@ it.skipIf(process.platform !== "linux").each(ManagedRequestLossPoint.literals)(
           { timeout: PROCESS_BOUND }
         )
       await runFile(
-        "pnpm",
+        ESBUILD_EXECUTABLE,
         [
-          "exec",
-          "esbuild",
           "test/resident/fixtures/managed-request-loss.ts",
           "--bundle",
           "--platform=node",

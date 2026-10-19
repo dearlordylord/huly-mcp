@@ -6,7 +6,7 @@ import { promisify } from "node:util"
 import { Schema } from "effect"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
-import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, ESBUILD_EXECUTABLE, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { ManagedParentObservation } from "./managed-observation.js"
 
@@ -26,10 +26,8 @@ describe.skipIf(process.platform !== "linux")("managed native backend", () => {
     host = join(dirname(bundle.path), "managed-native-host.cjs")
     race = join(dirname(bundle.path), "managed-ten-parents.cjs")
     await runFile(
-      "pnpm",
+      ESBUILD_EXECUTABLE,
       [
-        "exec",
-        "esbuild",
         "test/resident/fixtures/managed-native-host.ts",
         "--bundle",
         "--platform=node",
@@ -40,10 +38,8 @@ describe.skipIf(process.platform !== "linux")("managed native backend", () => {
       { timeout: PROCESS_BOUND }
     )
     await runFile(
-      "pnpm",
+      ESBUILD_EXECUTABLE,
       [
-        "exec",
-        "esbuild",
         "test/resident/fixtures/managed-ten-parents.ts",
         "--bundle",
         "--platform=node",

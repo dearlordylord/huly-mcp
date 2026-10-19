@@ -6,7 +6,7 @@ import { promisify } from "node:util"
 import { Schema } from "effect"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
-import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, ESBUILD_EXECUTABLE, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { StopFaultObservation } from "./stop-fault-observation.js"
 
@@ -34,10 +34,8 @@ describe.skipIf(process.platform !== "linux")("managed stop during committed fix
       ["managed-stop-fault", fixture]
     ])
       await runFile(
-        "pnpm",
+        ESBUILD_EXECUTABLE,
         [
-          "exec",
-          "esbuild",
           `test/resident/fixtures/${source}.ts`,
           "--bundle",
           "--platform=node",

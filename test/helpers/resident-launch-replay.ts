@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process"
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { promisify } from "node:util"
 import { Exit, Option, Schema } from "effect"
 
@@ -59,7 +59,11 @@ export const replayResidentAdmissions = async (
     await runFile(
       process.execPath,
       [cli, "test", path, "--backend=typescript", "--match", "Test$", "--max-samples=1"],
-      { timeout: 4_000, killSignal: "SIGKILL" }
+      {
+        timeout: 4_000,
+        killSignal: "SIGKILL",
+        env: { ...process.env, NODE_COMPILE_CACHE: join(dirname(cli), "compile-cache") }
+      }
     )
   } catch (error) {
     const parsed = Schema.decodeUnknownExit(QuintTestFailure)(error)

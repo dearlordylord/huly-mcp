@@ -25,7 +25,7 @@ import { makeResidentAdmissions } from "../../src/resident/admissions.js"
 import { ResidentAttachment, withPublishedResidentAttachment } from "../../src/resident/attachment-file.js"
 import { AUTHORIZATION, withNativeServer, type OwnerName, type Owner } from "../helpers/resident-native-fixture.js"
 import { withRegistryDirectory } from "../helpers/resident-registry-fixture.js"
-import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, ESBUILD_EXECUTABLE, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { residentSelectionEnvironment } from "../helpers/resident-selection-environment.js"
 import { captureResidentSelection } from "../../src/resident/selection-config.js"
 import { makeCompatibilityAuthority } from "../../src/resident/compatibility-authority.js"
@@ -76,10 +76,8 @@ describe.skipIf(process.platform !== "linux")("supervised live-read wire probe",
     )
     probe = join(dirname(bundle.path), "live-read-probe.cjs")
     await runFile(
-      "pnpm",
+      ESBUILD_EXECUTABLE,
       [
-        "exec",
-        "esbuild",
         "scripts/integration-resident-read-pair.ts",
         "--bundle",
         "--platform=node",

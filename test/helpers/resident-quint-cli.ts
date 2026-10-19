@@ -1,5 +1,7 @@
 import { copyFile, mkdtemp, rm } from "node:fs/promises"
 import { dirname, join } from "node:path"
+import { execFile } from "node:child_process"
+import { promisify } from "node:util"
 import { build } from "esbuild"
 
 import { ResidentPackagePath } from "../../src/resident/managed-contract.js"
@@ -22,6 +24,12 @@ export const prepareResidentQuintCli = async () => {
     })
     for (const asset of ["builtin.qnt", "reflection.proto"])
       await copyFile(join(dirname(source), asset), join(directory, asset))
+    // Prepare Node bytecode separately; each real replay retains its four-second execution bound.
+    await promisify(execFile)(process.execPath, [cli, "--version"], {
+      timeout: 30_000,
+      killSignal: "SIGKILL",
+      env: { ...process.env, NODE_COMPILE_CACHE: join(directory, "compile-cache") }
+    })
     return { cli: ResidentPackagePath.make(cli), cleanup }
   } catch (error) {
     await cleanup().catch(() => {

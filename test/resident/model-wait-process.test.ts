@@ -8,7 +8,7 @@ import { Schema } from "effect"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
 import { fixturePackageVersion } from "../helpers/resident-fixture.js"
-import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, ESBUILD_EXECUTABLE, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { residentSelectionEnvironment } from "../helpers/resident-selection-environment.js"
 import { ModelWaitPairInput, ModelWaitReceipt } from "./model-wait-contract.js"
 
@@ -40,10 +40,8 @@ describe.skipIf(process.platform !== "linux")("packaged shared model waiter isol
       ["managed-idle-clock-backend", clockBackend]
     ])
       await runFile(
-        "pnpm",
+        ESBUILD_EXECUTABLE,
         [
-          "exec",
-          "esbuild",
           `test/resident/fixtures/${source}.ts`,
           "--bundle",
           "--platform=node",

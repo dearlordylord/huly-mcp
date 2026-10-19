@@ -13,7 +13,7 @@ import {
   LiveReadProbeDiagnostic
 } from "../../scripts/resident-live-read-contract.js"
 import { withRegistryDirectory } from "../helpers/resident-registry-fixture.js"
-import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, ESBUILD_EXECUTABLE, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { residentSelectionEnvironment } from "../helpers/resident-selection-environment.js"
 import { DisposableRestProject, startDisposableRestFixture } from "./disposable-rest-fixture.js"
 
@@ -57,10 +57,8 @@ describe.skipIf(process.platform !== "linux")("managed live-read campaign probe"
     bundle = await buildIsolatedStdioServer(PROCESS_BOUND)
     probe = join(dirname(bundle.path), "managed-live-read-probe.cjs")
     await runFile(
-      "pnpm",
+      ESBUILD_EXECUTABLE,
       [
-        "exec",
-        "esbuild",
         "scripts/integration-resident-read-pair.ts",
         "--bundle",
         "--platform=node",

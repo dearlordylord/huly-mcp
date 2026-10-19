@@ -8,7 +8,7 @@ import { Schema } from "effect"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
 import { ResidentPackagePath } from "../../src/resident/managed-contract.js"
-import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, ESBUILD_EXECUTABLE, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { residentSelectionEnvironment } from "../helpers/resident-selection-environment.js"
 import { MixedLaunchInput, MixedLaunchReceipt } from "./mixed-launch-contract.js"
 
@@ -33,10 +33,8 @@ describe.skipIf(process.platform !== "linux")("packaged mixed explicit/automatic
       ["mixed-launch", driver]
     ])
       await runFile(
-        "pnpm",
+        ESBUILD_EXECUTABLE,
         [
-          "exec",
-          "esbuild",
           `test/resident/fixtures/${source}.ts`,
           "--bundle",
           "--platform=node",

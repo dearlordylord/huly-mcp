@@ -11,7 +11,7 @@ import { Deferred, Effect, Schema } from "effect"
 import { McpSchema } from "effect/ai"
 import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFailed } from "vitest"
 
-import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, ESBUILD_EXECUTABLE, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { residentSelectionEnvironment } from "../helpers/resident-selection-environment.js"
 import { NativeHostObservation } from "./native-host-observation.js"
@@ -284,10 +284,8 @@ describe("manual adapters against the packaged native HTTP backend", { timeout: 
   it.each(["modern", "legacy"])("serves %s catalogs to adapters owned by independent parents", async (mode) => {
     if (!nativeHostPrepared) {
       await runFile(
-        "pnpm",
+        ESBUILD_EXECUTABLE,
         [
-          "exec",
-          "esbuild",
           "test/resident/fixtures/native-host.ts",
           "--bundle",
           "--platform=node",

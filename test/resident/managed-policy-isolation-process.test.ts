@@ -8,7 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFailed } f
 
 import { LiveReadProtocol } from "../../scripts/resident-live-read-contract.js"
 
-import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, ESBUILD_EXECUTABLE, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { ManagedPolicyObservation, ManagedPolicyScenario } from "./managed-policy-observation.js"
 
@@ -26,10 +26,8 @@ describe.skipIf(process.platform !== "linux")("packaged managed policy isolation
     bundle = await buildIsolatedStdioServer(BUILD_BOUND)
     fixture = join(dirname(bundle.path), "managed-policy-isolation.cjs")
     await runFile(
-      "pnpm",
+      ESBUILD_EXECUTABLE,
       [
-        "exec",
-        "esbuild",
         "test/resident/fixtures/managed-policy-isolation.ts",
         "--bundle",
         "--platform=node",
