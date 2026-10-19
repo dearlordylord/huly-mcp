@@ -324,3 +324,19 @@ The built MCP artifact hash remained
 `22f5655a8a2b04483efa3ff628b64b1dc32d58a06171730707a276c522fd9a13`; the
 runtime sources were unchanged by this fixture cleanup. The gate remains failed
 and local-Huly read/write qualification is still pending.
+
+After that timeout, the exact ten-reader process file passed both protocol cases
+in 6.92 seconds. Each receipt binds package 22f565…, ten independent parents and
+adapters, two colliding-ID read rounds, one model request, all parent/adapter
+exits 0, backend kernel exit 0 and removed private state. The reaper recorded a
+one-minute host load average of 6.25. The receipts and command log are indexed in
+`ten-reader-focused-after-gate.json`.
+
+The six model-wait variants that failed during the overloaded gate then passed
+in a targeted 33.10-second run; the other two variants were skipped there and
+had successful receipts in the gate attempt. All eight current-package receipts
+bind package 22f565…, both parent exits 0, backend exit 0 and removed private
+state. The selected run's exact receipts are indexed in
+`model-wait-six-after-gate.json`. These focused results support a host-load
+sensitivity explanation for those process failures, but do not establish one
+exclusive cause or convert the timed-out coherent gate into a pass.
