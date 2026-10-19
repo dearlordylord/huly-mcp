@@ -100,3 +100,34 @@ client acquisition fiber and a required private status field. Artifact333 remain
 the exact measured candidate above; those measurements are not relabeled as
 measurements of the later package. Review did not require repeating the entire
 performance campaign solely for this projection. Its performance was not measured.
+
+### Focused functional-fixture retirement
+
+Ordinary successful read/routing/isolation fixtures now request authenticated
+stop of their exact generation after their business assertions and parent joins.
+They still require matching kernel-owned exit0 and their existing private-state
+assertions. Stop acknowledgement alone never establishes retirement. The control
+observation (5 seconds) and existing owned-exit observation (7 seconds) start
+concurrently, and both settle before returning even when one fails. Only an
+explicit target-missing result after exact owned exit0 can describe an owner
+that retired before control lookup; every other refusal or unconfirmed response
+fails qualification.
+
+Focused receipts are retained under
+`/tmp/resident-launch-model-a2935a11/functional-cleanup-{ten-readers,core,output}.json`:
+2, 17, and 6 tests passed respectively. Core/ten-reader runs preceded the final
+settlement-only correction; output/burst exercised the corrected helper. These
+are local functional checks, not a measured full-gate speedup. Dedicated idle,
+lease, drain, retirement, parent-loss and frozen benchmark cases remain unchanged.
+This removes incidental production idle waits without shortening those policies
+or increasing the test limits. A passing final coherent gate remains required.
+
+The corrected-helper ten-reader rerun is retained separately as
+`functional-cleanup-ten-readers-final.json`: one passed, one failed. The modern
+case exceeded the unchanged five-second initialization/discovery allowance before
+reaching functional cleanup; the older protocol completed. This is a retained
+startup qualification failure, not a passing rerun or evidence of retirement
+failure. No coherent-gate retry is admitted from this result. Spec review found
+no weakened business, ownership, idle/lease, or retirement assertions in the six
+migrations. The Standards finding about control outliving a rejected owned-exit
+observation was fixed by settling both operations before returning.

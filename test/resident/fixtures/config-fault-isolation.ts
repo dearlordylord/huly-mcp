@@ -5,6 +5,7 @@ import { strict as assert } from "node:assert"
 import * as fs from "node:fs/promises"
 import { join } from "node:path"
 import { Deferred, Effect, Result, Schema } from "effect"
+import { retireFunctionalResident } from "../../helpers/resident-retirement.js"
 import { HostMessage } from "../../../src/resident/request-headers.js"
 import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
 
@@ -202,7 +203,11 @@ const main = async () => {
     assert.equal(survivorAdapterExit.signal, null)
     assert.deepEqual(await survivor.close(), [0, null])
     stage = "survivor-backend-close"
-    const survivorBackendExit = await kernel.wait(ownerB.envelope.diagnostics.processId)
+    const survivorBackendExit = await retireFunctionalResident(
+      { directory: input.directory, generation: ownerB.envelope.generation },
+      ownerB.envelope.diagnostics.processId,
+      kernel
+    )
     assert.equal(survivorBackendExit.exitCode, 0)
     stage = "failed-parent-close"
     const fault = await (async () => {

@@ -2,6 +2,7 @@ import * as fs from "node:fs/promises"
 import { Effect, Schema } from "effect"
 
 import { currentPosixOwner, inspectPrivateDirectory } from "../src/resident/protected-path.js"
+import { retireFunctionalResident } from "../test/helpers/resident-retirement.js"
 import type { openKernelReapedEvents } from "../test/helpers/kernel-reaped-events.js"
 import {
   resolveLiveReadProtocol,
@@ -65,7 +66,8 @@ export const observeManagedLiveReadPair = Effect.fn("observeManagedLiveReadPair"
       return yield* new LiveReadProbeError({ phase: "pair" })
   }
   const backendExit = yield* Effect.tryPromise({
-    try: () => kernel.wait(a.backendProcessId),
+    try: () =>
+      retireFunctionalResident({ directory: input.directory, generation: a.generation }, a.backendProcessId, kernel),
     catch: () => new LiveReadProbeError({ phase: "retirement" })
   })
   if (backendExit.exitCode !== 0 || (yield* probeIo("retirement", () => fs.readdir(input.directory))).length !== 0)

@@ -8,6 +8,7 @@ import { readResidentNamespace } from "../../../src/resident/namespace-inventory
 import { readResidentLiveStatus } from "../../../src/resident/status-client.js"
 import type { ResidentLiveStatus } from "../../../src/resident/status-contract.js"
 import { openKernelReapedEvents, ReapedEventsFd } from "../../helpers/kernel-reaped-events.js"
+import { retireFunctionalResident } from "../../helpers/resident-retirement.js"
 import { boundActiveQuery, spawnActiveQueryParent } from "../../helpers/active-query-parent.js"
 import { DisposableRestProject, startDisposableRestFixture } from "../disposable-rest-fixture.js"
 import {
@@ -148,8 +149,12 @@ const main = async () => {
       exits,
       parents.map(() => [0, null])
     )
-    phase("ten parent exits joined; await kernel backend retirement")
-    const backendExit = await kernel.wait(record.envelope.diagnostics.processId)
+    phase("ten parent exits joined; stop and join exact backend")
+    const backendExit = await retireFunctionalResident(
+      { directory: input.directory, generation: idle.generation },
+      record.envelope.diagnostics.processId,
+      kernel
+    )
     assert.equal(backendExit.exitCode, 0)
     assert.deepEqual(await fs.readdir(input.directory), [])
     const counts = Schema.decodeUnknownSync(

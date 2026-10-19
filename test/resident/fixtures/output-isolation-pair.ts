@@ -4,6 +4,7 @@ import * as fs from "node:fs/promises"
 import { join } from "node:path"
 import { Deferred, Effect, Result, Schema } from "effect"
 
+import { retireFunctionalResident } from "../../helpers/resident-retirement.js"
 import { readResidentNamespace } from "../../../src/resident/namespace-inventory.js"
 import { readResidentLiveStatus } from "../../../src/resident/status-client.js"
 import { type ResidentLiveStatus } from "../../../src/resident/status-contract.js"
@@ -151,9 +152,13 @@ const main = async () => {
       [0, null],
       [0, null]
     ])
-    phase("both parent exits joined; await kernel backend retirement")
+    phase("both parent exits joined; stop and join exact backend")
     const backendPid = record.envelope.diagnostics.processId
-    const backendExit = await kernel.wait(backendPid)
+    const backendExit = await retireFunctionalResident(
+      { directory: input.directory, generation: idle.generation },
+      backendPid,
+      kernel
+    )
     assert.equal(backendExit.exitCode, 0)
     assert.deepEqual(await fs.readdir(input.directory), [])
     const counts = Schema.decodeUnknownSync(
