@@ -75,3 +75,64 @@ assertion. This demonstrates the scoped isolation behavior with disposable REST
 data; live Huly, native macOS, startup stability, the other lifecycle cases and
 the full quality gate remain separate qualification work. Empty state and process
 absence alone are not kernel exit proof for the earlier failed discovery attempt.
+
+## Protected work and shared-model waiting — criterion 3
+
+The current Linux checks passed all eight combinations of MCP revision
+(`2026-07-28`/`2025-06-18`), canceled role (model-load creator/joiner), and clock
+(real elapsed time/injected clock). Two independent adapters share one full-model
+load. Canceling one waiter leaves the other waiting and then completing its
+expected project read; a fresh read through the same generation also succeeds.
+Retained requests move from two to one to zero. Each successful receipt includes
+parent joins, backend kernel exit 0 and private-state removal.
+
+Model-wait cases alone retain live attachments and do not establish protection
+without membership. Three additional checks cover that boundary, including an
+actual SIGKILL of the only adapter, injected lease expiry and held request
+cleanup. The same generation remains alive across multiple idle intervals until
+cleanup is released; retirement then waits a new full idle interval. The process
+receipt records exactly one business dispatch, backend exit 0 and removed state.
+
+Evidence under `/tmp/resident-auth-config-0db836c2`:
+
+- `model-wait-current.json`: eight passes; `work-protection-observed-cases.json`
+  records the eight distinct receipt roots and their protocol/role/clock keys.
+- `idle-protected-work-current.json`: three passes.
+- `/tmp/resident-idle-work-nmwAks.receipt.json`: independent expired-membership
+  process receipt.
+
+Injected-clock cases qualify ordering, not measured physical durations. These
+checks use disposable local REST data; live Huly and native macOS remain separate.
+
+## Idle/admission ordering — criterion 4
+
+Seven focused component checks and two native process checks passed. They cover
+an admission begun before idle expiry, idle fencing before admission, the
+retained compatible admission path, fresh work on an accepting generation and
+refusal during held cleanup. After confirmed retirement, a new caller can start
+a distinct generation. The process cases join the owned backend exits and
+verify private-state removal.
+
+The reports are `idle-admission-order-current.json` and
+`idle-fence-process-current.json` in the evidence directory above.
+`idle-order-observed-cases.json` records the two exact native receipt paths and
+SHA-256 hashes. This qualifies
+the defined orderings; it is not exhaustive enumeration of OS schedules.
+
+## Drain and native-resource retention — criterion 5
+
+Sixteen focused checks passed across `admission-fence.test.ts`,
+`native-session-ownership.test.ts`, `resident-client-close.test.ts` and
+`resource-shutdown.test.ts`. Drain fences new admission, retains native session
+UUIDs and client leases until cleanup confirms, closes a client once, and
+preserves typed/redacted close failures and the existing five-second close bound.
+A quiesced native resource-discovery request is refused before Huly dispatch.
+The startup sequence awaits admission cleanup before closing the shared client;
+a failed drain does not authorize premature shared-client closure.
+
+`drain-retention-current.json` retains the sixteen results.
+`retirement-focused-results.json` summarizes these five focused groups: 8, 3, 7,
+2 and 16 passes, with zero failures. Fresh Spec review accepted the scoped
+criterion-3/4/5 evidence. These results do not establish native macOS behavior,
+full lifecycle-model coverage, the final combined quality gate or completion of
+all issue-326 criteria.

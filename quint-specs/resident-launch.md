@@ -1,105 +1,157 @@
-# Resident launch model sketch
+# Resident launch and retirement model
 
-Status: proposed types awaiting approval. `resident-launch.qnt` typechecks. It
-has no initialization, transitions, invariants or simulation results. The
-response-ownership model remains separate and unchanged.
+The user approved the independent state fields and plain Quint coordination
+model on 2026-10-18. The executable model now covers startup, attachment,
+request ownership, lease expiry, drain, owner loss and verified replacement.
+Bounded simulation is qualification of this abstract model, not exhaustive
+verification of the implementation. The separate response-ownership model is
+unchanged.
 
-## Scope and actors
+## Contract and state
 
-The source contract is GitHub #322 through #328,
+The source contract is GitHub #322–328,
 [ADR 0003](../docs/adr/0003-adopt-mcporter-resident-lifecycle.md) and
-[the selected lifecycle contract](../docs/adr/0003-adopt-mcporter-resident-lifecycle.md).
-The sketch follows the adopted MCPorter lifecycle practices: callers, native
-backends, namespace selection claims, publication receipts, attachment leases,
-requests and explicit retirement evidence. It does not require a guardian,
-restricted worker or operation journal.
+[the recovery decision](../docs/adr/0002-resident-recovery-without-operation-journal.md).
+There is no operation journal, replay queue, persisted reservation or
+cross-session operation-status lookup.
 
-`CallerId` denotes a unique adapter incarnation, not a reusable host name or wire
-request ID. Callers retain kill authority only before attempting Start. Backend
-resources and publication belong to their original generation. A lost receipt,
-PID or port cannot create authority to kill, delete or replace an unresolved
-owner. Application readiness remains separate from Huly model readiness.
+| Module | Responsibility |
+| --- | --- |
+| `resident-launch-types.qnt` | Approved caller, generation, claim, receipt, lease, request, resource and write-evidence types |
+| `resident-launch-core.qnt` | Captured selection, protected claim, Start transfer, application readiness, publication and attachment acquisition |
+| `resident-launch-requests.qnt` | Colliding wire IDs, shared-model waiting, cancellation, cleanup and separate remote/terminal evidence |
+| `resident-launch-lifetime.qnt` | Renewal, expiry, ordinary idle fencing, retained attachment owners and confirmed retirement |
+| `resident-launch-recovery.qnt` | Lost parent/backend/receipt, blocked selection, trusted retirement and stale-receipt cleanup decisions |
+| `resident-launch.qnt` | Independent state variables, guarded actions, default adversarial schedule, invariants and witnesses |
+| `resident-launch-observations.qnt` | Checked projection of actual admission-core decisions and inventory |
 
-`RetirementUnverified` blocks overlapping replacement. `OwnedClosureConfirmed`
-represents observed closure of actually owned resources. `OperatorRetirementVerified`
-is an explicit trusted input after verified local cleanup; it cannot be inferred
-from file absence, timeout, a diagnostic PID or an ordinary Huly read. Native
-verification of that input remains outside the abstract model's proof.
+`CallerId` identifies an adapter incarnation. Requests use `(adapter, ordinal)`;
+every modeled wire ID is deliberately 1. A new adapter cannot inherit the old
+invocation merely because a host reuses its JSON-RPC ID. Backend slots and their
+generations are used once; replacement consumes another slot.
 
-A backend crash may interrupt every client. The model must not require another
-client's request to survive that crash. Healthy-backend cancellation, EOF and
-ordinary idle shutdown retain their separate isolation/work-protection rules.
-Unexpected owner loss may produce bounded refusal rather than automatic failover.
-After verified retirement, concurrent callers serialize into one fresh generation.
+One protected state directory has one selection claim. Full selection keys
+contain independent symbolic authority, policy and implementation identities.
+These symbols are fixture identities, not exposed credential fingerprints.
+Different compatible groups may coexist after publication releases the claim.
+Callers retain kill authority only for their own prepared child, before attempting
+Start. `TransferOwner` covers the interval between revoking parent authority and
+child adoption. Start delivery checks the exact authenticated claim message.
 
-## Request evidence
+Application readiness and full Huly model readiness are independent. Attachment
+acquisition has separate beginning and completion transitions. A pending attempt
+protects the generation; a late owner after drain remains pending and owned until
+cleanup confirms. Lease eligibility, member ownership and request cleanup are
+separate facts. Expiry or cancellation cannot establish physical closure.
 
-There is no operation journal, persisted reservation, replay queue or cross-session
-operation-status lookup, as defined in
-[ADR 0002](../docs/adr/0002-resident-recovery-without-operation-journal.md).
-The `writes` map is specification/oracle history keyed by adapter incarnation and
-request ordinal, not runtime storage. Retaining this history across modeled actor
-loss lets the oracle detect replay without requiring application persistence.
+## Write uncertainty
 
-Backend terminal production, adapter receipt, queue admission and actual host
-observation are separate facts. Output write completion does not prove the host
-processed a result. Possible dispatch without a host-observed terminal result
-remains unconfirmed. An observed result remains known despite a later disconnect.
-No replacement restores an old invocation. Local retirement does not settle or
-cancel a remote Huly mutation; operation-specific reconciliation is separate.
-This has the same per-request uncertainty as standalone stdio.
+The `writes` map is verification-only oracle history. The application does not
+persist it. It distinguishes possible dispatch, remote outcome, backend terminal
+production, adapter receipt, adapter output queuing and actual host observation.
+A remote mutation can commit after local cleanup or retirement. Neither event
+turns an unobserved result into known failure. An already observed terminal
+result remains known after a later disconnect.
 
-## Transitions and evidence
+Dispatch occurs at most once per modeled invocation. Replacement cannot resume
+that invocation. This is not business-level deduplication of a deliberately new
+request submitted by a user. Operation-specific reconciliation is a separate,
+trusted input; ordinary local cleanup and arbitrary reads do not perform it.
+These are the same individual-request uncertainty windows as standalone stdio.
 
-The next increment would separate claim acquisition, Start attempt and delivery,
-application readiness, atomic publication and receipt observation, cancellation,
-drain, confirmed cleanup, unexpected backend loss, blocked selection, verified
-operator cleanup and replacement. Target dispatch, remote commit, terminal
-production, adapter receipt and host observation are separate crash windows.
+## Properties and schedules
 
-Intended checks are one admitted compatible owner, authenticated attachment,
-generation-fenced cleanup, no dispatch after waiting cancellation, no admission
-after drain, no ordinary idle retirement of protected work and no automatic replay.
-These checks are not implemented yet. Existing separate-parent concurrency cases,
-quality gates and deadlines remain independent requirements.
+The `safety` invariant checks unique unresolved compatible ownership, local
+pre-Start kill authority, captured attachment identity, publication identity,
+retired-resource closure, attachment/request resource ownership, and write
+history/delivery consistency. Accepting backends must retain their exact current
+locator. Stale cleanup actually compares a retained receipt with its target
+registry entry; it is not an assumed refusal event.
 
-The proposed sampled domain uses three caller incarnations, three backends,
-three generations, two compatibility identities and three invocations. It must
-cover concurrent startup, an independent configuration, ordinary retirement,
-blocked owner loss and a replacement after verified cleanup. Clock rounds order
-expiry; they do not certify measured deadlines.
+Explicit tests cover pending admission versus drain/idle, expired acquisition,
+shared-model cancellation, foreign-caller isolation with colliding wire IDs,
+uncertain writes across cleanup/replacement, remote commit after replacement,
+lost publication receipts, post-Start parent loss and unauthenticated Start.
+The first combined fault run found a model defect: attachment close overwrote
+request cleanup with a pre-interruption resource snapshot. The corrected transition
+updates the interrupted resource map. The retained ITF counterexample and an
+explicit cleanup-consistency scenario document that correction.
 
-Assume cooperating package writers and protected lifecycle state. Same-user
-manual destruction of the live namespace is not supported automatic recovery;
-missing files never establish verified retirement. Detectable corruption and
-missing expected records remain refusal cases. This explicit boundary replaces
-the prior arbitrary-erasure proof obligation in the guardian proposal.
+A private mutation allowing stale receipts to remove the replacement locator
+caused `safety` to fail in the explicit replacement scenario.
 
-No liveness result is claimed. Eventual replacement requires successful verified
-retirement, local coordination and explicit scheduling assumptions. Native OS
-permissions, process identity/cleanup, Huly semantics, actual host behavior and
-resource measurements still need separate qualification. Typechecking alone
-establishes none of those properties.
+The default `step` includes all modeled faults. Guided runs start from executable
+startup/request prefixes to exercise later crash windows; those prefixes use the
+same guarded actions. `serviceStep` separately exercises normal service without
+external fault injection. It does not replace the default adversarial run.
+Reachability counts include explicitly executed prefixes. They establish sampled
+or scheduled reachability, not frequency estimates for production failures.
 
+Initial unconstrained fault-heavy runs reached several late witnesses zero
+times, including identity refusal and stale cleanup. Guided publication and
+replacement prefixes reached these transitions. Failed/zero-witness build logs
+remain in `/tmp/resident-launch-model-a2935a11`; increasing random samples alone
+did not establish identity-refusal coverage.
 
-## Type reconciliation with observed fault schedules — 2026-10-18
+Run the reproducible local check with:
 
-The proposed request map now uses the same `InvocationId` as verification-only write history. A wire JSON-RPC ID is a separate request field: two adapter incarnations may both use ID1 while their invocation identities remain different. The caller is derived from the map key instead of duplicated in the request record. This permits the late old-reply/fresh-read schedule without treating a reused wire ID as the same invocation.
+```bash
+pnpm verify:resident-launch-model --out /tmp/resident-launch-evidence
+pnpm exec vitest run test/resident/launch-model-alignment.test.ts
+```
 
-`RemoteEffect` records oracle truth separately from caller knowledge: a write can remain uncertain while its remote effect is pending, and can commit after local retirement. Neither a fresh read nor local cleanup changes that fact into known failure. Request cleanup is independent of its execution phase, so a terminal/canceled request may still retain protected local resources. An owned resource also records its caller, allowing foreign-attachment cleanup to be distinguished from generation cleanup.
+The first command retains exact source hashes, commands, test/simulation logs and
+per-schedule witness counts. It fails for a failed command, missing or globally
+unreached witness, or inputs changed during the run. Tests are selected with
+`Test$`; matching every definition would incorrectly execute imported predicates
+and constructors as tests. No `quint verify` or exhaustive proof is claimed.
 
-These are proposed type corrections only. They add no actions, invariants, initialization or proof. The existing explicit type-sketch approval checkpoint remains in effect; it has not been inferred from repeated implementation continuations. The bounded domain must include colliding wire IDs, at least two adapter incarnations and an old invocation retained in oracle history after adapter loss.
+## Alignment with implementation
 
+The TypeScript alignment test drives the real `advanceAdmission`,
+`advanceLifetime` and `advanceMember` functions. It projects their actual
+decisions and pending/member counts into the model for ordinary admission and
+late owner publication after fencing. The observation codec is schema-owned.
+A contradictory late-owner count must produce the specific Quint disabled-step
+failure in `observedTest`; timeout, syntax or backend-start failure cannot satisfy
+that negative control. The helper invokes the installed Node CLI directly with the TypeScript evaluator,
+using a four-second child bound inside the unchanged five-second test allowance.
+Temporary replay files are removed without masking a primary replay failure.
 
-The proposed coordination abstraction remains plain Quint: protected claims/registry are shared-state coordination, while `starts` represents explicitly scheduled delivery of startup messages. This keeps ownership/retirement interleavings in one bounded state model but requires explicit message-delivery actions rather than Choreo scaffolding. The choice and the grouping of per-caller/per-backend records are part of the existing type-sketch sign-off, not an approved transition design.
+This projection covers admission inventory and decisions. It does not replay
+native startup IPC, actual Huly writes or OS process ownership. Independent
+process fixtures remain necessary for those boundaries.
 
-The sketch represents one protected state directory. Its single `claim` serializes
-selection across configuration identities, matching `selection.claim` in that
-directory. Backends for distinct configuration or implementation identities may
-coexist after publication releases the claim. `TransferOwner` represents the
-interval after the parent revokes its release capability and before the child
-adopts it. Start carries the same claim
-capability; the native device/inode pair remains an abstraction boundary. A lost
-Start does not make the claim free or restore parent release authority. These
-changes reconcile the proposed types with private bootstrap version 2; they add
-no transitions or verification claim and still await type-sketch approval.
+## Bounds and assumptions
+
+The concrete instance has three caller incarnations, three one-use backend
+slots/generations, four selection keys and six invocation identities. Request
+resource IDs 0–5 and acquisition resource IDs 100–102 are disjoint. Time is an
+abstract round bounded at 8; a lease lasts two rounds. Rounds advance only while
+an unexpired live attachment exists, coalescing irrelevant pre-lease time.
+Physical 5/30-second policy bounds are tested independently, not inferred here.
+
+The coordination abstraction is plain Quint: protected claims and registry are
+shared state, with explicitly scheduled Start messages. The user approved this
+choice instead of Choreo scaffolding. Partial maps represent absent resources;
+guards check key presence before reads, and insertion uses `put`.
+
+The model assumes cooperating package writers and protected lifecycle state.
+Arbitrary same-user destruction of a live namespace is outside supported
+recovery. Corrupt/version-incompatible file parsing and native inode/device
+checks are implementation boundaries, not modeled file codecs. Missing files,
+PID/port absence and timeout are never retirement evidence.
+
+`OwnedClosureConfirmed` is observed closure of actually owned resources.
+`OperatorRetirementVerified` is an explicit trusted input following verified
+cleanup; the model does not manufacture that certificate. Backend crash may
+interrupt all clients; healthy-backend cancellation isolation is a separate rule.
+No transparent failover is required. An unresolved owner may cause bounded
+refusal until retirement is verified.
+
+No liveness or arbitrary-scale result is claimed. Finite domains may exhaust,
+and no fairness is assumed. Eventual replacement requires verified retirement,
+working local coordination and appropriate scheduling. Native macOS behavior,
+OS ownership, Huly semantics, real host observation, resource measurements and the
+final combined quality gate remain independent qualification requirements.
+Update this model before changing the lifecycle contract it represents.
