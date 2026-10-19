@@ -1,5 +1,13 @@
 # @firfi/huly-cli
 
+## 0.53.0
+
+### Minor Changes
+
+- Add an experimental shared resident backend for explicitly selected MCP stdio adapters, with compatible configuration matching, isolated client cancellation, bounded idle retirement, and no automatic replay after connection loss. Add CLI resident status and generation-scoped stop commands. The experimental resident path has Linux process and local-Huly validation; native macOS validation remains pending and Windows resident startup is unsupported.
+
+  Expose issue `startDate` through create, update, and detail reads, including CLI `--start-date`. Omitted dates are not written, preserving existing issue operations on older Huly models. Explicit start dates require a Huly server model that provides the field; null clears it. This adds the scheduling field without automatic dependency scheduling or rescheduling.
+
 ## 0.52.0
 
 ### Minor Changes
