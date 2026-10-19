@@ -17,6 +17,10 @@ import { retireFunctionalResident } from "../../helpers/resident-retirement.js"
 import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
 import { testStdioEnvironment } from "../../helpers/stdio-environment.js"
 import { ManagedAuthObservation } from "../managed-auth-observation.js"
+import {
+  ProfileDiagnosticProcess,
+  PROFILE_DIAGNOSTIC_CATALOG_REQUEST
+} from "../../helpers/profile-diagnostic-process.js"
 
 const RESPONSE_BOUND = 5_000
 const INITIAL_AUTHORITIES = 2
@@ -24,13 +28,6 @@ const ROTATED_AUTHORITIES = 3
 const Input = Schema.Struct({ bundle: ResidentPackagePath, directory: ResidentDirectory, reapedFd: ReapedEventsFd })
 const ContextReply = Schema.Struct({ result: GetHulyContextResultSchema })
 const runFile = promisify(execFile)
-const RefusedProcess = Schema.Struct({
-  code: Schema.Literal(1),
-  killed: Schema.Literal(false),
-  signal: Schema.Null,
-  stdout: Schema.String,
-  stderr: Schema.String
-})
 type RefusalDiagnostic = "Selected Huly profile has no usable credentials." | "Selected Huly profile does not exist."
 
 const main = async () => {
@@ -157,16 +154,13 @@ const main = async () => {
       const refusedProfile = async (diagnostic: RefusalDiagnostic) => {
         const pending = runFile(process.execPath, [input.bundle], { timeout: RESPONSE_BOUND, env: profileEnvironment })
         pending.child.stdin?.on("error", () => {})
-        pending.child.stdin?.end()
-        const failure = await pending.then(
-          () => undefined,
-          (error: unknown) => error
-        )
-        const refused = Schema.decodeUnknownSync(RefusedProcess)(failure)
-        assert.equal(refused.stdout.length === 0, true)
+        pending.child.stdin?.end(PROFILE_DIAGNOSTIC_CATALOG_REQUEST)
+        const output = await pending
+        const refused = Schema.decodeUnknownSync(ProfileDiagnosticProcess)(output)
+        assert.equal(refused.stdout.result.tools[0].description.includes(diagnostic), true)
         assert.equal(refused.stderr.includes(diagnostic), true)
         for (const secret of [base.HULY_TOKEN, "fixture-private-password", "fixture-rotated-profile-token"])
-          assert.equal(refused.stderr.includes(secret), false)
+          assert.equal((output.stdout + output.stderr).includes(secret), false)
         assert.equal((await fs.readdir(join(state, "generations"))).length, ROTATED_AUTHORITIES)
       }
       await Effect.runPromise(

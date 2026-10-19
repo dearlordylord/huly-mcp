@@ -5,14 +5,14 @@ import { execFile } from "node:child_process"
 import { promisify } from "node:util"
 import { Client } from "@modelcontextprotocol/client"
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"
-import { Deferred, Effect, Result, Schema } from "effect"
+import { Deferred, Effect, Schema } from "effect"
 import { expect } from "vitest"
 
 import { cliProfilePaths, makeCliProfileStore } from "../../src/profiles/file-store.js"
 import { CliCredentialsFileSchema, CliProfilesFileSchema, type ProfileUrlSchema } from "../../src/profiles/model.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { residentSelectionEnvironment } from "../helpers/resident-selection-environment.js"
-import { HostMessage } from "../../src/resident/request-headers.js"
+import { ProfileDiagnosticProcess, PROFILE_DIAGNOSTIC_CATALOG_REQUEST } from "../helpers/profile-diagnostic-process.js"
 import { GetProjectResultSchema } from "../../src/domain/schemas/projects.js"
 import { DisposableRestProject } from "./disposable-rest-fixture.js"
 
@@ -149,23 +149,24 @@ export const exercisePackagedProfileLifecycle = async (
         env: { ...environment, HULY_PROFILE: profile }
       })
       pending.child.stdin?.on("error", () => {})
-      pending.child.stdin?.end(
-        `${Schema.encodeSync(Schema.fromJsonString(HostMessage))(
-          HostMessage.make({ jsonrpc: "2.0", id: 1, method: "ping" })
-        )}\n`
-      )
+      pending.child.stdin?.end(PROFILE_DIAGNOSTIC_CATALOG_REQUEST)
       const outcome = await pending.then(
-        () => undefined,
-        (error: unknown) => error
+        (value) => ({ diagnostic: Schema.decodeUnknownSync(ProfileDiagnosticProcess)(value), rawStdout: value.stdout }),
+        (error: unknown) => ({ refusal: Schema.decodeUnknownSync(RefusedProcess)(error) })
       )
-      const parsed = Schema.decodeUnknownResult(RefusedProcess)(outcome)
-      expect(Result.isSuccess(parsed)).toBe(true)
-      if (Result.isFailure(parsed)) throw new Error("Expected an owned adapter failure exit")
-      expect(parsed.success.stdout).toBe("")
-      expect(parsed.success.stderr.includes(diagnostic)).toBe(true)
-      expect(parsed.success.stderr.includes("rotated-private-fixture-token")).toBe(false)
-      expect(parsed.success.stderr.includes("other-private-fixture-token")).toBe(false)
-      expect(parsed.success.stderr.includes(base.HULY_TOKEN)).toBe(false)
+      if (diagnostic === ATTACHMENT_REFUSAL) {
+        if (!("refusal" in outcome)) throw new Error("Expected an owned adapter failure exit")
+        expect(outcome.refusal.stdout).toBe("")
+      } else {
+        if (!("diagnostic" in outcome)) throw new Error("Expected the profile diagnostic through clean EOF")
+        expect(outcome.diagnostic.stdout.result.tools[0].description).toContain(diagnostic)
+      }
+      const stderr = "refusal" in outcome ? outcome.refusal.stderr : outcome.diagnostic.stderr
+      expect(stderr.includes(diagnostic)).toBe(true)
+      const output = stderr + ("refusal" in outcome ? outcome.refusal.stdout : outcome.rawStdout)
+      expect(output.includes("rotated-private-fixture-token")).toBe(false)
+      expect(output.includes("other-private-fixture-token")).toBe(false)
+      expect(output.includes(base.HULY_TOKEN)).toBe(false)
       const currentCatalog = await existing.client.listTools(undefined, { timeout: RESPONSE_BOUND })
       expect(currentCatalog).toEqual(catalog)
       expect(await read(existing.client, currentCatalog)).toEqual(context)

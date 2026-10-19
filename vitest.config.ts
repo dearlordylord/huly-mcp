@@ -15,6 +15,7 @@ const portTestFiles = [
 ]
 
 const residentLaunchTestFiles = ['test/resident/managed-backend-process.test.ts']
+const residentModelTestFiles = ['test/resident/launch-model-alignment.test.ts']
 
 export default defineConfig({
   test: {
@@ -28,6 +29,15 @@ export default defineConfig({
     // Keep real subprocesses and packed-artifact tests out of usage analytics.
     env: { HULY_MCP_TELEMETRY: '0', HULY_CLI_TELEMETRY: '0' },
     projects: [
+      {
+        test: {
+          name: 'resident-model',
+          include: residentModelTestFiles,
+          isolate: true,
+          // Keep each four-second Quint replay independent of native process-race CPU load.
+          sequence: { groupOrder: -1 },
+        },
+      },
       {
         test: {
           name: 'resident-launch',
@@ -52,7 +62,7 @@ export default defineConfig({
           name: 'boundaries',
           globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
           include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
-          exclude: [...portTestFiles, ...residentLaunchTestFiles],
+          exclude: [...portTestFiles, ...residentLaunchTestFiles, ...residentModelTestFiles],
           isolate: true,
           sequence: { groupOrder: 1 },
         },

@@ -2,7 +2,7 @@ import { execFile } from "node:child_process"
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { promisify } from "node:util"
-import { Exit, Schema } from "effect"
+import { Exit, Option, Schema } from "effect"
 
 import type { ResidentPackagePath } from "../../src/resident/managed-contract.js"
 
@@ -20,6 +20,13 @@ const QuintTestFailure = Schema.Struct({
   killed: Schema.Literal(false),
   stdout: Schema.String,
   stderr: Schema.String
+})
+const QuintProcessFailure = Schema.Struct({
+  code: Schema.optionalKey(Schema.Union([Schema.Int, Schema.String, Schema.Null])),
+  signal: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  killed: Schema.optionalKey(Schema.Boolean),
+  stdout: Schema.optionalKey(Schema.String),
+  stderr: Schema.optionalKey(Schema.String)
 })
 export class ResidentObservationRejected extends Error {
   constructor(cause: unknown) {
@@ -55,15 +62,24 @@ export const replayResidentAdmissions = async (
       { timeout: 4_000, killSignal: "SIGKILL" }
     )
   } catch (error) {
-    await rm(directory, { recursive: true, force: true }).catch(() => undefined)
     const parsed = Schema.decodeUnknownExit(QuintTestFailure)(error)
     if (
       Exit.isSuccess(parsed) &&
       parsed.value.stdout.includes("observedTest") &&
       parsed.value.stdout.includes("[QNT513]") &&
       parsed.value.stdout.includes("Cannot continue in `then`")
-    )
+    ) {
+      await rm(directory, { recursive: true, force: true })
       throw new ResidentObservationRejected(error)
+    }
+    const diagnostic = Schema.decodeUnknownOption(QuintProcessFailure)(error)
+    if (Option.isSome(diagnostic))
+      await writeFile(
+        join(directory, "failure.json"),
+        Schema.encodeSync(Schema.fromJsonString(QuintProcessFailure))(diagnostic.value),
+        { flag: "wx", mode: 0o600 }
+      ).catch(() => process.stderr.write("Resident replay failure receipt could not be written\n"))
+    process.stderr.write(`Resident observation replay failed; retained ${directory}\n`)
     throw error
   }
   await rm(directory, { recursive: true, force: true })

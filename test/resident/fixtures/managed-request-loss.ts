@@ -180,7 +180,7 @@ const main = async () => {
     assert.deepEqual(await fs.readdir(join(input.directory, "generations")), [name])
     process.stderr.write("Managed loss: discover tools\n")
     const writing = input.point === "write" || input.point === "drain"
-    const toolName = writing ? "update_project" : "list_projects"
+    const toolName = writing ? "update_project" : input.point === "model" ? "get_project" : "list_projects"
     const definition = (await client.listTools(undefined, { timeout: RESPONSE_BOUND })).tools.find(
       (tool) => tool.name === toolName
     )
@@ -188,7 +188,14 @@ const main = async () => {
     process.stderr.write("Managed loss: begin request\n")
     await assert.rejects(
       client.callTool(
-        { name: toolName, arguments: writing ? { project: "LOSS", name: RequestLossUpdatedName } : {} },
+        {
+          name: toolName,
+          arguments: writing
+            ? { project: "LOSS", name: RequestLossUpdatedName }
+            : input.point === "model"
+              ? { project: "LOSS" }
+              : {}
+        },
         { timeout: RESPONSE_BOUND, toolDefinition: definition }
       )
     )
