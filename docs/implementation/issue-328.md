@@ -269,3 +269,28 @@ suite. It uses verified package22f565… copies with unchanged request bounds.
 Their full-run failures remain unexplained and are not relabeled as repaired
 startup reliability. A future coherent gate is still required before live-write
 certification and final delivery.
+
+### Shared-model fixture cleanup in the current candidate
+
+The physical-clock branch of `model-wait-pair.ts` now requests authenticated
+stop for the exact generation after all three reads, final status checks, and
+both parent exits. It still requires the matching kernel-observed backend exit
+0 and the empty private namespace. The four injected-clock cases keep their
+explicit release and retirement sequence. This is fixture cleanup only; it
+does not change runtime lifecycle policy, lease/idle qualification, deadlines,
+or the model-wait assertions.
+
+The focused eight-case run completed six cases and failed two legacy-protocol
+cases before reaching backend cleanup: creator/injected-clock at
+`/tmp/resident-model-wait-MwkNsz` and joiner/physical-clock at
+`/tmp/resident-model-wait-AdBovz`. Their retained logs report parent startup
+failure but do not expose its cause. A retry selecting only those two cases
+passed both (`model-wait-legacy-focused-retry.log`; six other cases skipped).
+The successful scenario receipts now cover all eight parameter combinations
+across the initial run and that focused retry, but this is not a single clean
+eight-case campaign and it does not resolve the intermittent legacy startup
+failures. The original failed logs remain preserved.
+
+The affected-file Oxlint and dprint checks passed. `pnpm typecheck` checked all
+1477 files with zero errors or warnings. These focused checks do not replace the
+required final coherent `check-all` run.

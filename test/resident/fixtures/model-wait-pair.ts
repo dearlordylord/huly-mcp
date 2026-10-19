@@ -11,6 +11,7 @@ import { readResidentLiveStatus } from "../../../src/resident/status-client.js"
 import { type ResidentLiveStatus } from "../../../src/resident/status-contract.js"
 import { KernelOwnedExit, openKernelReapedEvents, ReapedEventsFd } from "../../helpers/kernel-reaped-events.js"
 import { spawnIdleClockBackend } from "../../helpers/idle-clock-backend.js"
+import { retireFunctionalResident } from "../../helpers/resident-retirement.js"
 import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
 import { boundModelWait, spawnModelWaitParent } from "../../helpers/model-wait-parent.js"
 import { DisposableRestProject, startDisposableRestFixture } from "../disposable-rest-fixture.js"
@@ -223,7 +224,12 @@ const main = async () => {
       [0, null]
     ])
     const backendExit = await (async () => {
-      if (clock === undefined) return kernel.wait(record.envelope.diagnostics.processId)
+      if (clock === undefined)
+        return retireFunctionalResident(
+          { directory: input.directory, generation: idle.generation },
+          record.envelope.diagnostics.processId,
+          kernel
+        )
       assert.equal(clock.child.pid, record.envelope.diagnostics.processId)
       await clock.advance("released")
       assert.equal(await fs.readFile(recordFile, "utf8"), original)
@@ -232,7 +238,7 @@ const main = async () => {
       return KernelOwnedExit.make({ processId: record.envelope.diagnostics.processId, exitCode: 0 })
     })()
     assert.equal(backendExit.exitCode, 0)
-    phase("owned backend idle exit joined")
+    phase("owned backend exit joined")
     assert.deepEqual(await fs.readdir(input.directory), [])
     const finalCounts = Schema.decodeUnknownSync(
       Schema.Struct({
