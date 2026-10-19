@@ -29,6 +29,7 @@ import type {
 } from "../errors.js"
 import { HulyDataInvalidError, IssueNotFoundError } from "../errors.js"
 import { contact, tracker } from "../huly-plugins.js"
+import type { ScheduledIssue } from "../types/tracker.js"
 import { findComponentByIdOrLabel } from "./components.js"
 import { findPersonByIdOrExactEmailOrName } from "./contacts-shared.js"
 import { findIssueAssignee } from "./issue-assignee-resolution.js"
@@ -263,14 +264,15 @@ const issueDetailRelationshipFields = (
   }
 }
 
-const issueDetailMetricFields = (issue: HulyIssue) => ({
+const issueDetailMetricFields = (issue: ScheduledIssue) => ({
   subIssues: issue.subIssues > 0 ? issue.subIssues : undefined,
+  startDate: issue.startDate ?? undefined,
   dueDate: issue.dueDate ?? undefined,
   estimation: issue.estimation > 0 ? issue.estimation : undefined
 })
 
 const issueDetailProjection = (
-  issue: HulyIssue,
+  issue: ScheduledIssue,
   params: GetIssueParams,
   statusName: string,
   person: Person | undefined,

@@ -33,6 +33,7 @@ import type {
 } from "../errors.js"
 import { HulyError, InvalidStatusError } from "../errors.js"
 import { tracker } from "../huly-plugins.js"
+import type { ScheduledIssue } from "../types/tracker.js"
 import { renderIssueDescriptionForWrite } from "./issue-native-references.js"
 import { childIssueParent, topLevelIssueParent } from "./issues-parent.js"
 import {
@@ -209,7 +210,7 @@ const createIssueWithAssignee = Effect.fn("Issues.createWithAssignee")(function*
   const priority = stringToPriority(params.priority ?? DEFAULT_ISSUE_PRIORITY)
   const identifier = `${project.identifier}-${sequence}`
 
-  const issueData: AttachedData<HulyIssue> = {
+  const issueData: AttachedData<ScheduledIssue> = {
     title: params.title,
     description: descriptionMarkupRef,
     status: statusRef,
@@ -226,6 +227,7 @@ const createIssueWithAssignee = Effect.fn("Issues.createWithAssignee")(function*
     subIssues: 0,
     parents,
     childInfo: [],
+    startDate: params.startDate ?? null,
     dueDate: params.dueDate ?? null,
     rank
   }

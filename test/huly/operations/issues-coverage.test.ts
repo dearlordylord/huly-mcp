@@ -1259,6 +1259,44 @@ describe("Issues Coverage - updateIssue branches", () => {
     })
   )
 
+  it.effect("updates startDate", () =>
+    Effect.gen(function* () {
+      const project = makeProject({ identifier: "TEST" })
+      const issue = makeIssue({ identifier: "TEST-1", number: 1 })
+      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+
+      const testLayer = createTestLayerWithMocks({ projects: [project], issues: [issue], statuses, captureUpdateDoc })
+
+      yield* updateIssue({
+        project: projectIdentifier("TEST"),
+        identifier: issueIdentifier("TEST-1"),
+        startDate: Timestamp.make(1700000000000)
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+      expect(captureUpdateDoc.operations?.startDate).toBe(1700000000000)
+    })
+  )
+
+  it.effect("unschedules an issue when startDate is null", () =>
+    Effect.gen(function* () {
+      const project = makeProject({ identifier: "TEST" })
+      const issue = makeIssue({ identifier: "TEST-1", number: 1 })
+      const statuses = [makeStatus({ _id: "status-open" as Ref<Status>, name: "Open" })]
+      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+
+      const testLayer = createTestLayerWithMocks({ projects: [project], issues: [issue], statuses, captureUpdateDoc })
+
+      yield* updateIssue({
+        project: projectIdentifier("TEST"),
+        identifier: issueIdentifier("TEST-1"),
+        startDate: null
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+      expect(captureUpdateDoc.operations?.startDate).toBeNull()
+    })
+  )
+
   it.effect("clears estimation with null", () =>
     Effect.gen(function* () {
       const project = makeProject({ identifier: "TEST" })

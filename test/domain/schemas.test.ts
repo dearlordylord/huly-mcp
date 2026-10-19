@@ -347,6 +347,7 @@ describe("Domain Schemas", () => {
           project: "HULY",
           modifiedOn: 1706500000000,
           createdOn: 1706400000000,
+          startDate: 1706550000000,
           dueDate: 1706600000000,
           estimation: 3600000
         })
@@ -361,6 +362,7 @@ describe("Domain Schemas", () => {
         expect(result.project).toBe("HULY")
         expect(result.modifiedOn).toBe(1706500000000)
         expect(result.createdOn).toBe(1706400000000)
+        expect(result.startDate).toBe(1706550000000)
         expect(result.dueDate).toBe(1706600000000)
         expect(result.estimation).toBe(3600000)
       })
@@ -378,6 +380,35 @@ describe("Domain Schemas", () => {
           dueDate: null
         })
         expect(result.dueDate).toBeNull()
+      })
+    )
+
+    it.effect("handles null startDate", () =>
+      Effect.gen(function* () {
+        const result = yield* parseIssue({
+          issueId: "issue-123",
+          identifier: "HULY-123",
+          title: "Fix bug",
+          status: "Open",
+          labels: [],
+          project: "HULY",
+          startDate: null
+        })
+        expect(result.startDate).toBeNull()
+      })
+    )
+
+    it.effect("omits startDate when the workspace does not carry the attribute", () =>
+      Effect.gen(function* () {
+        const result = yield* parseIssue({
+          issueId: "issue-123",
+          identifier: "HULY-123",
+          title: "Fix bug",
+          status: "Open",
+          labels: [],
+          project: "HULY"
+        })
+        expect(result.startDate).toBeUndefined()
       })
     )
   })
@@ -486,8 +517,10 @@ describe("Domain Schemas", () => {
           description: "Details here",
           priority: "high",
           assignee: "john@example.com",
-          status: "Open"
+          status: "Open",
+          startDate: 1706550000000
         })
+        expect(result.startDate).toBe(1706550000000)
         expect(result.project).toBe("HULY")
         expect(result.title).toBe("New issue")
         expect(result.description).toBe("Details here")
@@ -520,6 +553,7 @@ describe("Domain Schemas", () => {
             { required: ["assignee"] },
             { required: ["status"] },
             { required: ["taskType"] },
+            { required: ["startDate"] },
             { required: ["dueDate"] },
             { required: ["estimation"] }
           ])
@@ -538,6 +572,17 @@ describe("Domain Schemas", () => {
         })
         expect(result.title).toBe("Updated title")
         expect(result.assignee).toBeNull()
+      })
+    )
+
+    it.effect("accepts startDate as the only update field", () =>
+      Effect.gen(function* () {
+        const result = yield* parseUpdateIssueParams({
+          project: "HULY",
+          identifier: "HULY-123",
+          startDate: 1706550000000
+        })
+        expect(result.startDate).toBe(1706550000000)
       })
     )
   })

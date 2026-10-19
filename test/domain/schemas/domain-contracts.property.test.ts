@@ -319,6 +319,7 @@ const updateSchemaCases: ReadonlyArray<UpdateSchemaCase> = [
       dueDate: null,
       estimation: null,
       priority: "low",
+      startDate: null,
       status: "Updated",
       taskType: "Updated",
       title: "Updated"
