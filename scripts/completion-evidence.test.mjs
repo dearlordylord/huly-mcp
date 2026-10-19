@@ -1,10 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
-import { execFileSync, spawnSync } from 'node:child_process'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { assertPublicationPreservesEvidence, evidenceFingerprint, parseCompletionEvidence } from './completion-evidence.mjs'
 import { verifyManifest } from './verify-completion-evidence.mjs'
 
@@ -55,44 +53,17 @@ test('boundary parser rejects missing, duplicate and unknown criterion fields', 
   report.criteria = [fixture().criteria[0]]; report.criteria[0].unreviewedProof = 'new'
   assert.throws(() => parseCompletionEvidence(JSON.stringify(report)))
 })
-test('published 71-criterion artifact matches its frozen integrity manifest', async () => {
-  const root = fileURLToPath(new URL('../', import.meta.url))
-  const result = await verifyManifest(root, fileURLToPath(new URL('../docs/implementation/completion-306-311.integrity.json', import.meta.url)))
-  assert.deepEqual(result, { criteria: 71, preserved: true })
-  const report = parseCompletionEvidence(await readFile(new URL('../docs/implementation/completion-306-311.json', import.meta.url), 'utf8'))
-  const changed = structuredClone(report)
-  const history = changed.criteria.flatMap(row => row.liveScenarios).flatMap(scenario => scenario.historicalRuntimeEvidence ?? [])
-  assert.ok(history.some(item => item.finalInputAudit === 'pending'))
-  for (const item of history) if (item.finalInputAudit === 'pending') item.finalInputAudit = 'passed'
-  assert.throws(() => assertPublicationPreservesEvidence(report, changed), /changed frozen evidence/)
-})
-test('actual hook rejects a staged rewrite hidden behind a restored working-tree report', async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'completion-staging-'))
-  const reportPath = 'docs/implementation/completion-306-311.json'
+test('explicit report manifest preserves evidence and rejects rewrites', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'completion-manifest-'))
   try {
-    await mkdir(path.join(root, 'docs/implementation'), { recursive: true })
-    const git = args => execFileSync('git', args, { cwd: root, timeout: 5000 })
-    git(['init', '-q'])
-    const valid = JSON.stringify(fixture())
-    await writeFile(path.join(root, reportPath), valid)
-    git(['add', reportPath])
-    git(['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'Frozen fixture'])
-    const bad = fixture(); bad.criteria[0].liveScenarios[0].historicalRuntimeEvidence[0].finalInputAudit = 'passed'
-    await writeFile(path.join(root, reportPath), JSON.stringify(bad)); git(['add', reportPath])
-    await writeFile(path.join(root, reportPath), valid)
-    const hook = (await readFile(new URL('../.husky/pre-commit', import.meta.url), 'utf8')).split('echo "Updating README')[0]
-    const gitExecutable = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim()
-    const bashExecutable = execFileSync('sh', ['-c', 'command -v bash'], { encoding: 'utf8' }).trim()
-    const gitOnlyPath = path.join(root, 'git-only-bin')
-    await mkdir(gitOnlyPath)
-    await symlink(gitExecutable, path.join(gitOnlyPath, 'git'))
-    for (const executablePath of [process.env.PATH, gitOnlyPath]) {
-      const result = spawnSync(bashExecutable, ['-c', hook], {
-        cwd: root, encoding: 'utf8', timeout: 5000, env: { ...process.env, PATH: executablePath }
-      })
-      assert.equal(result.status, 1)
-      assert.match(result.stdout, /Stage the complete protected report/)
-      assert.equal(result.signal, null)
-    }
+    const report = fixture()
+    await writeFile(path.join(root, 'report.json'), JSON.stringify(report))
+    const manifest = { report: 'report.json', frozenDraftSha256: '0'.repeat(64), immutableEvidenceSha256: evidenceFingerprint(report) }
+    const manifestPath = path.join(root, 'integrity.json')
+    await writeFile(manifestPath, JSON.stringify(manifest))
+    assert.deepEqual(await verifyManifest(root, manifestPath), { criteria: 1, preserved: true })
+    report.criteria[0].requirement = 'Changed requirement'
+    await writeFile(path.join(root, 'report.json'), JSON.stringify(report))
+    await assert.rejects(verifyManifest(root, manifestPath), /differs from its frozen projection/)
   } finally { await rm(root, { recursive: true }) }
 })

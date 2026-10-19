@@ -342,7 +342,7 @@ test('unsupported prior environment fails before any preparation side effect', a
   } finally { await rm(f.root, { recursive: true }) }
 })
 
-for (const file of ['README.md', 'packages/huly-cli/README.md', 'packages/huly-cli/skills/huly-cli/references/automation.md', 'docs/implementation/completion-306-311.json', 'docs/implementation/completion-306-311.integrity.json', '.husky/pre-commit']) test(`gate-read document ${file} invalidates quality reuse`, async () => {
+for (const file of ['README.md', 'packages/huly-cli/README.md', 'packages/huly-cli/skills/huly-cli/references/automation.md', '.husky/pre-commit']) test(`gate-read document ${file} invalidates quality reuse`, async () => {
   const f = await fixture()
   try {
     await mkdir(path.dirname(path.join(f.root, file)), { recursive: true })

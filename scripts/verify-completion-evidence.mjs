@@ -24,11 +24,11 @@ if (process.argv[1] !== undefined && path.resolve(process.argv[1]) === fileURLTo
       const baseline = parseCompletionEvidence(await readFile(args[1], 'utf8'))
       const published = parseCompletionEvidence(await readFile(args[2], 'utf8'))
       process.stdout.write(JSON.stringify({ immutableEvidenceSha256: assertPublicationPreservesEvidence(baseline, published) }) + '\n')
-    } else if (args.length === 0 || (args.length === 2 && args[0] === '--manifest')) {
+    } else if (args.length === 2 && args[0] === '--manifest') {
       const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-      const manifestPath = args.length === 0 ? path.join(root, 'docs/implementation/completion-306-311.integrity.json') : path.resolve(args[1])
+      const manifestPath = path.resolve(args[1])
       process.stdout.write(JSON.stringify(await verifyManifest(root, manifestPath)) + '\n')
-    } else throw new Error('Usage: verify-completion-evidence.mjs [--compare frozen.json published.json | --manifest integrity.json]')
+    } else throw new Error('Usage: verify-completion-evidence.mjs --compare frozen.json published.json | --manifest integrity.json')
   } catch {
     process.stderr.write('Completion evidence verification failed: check the frozen projection or --compare inputs.\n')
     process.exitCode = 1

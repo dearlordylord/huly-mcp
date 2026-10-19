@@ -532,8 +532,7 @@ HULY_URL="${HULY_URL/localhost/host.docker.internal}" bash scripts/integration_t
 
 This creates and cleans up a three-level tree with old/new ancestors, verifies
 preserved fields and relations, and checks actual `parents`, `subIssues` and
-`childInfo` data. See `docs/implementation/issue-306.md` for ordinary Huly 0.7.409
-trigger ownership and parent-array ordering. Movement refuses inconsistent trees;
+`childInfo` data. Movement refuses inconsistent trees;
 it does not repair or resume a partially moved tree automatically.
 
 The fixture waits 30 seconds between independent MCP and CLI scenario groups
@@ -734,18 +733,16 @@ Preserve nested historical statuses, source excerpts, original requirements,
 test declarations and receipt identities. Run:
 
 ```bash
-pnpm verify-completion-evidence --compare /path/to/frozen-draft.json docs/implementation/completion-306-311.json
-pnpm verify-completion-evidence
+pnpm verify-completion-evidence --compare /path/to/frozen-draft.json /path/to/published-report.json
+pnpm verify-completion-evidence --manifest /path/to/integrity.json
 ```
 
 The integrity manifest stores the reviewed frozen draft's hash and its immutable
-evidence projection. The normal process tests, quality gate and CI verify this
-projection; report edits also invoke the check before commit. Path sanitization
+evidence projection. The explicit manifest command verifies this projection. Path sanitization
 applies only to declared artifact locators. This detects publication drift; it
 does not independently certify the truth of tests or deployed observations.
-Future reports use `pnpm verify-completion-evidence --manifest <manifest.json>`
-with their reviewed baseline, and register their manifest/report in the process
-tests, quality input identity and hook. Updating a digest requires independent
+Reports supplied explicitly use `pnpm verify-completion-evidence --manifest <manifest.json>`
+with their reviewed baseline. Updating a digest requires independent
 review of the evidence change.
 
 Do not recompute `MOVEMENT_STOP_UTC` for a retry. The persisted campaign rejects
