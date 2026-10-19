@@ -1,18 +1,16 @@
 import { execFile } from "node:child_process"
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
-import { isAbsolute, join } from "node:path"
+import { join } from "node:path"
 import { createRequire } from "node:module"
 import { promisify } from "node:util"
 import { createHash } from "node:crypto"
 import { Schema } from "effect"
+import { StdioBundleGrant } from "../../scripts/stdio-bundle-grant.js"
 
 const runFile = promisify(execFile)
 export const ESBUILD_EXECUTABLE = createRequire(import.meta.url).resolve("esbuild/bin/esbuild")
 export const NATIVE_RUNTIME_EXTERNALS = ["--external:ws", "--external:@napi-rs/keyring", "--external:dbus-next"]
-export const StdioBundleGrant = Schema.Struct({
-  path: Schema.NonEmptyString.check(Schema.makeFilter(isAbsolute)),
-  sha256: Schema.String.check(Schema.makeFilter((value) => /^[0-9a-f]{64}$/.test(value)))
-})
+export { StdioBundleGrant } from "../../scripts/stdio-bundle-grant.js"
 const parseGrant = Schema.decodeUnknownSync(Schema.UndefinedOr(Schema.fromJsonString(StdioBundleGrant)))
 
 // Each suite owns its bundle: parallel builds cannot rewrite a running child's entrypoint.

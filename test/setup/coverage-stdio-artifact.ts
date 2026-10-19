@@ -9,7 +9,7 @@ const BUILD_BOUND = 30_000
 
 export default async function setup(project: TestProject) {
   if (!project.vitest.config.coverage.enabled) return
-  const source = await buildIsolatedStdioServer(BUILD_BOUND, () => undefined)
+  const source = await buildIsolatedStdioServer(BUILD_BOUND)
   const previous = project.config.env.HULY_TEST_STDIO_BUNDLE
   try {
     const bytes = await readFile(source.path)

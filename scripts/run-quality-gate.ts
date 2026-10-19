@@ -1,3 +1,5 @@
+import { resolve } from "node:path"
+import { makeStdioBundleGrant } from "./stdio-bundle-grant.js"
 import { Console, Effect, Schema } from "effect"
 
 import { NonEmptyString } from "../src/domain/schemas/shared.js"
@@ -51,11 +53,17 @@ const gates: ReadonlyArray<QualityGate> = [
 let successfulOutputLines = OutputLineCount.make(0)
 
 for (const gate of gates) {
+  const previousGrant = process.env.HULY_TEST_STDIO_BUNDLE
+  if (gate.args[0] === "test:coverage")
+    process.env.HULY_TEST_STDIO_BUNDLE = await makeStdioBundleGrant(resolve("dist/index.cjs"))
   const result = await runBoundedCommand({
     args: [pnpmEntryPoint, ...gate.args],
     executable: process.execPath,
     name: `Quality gate '${gate.name}'`,
     timeoutMilliseconds: gate.timeout
+  }).finally(() => {
+    if (previousGrant === undefined) delete process.env.HULY_TEST_STDIO_BUNDLE
+    else process.env.HULY_TEST_STDIO_BUNDLE = previousGrant
   })
   successfulOutputLines = addSuccessfulOutputLines({
     currentOutputLines: successfulOutputLines,

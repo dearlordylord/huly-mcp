@@ -6,6 +6,7 @@ import { promisify } from "node:util"
 import { Schema } from "effect"
 import { afterAll, beforeAll, expect, it } from "vitest"
 
+import { makeStdioBundleGrant } from "../../scripts/stdio-bundle-grant.js"
 import { buildIsolatedStdioServer, StdioBundleGrant } from "./stdio-build.js"
 
 const BUILD_BOUND = 30_000
@@ -14,12 +15,7 @@ let source: Awaited<ReturnType<typeof buildIsolatedStdioServer>>
 let grant: string
 beforeAll(async () => {
   source = await buildIsolatedStdioServer(BUILD_BOUND, () => undefined)
-  grant = Schema.encodeSync(Schema.fromJsonString(StdioBundleGrant))({
-    path: source.path,
-    sha256: createHash("sha256")
-      .update(await readFile(source.path))
-      .digest("hex")
-  })
+  grant = await makeStdioBundleGrant(source.path)
 }, BUILD_BOUND)
 afterAll(async () => {
   await source.cleanup()

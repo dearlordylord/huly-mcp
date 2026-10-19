@@ -80,7 +80,7 @@ export default defineConfig({
       },
       {
         test: {
-          name: 'boundaries',
+          name: 'units',
           globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
           include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
           exclude: [...portTestFiles, ...residentLaunchTestFiles, ...residentModelTestFiles, ...residentWaitTestFiles, ...processTestFiles],
@@ -90,7 +90,7 @@ export default defineConfig({
       },
       {
         test: {
-          name: 'processes',
+          name: 'boundaries',
           globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
           include: processTestFiles,
           exclude: [...residentLaunchTestFiles, ...residentWaitTestFiles],
