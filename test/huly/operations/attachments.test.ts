@@ -158,6 +158,7 @@ interface MockConfig {
   captureAddCollection?: { attributes?: Record<string, unknown> }
   getFileUrl?: HulyStorageOperations["getFileUrl"]
   downloadFile?: HulyStorageOperations["downloadFile"]
+  downloadFileBounded?: HulyStorageOperations["downloadFileBounded"]
   downloadUnavailable?: boolean
 }
 
@@ -274,7 +275,8 @@ const createTestLayer = (config: MockConfig) => {
         })
       : HulyStorageClient.testLayer({
           ...(config.getFileUrl === undefined ? {} : { getFileUrl: config.getFileUrl }),
-          ...(config.downloadFile === undefined ? {} : { downloadFile: config.downloadFile })
+          ...(config.downloadFile === undefined ? {} : { downloadFile: config.downloadFile }),
+          ...(config.downloadFileBounded === undefined ? {} : { downloadFileBounded: config.downloadFileBounded })
         })
 
   return Layer.merge(clientLayer, storageLayer)
@@ -868,6 +870,26 @@ describe("readAttachmentContent", () => {
 
       expect(error._tag).toBe("AttachmentContentTooLargeError")
       expect(error.message).toContain("download_attachment")
+    })
+  )
+
+  it.effect("rejects bytes above the limit even if a storage adapter ignores its requested bound", () =>
+    Effect.gen(function* () {
+      const bytes = Buffer.alloc(READ_ATTACHMENT_CONTENT_MAX_BYTES + 1)
+      const requested: Array<number> = []
+      const testLayer = createTestLayer({
+        attachments: [makeImageAttachment()],
+        downloadFileBounded: (_blob, maximum) => {
+          requested.push(maximum)
+          return Effect.succeed(bytes)
+        }
+      })
+      const error = yield* readAttachmentContent({ attachmentId: attachmentBrandId("att-image") }).pipe(
+        Effect.provide(testLayer),
+        Effect.flip
+      )
+      expect(requested).toEqual([READ_ATTACHMENT_CONTENT_MAX_BYTES])
+      expect(error).toMatchObject({ _tag: "AttachmentContentTooLargeError", size: bytes.length })
     })
   )
 

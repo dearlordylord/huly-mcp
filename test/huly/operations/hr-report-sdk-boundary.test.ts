@@ -59,3 +59,16 @@ describe("HR report SDK boundary", () => {
     })
   )
 })
+
+it.effect("rejects primitive Staff replies as typed record failures", () =>
+  Effect.gen(function* () {
+    for (const input of [null, "employee-1", 42]) {
+      const error = yield* parseHrReportStaffRecord(input).pipe(Effect.flip)
+      expect(error).toMatchObject({
+        _tag: "HulyDataInvalidError",
+        operation: "readHrReportStaff",
+        entity: "Staff record"
+      })
+    }
+  })
+)

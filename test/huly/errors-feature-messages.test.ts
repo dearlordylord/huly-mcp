@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest"
 
 import { CalendarName } from "../../src/domain/schemas/calendar.js"
-import { PersonLocator } from "../../src/domain/schemas/hr-departments.js"
+import { DepartmentIdentifier, PersonLocator } from "../../src/domain/schemas/hr-departments.js"
+import { PublicHolidayId } from "../../src/domain/schemas/hr-holidays.js"
 import { HrCalendarDate, HrRequestId, HrRequestTypeIdentifier } from "../../src/domain/schemas/hr-requests.js"
 import {
   CalendarId,
@@ -16,6 +17,8 @@ import {
 } from "../../src/domain/schemas/shared.js"
 import { FloorIdentifier } from "../../src/domain/schemas/virtual-office-administration.js"
 import {
+  PublicHolidayNotFoundError,
+  PublicHolidayConflictError,
   CalendarSettingsIdentifierAmbiguousError,
   CalendarSettingsInternalCalendarHideError,
   CalendarSettingsTargetNotAccessibleError,
@@ -188,4 +191,16 @@ describe("feature error messages", () => {
       "HR request attachment deletion is unavailable because the connected Huly client does not expose the required attached-collection operation"
     )
   })
+})
+
+it("identifies a missing holiday and a conflicting department/date in actionable errors", () => {
+  expect(new PublicHolidayNotFoundError({ holiday: PublicHolidayId.make("holiday-1") }).message).toBe(
+    "Public holiday 'holiday-1' not found"
+  )
+  expect(
+    new PublicHolidayConflictError({
+      date: HrCalendarDate.make("2026-10-19"),
+      department: DepartmentIdentifier.make("Engineering")
+    }).message
+  ).toBe("A public holiday already exists on '2026-10-19' for department 'Engineering'")
 })

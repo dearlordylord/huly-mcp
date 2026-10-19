@@ -218,7 +218,7 @@ const stateFixture = (): State => {
   }
 }
 
-const layerFor = (state: State): Layer.Layer<HulyClient | HulyStorageClient, never, never> => {
+const layerFor = (state: State, removalSupported = true): Layer.Layer<HulyClient | HulyStorageClient, never, never> => {
   const findAll: HulyClientOperations["findAll"] = <T extends Doc>(
     classRef: Ref<Class<T>>,
     query: DocumentQuery<T>,
@@ -308,7 +308,13 @@ const layerFor = (state: State): Layer.Layer<HulyClient | HulyStorageClient, nev
   }
 
   return Layer.merge(
-    HulyClient.testLayer({ findAll, findOne, addCollection, updateDoc, removeCollection }),
+    HulyClient.testLayer({
+      findAll,
+      findOne,
+      addCollection,
+      updateDoc,
+      ...(removalSupported ? { removeCollection } : {})
+    }),
     HulyStorageClient.testLayer(storage)
   )
 }
@@ -401,6 +407,24 @@ describe("chat message attachment operations", () => {
         "reply-1",
         chunter.class.ThreadMessage
       )
+    })
+  )
+
+  it.effect("refuses deletion without the SDK collection-removal capability and keeps the attachment", () =>
+    Effect.gen(function* () {
+      const state = stateFixture()
+      const before = [...state.attachments]
+      const params = yield* parseDeleteChatMessageAttachmentParams({
+        target: { kind: "channel_message", channel: "general", messageId: "msg-channel" },
+        attachmentId: "att-channel"
+      })
+      const error = yield* deleteChatMessageAttachment(params).pipe(
+        Effect.provide(layerFor(state, false)),
+        withDiagnostics,
+        Effect.flip
+      )
+      expect(error).toMatchObject({ _tag: "HulyError", message: "Huly client does not support removeCollection" })
+      expect(state.attachments).toEqual(before)
     })
   )
 
