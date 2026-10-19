@@ -63,7 +63,7 @@ const executableMode = 0o755
 const bundlePath = "package/dist/index.cjs"
 const manifestPath = "package/package.json"
 const effectCohortMarker =
-  "effect@4.0.0_patch_hash=583f1592041bd3cbff9dfc3f99b63c6f3a33410e4b22579e7d774074645a5755/node_modules/effect/"
+  "effect@4.0.0_patch_hash=8f77f9bbb337b5fb1f625e1a77aea5eb46cc094c1adb5fe9e657a6b053ec9e7b/node_modules/effect/"
 const parseManifest = Schema.decodeUnknownSync(Schema.fromJsonString(PackageManifestSchema))
 
 const readArchive = (archivePath: string): Promise<ReadonlyArray<ArchiveEntry>> =>

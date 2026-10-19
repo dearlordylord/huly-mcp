@@ -563,6 +563,10 @@ composition is no longer asserted by this gate; the local lease tests and EOF
 smoke checks cover separate parts of that behavior. Historical process receipts
 remain historical evidence, not proof that the removed scenarios ran again.
 
+The idle-restart process smoke uses two independent replacement parents after
+verified retirement. The separate first-launch race keeps its ten-parent case;
+the routine restart smoke does not repeat that load matrix.
+
 ## Bounded movement qualification
 
 Preparation tracks detached quality-stage groups in private `<log>.custody`

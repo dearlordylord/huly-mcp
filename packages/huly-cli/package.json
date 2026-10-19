@@ -24,7 +24,7 @@
   },
   "homepage": "https://huly-mcp.dearlordylord.com/cli/",
   "scripts": {
-    "build": "PKG_VERSION=$(node -p \"require('./package.json').version\") && esbuild src/index.ts --bundle --platform=node --format=cjs --log-level=warning --outfile=dist/index.cjs --external:ws --external:@napi-rs/keyring --external:dbus-next \"--define:PKG_VERSION=\\\"$PKG_VERSION\\\"\"",
+    "build": "PKG_VERSION=$(node -p \"require('./package.json').version\") && esbuild src/index.ts --bundle --platform=node --format=cjs --minify-whitespace --log-level=warning --outfile=dist/index.cjs --external:ws --external:@napi-rs/keyring --external:dbus-next \"--define:PKG_VERSION=\\\"$PKG_VERSION\\\"\"",
     "verify-version": "node -e \"const v=require('./package.json').version; const d=require('fs').readFileSync('dist/index.cjs','utf8'); if(!d.includes('\\\"'+v+'\\\"'))throw new Error('dist version mismatch: expected '+v)\"",
     "prepack": "pnpm build && pnpm verify-version",
     "prepublishOnly": "pnpm --dir ../.. check-all && pnpm build && pnpm verify-version"

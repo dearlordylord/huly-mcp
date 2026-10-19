@@ -22,7 +22,7 @@ const runFile = promisify(execFile)
 const FixtureFailure = Schema.Struct({ stderr: Schema.String })
 
 it.skipIf(process.platform !== "linux")(
-  "converges ten fresh parents after the previous packaged managed backend retires from idle",
+  "converges fresh parents after the previous packaged managed backend retires from idle",
   { timeout: BUILD_BOUND },
   async () => {
     const bundle = await buildIsolatedStdioServer(BUILD_BOUND)

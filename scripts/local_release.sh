@@ -6,7 +6,6 @@ CLI_PACKAGE_NAME="@firfi/huly-cli"
 RELEASE_BRANCH="master"
 CHANGES_DIR=".changeset"
 CHANGES_VERSION="2.30.0"
-ESBUILD_VERSION="0.27.2"
 EVIDENCE_WORKFLOW="prepare-release-evidence.yml"
 PACKAGE_SMOKE_WORKFLOW="package-smoke.yml"
 
@@ -74,31 +73,12 @@ stage_if_exists() {
 }
 
 build_mcp_package() {
-  local package_version="$1"
-  local node_engine_requirement
-  node_engine_requirement="$(node -p "require('./package.json').engines.node")"
-
-  pnpm dlx "esbuild@$ESBUILD_VERSION" src/launcher.ts \
-    --bundle \
-    --platform=node \
-    --format=cjs \
-    --outfile=dist/index.cjs \
-    --external:ws \
-    "--define:PKG_VERSION=\"$package_version\"" \
-    "--define:NODE_ENGINE_REQUIREMENT=\"$node_engine_requirement\""
+  pnpm build:mcp
   pnpm verify-version
 }
 
 build_cli_package() {
-  local package_version="$1"
-
-  pnpm dlx "esbuild@$ESBUILD_VERSION" packages/huly-cli/src/index.ts \
-    --bundle \
-    --platform=node \
-    --format=cjs \
-    --outfile=packages/huly-cli/dist/index.cjs \
-    --external:ws \
-    "--define:PKG_VERSION=\"$package_version\""
+  pnpm --filter "$CLI_PACKAGE_NAME" build
   pnpm --filter "$CLI_PACKAGE_NAME" verify-version
 }
 
@@ -285,11 +265,11 @@ else
 fi
 
 if [[ "$mcp_needs_publish" == "true" ]]; then
-  build_mcp_package "$mcp_package_version"
+  build_mcp_package
 fi
 
 if [[ "$cli_needs_publish" == "true" ]]; then
-  build_cli_package "$cli_package_version"
+  build_cli_package
   pnpm verify-cli-integration-coverage
 fi
 

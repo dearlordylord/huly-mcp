@@ -94,7 +94,7 @@ const main = async () => {
   const kernel = openKernelReapedEvents(input.reapedFd)
   try {
     const first = await cycle(input, kernel, 1)
-    process.stderr.write("Managed idle restart: starting ten independent parents after confirmed retirement\n")
+    process.stderr.write("Managed idle restart: starting independent parents after confirmed retirement\n")
     const second = await cycle(input, kernel, REPLACEMENT_PARENT_COUNT)
     assert.notEqual(second.generation, first.generation)
     const original = first.parents[0]

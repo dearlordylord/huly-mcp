@@ -4,7 +4,7 @@ import { ResidentRegistryEnvelope } from "../../src/resident/managed-contract.js
 import { KernelOwnedExit } from "../helpers/kernel-reaped-events.js"
 import { ManagedNativeHostObservation } from "./native-host-observation.js"
 
-export const REPLACEMENT_PARENT_COUNT = 10
+export const REPLACEMENT_PARENT_COUNT = 2
 
 export const IdleGenerationObservation = Schema.Struct({
   generation: ResidentRegistryEnvelope.fields.generation,

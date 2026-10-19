@@ -59,7 +59,7 @@ const expectedArtifact = {
 }
 
 const validEffectCohortMarker =
-  "effect@4.0.0_patch_hash=583f1592041bd3cbff9dfc3f99b63c6f3a33410e4b22579e7d774074645a5755/node_modules/effect/dist/Effect.js"
+  "effect@4.0.0_patch_hash=8f77f9bbb337b5fb1f625e1a77aea5eb46cc094c1adb5fe9e657a6b053ec9e7b/node_modules/effect/dist/Effect.js"
 
 describe("packed artifact certification", () => {
   it("includes lazy native imports in the exact external dependency closure", async () => {
@@ -121,11 +121,15 @@ describe("packed artifact certification", () => {
     }
   })
 
-  it("rejects an unresolved or unexpected Effect composition", async () => {
+  it.each([
+    'require("effect/Effect"); const cohort = "effect@3.19.13"',
+    'require("ws"); const cohort = "effect@4.0.0_patch_hash=583f1592041bd3cbff9dfc3f99b63c6f3a33410e4b22579e7d774074645a5755/node_modules/effect/dist/Effect.js"',
+    'require("ws"); const cohort = "effect@4.0.0/node_modules/effect/dist/Effect.js"'
+  ])("rejects an unresolved, stale-patched or unpatched Effect composition: %s", async (bundle) => {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), "packed-artifact-certification-"))
     const archive = path.join(directory, "package.tgz")
     try {
-      await writeArchive(archive, 0o755, 'require("effect/Effect"); const cohort = "effect@3.19.13"')
+      await writeArchive(archive, 0o755, bundle)
       await expect(certifyPackedArtifact(archive, expectedArtifact)).rejects.toThrow(/certified patched Effect/u)
     } finally {
       await fs.rm(directory, { force: true, recursive: true })
