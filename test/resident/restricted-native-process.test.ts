@@ -6,7 +6,7 @@ import { promisify } from "node:util"
 import { Result, Schema } from "effect"
 import { expect, it } from "vitest"
 
-import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import {
   PROJECT_READS,
@@ -45,6 +45,7 @@ it
           "--bundle",
           "--platform=node",
           "--format=cjs",
+          ...NATIVE_RUNTIME_EXTERNALS,
           `--outfile=${fixture}`
         ],
         { timeout: PROCESS_BOUND }

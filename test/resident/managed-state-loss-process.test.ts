@@ -6,7 +6,7 @@ import { promisify } from "node:util"
 import { Schema } from "effect"
 import { afterAll, beforeAll, expect, it } from "vitest"
 
-import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { StateLossObservation } from "./state-loss-observation.js"
 
@@ -34,6 +34,7 @@ beforeAll(async () => {
         "--bundle",
         "--platform=node",
         "--format=cjs",
+        ...NATIVE_RUNTIME_EXTERNALS,
         `--outfile=${output}`
       ],
       { timeout: PROCESS_BOUND }

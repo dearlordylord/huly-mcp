@@ -11,7 +11,7 @@ import { Deferred, Effect, Schema } from "effect"
 import { McpSchema } from "effect/ai"
 import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFailed } from "vitest"
 
-import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { residentSelectionEnvironment } from "../helpers/resident-selection-environment.js"
 import { NativeHostObservation } from "./native-host-observation.js"
@@ -292,6 +292,7 @@ describe("manual adapters against the packaged native HTTP backend", { timeout: 
           "--bundle",
           "--platform=node",
           "--format=cjs",
+          ...NATIVE_RUNTIME_EXTERNALS,
           `--outfile=${join(dirname(bundle.path), "native-host.cjs")}`
         ],
         { timeout: PROCESS_BOUND }

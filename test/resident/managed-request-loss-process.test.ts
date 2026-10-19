@@ -62,6 +62,7 @@ it.skipIf(process.platform !== "linux").each(ManagedRequestLossPoint.literals)(
           "--bundle",
           "--platform=node",
           "--format=cjs",
+          ...NATIVE_RUNTIME_EXTERNALS,
           `--outfile=${fixture}`
         ],
         { timeout: PROCESS_BOUND }

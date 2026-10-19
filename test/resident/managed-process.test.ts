@@ -1,3 +1,4 @@
+import { NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { execFile } from "node:child_process"
 import * as fs from "node:fs/promises"
 import { join } from "node:path"
@@ -41,6 +42,7 @@ beforeAll(async () => {
       "--bundle",
       "--platform=node",
       "--format=cjs",
+      ...NATIVE_RUNTIME_EXTERNALS,
       `--outfile=${file}`
     ],
     { timeout: PROCESS_BOUND }

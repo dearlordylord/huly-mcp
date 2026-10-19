@@ -7,7 +7,7 @@ import { Schema } from "effect"
 import { expect, it } from "vitest"
 
 import { MANAGED_PACKAGE_NAME } from "../../src/resident/managed-contract.js"
-import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { VersionCoexistenceObservation } from "./version-coexistence-observation.js"
 
@@ -72,6 +72,7 @@ it.skipIf(process.platform !== "linux")(
             "--bundle",
             "--platform=node",
             "--format=cjs",
+            ...NATIVE_RUNTIME_EXTERNALS,
             `--outfile=${destination}`
           ],
           { timeout: PROCESS_BOUND }

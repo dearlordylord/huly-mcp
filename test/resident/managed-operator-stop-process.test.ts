@@ -6,7 +6,7 @@ import { promisify } from "node:util"
 import { Schema } from "effect"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
-import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { ManagedStopObservation } from "./managed-stop-observation.js"
 
@@ -40,6 +40,7 @@ describe.skipIf(process.platform !== "linux")("packaged managed operator stop", 
           "--bundle",
           "--platform=node",
           "--format=cjs",
+          ...NATIVE_RUNTIME_EXTERNALS,
           `--outfile=${output}`
         ],
         { timeout: PROCESS_BOUND }

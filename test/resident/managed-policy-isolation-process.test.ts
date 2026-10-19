@@ -8,7 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFailed } f
 
 import { LiveReadProtocol } from "../../scripts/resident-live-read-contract.js"
 
-import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { ManagedPolicyObservation, ManagedPolicyScenario } from "./managed-policy-observation.js"
 
@@ -34,6 +34,7 @@ describe.skipIf(process.platform !== "linux")("packaged managed policy isolation
         "--bundle",
         "--platform=node",
         "--format=cjs",
+        ...NATIVE_RUNTIME_EXTERNALS,
         `--outfile=${fixture}`
       ],
       { timeout: BUILD_BOUND }

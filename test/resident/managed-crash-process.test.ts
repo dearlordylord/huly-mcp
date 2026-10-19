@@ -7,7 +7,7 @@ import { promisify } from "node:util"
 import { Schema } from "effect"
 import { expect, it } from "vitest"
 
-import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { CrashRefusalObservation } from "./crash-refusal-observation.js"
 
@@ -32,6 +32,7 @@ it.skipIf(process.platform !== "linux")(
           "--bundle",
           "--platform=node",
           "--format=cjs",
+          ...NATIVE_RUNTIME_EXTERNALS,
           `--outfile=${fixture}`
         ],
         { timeout: PROCESS_BOUND }

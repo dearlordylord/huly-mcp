@@ -17,7 +17,8 @@ beforeAll(async () => {
 afterAll(async () => {
   await cleanup?.()
 })
-it.each(
+// Each case owns its profile directory and child processes; no state is shared.
+it.concurrent.each(
   ["stdio", "stdio-resident", "stdio-http"].flatMap((transport) =>
     ["missing", "logged-out", "unavailable"].map((state) => ({ transport, state }))
   )
