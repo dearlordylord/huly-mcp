@@ -1,5 +1,6 @@
 import { strict as assert } from "node:assert"
 import { spawn } from "node:child_process"
+import { createHash } from "node:crypto"
 import { once } from "node:events"
 import * as fs from "node:fs/promises"
 import { createServer, type Socket } from "node:net"
@@ -35,6 +36,14 @@ const bounded = <A>(promise: Promise<A>) =>
 
 const main = async () => {
   const input = Schema.decodeUnknownSync(Input)({ bundle: process.argv[2], directory: process.argv[3] })
+  const artifacts = {
+    mcpSha256: createHash("sha256")
+      .update(await fs.readFile(input.bundle))
+      .digest("hex"),
+    fixtureSha256: createHash("sha256")
+      .update(await fs.readFile(process.argv[1] ?? ""))
+      .digest("hex")
+  }
   const environment = {
     ...residentSelectionEnvironment(),
     LAZY_ENVS: "true",
@@ -105,7 +114,7 @@ const main = async () => {
         assert.ok(Buffer.concat(diagnostics).toString("utf8").includes("No request was replayed"))
         assert.ok(Buffer.concat(diagnostics).toString("utf8").includes("no Huly request was dispatched"))
         process.stderr.write("Crash refusal: no-replay diagnostic confirmed\n")
-        assert.equal(await fs.readFile(registryFile, "utf8"), expectedRecord)
+        assert.equal((await fs.readFile(registryFile)).equals(Buffer.from(expectedRecord)), true)
         process.stderr.write("Crash refusal: expected record bytes confirmed\n")
         assert.deepEqual((await fs.readdir(input.directory)).sort(), originalInventory)
         assert.deepEqual((await fs.readdir(join(input.directory, "generations"))).sort(), originalRegistryInventory)
@@ -136,6 +145,16 @@ const main = async () => {
     await recover()
     assert.equal(foreign.listening, true)
     assert.equal(disclosure, false)
+    // Model stale diagnostics naming a now-unrelated live PID; actual kernel PID recycling is not forced.
+    const reusedPidRecord = Schema.encodeSync(Schema.fromJsonString(ResidentRegistryEnvelope))({
+      ...envelope,
+      diagnostics: { ...envelope.diagnostics, processId: process.pid }
+    })
+    await fs.writeFile(registryFile, reusedPidRecord, { mode: 0o600 })
+    process.stderr.write("Crash refusal: refusing stale ownership naming an unrelated live PID\n")
+    await recover(reusedPidRecord)
+    assert.equal(foreign.listening, true)
+    assert.equal(disclosure, false)
     const corruptRecord = "{invalid-json\n"
     await fs.writeFile(registryFile, corruptRecord, { mode: 0o600 })
     process.stderr.write("Crash refusal: refusing corrupt ownership metadata without repairing it\n")
@@ -144,12 +163,16 @@ const main = async () => {
     assert.equal(disclosure, false)
     process.stdout.write(
       Schema.encodeSync(Schema.fromJsonString(CrashRefusalObservation))({
+        artifacts,
         backendPid: backend.pid,
         backendChildrenBeforeKill: 0,
         backendExitSignal: "SIGKILL",
-        recoveringExitCodes: [1, 1, 1],
+        recoveringExitCodes: [1, 1, 1, 1],
         originalRecordRetained: true,
         foreignListenerSurvived: true,
+        reusedDiagnosticPid: process.pid,
+        reusedPidRecordRetained: true,
+        unrelatedPidSurvived: true,
         corruptRecordRetained: true,
         credentialDisclosure: false,
         stdoutBytes: 0

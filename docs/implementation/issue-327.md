@@ -78,3 +78,26 @@ checks and their limits.
 ## Formal correspondence — criterion 10 and issue 328 criterion 9
 
 The [native recovery correspondence](resident-launch-model.md#native-recovery-correspondence) maps the actual current retirement/late-commit, crash/refusal and version-coexistence receipts to executable guarded transitions. Five explicit scenarios and ten additional sampled safety traces pass; a specific contradictory non-dispatch claim fails in both evaluators. This closes the identified correspondence gap within the documented abstract domain. It does not replace remaining native/Linux or live-Huly qualification. Native macOS execution is now optional and deferred to the user, as amended in #322/#328.
+
+## Stale diagnostics naming a live unrelated PID
+
+The native crash/refusal fixture now replaces the stale owner's diagnostic PID
+with the still-running fixture coordinator's PID while retaining the old
+generation and descriptor. Recovery exits 1 without changing that record,
+signaling the unrelated process or disclosing credentials. Continued coordinator
+execution and receipt emission establish survival. This controls the safety
+premise of PID reuse; it does not force actual kernel PID recycling.
+
+The focused current-artifact case passed: `reused-pid-current.json` under
+`/tmp/resident-launch-model-a2935a11`. The exact native receipt is
+`/tmp/resident-crash-refusal-MlfMHm.receipt.json`; it binds MCP artifact333 and
+fixture SHA-256, four refused starts, retained original/replaced/corrupt records,
+a surviving foreign plaintext listener, no host output and no detected credential
+disclosure. The killed backend had no observed children before SIGKILL; this is
+not a universal descendant-exit assertion. The fixture closes its owned listener
+and the test removes its private state after success.
+
+Review found a failure-diagnostic risk in the shared record comparison: Node
+could render secret registry strings on inequality. The comparison now asserts
+only a buffer-equality boolean. No optional old-receipt parsing path was added.
+The full delivery gate remains unaccepted.

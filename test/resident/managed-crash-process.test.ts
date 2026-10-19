@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process"
+import { createHash } from "node:crypto"
 import * as fs from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
@@ -41,10 +42,21 @@ it.skipIf(process.platform !== "linux")(
         { timeout: PROCESS_BOUND, env: testStdioEnvironment() }
       )
       const receipt = Schema.decodeUnknownSync(Schema.fromJsonString(CrashRefusalObservation))(stdout)
+      expect(receipt.artifacts).toEqual({
+        mcpSha256: createHash("sha256")
+          .update(await fs.readFile(bundle.path))
+          .digest("hex"),
+        fixtureSha256: createHash("sha256")
+          .update(await fs.readFile(fixture))
+          .digest("hex")
+      })
       expect(receipt.backendChildrenBeforeKill).toBe(0)
-      expect(receipt.recoveringExitCodes).toEqual([1, 1, 1])
+      expect(receipt.recoveringExitCodes).toEqual([1, 1, 1, 1])
       expect(receipt.originalRecordRetained).toBe(true)
       expect(receipt.foreignListenerSurvived).toBe(true)
+      expect(receipt.reusedDiagnosticPid).not.toBe(receipt.backendPid)
+      expect(receipt.reusedPidRecordRetained).toBe(true)
+      expect(receipt.unrelatedPidSurvived).toBe(true)
       expect(receipt.corruptRecordRetained).toBe(true)
       expect(receipt.credentialDisclosure).toBe(false)
       expect(receipt.stdoutBytes).toBe(0)
