@@ -62,7 +62,8 @@ export const exercisePackagedProfileLifecycle = async (
   bundle: string,
   attachment: string,
   endpoint: Schema.Schema.Type<typeof ProfileUrlSchema>,
-  observe: (phase: Schema.Schema.Type<typeof ProfileLifecyclePhase>) => void
+  observe: (phase: Schema.Schema.Type<typeof ProfileLifecyclePhase>) => void,
+  withHeldRead: (read: () => Promise<void>, change: () => Promise<void>) => Promise<void>
 ) => {
   const directory = await fs.mkdtemp(join(await fs.realpath(tmpdir()), "resident-profile-lifecycle-"))
   const environment = {
@@ -170,8 +171,15 @@ export const exercisePackagedProfileLifecycle = async (
       expect(await read(existing.client, currentCatalog)).toEqual(context)
     }
     observe("rotation")
-    await save(original, "rotated-private-fixture-token")
-    await refused()
+    await withHeldRead(
+      async () => {
+        expect(await read(existing.client, catalog)).toEqual(context)
+      },
+      async () => {
+        await save(original, "rotated-private-fixture-token")
+        await refused()
+      }
+    )
     observe("logout")
     await save(original, undefined)
     await refused("Selected Huly profile has no usable credentials.")

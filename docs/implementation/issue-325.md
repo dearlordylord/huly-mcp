@@ -44,7 +44,7 @@ Codex consumer. It establishes this Linux authentication scenario. It does not
 establish modern protocol startup, macOS qualification, performance, a full
 quality gate or completion of issue 325.
 
-## Saved-profile changes — criterion 5, partial evidence
+## Saved-profile changes — criterion 5
 
 The focused packaged native-HTTP profile lifecycle scenario passed on
 2026-10-18. It checks token rotation, logout, URL and workspace changes, profile
@@ -69,5 +69,18 @@ Failed profile scenarios retain their last fixed phase in the owned bundle's
 values. One later success does not establish stable startup or explain the
 earlier intermittent failures.
 
-This observation does not prove credential invalidation during an in-flight
-operation or every concurrent-adapter case. Criterion 5 remains partial.
+The subsequent in-flight extension holds one actual REST project response while
+the saved token rotates. A new explicit adapter is refused and the existing
+adapter performs another business read. The held call must remain pending
+through both actions, then return the exact original result when released. This
+scenario asserts ten reads, no writes and no invalid REST requests. The first
+passing observation and exact source hashes are retained in
+`profile-inflight-first.json` and `inflight-first-input.json` under the same
+evidence directory. Cleanup releases and joins the held call before asserting
+success, preserving an earlier scenario failure if one occurred.
+
+The compatibility tests also distinguish password replacement and email changes.
+The managed-auth fixture covers equivalent token callers attached together,
+password isolation and a rotated token selecting a separate managed backend.
+These cases complement the explicit-backend refusal scenario. They do not
+establish upstream credential revocation or native macOS qualification.

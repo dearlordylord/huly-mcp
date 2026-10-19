@@ -42,6 +42,7 @@ let profileUrl: Schema.Schema.Type<typeof ProfileUrlSchema>
 let prepared = false
 let failed = false
 let nativeHostPrepared = false
+let heldRead: { arrived: Deferred.Deferred<void>; release: Deferred.Deferred<void> } | undefined
 const backendEnvironment = () => ({ ...residentSelectionEnvironment(), HULY_URL: profileUrl })
 
 beforeEach(() =>
@@ -52,7 +53,16 @@ beforeEach(() =>
 
 beforeAll(async () => {
   bundle = await buildIsolatedStdioServer(PROCESS_BOUND)
-  rest = await startDisposableRestFixture({ projects: [ProfileLifecycleProject] })
+  rest = await startDisposableRestFixture({
+    projects: [ProfileLifecycleProject],
+    onProjectRead: async () => {
+      const pending = heldRead
+      heldRead = undefined
+      if (pending === undefined) return
+      Effect.runSync(Deferred.succeed(pending.arrived, undefined))
+      await Effect.runPromise(Deferred.await(pending.release))
+    }
+  })
   profileUrl = Schema.decodeUnknownSync(ProfileUrlSchema)(rest.endpoint)
   stateDirectory = await fs.mkdtemp(join(await fs.realpath(tmpdir()), "resident-native-process-"))
   backend = spawn(process.execPath, [bundle.path], {
@@ -114,10 +124,40 @@ describe("manual adapters against the packaged native HTTP backend", { timeout: 
         )
       )
       const readsBefore = rest.observed.projectReads
-      await exercisePackagedProfileLifecycle(bundle.path, attachmentFile, profileUrl, (observed) => {
-        phase = observed
-      })
-      expect(rest.observed.projectReads - readsBefore).toBe(9)
+      await exercisePackagedProfileLifecycle(
+        bundle.path,
+        attachmentFile,
+        profileUrl,
+        (observed) => {
+          phase = observed
+        },
+        async (read, change) => {
+          const arrived = Effect.runSync(Deferred.make<void>())
+          const release = Effect.runSync(Deferred.make<void>())
+          heldRead = { arrived, release }
+          let settled = false
+          const pending = read()
+            .then(
+              () => true,
+              () => false
+            )
+            .finally(() => {
+              settled = true
+            })
+          try {
+            await Effect.runPromise(Deferred.await(arrived).pipe(Effect.timeout(RESPONSE_BOUND)))
+            expect(settled).toBe(false)
+            await change()
+            expect(settled).toBe(false)
+          } finally {
+            heldRead = undefined
+            Effect.runSync(Deferred.succeed(release, undefined))
+            await pending
+          }
+          expect(await pending).toBe(true)
+        }
+      )
+      expect(rest.observed.projectReads - readsBefore).toBe(10)
       expect(rest.observed.projectWrites).toBe(0)
       expect(rest.observed.invalidRequests).toBe(0)
       expect(backend.exitCode).toBeNull()
