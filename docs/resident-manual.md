@@ -134,6 +134,47 @@ Huly can make their requests fail; keeping a local snapshot does not bypass
 upstream revocation. An existing operation is never retried under credentials
 from a newly selected profile.
 
+## Attachment leases and managed idle retirement
+
+The current defaults are:
+
+| Policy | Configured interval |
+| --- | --- |
+| Adapter heartbeat | 5 seconds between renewals |
+| Attachment eligibility | 30 seconds from admission or the last accepted renewal |
+| Managed idle interval | 5 seconds after the last attachment and pending admission finish |
+| Idle inventory polling | At most 250 milliseconds between checks |
+| Attachment close and generation drain allowance | 5 seconds each |
+| Adapter admission, renewal and release control request | 5 seconds |
+
+Lease and idle decisions use the backend's injected monotonic clock. These
+intervals are configured policies, not measured native shutdown times or
+guarantees about OS scheduling.
+
+A paused or dead adapter, or one that loses heartbeats, becomes ineligible when
+its lease expires. Expiry retires that attachment and starts its owned cleanup;
+it does not prove that a dispatched Huly operation stopped or failed. Clean EOF
+and close release the adapter's own attachment. Another adapter's attachment and
+work remain independently owned.
+
+Request and cleanup accounting outlive adapter eligibility. An attachment stays
+in the generation inventory until its owned cleanup finishes, and pending
+admission is counted separately. Managed idle retirement waits for this inventory
+to empty, then fences new admission before stopping the server. A racing caller
+either enters an accepting generation or receives an explicit refusal; it is
+never admitted into the retiring generation.
+
+A drain fences admission first. If cleanup fails or exceeds its allowance,
+ownership remains unverified and overlapping replacement is blocked. Preserve
+the namespace and inspect authenticated status rather than deleting records or
+signalling a diagnostic PID. A local timeout, lease expiry or successful local
+cleanup never authorizes replay of an uncertain Huly write. There is no durable
+operation journal or cross-session operation-status lookup.
+
+Foreground/manual backends use attachment leases but do not use managed idle
+retirement. Native lifecycle measurements and the combined delivery gate remain
+separate qualification work.
+
 ## Managed package versions
 
 Automatic attachment requires an exact implementation-version match as well as
