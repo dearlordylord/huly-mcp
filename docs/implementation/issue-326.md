@@ -136,3 +136,13 @@ a failed drain does not authorize premature shared-client closure.
 criterion-3/4/5 evidence. These results do not establish native macOS behavior,
 full lifecycle-model coverage, the final combined quality gate or completion of
 all issue-326 criteria.
+
+## Repeated closure and failed cleanup — criteria 7 and 8
+
+On `f91fd0a0`, `close-status-units-current.json` records ten passing attachment-owner, blocked-status and operator-stop HTTP checks. They supplement the earlier 16 passing acquisition/drain/resource-close cases.
+
+A five-file coverage qualification reached its 60-second command bound before its last native output case completed. `close-output-fault-current-process.json` retains that incomplete attempt; it has no final Vitest result and is not a passing campaign. The later scoped inspection found all seven recorded processes absent. That observation is not retrospective kernel-wait proof for the interrupted case; its ownership state is not credited as cleaned.
+
+Native cases were not rerun to manufacture a complete group. Instead, `validated-native-output-stop-receipts.json` schema-decodes and checks all original assertions over four completed output observations from the `c23d1c72` gate and two completed stop-fault observations from the `f91fd0a0` attempt. The private read-only checker is `qualify-native-receipts.ts`. Output fixture/contract sources are unchanged between those candidates, and every observed MCP artifact is SHA-256 `33311217d91ac0938123173ea9d555939fe9321edbf6f763b4d67c0e404a5d4f`. The four output cases cover both protocols and closed/unread stdout, independent surviving parents, retained work 2→0→0, backend kernel exit 0 and removed private state. The stop cases distinguish confirmed retirement/replacement from failed cleanup, retained ownership and refused replacement, with private cause redacted.
+
+Fresh scoped Standards review accepted these Linux criterion cases together with the acquisition/drain evidence. Neither aggregate run becomes a passing full gate, and no macOS execution is inferred. Native macOS execution remains optional and user-deferred. Evidence root: `/tmp/resident-launch-model-a2935a11`.
