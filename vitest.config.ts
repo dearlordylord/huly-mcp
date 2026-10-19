@@ -17,6 +17,16 @@ const portTestFiles = [
 const residentLaunchTestFiles = ['test/resident/managed-backend-process.test.ts']
 const residentModelTestFiles = ['test/resident/launch-model-alignment.test.ts']
 const residentWaitTestFiles = ['test/resident/model-wait-process.test.ts']
+const processTestFiles = [
+  'test/resident/*-process.test.ts',
+  'test/mcp/stdio-process-lifecycle.test.ts',
+  'test/mcp/stdio-transport.test.ts',
+  'test/mcp/stdio-output-drain.test.ts',
+  'test/mcp/profile-startup-process.test.ts',
+  'test/mcp/stdio-startup-network.test.ts',
+  'test/helpers/stdio-build.test.ts',
+  'test/cli/full-integration-adapter.test.ts',
+]
 
 export default defineConfig({
   test: {
@@ -73,7 +83,17 @@ export default defineConfig({
           name: 'boundaries',
           globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
           include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
-          exclude: [...portTestFiles, ...residentLaunchTestFiles, ...residentModelTestFiles, ...residentWaitTestFiles],
+          exclude: [...portTestFiles, ...residentLaunchTestFiles, ...residentModelTestFiles, ...residentWaitTestFiles, ...processTestFiles],
+          isolate: true,
+          sequence: { groupOrder: 2 },
+        },
+      },
+      {
+        test: {
+          name: 'processes',
+          globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
+          include: processTestFiles,
+          exclude: [...residentLaunchTestFiles, ...residentWaitTestFiles],
           isolate: true,
           sequence: { groupOrder: 3 },
         },
@@ -81,7 +101,7 @@ export default defineConfig({
     ],
     setupFiles: ['./test/setup/quint-oracle.ts'],
     tags: [{ name: ORACLE_INFRASTRUCTURE_TAG, description: 'Tests the observation channel itself without model forwarding.' }],
-    reporters: ['default'],
+    reporters: ['dot'],
     silent: 'passed-only',
     coverage: {
       provider: 'v8',
