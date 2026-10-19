@@ -61,6 +61,7 @@ it("authenticates status without admission, preserves fencing and refuses mutati
                 statusWire: 1,
                 generation: identity.generation,
                 readiness: "ready",
+                hulyInitialization: "ready",
                 work: yield* admissions.status,
                 retirement: "unconfirmed"
               })
@@ -68,7 +69,12 @@ it("authenticates status without admission, preserves fencing and refuses mutati
             expect(yield* control("GET")).toEqual({ status: 200, cache: "no-store" })
             expect(yield* readResidentLiveStatus(attachment)).toMatchObject({
               kind: "authenticated",
-              status: { generation: identity.generation, readiness: "ready", work: { attachments: 0 } }
+              status: {
+                generation: identity.generation,
+                readiness: "ready",
+                hulyInitialization: "ready",
+                work: { attachments: 0 }
+              }
             })
             yield* admissions.fence
             const prior = yield* Ref.get(selected)

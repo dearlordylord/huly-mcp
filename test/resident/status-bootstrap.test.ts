@@ -11,7 +11,8 @@ it("reports starting before application readiness without dispatching or acquiri
     Effect.runPromise(
       Effect.gen(function* () {
         const backend = yield* makeManualResidentBackend()
-        const response = yield* backend.httpPolicy
+        const response = yield* backend
+          .httpPolicy(Effect.succeed("inactive"))
           .httpMiddleware(Effect.die("Status must not dispatch MCP"))
           .pipe(
             Effect.provideService(
@@ -24,6 +25,7 @@ it("reports starting before application readiness without dispatching or acquiri
         )
         expect(status).toMatchObject({
           readiness: "starting",
+          hulyInitialization: "inactive",
           work: { attachments: 0, retainedRequests: 0 },
           retirement: "unconfirmed"
         })

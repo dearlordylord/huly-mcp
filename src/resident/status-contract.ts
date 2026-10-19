@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 
 import { ResidentTlsIdentity } from "./tls-channel.js"
+import { HulyInitializationStatus } from "../runtime/client-initialization.js"
 
 export const RESIDENT_STATUS_PATH = "/resident/control/status-v1"
 const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
@@ -17,6 +18,7 @@ export const ResidentLiveStatus = Schema.Struct({
   statusWire: Schema.Literal(1),
   generation: ResidentTlsIdentity.fields.generation,
   readiness: Schema.Literals(["starting", "ready"]),
+  hulyInitialization: HulyInitializationStatus,
   work: ResidentWorkStatus,
   retirement: Schema.Literal("unconfirmed")
 })

@@ -13,6 +13,7 @@ import { observeResidentState, ResidentStateStatus } from "../../src/resident/st
 import { VERSION } from "../../src/version.js"
 import { AUTHORIZATION, withNativeServer, type Owner, type OwnerName } from "../helpers/resident-native-fixture.js"
 import { withRegistryDirectory } from "../helpers/resident-registry-fixture.js"
+import { HulyInitializationStatus } from "../../src/runtime/client-initialization.js"
 
 it("observes a protected live generation through the CLI without altering ownership or acquiring work", async () => {
   await withRegistryDirectory((directory) =>
@@ -27,6 +28,7 @@ it("observes a protected live generation through the CLI without altering owners
                 statusWire: 1,
                 generation: identity.generation,
                 readiness: "ready",
+                hulyInitialization: "ready",
                 retirement: "unconfirmed",
                 work: {
                   admission: "accepting",
@@ -57,23 +59,31 @@ it("observes a protected live generation through the CLI without altering owners
                           state: "observed",
                           generations: [{ observation: { kind: "authenticated", status: live } }]
                         })
-                        for (const json of [true, false]) {
-                          yield* Command.runWith(residentCommand, { version: "test", renderErrors: false })([
-                            "status",
-                            "--state-directory",
-                            directory,
-                            ...(json ? ["--json"] : [])
-                          ]).pipe(Effect.provide(NodeServices.layer))
-                          const output = (yield* TestConsole.logLines).at(-1)
-                          expect(output).toBeDefined()
-                          if (json) {
-                            const status = yield* Schema.decodeUnknownEffect(
-                              Schema.fromJsonString(ResidentStateStatus)
-                            )(output)
-                            expect(status).toMatchObject({
-                              generations: [{ observation: { kind: "authenticated", status: live } }]
-                            })
-                          } else expect(output).toContain("readiness=ready admission=accepting attachments=2")
+                        for (const initialization of HulyInitializationStatus.literals) {
+                          const observed = { ...live, hulyInitialization: initialization }
+                          yield* Ref.set(current, Effect.succeed(observed))
+                          for (const json of [true, false]) {
+                            yield* Command.runWith(residentCommand, { version: "test", renderErrors: false })([
+                              "status",
+                              "--state-directory",
+                              directory,
+                              ...(json ? ["--json"] : [])
+                            ]).pipe(Effect.provide(NodeServices.layer))
+                            const output = (yield* TestConsole.logLines).at(-1)
+                            expect(output).toBeDefined()
+                            if (json) {
+                              const status = yield* Schema.decodeUnknownEffect(
+                                Schema.fromJsonString(ResidentStateStatus)
+                              )(output)
+                              expect(status).toMatchObject({
+                                generations: [{ observation: { kind: "authenticated", status: observed } }]
+                              })
+                            } else {
+                              expect(output).toContain(`readiness=ready hulyInitialization=${initialization}`)
+                              expect(output).toContain("admission=accepting attachments=2")
+                              if (initialization === "initializing") expect(output).toContain("including model loading")
+                            }
+                          }
                         }
                         expect(yield* registry.inventory).toHaveLength(1)
                       }),

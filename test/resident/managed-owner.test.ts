@@ -70,7 +70,7 @@ it("retains its registry after native transport drain fails", async () =>
             httpHost: "127.0.0.1",
             httpPort: 0,
             mcpAuthToken: backend.authorization,
-            ...backend.httpPolicy,
+            ...backend.httpPolicy(Effect.succeed("inactive")),
             resolveClients: () => Promise.reject(new Error("Retirement fixture must not acquire Huly")),
             closeClients: () => Promise.reject(new Error("private client close cause"))
           }).pipe(Layer.provide(TelemetryService.testLayer({})))

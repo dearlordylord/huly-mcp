@@ -8,6 +8,7 @@ import { HulyStorageClient } from "../huly/storage.js"
 import { WorkspaceClient } from "../huly/workspace-client.js"
 import { findRecoverableCauseFailure } from "./cause-exit.js"
 import type { ClientBundle, ClientResolver, HulyClientBundleError } from "./client-resolver.js"
+import type { HulyInitializationStatus } from "./client-initialization.js"
 
 export type { ClientBundle, ClientResolver, HulyClientBundleError } from "./client-resolver.js"
 
@@ -25,11 +26,13 @@ export interface ScopedClientBundle {
 export interface ProcessClientResolver {
   readonly resolve: ClientResolver
   readonly close: () => Promise<void>
+  readonly status: Effect.Effect<HulyInitializationStatus>
 }
 
 interface ClientAcquisition {
   readonly result: Promise<Exit.Exit<ScopedClientBundle, HulyClientBundleError>>
   readonly close: () => Promise<void>
+  readonly poll: () => Exit.Exit<ScopedClientBundle, HulyClientBundleError> | undefined
 }
 
 interface ActiveClientAcquisition {
@@ -96,7 +99,7 @@ const startClientAcquisition = (combinedClientLayer: CombinedClientLayer): Clien
     )
     return state.closePromise
   }
-  return { result, close }
+  return { result, close, poll: () => fiber.pollUnsafe() }
 }
 
 const acquiredClients = (acquisition: ClientAcquisition): Promise<Exit.Exit<ClientBundle, HulyClientBundleError>> =>
@@ -161,5 +164,11 @@ export const createClientResolver = (combinedClientLayer: CombinedClientLayer): 
     return state.closePromise
   }
 
-  return { resolve, close }
+  const status = Effect.sync((): HulyInitializationStatus => {
+    if (state.closed) return "closed"
+    if (state.active === undefined) return "inactive"
+    const exit = state.active.acquisition.poll()
+    return exit === undefined ? "initializing" : Exit.isSuccess(exit) ? "ready" : "failed"
+  })
+  return { resolve, close, status }
 }

@@ -43,7 +43,9 @@ describe("shared Huly client runtime", () => {
       acquisitions += 1
       return clientLayer.pipe(Layer.tap(() => Effect.addFinalizer(() => Effect.sync(() => releases++))))
     })
-    const { close, resolve } = createClientResolver(trackedLayer)
+    const { close, resolve, status } = createClientResolver(trackedLayer)
+    expect(await Effect.runPromise(status)).toBe("inactive")
+    expect(acquisitions).toBe(0)
 
     const first = await resolve()
     const second = await resolve()
@@ -51,9 +53,11 @@ describe("shared Huly client runtime", () => {
     expect(second).toBe(first)
     expect(Exit.isSuccess(first)).toBe(true)
     expect(acquisitions).toBe(1)
+    expect(await Effect.runPromise(status)).toBe("ready")
 
     await Promise.all([close(), close()])
     expect(releases).toBe(1)
+    expect(await Effect.runPromise(status)).toBe("closed")
     expect(Exit.isFailure(await resolve())).toBe(true)
   })
 
@@ -74,10 +78,11 @@ describe("shared Huly client runtime", () => {
             )
           )
     )
-    const { close, resolve } = createClientResolver(recoverableLayer)
+    const { close, resolve, status } = createClientResolver(recoverableLayer)
 
     try {
       expect(Exit.isFailure(await resolve())).toBe(true)
+      expect(await Effect.runPromise(status)).toBe("inactive")
       available = true
       expect(Exit.isSuccess(await resolve())).toBe(true)
     } finally {
@@ -91,12 +96,13 @@ describe("shared Huly client runtime", () => {
       acquisitions += 1
       return clientLayer.pipe(Layer.tap(() => Effect.fail(new HulyConnectionError({ message: "stable failure" }))))
     })
-    const { close, resolve } = createClientResolver(failingLayer)
+    const { close, resolve, status } = createClientResolver(failingLayer)
 
     const first = await resolve()
     const second = await resolve()
 
     expect(Exit.isFailure(first)).toBe(true)
+    expect(await Effect.runPromise(status)).toBe("failed")
     expect(second).toBe(first)
     expect(acquisitions).toBe(1)
     await close()
@@ -128,19 +134,27 @@ describe("shared Huly client runtime", () => {
   it("interrupts and awaits a pending acquisition when closed", async () => {
     const started = await Effect.runPromise(Deferred.make<void>())
     const interrupted = await Effect.runPromise(Deferred.make<void>())
+    const finishCleanup = await Effect.runPromise(Deferred.make<void>())
     const pendingLayer = clientLayer.pipe(
       Layer.tap(() =>
         Deferred.succeed(started, undefined).pipe(
           Effect.andThen(Effect.never),
-          Effect.onInterrupt(() => Deferred.succeed(interrupted, undefined))
+          Effect.onInterrupt(() =>
+            Deferred.succeed(interrupted, undefined).pipe(Effect.andThen(Deferred.await(finishCleanup)))
+          )
         )
       )
     )
-    const { close, resolve } = createClientResolver(pendingLayer)
+    const { close, resolve, status } = createClientResolver(pendingLayer)
     const pendingResolution = resolve()
 
     await Effect.runPromise(Deferred.await(started))
-    await close()
+    expect(await Effect.runPromise(status)).toBe("initializing")
+    const closing = close()
+    await Effect.runPromise(Deferred.await(interrupted))
+    expect(await Effect.runPromise(status)).toBe("closed")
+    await Effect.runPromise(Deferred.succeed(finishCleanup, undefined))
+    await closing
 
     expect(await Effect.runPromise(Deferred.await(interrupted))).toBeUndefined()
     expect(Exit.isFailure(await pendingResolution)).toBe(true)

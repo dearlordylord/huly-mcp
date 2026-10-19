@@ -128,6 +128,8 @@ const main = async () => {
     const idle = await untilStatus(
       (status) => status.work.attachments === TWO_PARENTS && status.work.retainedRequests === 0
     )
+    assert.equal(idle.hulyInitialization, "inactive")
+    assert.equal(rest.observed.modelRequests, 0)
     const inventory = await Effect.runPromise(readResidentNamespace(input.directory))
     const [record] = inventory.records
     assert.ok(record !== undefined)
@@ -145,6 +147,24 @@ const main = async () => {
     phase("model response held; start second caller")
     await start(joiner, cancelled === joiner ? "CANCEL" : "SURVIVE")
     const waiting = await untilStatus((status) => status.work.retainedRequests === TWO_PARENTS)
+    assert.equal(waiting.hulyInitialization, "initializing")
+    const discovery = spawnModelWaitParent(
+      input.host,
+      Schema.decodeUnknownSync(ModelWaitHostInput)({ ...input, endpoint: rest.endpoint, role: "joiner" })
+    )
+    parents.push(discovery)
+    const discoveryParent = await discovery.next()
+    assert.ok(discoveryParent._tag === "ready")
+    assert.equal(discoveryParent.port, first.port)
+    assert.ok(ready.every((parent) => parent.parentPid !== discoveryParent.parentPid))
+    assert.ok(ready.every((parent) => parent.adapterPid !== discoveryParent.adapterPid))
+    const discoveryStatus = await untilStatus((status) => status.work.attachments === TWO_PARENTS + 1)
+    assert.equal(discoveryStatus.readiness, "ready")
+    assert.equal(discoveryStatus.hulyInitialization, "initializing")
+    assert.equal(discoveryStatus.work.retainedRequests, TWO_PARENTS)
+    assert.equal(rest.observed.modelRequests, 1)
+    assert.deepEqual(await discovery.close(), [0, null])
+    await untilStatus((status) => status.work.attachments === TWO_PARENTS)
     if (clock !== undefined) {
       await clock.advance("near")
       await clock.advance("protected")
@@ -159,6 +179,7 @@ const main = async () => {
     assert.deepEqual(await cancelled.next(), { _tag: "cancelled", project: "CANCEL" })
     phase("client acknowledged cancellation; await backend cleanup")
     const afterCancel = await untilStatus((status) => status.work.retainedRequests === 1)
+    assert.equal(afterCancel.hulyInitialization, "initializing")
     assert.equal(afterCancel.work.attachments, TWO_PARENTS)
     assert.equal(rest.observed.projectReads, 0)
     assert.equal(rest.observed.modelRequests, 1)
@@ -181,6 +202,7 @@ const main = async () => {
     await result(survivor, "SURVIVE")
     phase("survivor continued project result verified")
     const final = await untilStatus((status) => status.work.retainedRequests === 0)
+    assert.equal(final.hulyInitialization, "ready")
     assert.equal(final.work.attachments, TWO_PARENTS)
     for (const status of [waiting, afterCancel, final]) {
       assert.equal(status.generation, idle.generation)
@@ -194,7 +216,7 @@ const main = async () => {
     assert.equal(rest.observed.modelRequests, 1)
     assert.equal(rest.observed.invalidRequests, 0)
     assert.equal(await fs.readFile(recordFile, "utf8"), original)
-    const exits = await Promise.all(parents.map((parent) => parent.close()))
+    const exits = await Promise.all([creator, joiner].map((parent) => parent.close()))
     phase("both parent exits joined")
     assert.deepEqual(exits, [
       [0, null],
@@ -233,6 +255,7 @@ const main = async () => {
         generation: idle.generation,
         parents: [first, second],
         statuses: [waiting, afterCancel, final],
+        discoveryDuringInitialization: { parent: discoveryParent, status: discoveryStatus, parentExit: 0 },
         modelRequests: finalCounts.modelRequests,
         projectReads: finalCounts.projectReads,
         projectQueries: finalCounts.projectQueries,

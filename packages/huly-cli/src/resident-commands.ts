@@ -8,11 +8,20 @@ import { observeResidentState, ResidentStateStatus } from "../../../src/resident
 import { requestResidentStop, ResidentStopReport, ResidentStopTarget } from "../../../src/resident/operator-stop.js"
 import { CliRuntimeError } from "./render.js"
 import type { ResidentStatusObservation } from "../../../src/resident/status-contract.js"
+import type { HulyInitializationStatus } from "../../../src/runtime/client-initialization.js"
+
+const initializationDescriptions: Readonly<Record<HulyInitializationStatus, string>> = {
+  inactive: "No active Huly initialization",
+  initializing: "Huly initialization, including model loading",
+  ready: "Huly clients and model ready",
+  failed: "Huly initialization failed",
+  closed: "Huly initialization closed to new work; cleanup unconfirmed"
+}
 
 const renderObservation = (observation: ResidentStatusObservation | undefined) => {
   if (observation?.kind !== "authenticated") return "observation=unavailable recovery=unverified"
-  const { readiness, work } = observation.status
-  return `observation=authenticated readiness=${readiness} admission=${work.admission} attachments=${work.attachments} pendingAdmissions=${work.pendingAdmissions} retainedRequests=${work.retainedRequests} blockedRequests=${work.blockedRequests} drain=${work.drain} retirement=unconfirmed`
+  const { hulyInitialization, readiness, work } = observation.status
+  return `observation=authenticated readiness=${readiness} hulyInitialization=${hulyInitialization} (${initializationDescriptions[hulyInitialization]}) admission=${work.admission} attachments=${work.attachments} pendingAdmissions=${work.pendingAdmissions} retainedRequests=${work.retainedRequests} blockedRequests=${work.blockedRequests} drain=${work.drain} retirement=unconfirmed`
 }
 
 const STATE_DIRECTORY_FLAG = "state-directory"

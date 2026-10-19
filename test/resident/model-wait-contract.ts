@@ -51,6 +51,11 @@ export const ModelWaitReceipt = Schema.Struct({
   generation: ResidentRegistryEnvelope.fields.generation,
   parents: Schema.Tuple([ModelWaitEvent.cases.ready, ModelWaitEvent.cases.ready]),
   statuses: Schema.Tuple([ResidentLiveStatus, ResidentLiveStatus, ResidentLiveStatus]),
+  discoveryDuringInitialization: Schema.Struct({
+    parent: ModelWaitEvent.cases.ready,
+    status: ResidentLiveStatus,
+    parentExit: Schema.Literal(0)
+  }),
   modelRequests: Schema.Literal(1),
   projectReads: Schema.Literal(MODEL_WAIT_PROJECT_READS),
   projectQueries: Schema.Tuple([Schema.Literal("SURVIVE"), Schema.Literal("FRESH"), Schema.Literal("SURVIVE")]),

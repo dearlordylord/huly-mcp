@@ -89,7 +89,7 @@ it.each(["manual", "foreground", "managed"] as const)(
                 httpHost: "127.0.0.1",
                 httpPort: 0,
                 mcpAuthToken: backend.authorization,
-                ...backend.httpPolicy,
+                ...backend.httpPolicy(Effect.succeed("inactive")),
                 resolveClients: () => Promise.reject(new Error("Operator stop must not acquire Huly")),
                 closeClients: () =>
                   Effect.runPromise(Deferred.succeed(cleaning, undefined).pipe(Effect.andThen(Deferred.await(finish))))

@@ -71,7 +71,7 @@ it("fences attachment admission before held native client cleanup during normal 
               httpHost: "127.0.0.1",
               httpPort: 0,
               mcpAuthToken: backend.authorization,
-              ...backend.httpPolicy,
+              ...backend.httpPolicy(Effect.succeed("inactive")),
               resolveClients: () => Promise.reject(new Error("Shutdown fixture must not acquire Huly")),
               closeClients: () =>
                 Effect.runPromise(Deferred.succeed(cleaning, undefined).pipe(Effect.andThen(Deferred.await(finish))))
@@ -160,7 +160,7 @@ it.each(["stop", "interrupt"])("publishes after native application readiness and
               httpHost: "127.0.0.1",
               httpPort: 0,
               mcpAuthToken: backend.authorization,
-              ...backend.httpPolicy,
+              ...backend.httpPolicy(Effect.succeed("inactive")),
               resolveClients: () => Promise.reject(new Error("Application readiness must not acquire Huly"))
             }).pipe(Layer.provide(TelemetryService.testLayer({})))
           )
@@ -224,7 +224,7 @@ it.each(["publication", "readiness", "timeout"])("closes the bound listener afte
               httpHost: "127.0.0.1",
               httpPort: 0,
               mcpAuthToken: backend.authorization,
-              ...backend.httpPolicy,
+              ...backend.httpPolicy(Effect.succeed("inactive")),
               resolveClients: () => Promise.reject(new Error("Failed startup must not acquire Huly")),
               writeError: (line) => {
                 if (line.startsWith(READY_PREFIX))

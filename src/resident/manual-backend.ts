@@ -15,6 +15,7 @@ import type { StartupBudget } from "./startup-budget.js"
 import type { ResidentSelection } from "./compatibility-contract.js"
 import { withResidentHeaderRedaction } from "./private-http.js"
 import { ResidentLiveStatus } from "./status-contract.js"
+import type { HulyInitializationStatus } from "../runtime/client-initialization.js"
 
 const SECRET_BYTES = 32
 const STARTUP_ALLOWANCE = "5 seconds"
@@ -143,7 +144,7 @@ export const makeManualResidentBackend = Effect.fn("makeManualResidentBackend")(
   return {
     authorization,
     beforeClientsClose: admissions.drain,
-    httpPolicy: {
+    httpPolicy: (initialization: Effect.Effect<HulyInitializationStatus>) => ({
       httpMiddleware: residentAdmissionMiddleware(
         admissions,
         authority,
@@ -155,6 +156,7 @@ export const makeManualResidentBackend = Effect.fn("makeManualResidentBackend")(
             statusWire: 1,
             generation: identity.generation,
             readiness: (yield* Deferred.isDone(ready)) ? "ready" : "starting",
+            hulyInitialization: yield* initialization,
             work: yield* admissions.status,
             retirement: "unconfirmed"
           })
@@ -162,7 +164,7 @@ export const makeManualResidentBackend = Effect.fn("makeManualResidentBackend")(
       ),
       beforeHttpShutdown: admissions.fence,
       ...(selection === undefined ? {} : { processPolicy: selection.policy })
-    },
+    }),
     run
   }
 })

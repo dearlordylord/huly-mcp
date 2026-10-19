@@ -94,3 +94,9 @@ test/coverage limit. These measurements do not replace it. Final delivery,
 remaining relevant integration and prototype retirement remain incomplete.
 Native macOS execution is optional and user-deferred by the #322/#328 amendment;
 it remains unexecuted and is not qualified by Linux evidence.
+
+The later initialization diagnostic adds a read-only projection of the existing
+client acquisition fiber and a required private status field. Artifact333 remains
+the exact measured candidate above; those measurements are not relabeled as
+measurements of the later package. Review did not require repeating the entire
+performance campaign solely for this projection. Its performance was not measured.

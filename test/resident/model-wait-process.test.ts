@@ -103,6 +103,18 @@ describe.skipIf(process.platform !== "linux")("packaged shared model waiter isol
         expect(new Set(receipt.parents.map((parent) => parent.adapterPid)).size).toBe(TWO_PARENTS)
         expect(new Set(receipt.parents.map((parent) => parent.port)).size).toBe(1)
         expect(receipt.statuses.map((status) => status.work.retainedRequests)).toEqual([2, 1, 0])
+        expect(receipt.statuses.map((status) => status.hulyInitialization)).toEqual([
+          "initializing",
+          "initializing",
+          "ready"
+        ])
+        expect(receipt.discoveryDuringInitialization.status).toMatchObject({
+          readiness: "ready",
+          hulyInitialization: "initializing",
+          work: { attachments: 3, retainedRequests: 2 }
+        })
+        expect(receipt.discoveryDuringInitialization.parent.port).toBe(receipt.parents[0].port)
+        expect(receipt.discoveryDuringInitialization.parentExit).toBe(0)
         expect(receipt.statuses.every((status) => status.generation === receipt.generation)).toBe(true)
         expect(receipt.statuses.every((status) => status.work.attachments === TWO_PARENTS)).toBe(true)
         expect(receipt.modelRequests).toBe(1)

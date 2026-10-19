@@ -223,7 +223,7 @@ const runConfiguredServer = (
     const combinedClientLayer = buildCombinedClientLayer(configLayer)
     yield* Effect.acquireUseRelease(
       Effect.sync(() => createClientResolver(combinedClientLayer)),
-      ({ close: closeClients, resolve: resolveClients }) => {
+      ({ close: closeClients, resolve: resolveClients, status: clientStatus }) => {
         const resolveHttpClientLease = createHttpClientLeaseResolver(combinedClientLayer, resolveClients)
         return Effect.gen(function* () {
           const context = yield* Effect.context<never>()
@@ -256,7 +256,7 @@ const runConfiguredServer = (
             guardedClose,
             runtimeConfigContext,
             observeMovement,
-            resident?.httpPolicy
+            resident?.httpPolicy(clientStatus)
           )
 
           yield* Effect.gen(function* () {
