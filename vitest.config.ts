@@ -35,7 +35,7 @@ export default defineConfig({
           include: residentModelTestFiles,
           isolate: true,
           // Keep each four-second Quint replay independent of native process-race CPU load.
-          sequence: { groupOrder: -1 },
+          sequence: { groupOrder: 0 },
         },
       },
       {
@@ -45,14 +45,14 @@ export default defineConfig({
           include: residentLaunchTestFiles,
           isolate: true,
           // Ten independent parents already compete inside this fixture; keep unrelated suites out of its deadline.
-          sequence: { groupOrder: 0 },
+          sequence: { groupOrder: 1 },
         },
       },
       {
         test: {
           name: 'ports',
           include: portTestFiles,
-          sequence: { groupOrder: 1 },
+          sequence: { groupOrder: 2 },
           // The oracle adapter registers its guard at import, so it needs a fresh module graph per file.
           isolate: Boolean(process.env.QUINT_ORACLE_URL?.trim()),
         },
@@ -64,7 +64,7 @@ export default defineConfig({
           include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
           exclude: [...portTestFiles, ...residentLaunchTestFiles, ...residentModelTestFiles],
           isolate: true,
-          sequence: { groupOrder: 1 },
+          sequence: { groupOrder: 2 },
         },
       },
     ],

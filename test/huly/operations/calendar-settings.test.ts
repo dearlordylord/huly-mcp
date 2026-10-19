@@ -179,6 +179,29 @@ const harness = (options: HarnessOptions) => {
   return { layer, state }
 }
 
+it.effect("rejects malformed calendar and primary-preference SDK payloads before mutation", () =>
+  Effect.gen(function* () {
+    const valid = makeCalendar("valid", "primary")
+    for (const row of [makeCalendar("bad-name", "primary", { name: "" })]) {
+      const test = harness({ calendars: [row] })
+      const error = yield* listCalendarSettings({}).pipe(Effect.provide(test.layer), Effect.flip)
+      expect(error).toMatchObject({ _tag: "HulyDataInvalidError", entity: "calendar" })
+      expect(test.state.created).toBe(0)
+      expect(test.state.updates).toEqual([])
+    }
+    const preference = documentForTestClass<HulyPrimaryCalendar>({
+      ...makePrimary(valid._id),
+      _class: calendar.class.Calendar
+    })
+    if (preference === undefined) return yield* Effect.die("Expected malformed SDK preference fixture")
+    const test = harness({ calendars: [valid], preference })
+    const error = yield* listCalendarSettings({}).pipe(Effect.provide(test.layer), Effect.flip)
+    expect(error).toMatchObject({ _tag: "HulyDataInvalidError", entity: "primary calendar preference" })
+    expect(test.state.created).toBe(0)
+    expect(test.state.updates).toEqual([])
+  })
+)
+
 describe("caller-scoped calendar settings", () => {
   it.effect("lists all caller-owned rows and computes the valid primary fallback", () => {
     const internal = makeCalendar("internal", "primary", { name: "Personal" })

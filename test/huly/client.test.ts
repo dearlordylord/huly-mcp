@@ -2857,3 +2857,59 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
     })
   )
 })
+
+it.effect("keeps a failed lightweight project read typed without acquiring the full model", () =>
+  Effect.gen(function* () {
+    let modelAcquisitions = 0
+    const createRestTxOperations: HulySdkDependencies["createRestTxOperations"] = (...args) => {
+      modelAcquisitions++
+      return testSdk.createRestTxOperations(...args)
+    }
+    const createRestClient: HulySdkDependencies["createRestClient"] = (...args) => ({
+      ...testSdk.createRestClient(...args),
+      findAll: () => Promise.reject(new Error("project transport unavailable"))
+    })
+    const layer = HulyClient.onDemandLayerWithDependencies.pipe(
+      Layer.provide(
+        Layer.merge(testConfigLayer, Layer.succeed(HulySdk, { ...testSdk, createRestClient, createRestTxOperations }))
+      )
+    )
+    yield* Effect.gen(function* () {
+      const client = yield* HulyClient
+      const error = yield* assertExists(client.findProjectDocuments)({}).pipe(Effect.flip)
+      expect(error).toMatchObject({ _tag: "HulyConnectionError" })
+      expect(yield* assertExists(client.initializationStatus)).toBe("inactive")
+      expect(modelAcquisitions).toBe(0)
+    }).pipe(Effect.provide(layer), Effect.scoped)
+  })
+)
+
+it.effect("reports failed model initialization while keeping lightweight project reads available", () =>
+  Effect.gen(function* () {
+    const started = yield* Deferred.make<void>()
+    const createRestTxOperations: HulySdkDependencies["createRestTxOperations"] = async () => {
+      await Effect.runPromise(Deferred.succeed(started, undefined))
+      throw new Error("model transport unavailable")
+    }
+    const createRestClient: HulySdkDependencies["createRestClient"] = (...args) => ({
+      ...testSdk.createRestClient(...args),
+      findAll: mockFindAll
+    })
+    const layer = HulyClient.onDemandLayerWithDependencies.pipe(
+      Layer.provide(
+        Layer.merge(testConfigLayer, Layer.succeed(HulySdk, { ...testSdk, createRestClient, createRestTxOperations }))
+      )
+    )
+    yield* Effect.gen(function* () {
+      const client = yield* HulyClient
+      const loading = yield* client.findAllInModel(core.class.Status, {}).pipe(Effect.result, Effect.forkChild)
+      yield* Deferred.await(started)
+      yield* TestClock.adjust("500 millis")
+      const result = yield* Fiber.join(loading)
+      expect(result._tag).toBe("Failure")
+      expect(yield* assertExists(client.initializationStatus)).toBe("failed")
+      yield* assertExists(client.findProjectDocuments)({})
+      expect(yield* assertExists(client.initializationStatus)).toBe("failed")
+    }).pipe(Effect.provide(layer), Effect.scoped)
+  })
+)

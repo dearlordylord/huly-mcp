@@ -6,11 +6,11 @@ import { expect } from "vitest"
 import { sanitizeHulyRuntimeConfigFromEnv } from "../../src/config/config.js"
 import { HulyClient } from "../../src/huly/client.js"
 import { HulyStorageClient } from "../../src/huly/storage.js"
-import { HttpServerFactoryService } from "../../src/mcp/http-transport.js"
+import { HttpPort, HttpServerFactoryService } from "../../src/mcp/http-transport.js"
 import { McpServerError, McpServerService } from "../../src/mcp/server.js"
 import type { StdioProcessPort, StdioShutdownHandlers } from "../../src/mcp/stdio-shutdown.js"
 import { TelemetryService } from "../../src/telemetry/telemetry.js"
-import { inertHttpServerFactory } from "./http-test-support.js"
+import { inertHttpServerFactory, makeTestHttpServerFactory } from "./http-test-support.js"
 
 const runtimeEnv = { HULY_URL: "https://huly.example.com", HULY_WORKSPACE: "workspace", HULY_TOKEN: "test-token" }
 
@@ -71,14 +71,19 @@ const buildOperations = Effect.fn("buildServerOperations")(function* (
 })
 
 const buildHttpOperationsWithDefaultRuntimeContext = Effect.fn("buildHttpOperationsWithDefaultRuntimeContext")(
-  function* () {
+  function* (closeClients?: () => Promise<void>, shutdownTelemetry?: () => Promise<void>) {
     const clients = yield* Layer.build(Layer.mergeAll(HulyClient.testLayer({}), HulyStorageClient.testLayer({})))
     const bundle = {
       hulyClient: Context.get(clients, HulyClient),
       storageClient: Context.get(clients, HulyStorageClient)
     }
-    const layer = McpServerService.layer({ transport: "http", resolveClients: async () => Exit.succeed(bundle) }).pipe(
-      Layer.provide(TelemetryService.testLayer())
+    const layer = McpServerService.layer({
+      transport: "http",
+      httpPort: HttpPort.make(0),
+      resolveClients: async () => Exit.succeed(bundle),
+      ...(closeClients === undefined ? {} : { closeClients })
+    }).pipe(
+      Layer.provide(TelemetryService.testLayer(shutdownTelemetry === undefined ? {} : { shutdown: shutdownTelemetry }))
     )
     const context = yield* Layer.build(layer)
     return Context.get(context, McpServerService)
@@ -140,6 +145,38 @@ describe("McpServerService operations", () => {
       expect(first).toBeInstanceOf(McpServerError)
       expect(first.message).toBe("listener failed")
       expect(second.message).toBe("listener failed")
+    })
+  )
+
+  it.effect("attempts every HTTP cleanup and preserves failure when telemetry or client close rejects", () =>
+    Effect.gen(function* () {
+      for (const failed of ["telemetry", "clients", "both"]) {
+        const attempts: Array<string> = []
+        const operations = yield* buildHttpOperationsWithDefaultRuntimeContext(
+          async () => {
+            attempts.push("clients")
+            if (failed !== "telemetry") throw new Error("private client failure")
+          },
+          async () => {
+            attempts.push("telemetry")
+            if (failed !== "clients") throw new Error("private telemetry failure")
+          }
+        )
+        const fiber = yield* operations
+          .run()
+          .pipe(
+            Effect.provideService(HttpServerFactoryService, {
+              ...makeTestHttpServerFactory(() => {}),
+              shutdownPolicy: "confirmed"
+            }),
+            Effect.forkScoped({ startImmediately: true })
+          )
+        yield* operations.awaitReady()
+        yield* operations.stop()
+        const exit = yield* Fiber.await(fiber)
+        expect(Exit.isFailure(exit)).toBe(true)
+        expect(attempts).toEqual(["telemetry", "clients"])
+      }
     })
   )
 
