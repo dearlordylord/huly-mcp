@@ -139,9 +139,17 @@ const main = async () => {
         protocol,
         (id, method, params) =>
           Effect.tryPromise({
-            try: () => boundModelWait(request(Schema.decodeUnknownSync(Schema.Int)(id), method, params)),
+            try: () => request(Schema.decodeUnknownSync(Schema.Int)(id), method, params),
             catch: () => new LiveReadProbeError({ phase: "discover" })
-          }),
+          }).pipe(
+            Effect.timeoutOrElse({
+              duration: "5 seconds",
+              orElse: () =>
+                Effect.sync(() => {
+                  process.stderr.write("Active query initialization response exceeded its five-second allowance\n")
+                }).pipe(Effect.andThen(Effect.fail(new LiveReadProbeError({ phase: "discover" }))))
+            })
+          ),
         (frame) => Effect.tryPromise({ try: () => send(frame), catch: () => new LiveReadProbeError({ phase: "send" }) })
       )
     )

@@ -75,6 +75,8 @@ describe.skipIf(process.platform !== "linux")("packaged active query adapter los
             ...(loss === "kill" ? ["--lease-expiry"] : []),
             "--resources",
             join(root, "resources.jsonl"),
+            "--cpu-receipts",
+            join(root, "owned-exits.jsonl"),
             process.execPath,
             driver,
             Schema.encodeSync(Schema.fromJsonString(ActiveQueryPairInput))(input)
