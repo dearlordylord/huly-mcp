@@ -11,11 +11,12 @@ const portTestFiles = [
   'src/utils/**/*.test.ts',
   'test/runtime/**/*.test.ts',
   // Subprocess stdio suites retain fresh module graphs in the boundaries project.
-  'test/mcp/**/!(stdio-process-lifecycle|stdio-transport|stdio-output-drain).test.ts',
+  'test/mcp/**/!(stdio-process-lifecycle|stdio-transport|stdio-output-drain|profile-startup-process|stdio-startup-network).test.ts',
 ]
 
 const residentLaunchTestFiles = ['test/resident/managed-backend-process.test.ts']
 const residentModelTestFiles = ['test/resident/launch-model-alignment.test.ts']
+const residentWaitTestFiles = ['test/resident/model-wait-process.test.ts']
 
 export default defineConfig({
   test: {
@@ -50,6 +51,16 @@ export default defineConfig({
       },
       {
         test: {
+          name: 'resident-model-wait',
+          globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
+          include: residentWaitTestFiles,
+          isolate: true,
+          // Preserve held-request deadlines while pure port tests run alongside; keep process fleets in the next group.
+          sequence: { groupOrder: 2 },
+        },
+      },
+      {
+        test: {
           name: 'ports',
           include: portTestFiles,
           sequence: { groupOrder: 2 },
@@ -62,15 +73,15 @@ export default defineConfig({
           name: 'boundaries',
           globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
           include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
-          exclude: [...portTestFiles, ...residentLaunchTestFiles, ...residentModelTestFiles],
+          exclude: [...portTestFiles, ...residentLaunchTestFiles, ...residentModelTestFiles, ...residentWaitTestFiles],
           isolate: true,
-          sequence: { groupOrder: 2 },
+          sequence: { groupOrder: 3 },
         },
       },
     ],
     setupFiles: ['./test/setup/quint-oracle.ts'],
     tags: [{ name: ORACLE_INFRASTRUCTURE_TAG, description: 'Tests the observation channel itself without model forwarding.' }],
-    reporters: ['dot'],
+    reporters: ['default'],
     silent: 'passed-only',
     coverage: {
       provider: 'v8',
