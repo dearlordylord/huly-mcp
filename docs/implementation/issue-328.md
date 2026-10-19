@@ -171,3 +171,33 @@ The preceding diagnostic mistakenly placed its prefix before the executable
 shebang and failed parsing before backend startup; that separate failed attempt
 is preserved at `/tmp/resident-startup-profile-19bd-p3lt9s0l` and supplies no
 profile or functional qualification.
+
+### Mixed explicit/automatic first-start race
+
+The maintained `mixed-launch-process.test.ts` runs the packaged `resident-http`
+entrypoint and an independent `stdio-resident` parent without awaiting either's
+readiness. A second independent reader then verifies reuse. Both readers' ports
+match the authenticated descriptor, one registry generation serves both exact
+project reads, and only one full model is acquired. The explicit launcher may
+reuse and exit0 or own a foreground backend; the receipt distinguishes normal
+managed retirement0 from intentional owned foreground interruption130. No PID
+from registry metadata is used for signaling.
+
+`/tmp/resident-launch-model-a2935a11/mixed-launch-endpoint-corrected.json` records
+two passing protocol cases. Their receipts are
+`/tmp/resident-mixed-launch-H5pExg/receipt.json` and
+`/tmp/resident-mixed-launch-RWIrET/receipt.json`. Both launched package22f565…
+and driver30ec1eed…, and both observed automatic managed ownership. The explicit
+loser exited0, both independent caller parents exited0, authenticated stop was
+followed by exact backend kernel exit0, the supervisor exited0, and private
+state was empty. These cases do not claim both winner orderings or retirement
+of a separate prepared losing child that was never created.
+
+The initial two-case run also passed. A subsequent reviewed run failed because
+the new endpoint assertion compared an already-parsed URL object with a string.
+Those two failures remain in `mixed-launch-reviewed.json`; the corrected check
+compares the parsed port. `mixed-launch-observed-receipts.json` lists the separate
+receipt/driver hashes. Standards review also required independently settling
+cleanup operations and preserving the primary error, plus keeping package paths
+typed and parsing driver argv at the boundary; these corrections are included.
+This is focused native race evidence, not a passing complete Linux matrix/gate.
