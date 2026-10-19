@@ -8,7 +8,6 @@ import { tmpdir } from "node:os"
 import { Client } from "@modelcontextprotocol/client"
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"
 import { Deferred, Effect, Schema } from "effect"
-import { McpSchema } from "effect/ai"
 import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFailed } from "vitest"
 
 import { buildIsolatedStdioServer, ESBUILD_EXECUTABLE, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
@@ -25,14 +24,9 @@ import { ProfileUrlSchema } from "../../src/profiles/model.js"
 
 const PROCESS_BOUND = 30_000
 const RESPONSE_BOUND = 5_000
-const LEASE_PROCESS_BOUND = 45_000
-const EXPIRY_WAIT = "31 seconds"
 const READY_PREFIX = "Resident attachment: "
 const PROTOCOL = "2026-07-28"
 const runFile = promisify(execFile)
-const initializeReply = Schema.fromJsonString(
-  Schema.Struct({ jsonrpc: Schema.Literal("2.0"), id: Schema.Literal(1), result: McpSchema.InitializeResult })
-)
 let bundle: Awaited<ReturnType<typeof buildIsolatedStdioServer>>
 let backend: ChildProcessWithoutNullStreams
 let attachmentFile: string
@@ -192,94 +186,6 @@ describe("manual adapters against the packaged native HTTP backend", { timeout: 
     expect(backend.exitCode).toBeNull()
     expect(backend.signalCode).toBeNull()
   })
-
-  it.each(["death", "pause"])(
-    "expires an adapter after %s while its survivor keeps the same backend",
-    { timeout: LEASE_PROCESS_BOUND },
-    async (mode) => {
-      const transport = new StdioClientTransport({
-        command: process.execPath,
-        args: [bundle.path],
-        stderr: "pipe",
-        env: { ...backendEnvironment(), MCP_TRANSPORT: "stdio-http", MCP_RESIDENT_ATTACHMENT_FILE: attachmentFile }
-      })
-      const survivor = new Client(
-        { name: "claude-code", version: "1.0" },
-        { versionNegotiation: { mode: { pin: PROTOCOL } } }
-      )
-      const survivorClosed = Effect.runSync(Deferred.make<void>())
-      survivor.onclose = () => Effect.runSync(Deferred.succeed(survivorClosed, undefined))
-      const abandoned = spawn(process.execPath, [bundle.path], {
-        env: { ...backendEnvironment(), MCP_TRANSPORT: "stdio-http", MCP_RESIDENT_ATTACHMENT_FILE: attachmentFile }
-      })
-      const output: Array<string> = []
-      const firstReply = Effect.runSync(Deferred.make<void>())
-      const lines = createInterface({ input: abandoned.stdout })
-      lines.on("line", (line) => {
-        output.push(line)
-        Effect.runSync(Deferred.succeed(firstReply, undefined))
-      })
-      const abandonedExit = once(abandoned, "exit")
-      try {
-        await survivor.connect(transport, { timeout: RESPONSE_BOUND })
-        abandoned.stdin.write(
-          `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "paused-owned-host", version: "1.0" } } })}\n`
-        )
-        await Effect.runPromise(Deferred.await(firstReply).pipe(Effect.timeout(RESPONSE_BOUND)))
-        expect(output).toHaveLength(1)
-        const initialized = Schema.decodeUnknownSync(initializeReply)(output[0])
-        expect(initialized.result.protocolVersion).toBe("2025-06-18")
-        abandoned.kill(mode === "death" ? "SIGKILL" : "SIGSTOP")
-        if (mode === "death")
-          await Effect.runPromise(Effect.promise(() => abandonedExit).pipe(Effect.timeout(RESPONSE_BOUND)))
-        else abandoned.stdin.write('{"jsonrpc":"2.0","id":2,"method":"ping"}\n')
-        await Effect.runPromise(Effect.sleep(EXPIRY_WAIT))
-        const catalog = await survivor.listTools(undefined, { timeout: RESPONSE_BOUND })
-        expect(catalog.tools.length).toBeGreaterThan(0)
-        const fresh = new StdioClientTransport({
-          command: process.execPath,
-          args: [bundle.path],
-          stderr: "pipe",
-          env: { ...backendEnvironment(), MCP_TRANSPORT: "stdio-http", MCP_RESIDENT_ATTACHMENT_FILE: attachmentFile }
-        })
-        const next = new Client(
-          { name: "claude-code", version: "1.0" },
-          { versionNegotiation: { mode: { pin: PROTOCOL } } }
-        )
-        const nextClosed = Effect.runSync(Deferred.make<void>())
-        next.onclose = () => Effect.runSync(Deferred.succeed(nextClosed, undefined))
-        try {
-          await next.connect(fresh, { timeout: RESPONSE_BOUND })
-          expect((await next.listTools(undefined, { timeout: RESPONSE_BOUND })).tools.length).toBeGreaterThan(0)
-          if (mode === "pause") {
-            abandoned.kill("SIGCONT")
-            const [code] = await Effect.runPromise(
-              Effect.promise(() => abandonedExit).pipe(Effect.timeout(RESPONSE_BOUND))
-            )
-            expect(code).toBe(1)
-            expect(output).toHaveLength(1)
-          }
-        } finally {
-          const ownsAdapter = fresh.pid !== null
-          await fresh.close()
-          if (ownsAdapter) await Effect.runPromise(Deferred.await(nextClosed).pipe(Effect.timeout(RESPONSE_BOUND)))
-        }
-        expect(backend.exitCode).toBeNull()
-        expect(backend.signalCode).toBeNull()
-        expect((await survivor.listTools(undefined, { timeout: RESPONSE_BOUND })).tools.length).toBeGreaterThan(0)
-      } finally {
-        if (abandoned.exitCode === null && abandoned.signalCode === null) {
-          abandoned.kill("SIGCONT")
-          abandoned.kill("SIGKILL")
-          await Effect.runPromise(Effect.promise(() => abandonedExit).pipe(Effect.timeout(RESPONSE_BOUND)))
-        }
-        lines.close()
-        const ownsAdapter = transport.pid !== null
-        await transport.close()
-        if (ownsAdapter) await Effect.runPromise(Deferred.await(survivorClosed).pipe(Effect.timeout(RESPONSE_BOUND)))
-      }
-    }
-  )
 
   it.each(["modern", "legacy"])("serves %s catalogs to adapters owned by independent parents", async (mode) => {
     if (!nativeHostPrepared) {

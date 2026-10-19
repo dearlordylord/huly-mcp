@@ -42,6 +42,32 @@ it.effect("renewal extends eligibility but cannot revive an expired identity", (
   }).pipe(Effect.scoped)
 )
 
+it.effect("expires a silent adapter while its renewing survivor keeps working and capacity is reclaimed", () =>
+  Effect.gen(function* () {
+    const registry = yield* makeResidentAdmissions(
+      Schema.decodeUnknownSync(AdmissionPolicy)({ ...policy, capacity: 2 })
+    )
+    const silent = yield* registry.admit
+    const silentOwner = yield* registry.find(silent.token)
+    const survivor = yield* registry.admit
+    const survivorOwner = yield* registry.find(survivor.token)
+    yield* TestClock.adjust("500 millis")
+    yield* registry.renew(survivor.token)
+    yield* TestClock.adjust("500 millis")
+    yield* silentOwner.closed
+    expect((yield* Effect.result(registry.find(silent.token)))._tag).toBe("Failure")
+    expect((yield* Effect.result(registry.renew(silent.token)))._tag).toBe("Failure")
+    expect(yield* survivorOwner.withWork({ use: () => Effect.succeed("survived"), cleanup: () => Effect.void })).toBe(
+      "survived"
+    )
+    const fresh = yield* registry.admit
+    const capacity = yield* Effect.result(registry.admit)
+    expect(Result.isFailure(capacity) && capacity.failure.kind).toBe("capacity")
+    yield* registry.release(fresh.token)
+    yield* registry.release(survivor.token)
+  }).pipe(Effect.scoped)
+)
+
 it.effect("expiry fences a captured owner before releasing its retained work or slot", () =>
   Effect.gen(function* () {
     const registry = yield* makeResidentAdmissions(policy)

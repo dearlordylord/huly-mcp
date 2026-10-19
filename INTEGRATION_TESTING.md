@@ -544,6 +544,25 @@ They isolate independent certification cases from cumulative quota pressure;
 they are not evidence of improved product latency.
 
 
+## Fast resident regression checks
+
+Resident lease transitions run locally with `TestClock` in
+`test/resident/admission-expiry.test.ts`, including expiry, renewal, survivor
+isolation, capacity reclamation and cleanup fencing. Do not wait for the real
+30-second lease merely to repeat these state transitions in a process test.
+
+The packaged active-query smoke checks EOF on both MCP protocols. The shared
+model-wait matrix checks creator and joiner cancellation on both protocols using
+the controlled-clock backend; the duplicate wall-clock backend matrix is removed.
+Native backend process tests retain compatibility refusal, independent-parent
+catalogs and profile lifecycle checks.
+
+The former SIGKILL/SIGSTOP expiry scenarios and active-query SIGKILL scenarios
+are removed from the routine suite. Their exact operating-system-to-lease
+composition is no longer asserted by this gate; the local lease tests and EOF
+smoke checks cover separate parts of that behavior. Historical process receipts
+remain historical evidence, not proof that the removed scenarios ran again.
+
 ## Bounded movement qualification
 
 Preparation tracks detached quality-stage groups in private `<log>.custody`

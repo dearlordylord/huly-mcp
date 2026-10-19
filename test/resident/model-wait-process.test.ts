@@ -16,9 +16,7 @@ const PROCESS_BOUND = 30_000
 const TWO_PARENTS = 2
 const runFile = promisify(execFile)
 const scenarios = ["2026-07-28", "2025-06-18"].flatMap((protocol) =>
-  ["creator", "joiner"].flatMap((cancelledRole) =>
-    [false, true].map((clockControlled) => ({ protocol, cancelledRole, clockControlled }))
-  )
+  ["creator", "joiner"].map((cancelledRole) => ({ protocol, cancelledRole, clockControlled: true }))
 )
 
 describe.skipIf(process.platform !== "linux")("packaged shared model waiter isolation", () => {

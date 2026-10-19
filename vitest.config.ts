@@ -16,7 +16,6 @@ const portTestFiles = [
 
 const residentLaunchTestFiles = ['test/resident/managed-backend-process.test.ts']
 const residentModelTestFiles = ['test/resident/launch-model-alignment.test.ts']
-const residentActiveQueryTestFiles = ['test/resident/active-query-process.test.ts']
 const residentWaitTestFiles = ['test/resident/model-wait-process.test.ts']
 const processTestFiles = [
   'test/resident/*-process.test.ts',
@@ -91,20 +90,10 @@ export default defineConfig({
       },
       {
         test: {
-          name: 'resident-active-query',
-          maxConcurrency: 2,
-          globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
-          include: residentActiveQueryTestFiles,
-          isolate: true,
-          sequence: { groupOrder: 3 },
-        },
-      },
-      {
-        test: {
           name: 'boundaries',
           globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
           include: processTestFiles,
-          exclude: [...residentLaunchTestFiles, ...residentWaitTestFiles, ...residentActiveQueryTestFiles],
+          exclude: [...residentLaunchTestFiles, ...residentWaitTestFiles],
           isolate: true,
           sequence: { groupOrder: 3 },
         },

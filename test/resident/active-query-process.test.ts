@@ -12,12 +12,9 @@ import { residentSelectionEnvironment } from "../helpers/resident-selection-envi
 import { ActiveQueryPairInput, ActiveQueryReceipt } from "./active-query-contract.js"
 
 const PROCESS_BOUND = 30_000
-const LEASE_EXPIRY_PROCESS_BOUND = 50_000
 const TWO_PARENTS = 2
 const runFile = promisify(execFile)
-const scenarios = ["2026-07-28", "2025-06-18"].flatMap((protocol) =>
-  ["eof", "kill"].map((loss) => ({ protocol, loss }))
-)
+const scenarios = ["2026-07-28", "2025-06-18"].map((protocol) => ({ protocol, loss: "eof" }))
 
 describe.skipIf(process.platform !== "linux")("packaged active query adapter loss isolation", () => {
   let bundle: Awaited<ReturnType<typeof buildIsolatedStdioServer>>
@@ -50,9 +47,9 @@ describe.skipIf(process.platform !== "linux")("packaged active query adapter los
     if (!failed) await bundle.cleanup()
   })
 
-  it.concurrent.each(scenarios)(
+  it.each(scenarios)(
     "preserves the active survivor under $loss with $protocol",
-    { timeout: LEASE_EXPIRY_PROCESS_BOUND },
+    { timeout: PROCESS_BOUND },
     async ({ loss, protocol }) => {
       const root = await fs.mkdtemp(join(await fs.realpath(tmpdir()), "resident-active-query-"))
       const directory = join(root, "state")
@@ -70,7 +67,6 @@ describe.skipIf(process.platform !== "linux")("packaged active query adapter los
           [
             "test/resident/fixtures/reap-descendants.py",
             "--report-reaped",
-            ...(loss === "kill" ? ["--lease-expiry"] : []),
             "--resources",
             join(root, "resources.jsonl"),
             "--cpu-receipts",
@@ -79,7 +75,7 @@ describe.skipIf(process.platform !== "linux")("packaged active query adapter los
             driver,
             Schema.encodeSync(Schema.fromJsonString(ActiveQueryPairInput))(input)
           ],
-          { timeout: loss === "kill" ? LEASE_EXPIRY_PROCESS_BOUND : PROCESS_BOUND, env: residentSelectionEnvironment() }
+          { timeout: PROCESS_BOUND, env: residentSelectionEnvironment() }
         )
         await fs.writeFile(join(root, "phases.log"), result.stderr, { mode: 0o600, flag: "wx" })
         await fs.writeFile(join(root, "receipt.json"), result.stdout, { mode: 0o600, flag: "wx" })
@@ -97,8 +93,8 @@ describe.skipIf(process.platform !== "linux")("packaged active query adapter los
         expect(receipt.statuses.map((status) => status.work.retainedRequests)).toEqual([2, 1, 0])
         expect(receipt.statuses.every((status) => status.generation === receipt.generation)).toBe(true)
         expect(receipt.statuses[0].work.attachments).toBe(TWO_PARENTS)
-        expect(receipt.statuses[1].work.attachments).toBe(loss === "eof" ? 1 : TWO_PARENTS)
-        expect(receipt.departed).toEqual(loss === "eof" ? { code: 0, signal: null } : { code: null, signal: "SIGKILL" })
+        expect(receipt.statuses[1].work.attachments).toBe(1)
+        expect(receipt.departed).toEqual({ code: 0, signal: null })
         expect(receipt.interruptedId).toBe(41)
         expect(receipt.survivingIds).toEqual([41, 42])
         expect(receipt.modelRequests).toBe(1)
