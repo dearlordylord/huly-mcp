@@ -342,7 +342,7 @@ export const CreateIssueParamsSchema = Schema.Struct({
         "Parent issue identifier (e.g., 'HULY-42') to create as a sub-issue. Omit to create a native top-level issue."
     })
   ),
-  startDate: timestampParam("Start date for Gantt scheduling", "or null to leave unscheduled"),
+  startDate: timestampParam("Issue start date", "or null to leave unscheduled"),
   dueDate: timestampParam("Due date", "or null to clear"),
   estimation: Schema.optional(PositiveTimeHours.annotate({ description: timeHoursDescription("Time estimation") }))
 }).annotate({ title: "CreateIssueParams", description: "Parameters for creating an issue" })
@@ -385,7 +385,7 @@ export const UpdateIssueParamsSchema = Schema.Struct({
         "New issue/task type ID or display name. Resolved within the target project's project type; status is preserved only if valid for that task type. Use list_task_types or get_project_type to discover valid values."
     })
   ),
-  startDate: timestampParam("New start date for Gantt scheduling", "or null to unschedule"),
+  startDate: timestampParam("New issue start date", "or null to unschedule"),
   dueDate: timestampParam("Due date", "or null to clear"),
   estimation: Schema.optional(
     Schema.NullOr(PositiveTimeHours).annotate({

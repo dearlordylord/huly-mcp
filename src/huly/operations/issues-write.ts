@@ -227,7 +227,9 @@ const createIssueWithAssignee = Effect.fn("Issues.createWithAssignee")(function*
     subIssues: 0,
     parents,
     childInfo: [],
-    startDate: params.startDate ?? null,
+    // Omitted entirely when unspecified: a Huly build without the attribute must not
+    // receive it. An explicit value or explicit null is still written through.
+    ...(params.startDate === undefined ? {} : { startDate: params.startDate }),
     dueDate: params.dueDate ?? null,
     rank
   }
