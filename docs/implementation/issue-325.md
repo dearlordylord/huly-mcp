@@ -84,3 +84,45 @@ The managed-auth fixture covers equivalent token callers attached together,
 password isolation and a rotated token selecting a separate managed backend.
 These cases complement the explicit-backend refusal scenario. They do not
 establish upstream credential revocation or native macOS qualification.
+
+## Identity and profile observation correspondence — criterion 9
+
+`resident-identity-observations.qnt` reuses the approved launch model's existing
+state. Five explicit scenarios check changed-authority refusal, changed-policy
+refusal, unavailable selection before capture, exact restored-selection reuse,
+and separate successful reads with colliding wire ID 1. The held request keeps
+its captured authority through refusal and may then finish normally. The observer
+checks the request's own backend and caller authority rather than finding a
+request by wire ID alone.
+
+The profile scenarios correspond to `exercisePackagedProfileLifecycle`: token
+rotation and destination/profile changes refuse a fresh explicit attachment;
+logout, deletion and missing credentials/profile fail before capture; the held
+old read and restored exact selection remain usable. The retained current
+`profile-inflight-first.json` and `profile-inflight-reviewed.json` under
+`/tmp/resident-auth-config-0db836c2` supply those native observations. Authority
+symbols normalize configuration identity; they neither contain credentials nor
+prove upstream revocation. The model does not watch profile files or infer that
+an edit changes an already admitted session.
+
+The two-authority successful-reply collision is an abstract property. Native
+identity/policy isolation and distinct-result routing observations separately
+support its premises; the profile fixture itself refuses the changed-authority
+caller and does not execute that exact two-successful-reply schedule. This is
+not a claim that the combined schedule was natively replayed.
+
+Focused evidence in `/tmp/resident-launch-model-a2935a11`:
+
+- `identity-correspondence-tests-final.log`: five scenarios passed after the
+  review correction to reuse the existing wire-request-ID domain type.
+- `identity-correspondence-sampled.log` and its process receipt: ten sampled
+  safety traces, at most 32 steps after a running captured-read prefix; joined
+  command, exit 0. These are sampled checks, not exhaustive verification.
+- `identity-contradictory-authority.log` and its process receipt: a private
+  control changes the observed original reply authority from 0 to 1 after the
+  same valid refusal/read-completion prefix. It must fail specifically with
+  QNT511, preserving the contradiction rather than accepting another identity.
+
+An earlier QNT404 from a misspelled existing action name is retained separately;
+it provides no behavioral evidence. The maintained model runner includes the
+new sources and scenarios without repeating the full model campaign here.

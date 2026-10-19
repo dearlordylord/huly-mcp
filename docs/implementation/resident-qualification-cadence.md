@@ -33,3 +33,26 @@ Installed Vitest runs setup before pool tasks and copies project env to workers.
 `output-backpressure-first.json`, `output-backpressure-reviewed.json` and `output-backpressure-final.json` each record one passing actual packaged-adapter scenario. One SSE call submits 80 progress frames of 256 KiB, below the existing response-byte budget. With stdout unread, accepted progress reaches a bounded plateau while a separate adapter returns two exact colliding-ID replies. Controlled FIFO drainage advances progress beyond the plateau; stopping drainage again leaves substantial output and triggers the unchanged ten-second output-write allowance, exit 1 and the checked diagnostic. The peer returns a third reply. This establishes controlled output-pipeline backpressure; it does not independently measure an exact internal queue occupancy.
 
 The reviewed test uses one five-second deadline per observation/drain phase, waits for process close before inspecting stderr, and independently attempts adapter and fixture cleanup while preserving the primary scenario failure. This adds a distinct case alongside large unread output and request-admission overflow; it does not replace those checks.
+
+### d9ed coherent gate and isolated startup diagnostic
+
+The new gate after fresh coverage-artifact isolation failed at the unchanged
+300-second test/coverage limit. Every preceding stage passed, including all
+1471 TypeScript/Effect diagnostic files and 0.9% duplicated production lines.
+Only 40 test-file coverage fragments were produced; some contain failures, and
+there are no final coverage totals. The gate is not accepted. Its log, retained
+fragments and frontier are under `/tmp/resident-launch-model-a2935a11` as
+`check-all-d9edbed6.log`, `failed-gate-d9edbed6-coverage-chunks` and
+`coverage-frontier-d9edbed6.json`.
+
+A retained configuration-fault failure reports a five-second initialize timeout
+while its unrelated peer completed a read. Host load was observed around 30 at
+one point during the run; this does not by itself establish the failure's cause.
+One fresh isolated diagnostic reuses the exact failed fixture and artifact333
+for legacy concurrent backend-only loss. It passed with independently waited
+owned exits and retained/unchanged ownership as asserted by that fixture.
+`/tmp/resident-config-fault-d9ed-diagnostic-psppjek1` retains input, artifact hash,
+stdout, stderr, resource observations and joined exit0. This is one diagnostic,
+not a replacement for the failed gate or the six-case matrix. No deadline,
+coverage threshold, inventory or worker limit changed; no automatic full retry
+was admitted.
