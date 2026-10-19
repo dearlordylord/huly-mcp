@@ -50,7 +50,7 @@ describe.skipIf(process.platform !== "linux")("packaged active query adapter los
     if (!failed) await bundle.cleanup()
   })
 
-  it.each(scenarios)(
+  it.concurrent.each(scenarios)(
     "preserves the active survivor under $loss with $protocol",
     { timeout: LEASE_EXPIRY_PROCESS_BOUND },
     async ({ loss, protocol }) => {

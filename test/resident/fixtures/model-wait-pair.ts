@@ -14,6 +14,7 @@ import { spawnIdleClockBackend } from "../../helpers/idle-clock-backend.js"
 import { retireFunctionalResident } from "../../helpers/resident-retirement.js"
 import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
 import { boundModelWait, spawnModelWaitParent } from "../../helpers/model-wait-parent.js"
+import { writeModelWaitFailure } from "../../helpers/model-wait-failure.js"
 import { DisposableRestProject, startDisposableRestFixture } from "../disposable-rest-fixture.js"
 import {
   MODEL_WAIT_PROJECT_READS,
@@ -288,7 +289,8 @@ const main = async () => {
   if (cleanupFailure !== undefined) throw cleanupFailure.reason
 }
 
-void main().catch(() => {
+void main().catch((error: unknown) => {
+  writeModelWaitFailure("driver", error)
   process.stderr.write("Shared model waiter fixture failed\n")
   process.exitCode = 1
 })

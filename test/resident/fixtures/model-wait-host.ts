@@ -8,8 +8,10 @@ import { GetProjectResultSchema } from "../../../src/domain/schemas/projects.js"
 import { ModelWaitCommand, ModelWaitEvent, ModelWaitHostInput } from "../model-wait-contract.js"
 import { boundModelWait } from "../../helpers/model-wait-parent.js"
 import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
+import { type ModelWaitFailure, writeModelWaitFailure } from "../../helpers/model-wait-failure.js"
 
 const RESPONSE_BOUND = 5_000
+let stage: ModelWaitFailure["stage"] = "connect"
 const ContextReply = Schema.Struct({ result: GetHulyContextResultSchema })
 const ProjectReply = Schema.Struct({
   isError: Schema.optionalKey(Schema.Literal(false)),
@@ -64,8 +66,10 @@ const main = async () => {
   try {
     await client.connect(transport, { timeout: RESPONSE_BOUND })
     if (client.getNegotiatedProtocolVersion() !== input.protocol) throw new Error("Unexpected negotiated protocol")
+    stage = "discovery"
     const tools = await client.listTools(undefined, { timeout: RESPONSE_BOUND })
     if (!tools.tools.some((tool) => tool.name === "get_project")) throw new Error("Native project tool unavailable")
+    stage = "context"
     const context = await client.callTool({ name: "get_huly_context", arguments: {} }, { timeout: RESPONSE_BOUND })
     const parsed = Schema.decodeUnknownSync(ContextReply)(context.structuredContent).result
     emit(
@@ -77,6 +81,7 @@ const main = async () => {
         port: parsed.transport.http?.port
       })
     )
+    stage = "command"
     for await (const line of incomingCommands) {
       const command = Schema.decodeUnknownSync(Schema.fromJsonString(ModelWaitCommand))(line)
       if (command._tag === "close") break
@@ -86,7 +91,8 @@ const main = async () => {
       } else {
         if (active !== undefined) throw new Error("Fixture already owns a request")
         const abort = new AbortController()
-        const settled = read(command.project, abort).catch(() => {
+        const settled = read(command.project, abort).catch((error: unknown) => {
+          writeModelWaitFailure("read", error)
           failed = true
           emit({ _tag: "failed" })
         })
@@ -104,7 +110,8 @@ const main = async () => {
   if (failed) throw new Error("Model waiter operation failed")
 }
 
-void main().catch(() => {
+void main().catch((error: unknown) => {
+  writeModelWaitFailure(stage, error)
   process.stderr.write("Model waiter parent failed\n")
   process.exitCode = 1
 })
