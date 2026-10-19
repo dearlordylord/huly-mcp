@@ -324,7 +324,35 @@ describe("McpServerService Effect HTTP integration", () => {
       const responseText = await response.text()
 
       expect({ status: response.status, text: responseText }).toMatchObject({ status: 200 })
-      const body = Schema.decodeUnknownSync(Schema.fromJsonString(JsonRpcResponse))(responseText)
+      const payloads = response.headers.get("content-type")?.includes("text/event-stream")
+        ? responseText
+            .split(/\r?\n\r?\n/)
+            .map((event) =>
+              event
+                .split(/\r?\n/)
+                .filter((line) => line.startsWith("data:"))
+                .map((line) => line.slice("data:".length).trimStart())
+                .join("\n")
+            )
+            .filter((payload) => payload.length > 0)
+        : [responseText]
+      const messages = payloads.map((payload) =>
+        Schema.decodeUnknownSync(
+          Schema.fromJsonString(
+            Schema.Union([
+              JsonRpcResponse,
+              Schema.Struct({
+                jsonrpc: Schema.Literal("2.0"),
+                method: Schema.String,
+                params: Schema.optionalKey(Schema.Unknown)
+              })
+            ])
+          )
+        )(payload)
+      )
+      const responses = messages.filter((message) => "id" in message)
+      expect(responses).toHaveLength(1)
+      const body = Schema.decodeUnknownSync(JsonRpcResponse)(responses[0])
       expect(body.id).toBe(7)
       expect(body.error).toBeUndefined()
       expect(releases).toBe(1)

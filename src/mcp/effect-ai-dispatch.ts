@@ -1,17 +1,18 @@
 import { Effect, Exit, Schema } from "effect"
 
-import { type GetHulyContextResult, GetHulyContextResultSchema } from "../domain/schemas/index.js"
+import { type GetHulyContextResult, GetHulyContextResultSchema } from "../domain/schemas/huly-context.js"
 import { HulyError } from "../huly/errors-base.js"
 import { type ClientBundle, type ClientResolver, resolveClientBundleAbortably } from "../runtime/client-resolver.js"
 import { VERSION } from "../version.js"
 import { EffectMcpBoundaryError } from "./effect-ai-boundary-error.js"
-import type { McpToolResponse } from "./error-mapping.js"
 import {
+  type McpToolResponse,
   createSuccessResponse,
   createUnknownToolError,
   mapClientResolutionCauseToMcp,
   mapDomainErrorToMcp
 } from "./error-mapping.js"
+
 import {
   GET_HULY_CONTEXT_TOOL_NAME,
   type ToolExposureContext,
@@ -25,8 +26,9 @@ import {
   InvokeToolParamsSchema,
   isProxyToolName
 } from "./proxy-tools.js"
-import type { ToolDefinition, ToolName } from "./tools/registry.js"
 import {
+  type ToolDefinition,
+  type ToolName,
   executeRegisteredOperation,
   isEmptyArgumentsObject,
   isNoArgumentTool,

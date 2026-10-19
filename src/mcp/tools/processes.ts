@@ -9,9 +9,7 @@ import {
   parseListProcessesParams,
   parseStartProcessParams,
   ProcessDetailSchema,
-  startProcessParamsJsonSchema
-} from "../../domain/schemas.js"
-import {
+  startProcessParamsJsonSchema,
   CancelExecutionResultSchema,
   ListExecutionsResultSchema,
   ListProcessesResultSchema,

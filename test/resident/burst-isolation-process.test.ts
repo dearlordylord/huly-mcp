@@ -7,7 +7,7 @@ import { promisify } from "node:util"
 import { Schema } from "effect"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
-import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { residentSelectionEnvironment } from "../helpers/resident-selection-environment.js"
 import { MAX_ADAPTER_REQUESTS } from "../../src/resident/adapter-limits.js"
 import { ACTIVE_FIRST_ID } from "./active-query-contract.js"
@@ -41,7 +41,7 @@ describe.skipIf(process.platform !== "linux")("packaged managed adapter request 
           "--bundle",
           "--platform=node",
           "--format=cjs",
-          "--external:ws",
+          ...NATIVE_RUNTIME_EXTERNALS,
           `--outfile=${output}`
         ],
         { timeout: PROCESS_BOUND }

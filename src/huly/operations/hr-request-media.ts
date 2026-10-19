@@ -2,21 +2,22 @@ import type { Space } from "@hcengineering/core"
 import type { Request as HulyRequest } from "@hcengineering/hr"
 import { Effect } from "effect"
 
-import type {
-  AddHrRequestAttachmentParams,
-  AddHrRequestCommentParams,
-  DeleteHrRequestAttachmentResult,
-  DeleteHrRequestAttachmentParams,
-  DeleteHrRequestCommentResult,
-  DeleteHrRequestCommentParams,
-  GetHrRequestAttachmentParams,
-  ListHrRequestAttachmentsParams,
-  ListHrRequestCommentsParams,
-  UpdateHrRequestAttachmentParams,
-  UpdateHrRequestAttachmentResult,
-  UpdateHrRequestCommentParams
+import {
+  type AddHrRequestAttachmentParams,
+  type AddHrRequestCommentParams,
+  type DeleteHrRequestAttachmentResult,
+  type DeleteHrRequestAttachmentParams,
+  type DeleteHrRequestCommentResult,
+  type DeleteHrRequestCommentParams,
+  type GetHrRequestAttachmentParams,
+  type ListHrRequestAttachmentsParams,
+  type ListHrRequestCommentsParams,
+  type UpdateHrRequestAttachmentParams,
+  type UpdateHrRequestAttachmentResult,
+  type UpdateHrRequestCommentParams,
+  HrRequestId
 } from "../../domain/schemas.js"
-import { HrRequestId } from "../../domain/schemas.js"
+
 import { HulyClient } from "../client.js"
 import { HrRequestCommentNotFoundError, HrRequestMutationUnsupportedError } from "../errors.js"
 import { attachment, hr } from "../huly-plugins.js"

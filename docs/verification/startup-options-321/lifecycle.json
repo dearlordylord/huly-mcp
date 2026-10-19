@@ -1,0 +1,8 @@
+{
+  "traces": [
+    "[ACQUIRE321] start",
+    "[ACQUIRE321] ready"
+  ],
+  "loadedGroupCount": 59,
+  "passed": true
+}

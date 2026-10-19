@@ -14,9 +14,7 @@ import {
   parseStopTimerParams,
   startTimerParamsJsonSchema,
   stopTimerParamsJsonSchema,
-  TimeReportSummarySchema
-} from "../../domain/schemas.js"
-import {
+  TimeReportSummarySchema,
   ListTimeSpendReportsResultSchema,
   ListWorkSlotsResultSchema,
   LogTimeResultSchema,

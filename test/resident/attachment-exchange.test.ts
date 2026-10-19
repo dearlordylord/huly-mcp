@@ -25,6 +25,20 @@ it("rejects unencodable input before dispatch and reports a lost connection with
       withResidentExchange(attachment, unencodable, Option.none(), () => Effect.die("Must not dispatch"))
     )
     expect(Exit.isFailure(encoding) && Cause.pretty(encoding.cause)).toContain("could not be encoded")
+    for (const invalid of [
+      { ...message, method: "bad\nmethod" },
+      { ...message, method: "日本語" },
+      { ...message, params: { _meta: { "io.modelcontextprotocol/protocolVersion": "bad\r\nversion" } } },
+      { ...message, params: { _meta: { "io.modelcontextprotocol/protocolVersion": "日本語" } } }
+    ]) {
+      const refused = await Effect.runPromise(
+        withResidentExchange(attachment, HostMessage.make(invalid), Option.none(), () =>
+          Effect.die("Must not dispatch")
+        ).pipe(Effect.flip)
+      )
+      expect(refused._tag).toBe("BackendResponseError")
+      expect(refused.message).toBe("Stdio request headers are invalid; it was not dispatched")
+    }
     await new Promise<void>((resolve, reject) => fixture.backend.close((error) => (error ? reject(error) : resolve())))
     const disconnected = await Effect.runPromiseExit(
       withResidentExchange(attachment, message, Option.none(), () => Effect.die("Must not dispatch"))

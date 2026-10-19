@@ -2,25 +2,25 @@ import type { Board as HulyBoard, Card as HulyBoardCard } from "@hcengineering/b
 import type { ProjectType } from "@hcengineering/task"
 import { Effect } from "effect"
 
-import type {
-  BoardCardCoverInput,
-  BoardCardDetail,
-  BoardCardSummary,
-  BoardDetail,
-  Count
-} from "../../domain/schemas.js"
 import {
+  type BoardCardCoverInput,
   BoardCardId,
   BoardCardSequenceIdentifier,
   BoardCardTitle,
   BoardId,
-  BoardName,
+  BoardName
+} from "../../domain/schemas/boards.js"
+import type { BoardCardDetail, BoardCardSummary, BoardDetail } from "../../domain/schemas/boards-results.js"
+import {
+  type Count,
   IssueStatusId,
   NonEmptyString,
   ProjectTypeId,
-  TaskTypeId
-} from "../../domain/schemas.js"
-import { PersonName, StatusName } from "../../domain/schemas/shared.js"
+  TaskTypeId,
+  PersonName,
+  StatusName
+} from "../../domain/schemas/shared.js"
+
 import type { HulyClient } from "../client.js"
 import { markdownToMarkupString, optionalMarkupToMarkdown } from "./markup.js"
 

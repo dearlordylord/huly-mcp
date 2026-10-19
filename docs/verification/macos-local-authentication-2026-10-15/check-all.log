@@ -1,0 +1,135 @@
+
+> @firfi/huly-mcp@0.53.1 check-all /private/tmp/hulymcp-macos-auth
+> tsx scripts/run-quality-gate.ts
+
+
+> @firfi/huly-mcp@0.53.1 verify-movement-fixtures /private/tmp/hulymcp-macos-auth
+> node scripts/verify-movement-fixtures.mjs
+
+Verified 5 movement fixture scripts.
+
+> @firfi/huly-mcp@0.53.1 test:movement-process /private/tmp/hulymcp-macos-auth
+> node --test --test-reporter=dot scripts/completion-evidence.test.mjs scripts/verify-movement-fixtures.test.mjs scripts/movement-artifact-hashes.test.mjs scripts/issue-tree-aggregates.test.mjs scripts/issue-tree-completion.test.mjs scripts/issue-tree-ledger.test.mjs scripts/integration-mcp-adapter.test.mjs scripts/issue-movement-concurrency/select-cases.test.mjs test/scripts/run-movement-certification.node.test.mjs
+
+....................
+..................X.
+.XX..XXXX...........
+....................
+....................
+....
+
+Failed tests:
+
+✖ retains exact private reply once without printing its contents (49.8075ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///private/tmp/hulymcp-macos-auth/scripts/issue-tree-completion.test.mjs:78:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+✖ actual bundled ledger entry atomically retains private acknowledged IDs and unknown limitations (1427.896667ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at file:///private/tmp/hulymcp-macos-auth/scripts/issue-tree-ledger.test.mjs:21:10
+      at fixture (file:///private/tmp/hulymcp-macos-auth/scripts/issue-tree-ledger.test.mjs:18:9)
+      at TestContext.<anonymous> (file:///private/tmp/hulymcp-macos-auth/scripts/issue-tree-ledger.test.mjs:20:111)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+✖ conflicting acknowledged ownership fails without replacing durable evidence (782.048917ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at file:///private/tmp/hulymcp-macos-auth/scripts/issue-tree-ledger.test.mjs:35:10
+      at fixture (file:///private/tmp/hulymcp-macos-auth/scripts/issue-tree-ledger.test.mjs:18:9)
+      at TestContext.<anonymous> (file:///private/tmp/hulymcp-macos-auth/scripts/issue-tree-ledger.test.mjs:34:91)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+✖ nested empty custody directory and regular file share one audited snapshot (21.444834ms)
+  Error: Evidence directory unavailable
+      at snapshotEvidenceArtifacts (file:///private/tmp/hulymcp-macos-auth/scripts/movement-artifact-hashes.mjs:13:178)
+      at async file:///private/tmp/hulymcp-macos-auth/scripts/movement-artifact-hashes.test.mjs:10:17
+      at async fixture (file:///private/tmp/hulymcp-macos-auth/scripts/movement-artifact-hashes.test.mjs:6:127)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
+✖ added and removed empty directories invalidate the directory audit (13.849708ms)
+  Error: Evidence directory unavailable
+      at snapshotEvidenceArtifacts (file:///private/tmp/hulymcp-macos-auth/scripts/movement-artifact-hashes.mjs:13:178)
+      at async file:///private/tmp/hulymcp-macos-auth/scripts/movement-artifact-hashes.test.mjs:18:14
+      at async fixture (file:///private/tmp/hulymcp-macos-auth/scripts/movement-artifact-hashes.test.mjs:6:127)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+✖ symlinks and public files cannot enter an owned private snapshot (28.096833ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /ownership unavailable/. Input:
+  
+  'Error: Evidence directory unavailable'
+  
+      at async file:///private/tmp/hulymcp-macos-auth/scripts/movement-artifact-hashes.test.mjs:28:2
+      at async fixture (file:///private/tmp/hulymcp-macos-auth/scripts/movement-artifact-hashes.test.mjs:6:127)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: Evidence directory unavailable
+        at snapshotEvidenceArtifacts (file:///private/tmp/hulymcp-macos-auth/scripts/movement-artifact-hashes.mjs:13:178)
+        at async waitForActual (node:assert:621:5)
+        at async strict.rejects (node:assert:744:25)
+        at async file:///private/tmp/hulymcp-macos-auth/scripts/movement-artifact-hashes.test.mjs:28:2
+        at async fixture (file:///private/tmp/hulymcp-macos-auth/scripts/movement-artifact-hashes.test.mjs:6:127)
+        at async Test.run (node:internal/test_runner/test:1125:7)
+        at async Test.processPendingSubtests (node:internal/test_runner/test:787:7),
+    expected: /ownership unavailable/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+✖ prototype-shaped filename remains an own hashed artifact and tampering fails (18.58675ms)
+  Error: Evidence directory unavailable
+      at snapshotEvidenceArtifacts (file:///private/tmp/hulymcp-macos-auth/scripts/movement-artifact-hashes.mjs:13:178)
+      at async file:///private/tmp/hulymcp-macos-auth/scripts/movement-artifact-hashes.test.mjs:36:17
+      at async fixture (file:///private/tmp/hulymcp-macos-auth/scripts/movement-artifact-hashes.test.mjs:6:127)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+ ELIFECYCLE  Command failed with exit code 1.
+/private/tmp/hulymcp-macos-auth/scripts/run-bounded-command.ts:269
+        reject(new Error(`${name} failed with ${signal ?? `exit ${code}`}`))
+               ^
+
+Error: Quality gate 'movement process checks' failed with exit 1
+    at ChildProcess.<anonymous> (/private/tmp/hulymcp-macos-auth/scripts/run-bounded-command.ts:269:16)
+
+Node.js v25.6.1
+ ELIFECYCLE  Command failed with exit code 1.

@@ -80,6 +80,8 @@ const categoryRepresentativeCommands = categoryRepresentativeToolNames(
   allTools.map((tool) => ({ category: tool.category, name: ToolName.make(tool.name) }))
 ).map((toolName) => cliCommandCatalog[toolName].path)
 const behaviorSpecificLeafHelpCommands = [
+  ["auth", "check"],
+  ["auth", "import-token"],
   ["attachments", "add"],
   ["attachments", "download"],
   ["attachments", "read-image"],
@@ -94,7 +96,9 @@ const leafHelpCommands = [...categoryRepresentativeCommands, ...behaviorSpecific
 )
 for (const command of leafHelpCommands) {
   const help = runCli([...command, "--help"])
-  const expectedUsage = `Usage:\n  huly ${command.join(" ")}`
+  // Local auth commands use Effect CLI's help renderer; catalog leaves use our renderer.
+  const usageHeading = command[0] === "auth" ? "USAGE" : "Usage:"
+  const expectedUsage = `${usageHeading}\n  huly ${command.join(" ")}`
   if (help.status !== 0 || !help.stdout.includes(expectedUsage)) {
     throw new Error(`Packed CLI leaf help failed for '${command.join(" ")}': ${help.stderr}`)
   }

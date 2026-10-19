@@ -13,27 +13,34 @@ import { Effect } from "effect"
 
 import type {
   BoardCardDetail,
-  BoardCardMutationParams,
   BoardCardMutationResult,
   BoardDetail,
-  BoardMutationParams,
   BoardMutationResult,
   BoardSummary,
-  CreateBoardCardParams,
   CreateBoardCardResult,
-  CreateBoardParams,
   CreateBoardResult,
   DeleteBoardCardResult,
-  GetBoardCardParams,
-  GetBoardParams,
-  ListBoardCardsParams,
   ListBoardCardsResult,
-  ListBoardsParams,
-  ListBoardsResult,
-  UpdateBoardCardParams,
-  UpdateBoardParams
-} from "../../domain/schemas.js"
-import { BoardCardId, BoardCardSequenceIdentifier, BoardId, BoardName, Count } from "../../domain/schemas.js"
+  ListBoardsResult
+} from "../../domain/schemas/boards-results.js"
+import {
+  type BoardCardMutationParams,
+  type BoardMutationParams,
+  type CreateBoardCardParams,
+  type CreateBoardParams,
+  type GetBoardCardParams,
+  type GetBoardParams,
+  type ListBoardCardsParams,
+  type ListBoardsParams,
+  type UpdateBoardCardParams,
+  type UpdateBoardParams,
+  BoardCardId,
+  BoardCardSequenceIdentifier,
+  BoardId,
+  BoardName
+} from "../../domain/schemas/boards.js"
+
+import { Count } from "../../domain/schemas/shared.js"
 import { isSingle } from "../../utils/assertions.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import type { Diagnostics } from "../diagnostics.js"

@@ -1,20 +1,18 @@
 import {
   addCommentParamsJsonSchema,
   deleteCommentParamsJsonSchema,
-  HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
   listCommentsParamsJsonSchema,
   parseAddCommentParams,
   parseDeleteCommentParams,
   parseListCommentsParams,
   parseUpdateCommentParams,
-  updateCommentParamsJsonSchema
-} from "../../domain/schemas.js"
-import {
+  updateCommentParamsJsonSchema,
   AddCommentResultSchema,
   DeleteCommentResultSchema,
   ListCommentsResultSchema,
   UpdateCommentResultSchema
 } from "../../domain/schemas/comments.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "../../domain/schemas/document-native-references.js"
 import { addComment, deleteComment, listComments, updateComment } from "../../huly/operations/comments.js"
 import { defineTool, type RegisteredTool } from "./registry.js"
 

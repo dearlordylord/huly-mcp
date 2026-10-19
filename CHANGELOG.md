@@ -1,5 +1,16 @@
 # @firfi/huly-mcp
 
+## 0.54.0
+
+### Minor Changes
+
+- 2a6acb8: Add private token import, offline configuration status, explicit connection checks,
+  and opt-in macOS Keychain/Linux Secret Service storage shared by CLI and stdio.
+
+### Patch Changes
+
+- 347b34b: Separate tool discovery from lazy handler loading, prewarm the stdio Huly model in the background, and list projects without waiting for the full model. Share initialization across concurrent callers and safely release clients that finish loading after shutdown.
+
 ## 0.53.1
 
 ### Patch Changes

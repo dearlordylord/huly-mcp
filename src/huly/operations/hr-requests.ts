@@ -1,6 +1,6 @@
 import type { Employee } from "@hcengineering/contact"
-import type { AttachedData, Class, DocumentUpdate, Space } from "@hcengineering/core"
-import { SortingOrder } from "@hcengineering/core"
+import { type AttachedData, type Class, type DocumentUpdate, type Space, SortingOrder } from "@hcengineering/core"
+
 import type { Department, Request as HulyRequest, RequestType, Staff } from "@hcengineering/hr"
 import { Effect } from "effect"
 

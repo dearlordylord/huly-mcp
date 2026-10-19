@@ -32,7 +32,7 @@ const expected =
     ? {
         binName: "huly-mcp",
         expectedEntries: ["package/LICENSE", "package/README.md", "package/dist/index.cjs", "package/package.json"],
-        expectedExternalModules: ["@opentelemetry/api", "ws"],
+        expectedExternalModules: ["@napi-rs/keyring", "dbus-next", "ws"],
         name: "@firfi/huly-mcp",
         version
       }
@@ -47,7 +47,7 @@ const expected =
           "package/skills/huly-cli/agents/openai.yaml",
           "package/skills/huly-cli/references/automation.md"
         ],
-        expectedExternalModules: ["ws"],
+        expectedExternalModules: ["@napi-rs/keyring", "dbus-next", "ws"],
         name: "@firfi/huly-cli",
         version
       }

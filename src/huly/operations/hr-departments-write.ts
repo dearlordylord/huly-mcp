@@ -1,6 +1,6 @@
 import type { Employee, Person } from "@hcengineering/contact"
-import type { Data, DocumentUpdate, Ref } from "@hcengineering/core"
-import { generateId } from "@hcengineering/core"
+import { type Data, type DocumentUpdate, type Ref, generateId } from "@hcengineering/core"
+
 import type { Department as HulyDepartment, Staff as HulyStaff } from "@hcengineering/hr"
 import { Effect } from "effect"
 

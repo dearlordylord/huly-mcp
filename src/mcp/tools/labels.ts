@@ -6,9 +6,7 @@ import {
   parseDeleteLabelParams,
   parseListLabelsParams,
   parseUpdateLabelParams,
-  updateLabelParamsJsonSchema
-} from "../../domain/schemas.js"
-import {
+  updateLabelParamsJsonSchema,
   CreateLabelResultSchema,
   DeleteLabelResultSchema,
   ListLabelsResultSchema,

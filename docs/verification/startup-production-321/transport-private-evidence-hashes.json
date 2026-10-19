@@ -1,0 +1,42 @@
+[
+  {
+    "artifact": "pilot-qualified-ready.log",
+    "sha256": "882c6d9e440f823ca18a87532ae06cdc420be7b86d2f3c0b43aa82c42d2ea294",
+    "bytes": 359
+  },
+  {
+    "artifact": "pilot-stderr-ready.log",
+    "sha256": "74a2e5acdb3608499fe48fd97ae10ee790c91f4df2a1581077834d72faafa67f",
+    "bytes": 3452
+  },
+  {
+    "artifact": "pilot-wire-details.log",
+    "sha256": "ef4701405194da0713f16dfc9390be36b269f0ebe111596203f24cad74a8d53e",
+    "bytes": 722
+  },
+  {
+    "artifact": "pilot-wire.log",
+    "sha256": "bca8fbe4019e5deb1cb78297f7d9c95fcb1c45418ddfc56d32c6462b1f8614c9",
+    "bytes": 263
+  },
+  {
+    "artifact": "pilot.log",
+    "sha256": "4fc9ccfbc0cb61bd019e1bddb89454b971ab489081532fd5827d7ddb7368ac0e",
+    "bytes": 523
+  },
+  {
+    "artifact": "pilot-modern.log",
+    "sha256": "df5da13e4debc217b39e228da7c02e9ab0f335a38f0e21870dd8eef8fc7346f2",
+    "bytes": 522
+  },
+  {
+    "artifact": "raw-pilot.log",
+    "sha256": "6ec820559fa9415b009ee3d70d00f9772d7153d5e81788a0f2910279c4f6e2d5",
+    "bytes": 87
+  },
+  {
+    "artifact": "raw-string-id.log",
+    "sha256": "6cd78e8535cd2871d6dd1df20f0b3cc85f66d2ce66540abacb552a7f32e90334",
+    "bytes": 87
+  }
+]

@@ -1,0 +1,662 @@
+[
+  {
+    "variant": "baseline",
+    "delay": 0,
+    "trial": 0,
+    "network": true,
+    "handshakeMs": 751.673333,
+    "catalogMs": 759.193041,
+    "calls": [
+      1705.5047080000002,
+      21.944082999999864,
+      24.33050000000003
+    ]
+  },
+  {
+    "variant": "lazy",
+    "delay": 0,
+    "trial": 0,
+    "network": true,
+    "handshakeMs": 705.5474170000002,
+    "catalogMs": 711.7538330000002,
+    "calls": [
+      1309.0824169999996,
+      26.069915999999466,
+      24.581583000000137
+    ]
+  },
+  {
+    "variant": "background",
+    "delay": 0,
+    "trial": 0,
+    "network": true,
+    "handshakeMs": 744.4585830000005,
+    "catalogMs": 749.6374580000002,
+    "calls": [
+      1521.0279170000003,
+      21.195458000000144,
+      22.32154200000059
+    ]
+  },
+  {
+    "variant": "light",
+    "delay": 0,
+    "trial": 0,
+    "network": true,
+    "handshakeMs": 776.84375,
+    "catalogMs": 782.690458,
+    "calls": [
+      442.8734999999997,
+      22.01812499999869,
+      21.516708999999537
+    ]
+  },
+  {
+    "variant": "background-light",
+    "delay": 0,
+    "trial": 0,
+    "network": true,
+    "handshakeMs": 681.956666,
+    "catalogMs": 687.2363750000004,
+    "calls": [
+      643.4848749999983,
+      26.558583,
+      25.537540999999692
+    ]
+  },
+  {
+    "variant": "baseline",
+    "delay": 2000,
+    "trial": 0,
+    "network": true,
+    "handshakeMs": 795.9122920000009,
+    "catalogMs": 803.8398750000015,
+    "calls": [
+      1381.0256249999984,
+      22.23070899999948,
+      20.196208999999726
+    ]
+  },
+  {
+    "variant": "lazy",
+    "delay": 2000,
+    "trial": 0,
+    "network": true,
+    "handshakeMs": 709.0125840000001,
+    "catalogMs": 714.8795000000009,
+    "calls": [
+      1453.9802920000002,
+      25.062292000002344,
+      24.11029200000121
+    ]
+  },
+  {
+    "variant": "background",
+    "delay": 2000,
+    "trial": 0,
+    "network": true,
+    "handshakeMs": 716.5305830000034,
+    "catalogMs": 722.7330419999998,
+    "calls": [
+      39.33387500000026,
+      26.90625,
+      25.990042000001267
+    ]
+  },
+  {
+    "variant": "light",
+    "delay": 2000,
+    "trial": 0,
+    "network": true,
+    "handshakeMs": 716.9465830000008,
+    "catalogMs": 722.1338749999995,
+    "calls": [
+      485.49512499999764,
+      30.53704199999993,
+      29.079000000001543
+    ]
+  },
+  {
+    "variant": "background-light",
+    "delay": 2000,
+    "trial": 0,
+    "network": true,
+    "handshakeMs": 724.7141669999983,
+    "catalogMs": 730.6209170000002,
+    "calls": [
+      59.1439169999976,
+      51.040375000000495,
+      38.14362500000061
+    ]
+  },
+  {
+    "variant": "background-light",
+    "delay": 0,
+    "trial": 1,
+    "network": true,
+    "handshakeMs": 734.1499169999988,
+    "catalogMs": 740.0560000000005,
+    "calls": [
+      631.3076669999973,
+      21.638582999999926,
+      22.553791999998793
+    ]
+  },
+  {
+    "variant": "light",
+    "delay": 0,
+    "trial": 1,
+    "network": true,
+    "handshakeMs": 913.625415999999,
+    "catalogMs": 919.2744160000002,
+    "calls": [
+      457.64729199999783,
+      19.82629100000122,
+      21.747707999998966
+    ]
+  },
+  {
+    "variant": "background",
+    "delay": 0,
+    "trial": 1,
+    "network": true,
+    "handshakeMs": 686.1809590000012,
+    "catalogMs": 691.3315419999999,
+    "calls": [
+      1355.3693329999987,
+      22.72770799999853,
+      21.892791999998735
+    ]
+  },
+  {
+    "variant": "lazy",
+    "delay": 0,
+    "trial": 1,
+    "network": true,
+    "handshakeMs": 684.958499999997,
+    "catalogMs": 690.1950830000023,
+    "calls": [
+      1242.2633750000023,
+      20.79324999999517,
+      20.21349999999802
+    ]
+  },
+  {
+    "variant": "baseline",
+    "delay": 0,
+    "trial": 1,
+    "network": true,
+    "handshakeMs": 711.5130419999987,
+    "catalogMs": 716.3808749999953,
+    "calls": [
+      1208.5990410000013,
+      21.32274999999936,
+      20.12333299999591
+    ]
+  },
+  {
+    "variant": "background-light",
+    "delay": 2000,
+    "trial": 1,
+    "network": true,
+    "handshakeMs": 684.833584,
+    "catalogMs": 690.2284170000057,
+    "calls": [
+      23.042874999999185,
+      25.778125000004366,
+      18.77429200000188
+    ]
+  },
+  {
+    "variant": "light",
+    "delay": 2000,
+    "trial": 1,
+    "network": true,
+    "handshakeMs": 761.6395410000041,
+    "catalogMs": 767.0838750000039,
+    "calls": [
+      539.903416000001,
+      35.3227920000063,
+      20.742624999998952
+    ]
+  },
+  {
+    "variant": "background",
+    "delay": 2000,
+    "trial": 1,
+    "network": true,
+    "handshakeMs": 807.2576659999977,
+    "catalogMs": 823.8145829999994,
+    "calls": [
+      70.86262500000157,
+      25.350042000005487,
+      24.49199999999837
+    ]
+  },
+  {
+    "variant": "lazy",
+    "delay": 2000,
+    "trial": 1,
+    "network": true,
+    "handshakeMs": 694.2600420000017,
+    "catalogMs": 699.4120420000036,
+    "calls": [
+      1250.5668749999968,
+      21.383708000001207,
+      20.184000000001106
+    ]
+  },
+  {
+    "variant": "baseline",
+    "delay": 2000,
+    "trial": 1,
+    "network": true,
+    "handshakeMs": 708.3095419999954,
+    "catalogMs": 713.1629999999932,
+    "calls": [
+      1233.5429170000061,
+      21.1103329999969,
+      19.278166000003694
+    ]
+  },
+  {
+    "variant": "baseline",
+    "delay": 0,
+    "trial": 2,
+    "network": true,
+    "handshakeMs": 731.6649170000019,
+    "catalogMs": 736.6323330000014,
+    "calls": [
+      1199.1614589999954,
+      21.88445800000045,
+      23.224834000000556
+    ]
+  },
+  {
+    "variant": "lazy",
+    "delay": 0,
+    "trial": 2,
+    "network": true,
+    "handshakeMs": 679.2052500000063,
+    "catalogMs": 684.5742500000051,
+    "calls": [
+      1245.2624580000047,
+      18.330333999998402,
+      18.376083000002836
+    ]
+  },
+  {
+    "variant": "background",
+    "delay": 0,
+    "trial": 2,
+    "network": true,
+    "handshakeMs": 649.5901659999945,
+    "catalogMs": 654.6219579999961,
+    "calls": [
+      1352.294584000003,
+      19.52087500000198,
+      27.48720800000592
+    ]
+  },
+  {
+    "variant": "light",
+    "delay": 0,
+    "trial": 2,
+    "network": true,
+    "handshakeMs": 777.1754169999986,
+    "catalogMs": 784.9807089999958,
+    "calls": [
+      477.51104199999827,
+      17.647541999998793,
+      17.95391699999891
+    ]
+  },
+  {
+    "variant": "background-light",
+    "delay": 0,
+    "trial": 2,
+    "network": true,
+    "handshakeMs": 636.4546670000054,
+    "catalogMs": 641.479459000002,
+    "calls": [
+      572.2394580000037,
+      17.825457999999344,
+      16.993000000002212
+    ]
+  },
+  {
+    "variant": "baseline",
+    "delay": 2000,
+    "trial": 2,
+    "network": true,
+    "handshakeMs": 808.3399160000045,
+    "catalogMs": 815.9590830000016,
+    "calls": [
+      1319.1295830000017,
+      28.15908300000592,
+      25.037083000002895
+    ]
+  },
+  {
+    "variant": "lazy",
+    "delay": 2000,
+    "trial": 2,
+    "network": true,
+    "handshakeMs": 758.2690000000002,
+    "catalogMs": 764.3942910000042,
+    "calls": [
+      1292.6638749999984,
+      23.188750000001164,
+      22.590291999993497
+    ]
+  },
+  {
+    "variant": "background",
+    "delay": 2000,
+    "trial": 2,
+    "network": true,
+    "handshakeMs": 685.1108329999988,
+    "catalogMs": 690.0319159999926,
+    "calls": [
+      32.668791999996756,
+      26.31745800000499,
+      23.566166999997222
+    ]
+  },
+  {
+    "variant": "light",
+    "delay": 2000,
+    "trial": 2,
+    "network": true,
+    "handshakeMs": 704.7834589999984,
+    "catalogMs": 709.8864999999932,
+    "calls": [
+      435.2308750000084,
+      19.869292000003043,
+      20.078624999994645
+    ]
+  },
+  {
+    "variant": "background-light",
+    "delay": 2000,
+    "trial": 2,
+    "network": true,
+    "handshakeMs": 639.6194160000014,
+    "catalogMs": 644.351582999996,
+    "calls": [
+      29.49754199999734,
+      21.212333000003127,
+      20.13658299999952
+    ]
+  },
+  {
+    "variant": "baseline",
+    "delay": 0,
+    "trial": 9,
+    "network": false,
+    "handshakeMs": 1616.979707999999,
+    "catalogMs": 1627.848582999999,
+    "calls": []
+  },
+  {
+    "variant": "baseline",
+    "delay": 0,
+    "trial": 0,
+    "network": false,
+    "handshakeMs": 1652.574375000011,
+    "catalogMs": 1664.4417499999981,
+    "calls": []
+  },
+  {
+    "variant": "baseline",
+    "delay": 0,
+    "trial": 1,
+    "network": false,
+    "handshakeMs": 1643.9487919999956,
+    "catalogMs": 1675.6207499999873,
+    "calls": []
+  },
+  {
+    "variant": "baseline",
+    "delay": 0,
+    "trial": 8,
+    "network": false,
+    "handshakeMs": 1672.5766670000012,
+    "catalogMs": 1685.0209170000016,
+    "calls": []
+  },
+  {
+    "variant": "baseline",
+    "delay": 0,
+    "trial": 3,
+    "network": false,
+    "handshakeMs": 1656.797166999997,
+    "catalogMs": 1695.5499579999887,
+    "calls": []
+  },
+  {
+    "variant": "baseline",
+    "delay": 0,
+    "trial": 2,
+    "network": false,
+    "handshakeMs": 1695.277833,
+    "catalogMs": 1714.864333000005,
+    "calls": []
+  },
+  {
+    "variant": "baseline",
+    "delay": 0,
+    "trial": 5,
+    "network": false,
+    "handshakeMs": 1673.163625000001,
+    "catalogMs": 1724.758084000001,
+    "calls": []
+  },
+  {
+    "variant": "baseline",
+    "delay": 0,
+    "trial": 6,
+    "network": false,
+    "handshakeMs": 1713.376833000002,
+    "catalogMs": 1738.5922920000012,
+    "calls": []
+  },
+  {
+    "variant": "baseline",
+    "delay": 0,
+    "trial": 7,
+    "network": false,
+    "handshakeMs": 1748.4342079999915,
+    "catalogMs": 1754.4180829999968,
+    "calls": []
+  },
+  {
+    "variant": "baseline",
+    "delay": 0,
+    "trial": 4,
+    "network": false,
+    "handshakeMs": 1749.5734169999923,
+    "catalogMs": 1774.7044999999925,
+    "calls": []
+  },
+  {
+    "variant": "lazy",
+    "delay": 0,
+    "trial": 9,
+    "network": false,
+    "handshakeMs": 1748.427874999994,
+    "catalogMs": 1765.7192499999946,
+    "calls": []
+  },
+  {
+    "variant": "lazy",
+    "delay": 0,
+    "trial": 5,
+    "network": false,
+    "handshakeMs": 1707.6152500000026,
+    "catalogMs": 1719.9995000000054,
+    "calls": []
+  },
+  {
+    "variant": "lazy",
+    "delay": 0,
+    "trial": 6,
+    "network": false,
+    "handshakeMs": 1714.2417920000007,
+    "catalogMs": 1739.3948749999981,
+    "calls": []
+  },
+  {
+    "variant": "lazy",
+    "delay": 0,
+    "trial": 7,
+    "network": false,
+    "handshakeMs": 1717.6542079999927,
+    "catalogMs": 1749.3270000000048,
+    "calls": []
+  },
+  {
+    "variant": "lazy",
+    "delay": 0,
+    "trial": 0,
+    "network": false,
+    "handshakeMs": 1750.825542000006,
+    "catalogMs": 1788.3112499999988,
+    "calls": []
+  },
+  {
+    "variant": "lazy",
+    "delay": 0,
+    "trial": 3,
+    "network": false,
+    "handshakeMs": 1808.6994169999962,
+    "catalogMs": 1820.7337499999994,
+    "calls": []
+  },
+  {
+    "variant": "lazy",
+    "delay": 0,
+    "trial": 2,
+    "network": false,
+    "handshakeMs": 1809.5733749999927,
+    "catalogMs": 1838.145749999996,
+    "calls": []
+  },
+  {
+    "variant": "lazy",
+    "delay": 0,
+    "trial": 4,
+    "network": false,
+    "handshakeMs": 1808.8943329999893,
+    "catalogMs": 1852.2737079999933,
+    "calls": []
+  },
+  {
+    "variant": "lazy",
+    "delay": 0,
+    "trial": 8,
+    "network": false,
+    "handshakeMs": 1808.252874999991,
+    "catalogMs": 1861.828291999991,
+    "calls": []
+  },
+  {
+    "variant": "lazy",
+    "delay": 0,
+    "trial": 1,
+    "network": false,
+    "handshakeMs": 1873.7741670000105,
+    "catalogMs": 1885.078084000008,
+    "calls": []
+  },
+  {
+    "variant": "background",
+    "delay": 0,
+    "trial": 3,
+    "network": false,
+    "handshakeMs": 2078.233708999993,
+    "catalogMs": 2091.0432919999876,
+    "calls": []
+  },
+  {
+    "variant": "background",
+    "delay": 0,
+    "trial": 8,
+    "network": false,
+    "handshakeMs": 2283.9717079999973,
+    "catalogMs": 2331.391499999998,
+    "calls": []
+  },
+  {
+    "variant": "background",
+    "delay": 0,
+    "trial": 4,
+    "network": false,
+    "handshakeMs": 2284.6236669999926,
+    "catalogMs": 2309.5096249999915,
+    "calls": []
+  },
+  {
+    "variant": "background",
+    "delay": 0,
+    "trial": 7,
+    "network": false,
+    "handshakeMs": 2358.825417,
+    "catalogMs": 2371.4347500000003,
+    "calls": []
+  },
+  {
+    "variant": "background",
+    "delay": 0,
+    "trial": 0,
+    "network": false,
+    "handshakeMs": 2349.312334000002,
+    "catalogMs": 2384.01449999999,
+    "calls": []
+  },
+  {
+    "variant": "background",
+    "delay": 0,
+    "trial": 6,
+    "network": false,
+    "handshakeMs": 2390.8442499999946,
+    "catalogMs": 2408.026291999995,
+    "calls": []
+  },
+  {
+    "variant": "background",
+    "delay": 0,
+    "trial": 1,
+    "network": false,
+    "handshakeMs": 2436.431249999994,
+    "catalogMs": 2449.7551660000026,
+    "calls": []
+  },
+  {
+    "variant": "background",
+    "delay": 0,
+    "trial": 9,
+    "network": false,
+    "handshakeMs": 2466.6744999999937,
+    "catalogMs": 2482.5158329999977,
+    "calls": []
+  },
+  {
+    "variant": "background",
+    "delay": 0,
+    "trial": 2,
+    "network": false,
+    "handshakeMs": 2497.9006250000093,
+    "catalogMs": 2508.233916000012,
+    "calls": []
+  },
+  {
+    "variant": "background",
+    "delay": 0,
+    "trial": 5,
+    "network": false,
+    "handshakeMs": 2560.0319170000002,
+    "catalogMs": 2565.0752079999947,
+    "calls": []
+  }
+]

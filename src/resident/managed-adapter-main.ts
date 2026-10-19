@@ -6,6 +6,7 @@ import { Effect, Schema } from "effect"
 import { ConfigValidationError } from "../config/config.js"
 import { McpProcessPolicyError } from "../mcp/process-policy.js"
 import { CliProfileStoreError } from "../profiles/model.js"
+import { runProfileStartupDiagnostic } from "../profiles/startup-diagnostic.js"
 import { type AdapterExchange, withAdapterAttachment } from "./adapter-attachment.js"
 import { readResidentAttachment } from "./attachment-file.js"
 import { ManagedExecutable, ManagedLaunchError } from "./managed-contract.js"
@@ -48,6 +49,7 @@ const main = Effect.gen(function* () {
     })
   })
 }).pipe(
+  Effect.catchTag("CliProfileStoreError", (error) => runProfileStartupDiagnostic(error, PKG_VERSION)),
   Effect.provide(NodeStdio.layer),
   Effect.mapError((error) =>
     error instanceof ManagedLaunchError ||

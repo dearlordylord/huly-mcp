@@ -1,42 +1,50 @@
 /* eslint-disable max-lines -- task-management workflow discovery and additive mutations share local invariants */
-import type { Class, Data, Doc, DocumentUpdate, Mixin, Ref, Status, StatusCategory } from "@hcengineering/core"
-import { ClassifierKind, generateId, SortingOrder } from "@hcengineering/core"
+/* eslint-disable max-lines -- task-management workflow discovery and additive mutations share local invariants */
+import {
+  type Class,
+  type Data,
+  type Doc,
+  type DocumentUpdate,
+  type Mixin,
+  type Ref,
+  type Status,
+  type StatusCategory,
+  ClassifierKind,
+  generateId,
+  SortingOrder
+} from "@hcengineering/core"
+
 import { getEmbeddedLabel } from "@hcengineering/platform"
 import type { ProjectStatus, ProjectType, Task, TaskType } from "@hcengineering/task"
 import { Effect, Schema } from "effect"
 
-import type {
-  CreateIssueStatusParams,
-  CreateIssueStatusResult,
-  CreateStatusCategoryValue,
-  CreateTaskTypeParams,
-  CreateTaskTypeResult,
-  GetProjectTypeParams,
-  IssueStatusSummary,
-  ListProjectTypesParams,
-  ListProjectTypesResult,
-  ListTaskTypesParams,
-  ListTaskTypesResult,
-  ProjectTypeDetail,
-  ProjectTypeSummary,
-  StatusCategorySummary,
-  StatusCategoryValue,
-  TaskTypeSummary
-} from "../../domain/schemas.js"
 import {
-  Count,
+  type CreateIssueStatusParams,
+  type CreateIssueStatusResult,
+  type CreateStatusCategoryValue,
+  type CreateTaskTypeParams,
+  type CreateTaskTypeResult,
+  type GetProjectTypeParams,
+  type IssueStatusSummary,
+  type ListProjectTypesParams,
+  type ListProjectTypesResult,
+  type ListTaskTypesParams,
+  type ListTaskTypesResult,
+  type ProjectTypeDetail,
+  type ProjectTypeSummary,
+  type StatusCategorySummary,
+  type StatusCategoryValue,
+  type TaskTypeSummary,
   CreateIssueStatusResultSchema,
   CreateTaskTypeResultSchema,
-  IssueStatusId,
   ListProjectTypesResultSchema,
   ListTaskTypesResultSchema,
   ProjectTypeDetailSchema,
-  ProjectTypeId,
   StatusCategoryBySdkKey,
-  TaskTypeId,
   UnknownStatusCategoryValue
-} from "../../domain/schemas.js"
-import { StatusName } from "../../domain/schemas/shared.js"
+} from "../../domain/schemas/task-management.js"
+import { Count, IssueStatusId, ProjectTypeId, TaskTypeId, StatusName } from "../../domain/schemas/shared.js"
+
 import { isSingle } from "../../utils/assertions.js"
 import { normalizeForComparison } from "../../utils/normalize.js"
 import { HulyClient, type HulyClientError, type HulyClientOperations } from "../client.js"

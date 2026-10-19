@@ -8,7 +8,7 @@ import { Schema } from "effect"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
 import { ResidentPackagePath } from "../../src/resident/managed-contract.js"
-import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { residentSelectionEnvironment } from "../helpers/resident-selection-environment.js"
 import { MixedLaunchInput, MixedLaunchReceipt } from "./mixed-launch-contract.js"
 
@@ -41,7 +41,7 @@ describe.skipIf(process.platform !== "linux")("packaged mixed explicit/automatic
           "--bundle",
           "--platform=node",
           "--format=cjs",
-          "--external:ws",
+          ...NATIVE_RUNTIME_EXTERNALS,
           `--outfile=${output}`
         ],
         { timeout: PROCESS_BOUND }

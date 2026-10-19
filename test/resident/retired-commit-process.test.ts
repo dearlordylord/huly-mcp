@@ -6,7 +6,7 @@ import { dirname, join } from "node:path"
 import { Schema } from "effect"
 import { afterAll, beforeAll, expect, it } from "vitest"
 
-import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { LiveReadProtocol } from "../../scripts/resident-live-read-contract.js"
 import { CrashedCommitObservation } from "./crashed-commit-observation.js"
@@ -43,7 +43,7 @@ beforeAll(async () => {
         "--bundle",
         "--platform=node",
         "--format=cjs",
-        "--external:ws",
+        ...NATIVE_RUNTIME_EXTERNALS,
         `--define:PKG_VERSION=${JSON.stringify(pkg.version)}`,
         `--outfile=${output}`
       ],

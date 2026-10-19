@@ -12,7 +12,7 @@ import {
   type FulltextSearchResult,
   parseSearchResult,
   UNKNOWN_SEARCH_TOTAL
-} from "../../domain/schemas.js"
+} from "../../domain/schemas/search.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { HulyDataInvalidError } from "../errors.js"
 import { listTotal } from "./counts.js"

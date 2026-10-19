@@ -6,6 +6,7 @@ import { createHash } from "node:crypto"
 import { Schema } from "effect"
 
 const runFile = promisify(execFile)
+export const NATIVE_RUNTIME_EXTERNALS = ["--external:ws", "--external:@napi-rs/keyring", "--external:dbus-next"]
 export const StdioBundleGrant = Schema.Struct({
   path: Schema.NonEmptyString.check(Schema.makeFilter(isAbsolute)),
   sha256: Schema.String.check(Schema.makeFilter((value) => /^[0-9a-f]{64}$/.test(value)))

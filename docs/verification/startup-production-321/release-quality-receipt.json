@@ -1,0 +1,12 @@
+{
+  "prepare": "scripts/prepare-movement-certification.sh",
+  "fingerprint": "d32caea9fcb7c27b311152494b5178b8d6e1a3fbeadca126c9e9bcf34842c209",
+  "artifactFingerprint": "d60be6c8c391c2bbe4abefdf786957b75db849b745729c5566f50f1a4f07cc7f",
+  "sourceCommit": "ce0b1d6f4514935b2c83d7b4f5b30e3b1e8e1f95",
+  "logHash": "3d97c4a07a813de5e4fe0f92faf7d9defcb4b713352a3dd14940f6cd3c590620",
+  "started": 1792205237207,
+  "ended": 1792205451696,
+  "exit": 0,
+  "clean": true,
+  "inputsStable": true
+}

@@ -1,3 +1,4 @@
+import { expectRegisteredMetadata } from "../../helpers/registered-tool.js"
 import { describe, it } from "@effect/vitest"
 import type { AccountUuid, Class, Doc, DocumentQuery, PersonId, Ref, Space } from "@hcengineering/core"
 import { toFindResult } from "@hcengineering/core"
@@ -111,7 +112,7 @@ describe("preferenceTools", () => {
       expect(preferenceTools.map((tool) => tool.name)).toEqual(["list_space_preferences", "get_space_preference"])
       for (const tool of preferenceTools) {
         expect(tool.category).toBe("preferences")
-        expect(TOOL_DEFINITIONS[tool.name]).toBe(tool)
+        expectRegisteredMetadata(TOOL_DEFINITIONS[tool.name], tool)
         expect(resolveAnnotations(tool).readOnlyHint).toBe(true)
       }
     })

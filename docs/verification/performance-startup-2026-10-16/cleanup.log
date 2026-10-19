@@ -1,0 +1,2 @@
+PASS normal logout removes native entry and retains profile metadata/selection
+PASS fresh CLI read after logout requires credentials without terminal prompt

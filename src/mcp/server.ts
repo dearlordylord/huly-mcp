@@ -62,6 +62,7 @@ interface McpServerConfigData {
 interface McpServerConfigCallbacks {
   readonly httpMiddleware?: HttpMiddleware
   readonly beforeHttpShutdown?: Effect.Effect<void>
+  readonly onDiscovery?: () => void
   readonly observeMovement?: MovementStageObserver
   readonly resolveClients: ClientResolver
   readonly resolveClientLeaseForHttpRequest?: (
@@ -356,6 +357,7 @@ export class McpServerService extends Context.Service<McpServerService, McpServe
                 const runtimeConfig = getRuntimeConfigContext()
                 const registry = makeEffectMcpRegistry({
                   resolveClients: config.resolveClients,
+                  ...(config.onDiscovery === undefined ? {} : { onDiscovery: config.onDiscovery }),
                   ...(config.observeMovement === undefined ? {} : { observeMovement: config.observeMovement }),
                   telemetry,
                   registry: registries,

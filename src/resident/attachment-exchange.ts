@@ -27,8 +27,14 @@ export const withResidentExchange = <A, E, R>(
       const client = yield* NodeHttpClient.makeNodeHttp.pipe(
         Effect.provideService(NodeHttpClient.HttpAgent, { http: agent, https: agent })
       )
-      const headers = requestHeaders(message, attachment.authorization, session)
-      if (token !== undefined) headers.set(RESIDENT_ATTACHMENT_HEADER, Redacted.value(token))
+      const headers = yield* Effect.try({
+        try: () => {
+          const headers = requestHeaders(message, attachment.authorization, session)
+          if (token !== undefined) headers.set(RESIDENT_ATTACHMENT_HEADER, Redacted.value(token))
+          return headers
+        },
+        catch: () => new BackendResponseError({ message: "Stdio request headers are invalid; it was not dispatched" })
+      })
       const request = HttpClientRequest.post(attachment.endpoint.href).pipe(
         HttpClientRequest.setHeaders(headers),
         HttpClientRequest.bodyText(body, "application/json")

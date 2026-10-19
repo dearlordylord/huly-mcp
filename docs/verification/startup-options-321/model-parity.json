@@ -1,0 +1,238 @@
+[
+  {
+    "type": "model-resource",
+    "variant": "baseline",
+    "resourceMs": 1293.550417,
+    "resourceCount": 8,
+    "ops": {
+      "list_projects": {
+        "isError": false,
+        "bytes": 1463
+      },
+      "list_notification_providers": {
+        "isError": false,
+        "bytes": 2843
+      },
+      "list_notification_types": {
+        "isError": false,
+        "bytes": 29189
+      },
+      "list_workbench_applications": {
+        "isError": false,
+        "bytes": 19614
+      },
+      "list_viewlets": {
+        "isError": false,
+        "bytes": 112329
+      },
+      "list_huly_classes": {
+        "isError": false,
+        "bytes": 50363
+      }
+    }
+  },
+  {
+    "type": "model-resource",
+    "variant": "light",
+    "resourceMs": 460.2474159999997,
+    "resourceCount": 8,
+    "ops": {
+      "list_projects": {
+        "isError": false,
+        "bytes": 1463
+      },
+      "list_notification_providers": {
+        "isError": true,
+        "bytes": 249
+      },
+      "list_notification_types": {
+        "isError": false,
+        "bytes": 30396
+      },
+      "list_workbench_applications": {
+        "isError": false,
+        "bytes": 243
+      },
+      "list_viewlets": {
+        "isError": false,
+        "bytes": 207
+      },
+      "list_huly_classes": {
+        "isError": false,
+        "bytes": 50363
+      }
+    }
+  },
+  {
+    "type": "model-resource",
+    "variant": "lazy",
+    "resourceMs": 1307.3862500000005,
+    "resourceCount": 8,
+    "ops": {
+      "list_projects": {
+        "isError": false,
+        "bytes": 1463
+      },
+      "list_notification_providers": {
+        "isError": false,
+        "bytes": 2843
+      },
+      "list_notification_types": {
+        "isError": false,
+        "bytes": 29189
+      },
+      "list_workbench_applications": {
+        "isError": false,
+        "bytes": 19614
+      },
+      "list_viewlets": {
+        "isError": false,
+        "bytes": 112329
+      },
+      "list_huly_classes": {
+        "isError": false,
+        "bytes": 50363
+      }
+    }
+  },
+  {
+    "type": "model-resource",
+    "variant": "narrow",
+    "resourceMs": 1247.984375,
+    "resourceCount": 8,
+    "ops": {
+      "list_projects": {
+        "isError": false,
+        "bytes": 1463
+      },
+      "list_notification_providers": {
+        "isError": false,
+        "bytes": 2843
+      },
+      "list_notification_types": {
+        "isError": false,
+        "bytes": 29189
+      },
+      "list_workbench_applications": {
+        "isError": false,
+        "bytes": 19614
+      },
+      "list_viewlets": {
+        "isError": false,
+        "bytes": 112329
+      },
+      "list_huly_classes": {
+        "isError": false,
+        "bytes": 50363
+      }
+    }
+  },
+  {
+    "type": "parity",
+    "variant": "light",
+    "name": "list_projects",
+    "equal": true
+  },
+  {
+    "type": "parity",
+    "variant": "light",
+    "name": "list_notification_providers",
+    "equal": false
+  },
+  {
+    "type": "parity",
+    "variant": "light",
+    "name": "list_notification_types",
+    "equal": false
+  },
+  {
+    "type": "parity",
+    "variant": "light",
+    "name": "list_workbench_applications",
+    "equal": false
+  },
+  {
+    "type": "parity",
+    "variant": "light",
+    "name": "list_viewlets",
+    "equal": false
+  },
+  {
+    "type": "parity",
+    "variant": "light",
+    "name": "list_huly_classes",
+    "equal": true
+  },
+  {
+    "type": "parity",
+    "variant": "lazy",
+    "name": "list_projects",
+    "equal": true
+  },
+  {
+    "type": "parity",
+    "variant": "lazy",
+    "name": "list_notification_providers",
+    "equal": true
+  },
+  {
+    "type": "parity",
+    "variant": "lazy",
+    "name": "list_notification_types",
+    "equal": true
+  },
+  {
+    "type": "parity",
+    "variant": "lazy",
+    "name": "list_workbench_applications",
+    "equal": true
+  },
+  {
+    "type": "parity",
+    "variant": "lazy",
+    "name": "list_viewlets",
+    "equal": true
+  },
+  {
+    "type": "parity",
+    "variant": "lazy",
+    "name": "list_huly_classes",
+    "equal": true
+  },
+  {
+    "type": "parity",
+    "variant": "narrow",
+    "name": "list_projects",
+    "equal": true
+  },
+  {
+    "type": "parity",
+    "variant": "narrow",
+    "name": "list_notification_providers",
+    "equal": true
+  },
+  {
+    "type": "parity",
+    "variant": "narrow",
+    "name": "list_notification_types",
+    "equal": true
+  },
+  {
+    "type": "parity",
+    "variant": "narrow",
+    "name": "list_workbench_applications",
+    "equal": true
+  },
+  {
+    "type": "parity",
+    "variant": "narrow",
+    "name": "list_viewlets",
+    "equal": true
+  },
+  {
+    "type": "parity",
+    "variant": "narrow",
+    "name": "list_huly_classes",
+    "equal": true
+  }
+]

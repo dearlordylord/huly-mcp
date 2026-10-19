@@ -1,26 +1,32 @@
 /* eslint-disable max-lines -- Process read/write operations share resolver and enrichment helpers in one module */
 import type { Card, MasterTag, Tag } from "@hcengineering/card"
-import type { Data, DocumentQuery, DocumentUpdate, Ref, Space } from "@hcengineering/core"
-import { generateId, SortingOrder } from "@hcengineering/core"
+import {
+  type Data,
+  type DocumentQuery,
+  type DocumentUpdate,
+  type Ref,
+  type Space,
+  generateId,
+  SortingOrder
+} from "@hcengineering/core"
+
 import { Effect, Schema } from "effect"
 
-import type {
-  CancelExecutionParams,
-  CancelExecutionResult,
-  GetProcessParams,
-  ListExecutionsParams,
-  ListExecutionsResult,
-  ListProcessesParams,
-  ListProcessesResult,
-  ProcessCandidate,
-  ProcessDetail,
-  ProcessExecutionSummary,
-  ProcessSummary,
-  ProcessTransitionSummary,
-  StartProcessParams,
-  StartProcessResult
-} from "../../domain/schemas.js"
 import {
+  type CancelExecutionParams,
+  type CancelExecutionResult,
+  type GetProcessParams,
+  type ListExecutionsParams,
+  type ListExecutionsResult,
+  type ListProcessesParams,
+  type ListProcessesResult,
+  type ProcessCandidate,
+  type ProcessDetail,
+  type ProcessExecutionSummary,
+  type ProcessSummary,
+  type ProcessTransitionSummary,
+  type StartProcessParams,
+  type StartProcessResult,
   CancelExecutionResultSchema,
   ListExecutionsResultSchema,
   ListProcessesResultSchema,
@@ -30,7 +36,8 @@ import {
   ProcessStateId,
   ProcessTransitionId,
   StartProcessResultSchema
-} from "../../domain/schemas.js"
+} from "../../domain/schemas/processes.js"
+
 import { CardId, Count, MasterTagId, Timestamp } from "../../domain/schemas/shared.js"
 import { isSingle } from "../../utils/assertions.js"
 import { normalizeForComparison } from "../../utils/normalize.js"

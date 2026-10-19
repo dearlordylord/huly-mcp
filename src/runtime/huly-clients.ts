@@ -44,9 +44,12 @@ interface ActiveClientAcquisition {
  * Build the combined client layer (not yet evaluated — deferred until first use).
  */
 export const buildCombinedClientLayer = (
-  configLayer: Layer.Layer<HulyConfigService, ConfigValidationError> = HulyConfigService.layer
+  configLayer: Layer.Layer<HulyConfigService, ConfigValidationError> = HulyConfigService.layer,
+  modelLoading: "background" | "on-demand" = "background"
 ): CombinedClientLayer => {
-  const hulyClientLayer = HulyClient.layer.pipe(Layer.provide(configLayer))
+  const hulyClientLayer = (modelLoading === "background" ? HulyClient.layer : HulyClient.onDemandLayer).pipe(
+    Layer.provide(configLayer)
+  )
 
   const storageClientLayer = HulyStorageClient.layer.pipe(Layer.provide(configLayer))
 
@@ -164,11 +167,13 @@ export const createClientResolver = (combinedClientLayer: CombinedClientLayer): 
     return state.closePromise
   }
 
-  const status = Effect.sync((): HulyInitializationStatus => {
-    if (state.closed) return "closed"
-    if (state.active === undefined) return "inactive"
+  const status = Effect.suspend((): Effect.Effect<HulyInitializationStatus> => {
+    if (state.closed) return Effect.succeed("closed")
+    if (state.active === undefined) return Effect.succeed("inactive")
     const exit = state.active.acquisition.poll()
-    return exit === undefined ? "initializing" : Exit.isSuccess(exit) ? "ready" : "failed"
+    if (exit === undefined) return Effect.succeed("initializing")
+    if (Exit.isFailure(exit)) return Effect.succeed("failed")
+    return exit.value.bundle.hulyClient.initializationStatus ?? Effect.succeed("ready")
   })
   return { resolve, close, status }
 }

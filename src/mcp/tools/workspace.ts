@@ -2,7 +2,6 @@ import {
   createAccessLinkParamsJsonSchema,
   createWorkspaceParamsJsonSchema,
   DEFAULT_ACCESS_LINK_ROLE,
-  emptyParamsJsonSchema,
   getRegionsParamsJsonSchema,
   listWorkspaceMembersParamsJsonSchema,
   listWorkspacesParamsJsonSchema,
@@ -17,9 +16,7 @@ import {
   updateGuestSettingsParamsJsonSchema,
   updateMemberRoleParamsJsonSchema,
   updateUserProfileParamsJsonSchema,
-  WorkspaceInfoSchema
-} from "../../domain/schemas.js"
-import {
+  WorkspaceInfoSchema,
   CreateAccessLinkResultSchema,
   CreateWorkspaceResultSchema,
   DeleteWorkspaceResultSchema,
@@ -31,6 +28,7 @@ import {
   UpdateMemberRoleResultSchema,
   UpdateUserProfileResultSchema
 } from "../../domain/schemas/workspace.js"
+import { emptyParamsJsonSchema } from "../../domain/schemas/shared.js"
 import {
   createAccessLink,
   createWorkspace,

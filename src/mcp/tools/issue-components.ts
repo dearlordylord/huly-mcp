@@ -2,7 +2,6 @@ import {
   createComponentParamsJsonSchema,
   deleteComponentParamsJsonSchema,
   getComponentParamsJsonSchema,
-  HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
   listComponentsParamsJsonSchema,
   parseCreateComponentParams,
   parseDeleteComponentParams,
@@ -11,9 +10,7 @@ import {
   parseSetIssueComponentParams,
   parseUpdateComponentParams,
   setIssueComponentParamsJsonSchema,
-  updateComponentParamsJsonSchema
-} from "../../domain/schemas.js"
-import {
+  updateComponentParamsJsonSchema,
   CreateComponentResultSchema,
   DeleteComponentResultSchema,
   GetComponentResultSchema,
@@ -21,6 +18,7 @@ import {
   SetIssueComponentResultSchema,
   UpdateComponentResultSchema
 } from "../../domain/schemas/components.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "../../domain/schemas/document-native-references.js"
 import {
   createComponent,
   deleteComponent,

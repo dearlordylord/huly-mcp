@@ -2,9 +2,10 @@ import {
   listEmployeesParamsJsonSchema,
   parseListEmployeesParams,
   parseSetEmployeePositionParams,
-  setEmployeePositionParamsJsonSchema
-} from "../../domain/schemas.js"
-import { ListEmployeesResultSchema, SetEmployeePositionResultSchema } from "../../domain/schemas/contacts.js"
+  setEmployeePositionParamsJsonSchema,
+  ListEmployeesResultSchema,
+  SetEmployeePositionResultSchema
+} from "../../domain/schemas/contacts.js"
 import {
   deactivateEmployeeParamsJsonSchema,
   DeactivateEmployeeResultSchema,

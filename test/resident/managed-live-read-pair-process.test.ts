@@ -13,7 +13,7 @@ import {
   LiveReadProbeDiagnostic
 } from "../../scripts/resident-live-read-contract.js"
 import { withRegistryDirectory } from "../helpers/resident-registry-fixture.js"
-import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { residentSelectionEnvironment } from "../helpers/resident-selection-environment.js"
 import { DisposableRestProject, startDisposableRestFixture } from "./disposable-rest-fixture.js"
 
@@ -65,7 +65,7 @@ describe.skipIf(process.platform !== "linux")("managed live-read campaign probe"
         "--bundle",
         "--platform=node",
         "--format=cjs",
-        "--external:ws",
+        ...NATIVE_RUNTIME_EXTERNALS,
         `--outfile=${probe}`
       ],
       { timeout: PROCESS_BOUND }

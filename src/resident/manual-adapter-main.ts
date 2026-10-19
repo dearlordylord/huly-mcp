@@ -5,6 +5,7 @@ import { Effect } from "effect"
 import { ConfigValidationError } from "../config/config.js"
 import { McpProcessPolicyError } from "../mcp/process-policy.js"
 import { CliProfileStoreError } from "../profiles/model.js"
+import { runProfileStartupDiagnostic } from "../profiles/startup-diagnostic.js"
 import { runManualAdapter } from "./manual-adapter.js"
 import { captureManualResidentSelection } from "./selection-config.js"
 import { BackendResponseError } from "./response-stream.js"
@@ -16,6 +17,7 @@ NodeRuntime.runMain(
     const captured = yield* captureManualResidentSelection(environment)
     yield* runManualAdapter(captured?.selection)
   }).pipe(
+    Effect.catchTag("CliProfileStoreError", (error) => runProfileStartupDiagnostic(error, PKG_VERSION)),
     Effect.provide(NodeStdio.layer),
     Effect.mapError((error) =>
       error instanceof BackendResponseError ||

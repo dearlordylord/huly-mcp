@@ -49,7 +49,7 @@ const outcome = await (async () => {
     const result = await build({
       bundle: true,
       entryPoints: [entryPath],
-      external: ["ws"],
+      external: ["ws", "@napi-rs/keyring", "dbus-next"],
       format: "cjs",
       platform: "node",
       write: false

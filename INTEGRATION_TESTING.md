@@ -491,7 +491,33 @@ printf '%s\n' \
 
 ### Shared local profiles
 
-Run `pnpm build`, source `.env.local`, and run `HULY_URL="${HULY_URL/localhost/host.docker.internal}" pnpm integration:profiles` from a Linux-local checkout in this container. The focused harness packs/installs the CLI, logs into local Huly through its real prompts, removes environment credentials, reads projects through CLI and stdio with the same profile, and checks independent active selection, destination binding, and prompt-free missing credentials. It uses an isolated temporary configuration directory and deletes it afterward. Requires Python 3 and jq. Test telemetry is disabled by the shared harness helper.
+Run `pnpm build`, source `.env.local`, and run `HULY_URL="${HULY_URL/localhost/host.docker.internal}" pnpm integration:profiles` from a Linux-local checkout in this container. The focused harness packs/installs the CLI, logs into local Huly through a real pseudo-terminal, imports the token through hidden input and explicit stdin, checks failed-replacement preservation, removes environment credentials, compares CLI/stdio live project reads, and checks offline status, explicit connectivity, destination binding, and logout without metadata loss. Requires Python 3, jq, and a Unix pseudo-terminal. Test telemetry is disabled by the shared harness helper.
+
+`HULY_TEST_CREDENTIAL_STORAGE=os` runs the same workflow with the native backend.
+On Linux, run it in a user D-Bus session with an already-unlocked Secret Service
+collection. `HULY_TEST_SECRET_TOOL` can select the fixture's `secret-tool` path;
+it is used privately to retrieve the token for import testing, never printed or
+passed in token arguments. Native mode inspects application-managed files for
+credential material. Keep GNOME Keyring test data in an isolated `XDG_DATA_HOME`.
+The application never uses `secret-tool`; it makes noninteractive D-Bus calls.
+
+The standalone adapter probe can run in that same native session:
+
+```bash
+pnpm exec tsx scripts/native-credentials-probe.ts
+# In a disposable Linux session/collection only: locks the collection.
+pnpm exec tsx scripts/native-credentials-probe.ts --locked
+# In a private D-Bus session with no Secret Service:
+dbus-run-session -- node_modules/.bin/tsx scripts/native-credentials-probe.ts --unavailable
+```
+
+The default probe exercises real write/read/replace/delete and idempotent
+missing-item deletion. The locked probe verifies read/save/delete failures.
+The unavailable probe verifies all three operations fail without fallback.
+A successful Linux probe does not certify macOS. macOS requires actual packaged
+CLI/MCP-host execution, Keychain denial/locked/unavailable checks, and observed
+system-prompt/update behavior under the same OS user/session. See
+[local authentication](docs/local-authentication.md) for the operator contract.
 
 ## Destination-based same-project movement
 
@@ -700,6 +726,24 @@ handoff. After two attempts without new distinguishing evidence, or thirty
 minutes of active repair, change the diagnostic method before another broad run.
 Waiting on a confirmed live handle is separate from active repair. Reuse the
 existing runner and evidence format before adding a private coordinator.
+
+Publish a report from its frozen draft by changing only top-level adjudication,
+per-criterion certification and the precise pending-adjudication annotation.
+Preserve nested historical statuses, source excerpts, original requirements,
+test declarations and receipt identities. Run:
+
+```bash
+pnpm verify-completion-evidence --compare /path/to/frozen-draft.json /path/to/published-report.json
+pnpm verify-completion-evidence --manifest /path/to/integrity.json
+```
+
+The integrity manifest stores the reviewed frozen draft's hash and its immutable
+evidence projection. The explicit manifest command verifies this projection. Path sanitization
+applies only to declared artifact locators. This detects publication drift; it
+does not independently certify the truth of tests or deployed observations.
+Reports supplied explicitly use `pnpm verify-completion-evidence --manifest <manifest.json>`
+with their reviewed baseline. Updating a digest requires independent
+review of the evidence change.
 
 Do not recompute `MOVEMENT_STOP_UTC` for a retry. The persisted campaign rejects
 extension and expiry. A retained custody lock means cleanup is unconfirmed:

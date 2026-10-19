@@ -6,16 +6,14 @@
 import { Effect, Schema } from "effect"
 import * as McpSchema from "effect/ai/McpSchema"
 
+import { type Issue, IssueSchema, parseGetIssueParams } from "../domain/schemas/issues.js"
 import {
-  type Issue,
-  IssueSchema,
-  parseGetIssueParams,
   parseGetProjectParams,
   parseListProjectsParams,
   type Project,
   ProjectSchema,
   type ProjectSummary
-} from "../domain/schemas.js"
+} from "../domain/schemas/projects.js"
 import { IssueIdentifier, MAX_LIMIT, ProjectIdentifier } from "../domain/schemas/shared.js"
 import type { HulyClient } from "../huly/client.js"
 import type { Diagnostics } from "../huly/diagnostics.js"

@@ -1,47 +1,32 @@
 import {
   addThreadReplyParamsJsonSchema,
   createChannelParamsJsonSchema,
-  createDirectMessageParamsJsonSchema,
   deleteChannelMessageParamsJsonSchema,
   deleteChannelParamsJsonSchema,
-  deleteDmMessageParamsJsonSchema,
   deleteThreadReplyParamsJsonSchema,
   getChannelParamsJsonSchema,
-  HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
   listChannelMessagesParamsJsonSchema,
   listChannelsParamsJsonSchema,
   listDirectMessagesParamsJsonSchema,
-  listDmMessagesParamsJsonSchema,
-  listExternalChannelMessagesParamsJsonSchema,
   listThreadRepliesParamsJsonSchema,
   parseAddThreadReplyParams,
   parseCreateChannelParams,
-  parseCreateDirectMessageParams,
   parseDeleteChannelMessageParams,
   parseDeleteChannelParams,
-  parseDeleteDmMessageParams,
   parseDeleteThreadReplyParams,
   parseGetChannelParams,
   parseListChannelMessagesParams,
   parseListChannelsParams,
   parseListDirectMessagesParams,
-  parseListDmMessagesParams,
-  parseListExternalChannelMessagesParams,
   parseListThreadRepliesParams,
   parseSendChannelMessageParams,
-  parseSendDmMessageParams,
   parseUpdateChannelMessageParams,
   parseUpdateChannelParams,
-  parseUpdateDmMessageParams,
   parseUpdateThreadReplyParams,
   sendChannelMessageParamsJsonSchema,
-  sendDmMessageParamsJsonSchema,
   updateChannelMessageParamsJsonSchema,
   updateChannelParamsJsonSchema,
-  updateDmMessageParamsJsonSchema,
-  updateThreadReplyParamsJsonSchema
-} from "../../domain/schemas.js"
-import {
+  updateThreadReplyParamsJsonSchema,
   AddThreadReplyResultSchema,
   ChannelSchema,
   CreateChannelResultSchema,
@@ -58,13 +43,29 @@ import {
   UpdateThreadReplyResultSchema
 } from "../../domain/schemas/channels.js"
 import {
+  createDirectMessageParamsJsonSchema,
+  deleteDmMessageParamsJsonSchema,
+  listDmMessagesParamsJsonSchema,
+  parseCreateDirectMessageParams,
+  parseDeleteDmMessageParams,
+  parseListDmMessagesParams,
+  parseSendDmMessageParams,
+  parseUpdateDmMessageParams,
+  sendDmMessageParamsJsonSchema,
+  updateDmMessageParamsJsonSchema,
   CreateDirectMessageResultSchema,
   DeleteDmMessageResultSchema,
   ListDmMessagesResultSchema,
   SendDmMessageResultSchema,
   UpdateDmMessageResultSchema
 } from "../../domain/schemas/direct-messages.js"
-import { ListExternalChannelMessagesResultSchema } from "../../domain/schemas/external-channel-messages.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "../../domain/schemas/document-native-references.js"
+import {
+  listExternalChannelMessagesParamsJsonSchema,
+  parseListExternalChannelMessagesParams,
+  ListExternalChannelMessagesResultSchema
+} from "../../domain/schemas/external-channel-messages.js"
+
 import {
   createChannel,
   deleteChannel,

@@ -86,9 +86,12 @@ The CLI and stdio MCP share named profiles. CLI selection uses `--profile`, then
 ### Authentication and profiles
 
 ```bash
-# Interactive login, sanitized inspection, and logout.
-huly auth login --profile work
+# Interactive login (file storage by default; opt into OS storage explicitly).
+huly auth login --profile work --storage os
+# Hidden token import, offline configuration, explicit live check, and logout.
+huly auth import-token --profile work
 huly auth status --json
+huly auth check --profile work --json
 huly auth logout --profile work
 
 # Named contexts with an optional default project.
@@ -97,6 +100,8 @@ huly profile list --json
 huly profile select work
 huly profile update work --default-project CLI
 ```
+
+See [local authentication](../../docs/local-authentication.md) for private stdin import, backend selection, native-session requirements, environment injection, and logout semantics. OS storage is recommended; persisted plaintext remains supported. Offline status reports `configured` and `verified: false`; use `auth check` to verify connectivity.
 
 Profile selection and credential precedence are separate:
 

@@ -7,7 +7,7 @@ import { collectJsonSchemaDefinitions, omitJsonSchemaDocumentMetadata } from "./
 export interface McpOutputSchema {
   readonly type: "object"
   readonly properties?: Record<string, unknown>
-  readonly required?: Array<string>
+  readonly required?: ReadonlyArray<string>
   readonly [key: string]: unknown
 }
 

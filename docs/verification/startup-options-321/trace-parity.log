@@ -1,0 +1,3 @@
+PASS exact auto listing and project result parity
+PASS exact native listing and project result parity
+PASS first project call does not evaluate Issues tool group

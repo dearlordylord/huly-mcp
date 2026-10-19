@@ -8,7 +8,7 @@ import {
   parsePublishIssueToExternalTrackerParams,
   publishIssueToExternalTrackerParamsJsonSchema,
   PublishIssueToExternalTrackerResultSchema
-} from "../../domain/schemas.js"
+} from "../../domain/schemas/external-tracker-publication.js"
 import {
   getIssuePublicationStatus,
   listExternalTrackerTargets,

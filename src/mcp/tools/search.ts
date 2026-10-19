@@ -1,5 +1,8 @@
-import { fulltextSearchParamsJsonSchema, parseFulltextSearchParams } from "../../domain/schemas.js"
-import { FulltextSearchResultSchema } from "../../domain/schemas/search.js"
+import {
+  fulltextSearchParamsJsonSchema,
+  parseFulltextSearchParams,
+  FulltextSearchResultSchema
+} from "../../domain/schemas/search.js"
 import { fulltextSearch } from "../../huly/operations/search.js"
 import { defineTool, type RegisteredTool } from "./registry.js"
 

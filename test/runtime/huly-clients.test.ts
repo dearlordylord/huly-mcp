@@ -1,5 +1,6 @@
 import { it } from "@effect/vitest"
-import { Cause, Deferred, Effect, Exit, Fiber, Layer } from "effect"
+import { Cause, ConfigProvider, Deferred, Effect, Exit, Fiber, Layer, Ref } from "effect"
+import type { HulyInitializationStatus } from "../../src/runtime/client-initialization.js"
 import { describe, expect } from "vitest"
 
 import { HulyClient } from "../../src/huly/client.js"
@@ -7,7 +8,11 @@ import { HulyConnectionError, HulyUnavailableError } from "../../src/huly/errors
 import { HulyStorageClient } from "../../src/huly/storage.js"
 import { normalizeHulyOrigin } from "../../src/huly/unavailable-diagnostics.js"
 import { WorkspaceClient } from "../../src/huly/workspace-client.js"
-import { buildScopedClientBundle, createClientResolver } from "../../src/runtime/huly-clients.js"
+import {
+  buildCombinedClientLayer,
+  buildScopedClientBundle,
+  createClientResolver
+} from "../../src/runtime/huly-clients.js"
 
 const clientLayer = Layer.merge(
   Layer.merge(HulyClient.testLayer({}), HulyStorageClient.testLayer({})),
@@ -15,6 +20,44 @@ const clientLayer = Layer.merge(
 )
 
 describe("shared Huly client runtime", () => {
+  it.effect("reports full-model initialization independently of an available lightweight client", () =>
+    Effect.gen(function* () {
+      const model = yield* Ref.make<HulyInitializationStatus>("initializing")
+      const layer = Layer.mergeAll(
+        HulyClient.testLayer({ initializationStatus: Ref.get(model) }),
+        HulyStorageClient.testLayer({}),
+        WorkspaceClient.testLayer({})
+      )
+      const resolver = createClientResolver(layer)
+      yield* Effect.acquireUseRelease(
+        Effect.succeed(resolver),
+        ({ resolve, status }) =>
+          Effect.gen(function* () {
+            expect(Exit.isSuccess(yield* Effect.promise(resolve))).toBe(true)
+            expect(yield* status).toBe("initializing")
+            yield* Ref.set(model, "failed")
+            expect(yield* status).toBe("failed")
+            yield* Ref.set(model, "ready")
+            expect(yield* status).toBe("ready")
+          }),
+        ({ close }) => Effect.promise(close)
+      )
+      expect(yield* resolver.status).toBe("closed")
+    })
+  )
+  it.effect("rejects missing configuration before network acquisition in background and on-demand modes", () =>
+    Effect.gen(function* () {
+      for (const mode of ["background", "on-demand"] as const) {
+        const layer = mode === "background" ? buildCombinedClientLayer() : buildCombinedClientLayer(undefined, mode)
+        const error = yield* buildScopedClientBundle(layer).pipe(
+          Effect.provide(ConfigProvider.layer(ConfigProvider.fromUnknown({}))),
+          Effect.flip
+        )
+        expect(error._tag).toBe("ConfigValidationError")
+      }
+    })
+  )
+
   it("builds scoped client bundles and closes them exactly once", async () => {
     let releases = 0
     const trackedLayer = clientLayer.pipe(Layer.tap(() => Effect.addFinalizer(() => Effect.sync(() => releases++))))

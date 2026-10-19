@@ -7,7 +7,7 @@ import { promisify } from "node:util"
 import { Schema } from "effect"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
-import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { residentSelectionEnvironment } from "../helpers/resident-selection-environment.js"
 import { ErrorRoutingInput, ErrorRoutingReceipt } from "./error-routing-contract.js"
 
@@ -38,7 +38,7 @@ describe.skipIf(process.platform !== "linux")("packaged shared backend error rou
           "--bundle",
           "--platform=node",
           "--format=cjs",
-          "--external:ws",
+          ...NATIVE_RUNTIME_EXTERNALS,
           `--outfile=${output}`
         ],
         { timeout: PROCESS_BOUND }

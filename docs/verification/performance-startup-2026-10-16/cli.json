@@ -1,0 +1,62 @@
+[
+  {
+    "version": "baseline",
+    "round": 0,
+    "helpMs": 633.175417,
+    "bytes": 2777
+  },
+  {
+    "version": "optimized",
+    "round": 0,
+    "helpMs": 689.794833,
+    "bytes": 2777
+  },
+  {
+    "version": "optimized",
+    "round": 1,
+    "helpMs": 692.881791,
+    "bytes": 2777
+  },
+  {
+    "version": "baseline",
+    "round": 1,
+    "helpMs": 600.9407500000002,
+    "bytes": 2777
+  },
+  {
+    "version": "baseline",
+    "round": 2,
+    "helpMs": 597.3769169999996,
+    "bytes": 2777
+  },
+  {
+    "version": "optimized",
+    "round": 2,
+    "helpMs": 592.7787920000001,
+    "bytes": 2777
+  },
+  {
+    "version": "optimized",
+    "round": 3,
+    "helpMs": 604.6630829999999,
+    "bytes": 2777
+  },
+  {
+    "version": "baseline",
+    "round": 3,
+    "helpMs": 641.4352920000001,
+    "bytes": 2777
+  },
+  {
+    "version": "baseline",
+    "round": 4,
+    "helpMs": 742.8484589999998,
+    "bytes": 2777
+  },
+  {
+    "version": "optimized",
+    "round": 4,
+    "helpMs": 589.2497919999996,
+    "bytes": 2777
+  }
+]

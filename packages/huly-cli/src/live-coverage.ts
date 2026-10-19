@@ -22,7 +22,7 @@ export type CliIntegrationCoverageDecision =
 
 export const CLI_COVERAGE_REVIEWED_REGISTRY_OPERATIONS = 604
 export const CLI_COVERAGE_REVIEWED_ROOT_COMMANDS = 55
-export const CLI_COVERAGE_REVIEWED_LOCAL_COMMANDS = 7
+export const CLI_COVERAGE_REVIEWED_LOCAL_COMMANDS = 9
 
 export const CLI_REVIEWED_COVERAGE_CATEGORIES = [
   "activity",

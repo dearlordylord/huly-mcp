@@ -47,5 +47,13 @@ export const resolveProcessConfiguration = Effect.fn("resolveProcessConfiguratio
     transport === "stdio" && environment["HULY_PROFILE"] !== undefined
       ? yield* resolveStdioProfile(environment, store ?? (yield* defaultProfileStore(environment)))
       : undefined
-  return { lazyEnvs, ...bindProfileConfiguration(environment, profile) }
+  const configuration = bindProfileConfiguration(environment, profile)
+  const configLayer =
+    !lazyEnvs && transport === "stdio"
+      ? yield* HulyConfigService.pipe(
+          Effect.provide(configuration.configLayer),
+          Effect.map((config) => Layer.succeed(HulyConfigService, config))
+        )
+      : configuration.configLayer
+  return { lazyEnvs, ...configuration, configLayer }
 })

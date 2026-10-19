@@ -6,7 +6,7 @@ import { promisify } from "node:util"
 import { Schema } from "effect"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
-import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { StopFaultObservation } from "./stop-fault-observation.js"
 
@@ -42,7 +42,7 @@ describe.skipIf(process.platform !== "linux")("managed stop during committed fix
           "--bundle",
           "--platform=node",
           "--format=cjs",
-          "--external:ws",
+          ...NATIVE_RUNTIME_EXTERNALS,
           `--define:PKG_VERSION=${JSON.stringify(pkg.version)}`,
           `--outfile=${output}`
         ],

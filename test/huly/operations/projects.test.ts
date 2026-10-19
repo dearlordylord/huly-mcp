@@ -50,6 +50,23 @@ const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
   return result
 }
 
+it.effect("lists projects through the lightweight query capability without acquiring the full SDK", () => {
+  const layer = HulyClient.testLayer({
+    findAll: () => Effect.die("Full SDK must not be acquired for this read"),
+    findProjectDocuments: () => Effect.succeed(toFindResult([makeProject()]))
+  })
+  return listProjects({}).pipe(
+    Effect.provide(layer),
+    Effect.tap((result) =>
+      Effect.sync(() => {
+        expect(result.projects).toEqual([
+          { identifier: "TEST", name: "Test Project", description: "A test project", archived: false }
+        ])
+      })
+    )
+  )
+})
+
 const makeStatus = (overrides: Pick<Status, "_id" | "name"> & Partial<Status>): Status => {
   const { _id, name, ...rest } = overrides
   return asStatus({

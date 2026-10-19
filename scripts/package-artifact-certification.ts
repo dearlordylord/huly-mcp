@@ -85,7 +85,7 @@ const readArchive = (archivePath: string): Promise<ReadonlyArray<ArchiveEntry>> 
   })
 
 const externalModules = (bundle: string): ReadonlyArray<string> => {
-  const requirePattern = /require\("([^".][^"]*)"\)/gu
+  const requirePattern = /(?:require|import)\("([^".][^"]*)"\)/gu
   const builtins = new Set([...builtinModules, ...builtinModules.map((name) => `node:${name}`)])
   return [
     ...new Set(

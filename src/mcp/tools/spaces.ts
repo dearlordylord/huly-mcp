@@ -1,33 +1,35 @@
 import {
   createSpaceParamsJsonSchema,
   getGlobalSpaceAdminsParamsJsonSchema,
+  parseCreateSpaceParams,
+  parseGetGlobalSpaceAdminsParams,
+  parseSetGlobalSpaceAdminsParams,
+  setGlobalSpaceAdminsParamsJsonSchema,
+  CreateSpaceResultSchema,
+  GetGlobalSpaceAdminsResultSchema,
+  SetGlobalSpaceAdminsResultSchema
+} from "../../domain/schemas/spaces-administration.js"
+import {
   getSpaceParamsJsonSchema,
   getSpaceTypeParamsJsonSchema,
   listSpacePermissionsParamsJsonSchema,
   listSpacesParamsJsonSchema,
   listSpaceTypesParamsJsonSchema,
   parseGetSpaceParams,
-  parseCreateSpaceParams,
-  parseGetGlobalSpaceAdminsParams,
   parseGetSpaceTypeParams,
   parseListSpacePermissionsParams,
   parseListSpacesParams,
   parseListSpaceTypesParams,
   parseSetSpaceOwnersParams,
-  parseSetGlobalSpaceAdminsParams,
   parseSetSpaceRoleMembersParams,
   parseSpaceMemberMutationParams,
   parseSpaceRoleMemberMutationParams,
   parseUpdateSpaceParams,
   setSpaceOwnersParamsJsonSchema,
-  setGlobalSpaceAdminsParamsJsonSchema,
   setSpaceRoleMembersParamsJsonSchema,
   spaceMemberMutationParamsJsonSchema,
   spaceRoleMemberMutationParamsJsonSchema,
-  updateSpaceParamsJsonSchema
-} from "../../domain/schemas.js"
-import { DEFAULT_INCLUDE_ARCHIVED } from "../../domain/schemas/shared.js"
-import {
+  updateSpaceParamsJsonSchema,
   AddSpaceMembersResultSchema,
   AddSpaceRoleMembersResultSchema,
   GetSpaceResultSchema,
@@ -41,11 +43,8 @@ import {
   SetSpaceRoleMembersResultSchema,
   UpdateSpaceResultSchema
 } from "../../domain/schemas/spaces.js"
-import {
-  CreateSpaceResultSchema,
-  GetGlobalSpaceAdminsResultSchema,
-  SetGlobalSpaceAdminsResultSchema
-} from "../../domain/schemas/spaces-administration.js"
+import { DEFAULT_INCLUDE_ARCHIVED } from "../../domain/schemas/shared.js"
+
 import {
   addSpaceMembers,
   addSpaceRoleMembers,

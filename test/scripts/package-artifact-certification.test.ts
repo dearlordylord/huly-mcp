@@ -62,6 +62,28 @@ const validEffectCohortMarker =
   "effect@4.0.0_patch_hash=583f1592041bd3cbff9dfc3f99b63c6f3a33410e4b22579e7d774074645a5755/node_modules/effect/dist/Effect.js"
 
 describe("packed artifact certification", () => {
+  it("includes lazy native imports in the exact external dependency closure", async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "native-artifact-certification-"))
+    const archive = path.join(directory, "package.tgz")
+    try {
+      await writeArchive(
+        archive,
+        0o755,
+        `require("ws"); import("dbus-next"); import("@napi-rs/keyring"); const cohort = "${validEffectCohortMarker}"`
+      )
+      await expect(certifyPackedArtifact(archive, expectedArtifact)).rejects.toThrow(
+        "Unexpected packed external modules"
+      )
+      await expect(
+        certifyPackedArtifact(archive, {
+          ...expectedArtifact,
+          expectedExternalModules: ["@napi-rs/keyring", "dbus-next", "ws"]
+        })
+      ).resolves.toMatchObject({ externalModules: ["@napi-rs/keyring", "dbus-next", "ws"] })
+    } finally {
+      await fs.rm(directory, { force: true, recursive: true })
+    }
+  })
   it("reports both expected and actual certificates when evidence is stale", () => {
     const parseCertification = Schema.decodeUnknownSync(PackedArtifactCertificationSchema)
     const expected = parseCertification({

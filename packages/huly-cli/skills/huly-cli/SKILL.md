@@ -22,7 +22,9 @@ Key local command surfaces:
 
 `huly resident status [--state-directory <path>] [--json]`
 `huly resident stop --generation <uuid> [--state-directory <path>] [--json]`
-`huly auth login [--profile <name>] [--json]`
+`huly auth import-token [--storage file|os] [--profile <name>] [--stdin] [--json]`
+`huly auth check [--profile <name>] [--json]`
+`huly auth login [--storage file|os] [--profile <name>] [--json]`
 `huly auth status [--profile <name>] [--json]`
 `huly auth logout [--profile <name>] [--json]`
 `huly profile create <name> --url <url> --workspace <workspace> [--default-project <project>] [--json]`

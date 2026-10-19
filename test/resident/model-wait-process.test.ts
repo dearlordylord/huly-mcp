@@ -8,7 +8,7 @@ import { Schema } from "effect"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
 import { fixturePackageVersion } from "../helpers/resident-fixture.js"
-import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { residentSelectionEnvironment } from "../helpers/resident-selection-environment.js"
 import { ModelWaitPairInput, ModelWaitReceipt } from "./model-wait-contract.js"
 
@@ -48,7 +48,7 @@ describe.skipIf(process.platform !== "linux")("packaged shared model waiter isol
           "--bundle",
           "--platform=node",
           "--format=cjs",
-          "--external:ws",
+          ...NATIVE_RUNTIME_EXTERNALS,
           `--define:PKG_VERSION=${JSON.stringify(version)}`,
           `--outfile=${output}`
         ],

@@ -1,0 +1,2985 @@
+{
+  "sourceCommit": "9e8ed80b4d4d564cd89b17aca2ab52ad8a1a2f06",
+  "artifactSha256": "95bb2826e50607159f10241650be38341b54e06de18777f8fd7466614d9c4cac",
+  "node": "v24.14.0",
+  "platform": "darwin",
+  "architecture": "arm64",
+  "logicalCpuCount": 12,
+  "totalMemoryGiB": 96,
+  "requestTimeoutMs": 20000,
+  "observations": [
+    {
+      "mode": "stdio",
+      "count": 1,
+      "trial": 0,
+      "loadAverageAtStart": [
+        8.056640625,
+        10.10546875,
+        15.54931640625
+      ],
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 560.2446669999999,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 577.439959,
+          "projectsCallMs": 119.82291599999996,
+          "projectsReadyMs": 697.2675839999999,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1298.7858749999998,
+          "modelReadyMs": 1996.102375,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 41.44204200000013,
+          "resourcesReadyMs": 2037.577792,
+          "warmProjectsMs": [
+            52.37287500000002,
+            45.030874999999924
+          ],
+          "warmModelMs": [
+            3.754834000000301,
+            1.8497919999999795
+          ],
+          "status": "passed"
+        }
+      ],
+      "postReads": {
+        "rssMiB": 569.90625,
+        "cpuSeconds": 1.98
+      },
+      "status": "passed",
+      "sampledPeakSumRssMiB": 569.90625,
+      "workloadCompletedMs": 2148.404417,
+      "cleanupConfirmed": true,
+      "cleanupCompletedMs": 2174.779417,
+      "loadAverageAtEnd": [
+        8.4521484375,
+        10.1533203125,
+        15.5341796875
+      ]
+    },
+    {
+      "mode": "http-env",
+      "count": 1,
+      "trial": 0,
+      "loadAverageAtStart": [
+        8.4521484375,
+        10.1533203125,
+        15.5341796875
+      ],
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 575.415,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 584.074916,
+          "projectsCallMs": 126.84116600000016,
+          "projectsReadyMs": 710.9175,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1233.728208,
+          "modelReadyMs": 1944.6738750000004,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 53.17500000000018,
+          "resourcesReadyMs": 1997.8777499999997,
+          "warmProjectsMs": [
+            39.95958299999984,
+            41.19945800000005
+          ],
+          "warmModelMs": [
+            3.910208000000239,
+            4.115125000000262
+          ],
+          "status": "passed"
+        }
+      ],
+      "listenerReadyMs": 545.0406659999999,
+      "postReads": {
+        "rssMiB": 576.28125,
+        "cpuSeconds": 2.06
+      },
+      "status": "passed",
+      "sampledPeakSumRssMiB": 576.28125,
+      "workloadCompletedMs": 2094.6707910000005,
+      "cleanupConfirmed": true,
+      "cleanupCompletedMs": 2196.8435,
+      "loadAverageAtEnd": [
+        8.4521484375,
+        10.1533203125,
+        15.5341796875
+      ]
+    },
+    {
+      "mode": "http-headers",
+      "count": 1,
+      "trial": 0,
+      "loadAverageAtStart": [
+        8.4521484375,
+        10.1533203125,
+        15.5341796875
+      ],
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 507.86774999999943,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 515.2216250000001,
+          "projectsCallMs": 124.28662499999973,
+          "projectsReadyMs": 639.5098330000001,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1291.70075,
+          "modelReadyMs": 1931.2382499999994,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 67.73087499999929,
+          "resourcesReadyMs": 1999.003917,
+          "warmProjectsMs": [
+            72.92512500000066,
+            108.6253340000003
+          ],
+          "warmModelMs": [
+            1374.5877089999994,
+            1221.6483750000007
+          ],
+          "status": "passed"
+        }
+      ],
+      "listenerReadyMs": 493.8578749999997,
+      "postReads": {
+        "rssMiB": 723.390625,
+        "cpuSeconds": 4.03
+      },
+      "status": "passed",
+      "sampledPeakSumRssMiB": 723.390625,
+      "workloadCompletedMs": 4784.142708,
+      "cleanupConfirmed": true,
+      "cleanupCompletedMs": 4886.186875,
+      "loadAverageAtEnd": [
+        8.49560546875,
+        10.1337890625,
+        15.49560546875
+      ]
+    },
+    {
+      "mode": "stdio",
+      "count": 10,
+      "trial": 0,
+      "loadAverageAtStart": [
+        8.49560546875,
+        10.1337890625,
+        15.49560546875
+      ],
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 2275.368458000001,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 2604.9950420000005,
+          "projectsCallMs": 913.5724169999994,
+          "projectsReadyMs": 3518.569958,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 5310.9061249999995,
+          "modelReadyMs": 8829.499,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 67.61724999999933,
+          "resourcesReadyMs": 8897.145917000002,
+          "warmProjectsMs": [
+            55.741416999997455,
+            50.29937499999869
+          ],
+          "warmModelMs": [
+            2.339790999998513,
+            1.9560830000009446
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 1,
+          "handshakeMs": 2266.636458000001,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 2581.975292000001,
+          "projectsCallMs": 923.6684999999998,
+          "projectsReadyMs": 3505.645458000001,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 4958.687166,
+          "modelReadyMs": 8464.357166999998,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 59.604457999997976,
+          "resourcesReadyMs": 8523.988916999999,
+          "warmProjectsMs": [
+            150.06012499999997,
+            151.29249999999956
+          ],
+          "warmModelMs": [
+            4.865874999999505,
+            6.606166999998095
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 2,
+          "handshakeMs": 2275.591625000001,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 2689.803583000001,
+          "projectsCallMs": 815.2951250000006,
+          "projectsReadyMs": 3505.1020420000004,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 4883.226540999998,
+          "modelReadyMs": 8388.374042,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 131.12587500000154,
+          "resourcesReadyMs": 8519.525417,
+          "warmProjectsMs": [
+            153.5264160000006,
+            151.71479199999885
+          ],
+          "warmModelMs": [
+            5.204957999998442,
+            5.856833999998344
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 3,
+          "handshakeMs": 2274.9882500000003,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 2654.4872080000005,
+          "projectsCallMs": 863.633167,
+          "projectsReadyMs": 3518.1234170000007,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 5076.545333999999,
+          "modelReadyMs": 8594.710958,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 123.25654199999917,
+          "resourcesReadyMs": 8718.001417,
+          "warmProjectsMs": [
+            112.05395800000042,
+            60.09725000000253
+          ],
+          "warmModelMs": [
+            5.874250000000757,
+            5.282333999999537
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 4,
+          "handshakeMs": 2002.5218330000007,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 2231.417375000001,
+          "projectsCallMs": 611.2069589999992,
+          "projectsReadyMs": 2842.633917000001,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1620.1247089999997,
+          "modelReadyMs": 4462.7919170000005,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 2164.014500000001,
+          "resourcesReadyMs": 6626.840542,
+          "warmProjectsMs": [
+            625.2092499999981,
+            120.25374999999985
+          ],
+          "warmModelMs": [
+            234.98216700000194,
+            11.361916000001656
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 5,
+          "handshakeMs": 2275.489625,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 2560.8038749999996,
+          "projectsCallMs": 964.8835830000007,
+          "projectsReadyMs": 3525.690917,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 5082.312875000001,
+          "modelReadyMs": 8608.055333,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 110.65837499999907,
+          "resourcesReadyMs": 8718.766167000002,
+          "warmProjectsMs": [
+            111.36883300000045,
+            59.4667920000029
+          ],
+          "warmModelMs": [
+            6.547833000000537,
+            3.6775420000012673
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 6,
+          "handshakeMs": 2266.890542000001,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 2297.2832080000007,
+          "projectsCallMs": 1211.4623330000013,
+          "projectsReadyMs": 3508.747792,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 5157.280207999998,
+          "modelReadyMs": 8666.063417000001,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 52.84133400000064,
+          "resourcesReadyMs": 8719.027291999999,
+          "warmProjectsMs": [
+            110.84679200000028,
+            59.870082999997976
+          ],
+          "warmModelMs": [
+            6.494042000002082,
+            3.6582500000004075
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 7,
+          "handshakeMs": 1960.8642920000002,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 2214.192500000001,
+          "projectsCallMs": 628.7499160000007,
+          "projectsReadyMs": 2842.9432500000003,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1815.6960830000007,
+          "modelReadyMs": 4658.650250000001,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 1969.0626249999987,
+          "resourcesReadyMs": 6627.773125,
+          "warmProjectsMs": [
+            623.4250419999989,
+            120.28483399999823
+          ],
+          "warmModelMs": [
+            235.1817919999994,
+            12.354917000000569
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 8,
+          "handshakeMs": 2266.392667,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 2364.411167,
+          "projectsCallMs": 1148.539084,
+          "projectsReadyMs": 3512.9532500000005,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 4874.823500000002,
+          "modelReadyMs": 8387.806166999999,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 131.91191699999763,
+          "resourcesReadyMs": 8519.773375,
+          "warmProjectsMs": [
+            152.97779199999786,
+            151.63404100000116
+          ],
+          "warmModelMs": [
+            5.348207999999431,
+            3.4162500000020373
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 9,
+          "handshakeMs": 2266.756958,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 2534.693542000001,
+          "projectsCallMs": 1004.0825829999994,
+          "projectsReadyMs": 3538.7779169999994,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 5133.49,
+          "modelReadyMs": 8672.294708000001,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 158.00020799999766,
+          "resourcesReadyMs": 8830.341292000001,
+          "warmProjectsMs": [
+            65.48474999999962,
+            53.537875000001804
+          ],
+          "warmModelMs": [
+            3.805292000000918,
+            2.2347919999992882
+          ],
+          "status": "passed"
+        }
+      ],
+      "postReads": {
+        "rssMiB": 5216.46875,
+        "cpuSeconds": 24.45
+      },
+      "status": "passed",
+      "sampledPeakSumRssMiB": 5216.46875,
+      "workloadCompletedMs": 9139.828333000001,
+      "cleanupConfirmed": true,
+      "cleanupCompletedMs": 9228.267082999999,
+      "loadAverageAtEnd": [
+        12.9287109375,
+        11.02001953125,
+        15.7470703125
+      ]
+    },
+    {
+      "mode": "http-env",
+      "count": 10,
+      "trial": 0,
+      "loadAverageAtStart": [
+        12.9287109375,
+        11.02001953125,
+        15.7470703125
+      ],
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 529.3110410000008,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 569.8407910000024,
+          "projectsCallMs": 132.1045840000006,
+          "projectsReadyMs": 701.9457079999993,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1348.0173329999998,
+          "modelReadyMs": 2049.971125,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 47.74383300000045,
+          "resourcesReadyMs": 2097.730291,
+          "warmProjectsMs": [
+            40.599082999997336,
+            49.976167000000714
+          ],
+          "warmModelMs": [
+            6.651667000001908,
+            10.198583000001236
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 1,
+          "handshakeMs": 531.3293750000012,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 537.4061660000007,
+          "projectsCallMs": 162.46495800000048,
+          "projectsReadyMs": 699.8757499999992,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1348.336790999998,
+          "modelReadyMs": 2048.2392910000017,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 45.25762499999837,
+          "resourcesReadyMs": 2093.5252910000017,
+          "warmProjectsMs": [
+            41.12620799999786,
+            48.44025000000329
+          ],
+          "warmModelMs": [
+            7.199500000002445,
+            10.333458000000974
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 2,
+          "handshakeMs": 532.4029160000027,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 550.7012080000022,
+          "projectsCallMs": 150.24866699999984,
+          "projectsReadyMs": 700.9507080000003,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1348.0867499999986,
+          "modelReadyMs": 2049.051875000001,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 47.575416000003315,
+          "resourcesReadyMs": 2096.6437079999996,
+          "warmProjectsMs": [
+            40.477875000000495,
+            50.48183300000164
+          ],
+          "warmModelMs": [
+            6.310374999997293,
+            10.868458000000828
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 3,
+          "handshakeMs": 549.8424159999995,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 583.1262910000005,
+          "projectsCallMs": 118.34404199999699,
+          "projectsReadyMs": 701.4707500000004,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1348.0847090000025,
+          "modelReadyMs": 2049.565375000002,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 47.646208000001934,
+          "resourcesReadyMs": 2097.222791,
+          "warmProjectsMs": [
+            40.5278330000001,
+            50.25975000000108
+          ],
+          "warmModelMs": [
+            6.537250000001222,
+            10.467249999997875
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 4,
+          "handshakeMs": 567.1194160000014,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 604.127708,
+          "projectsCallMs": 98.32116600000154,
+          "projectsReadyMs": 702.4496250000011,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1347.8658749999995,
+          "modelReadyMs": 2050.3231250000026,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 47.89454200000182,
+          "resourcesReadyMs": 2098.225208,
+          "warmProjectsMs": [
+            40.86195800000132,
+            49.93016600000192
+          ],
+          "warmModelMs": [
+            6.3544589999983145,
+            9.94262499999968
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 5,
+          "handshakeMs": 567.6910000000025,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 622.601708000002,
+          "projectsCallMs": 80.24645899999814,
+          "projectsReadyMs": 702.848750000001,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1347.773541999999,
+          "modelReadyMs": 2050.6296250000014,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 47.989332999997714,
+          "resourcesReadyMs": 2098.626166000002,
+          "warmProjectsMs": [
+            41.21229200000016,
+            43.835291999999754
+          ],
+          "warmModelMs": [
+            12.043249999998807,
+            9.733457999998791
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 6,
+          "handshakeMs": 568.1101660000022,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 635.9144159999996,
+          "projectsCallMs": 67.31479200000103,
+          "projectsReadyMs": 703.2297500000022,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1347.6879999999983,
+          "modelReadyMs": 2050.9263329999994,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 48.12629200000083,
+          "resourcesReadyMs": 2099.0594579999997,
+          "warmProjectsMs": [
+            41.335707999998704,
+            46.45154199999888
+          ],
+          "warmModelMs": [
+            12.263875000000553,
+            8.405957999999373
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 7,
+          "handshakeMs": 568.4966660000027,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 654.0585410000022,
+          "projectsCallMs": 141.19304099999863,
+          "projectsReadyMs": 795.2529160000013,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1255.7993339999994,
+          "modelReadyMs": 2051.209708000002,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 48.31995900000038,
+          "resourcesReadyMs": 2099.5364160000026,
+          "warmProjectsMs": [
+            41.25370800000019,
+            46.598416999997426
+          ],
+          "warmModelMs": [
+            12.319500000001426,
+            7.953750000000582
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 8,
+          "handshakeMs": 568.8362500000003,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 672.484625000001,
+          "projectsCallMs": 123.90866599999936,
+          "projectsReadyMs": 796.3938750000016,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1255.083208,
+          "modelReadyMs": 2051.4915830000027,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 48.49066600000151,
+          "resourcesReadyMs": 2099.988625000002,
+          "warmProjectsMs": [
+            41.2143329999999,
+            46.627416999999696
+          ],
+          "warmModelMs": [
+            12.26104199999827,
+            7.677833000001556
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 9,
+          "handshakeMs": 569.1611250000024,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 685.9960830000018,
+          "projectsCallMs": 110.99316700000054,
+          "projectsReadyMs": 796.9899160000023,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1254.7872500000012,
+          "modelReadyMs": 2051.7867079999996,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 49.415249999998196,
+          "resourcesReadyMs": 2101.208791000001,
+          "warmProjectsMs": [
+            40.33662499999991,
+            47.02033300000039
+          ],
+          "warmModelMs": [
+            12.235499999998865,
+            7.401332999997976
+          ],
+          "status": "passed"
+        }
+      ],
+      "listenerReadyMs": 515.2635410000003,
+      "postReads": {
+        "rssMiB": 578.953125,
+        "cpuSeconds": 2.17
+      },
+      "status": "passed",
+      "sampledPeakSumRssMiB": 578.953125,
+      "workloadCompletedMs": 2215.391875000001,
+      "cleanupConfirmed": true,
+      "cleanupCompletedMs": 2318.225666000002,
+      "loadAverageAtEnd": [
+        12.45361328125,
+        10.953125,
+        15.69580078125
+      ]
+    },
+    {
+      "mode": "http-headers",
+      "count": 10,
+      "trial": 0,
+      "loadAverageAtStart": [
+        12.45361328125,
+        10.953125,
+        15.69580078125
+      ],
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 492.6159579999985,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 536.3464160000003,
+          "projectsCallMs": 290.4592499999999,
+          "projectsReadyMs": 826.8063750000001,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 9416.887917,
+          "modelReadyMs": 10243.7075,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 149.04975000000195,
+          "resourcesReadyMs": 10392.777374999998,
+          "warmProjectsMs": [
+            134.38083299999926,
+            794.7517500000031
+          ],
+          "warmModelMs": [
+            8419.707667000002,
+            6932.81525
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 1,
+          "handshakeMs": 494.7807079999984,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 505.8155829999996,
+          "projectsCallMs": 310.26795800000036,
+          "projectsReadyMs": 816.0840409999983,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 4627.390374999999,
+          "modelReadyMs": 5443.48475,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 4948.182250000002,
+          "resourcesReadyMs": 10391.681874999998,
+          "warmProjectsMs": [
+            128.52129100000093,
+            6219.752415999996
+          ],
+          "warmModelMs": [
+            3039.3594580000026,
+            9114.402166
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 2,
+          "handshakeMs": 495.86612500000047,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 522.6015000000007,
+          "projectsCallMs": 290.1610409999994,
+          "projectsReadyMs": 812.763332999999,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 4628.235459000003,
+          "modelReadyMs": 5441.025374999997,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 4953.313332999998,
+          "resourcesReadyMs": 10394.398791,
+          "warmProjectsMs": [
+            133.7635420000006,
+            142.03216599999723
+          ],
+          "warmModelMs": [
+            9078.479292,
+            6926.414707999997
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 3,
+          "handshakeMs": 521.6652909999975,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 563.2794579999972,
+          "projectsCallMs": 263.9685830000017,
+          "projectsReadyMs": 827.2485830000005,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 7244.218792,
+          "modelReadyMs": 8071.505207999999,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 2322.0750829999997,
+          "resourcesReadyMs": 10393.603790999998,
+          "warmProjectsMs": [
+            127.95845800000097,
+            811.2813749999987
+          ],
+          "warmModelMs": [
+            8421.656709000003,
+            6920.4752080000035
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 4,
+          "handshakeMs": 533.8131659999999,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 549.2152079999978,
+          "projectsCallMs": 267.5761249999996,
+          "projectsReadyMs": 816.791957999998,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 7253.412125000003,
+          "modelReadyMs": 8070.216457999999,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 2322.1646250000013,
+          "resourcesReadyMs": 10392.422415999998,
+          "warmProjectsMs": [
+            128.15133299999798,
+            810.2931249999965
+          ],
+          "warmModelMs": [
+            8422.207458999997,
+            6921.745666999996
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 5,
+          "handshakeMs": 534.2512079999979,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 585.0194579999988,
+          "projectsCallMs": 230.48166700000002,
+          "projectsReadyMs": 815.5019580000007,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 4626.542000000001,
+          "modelReadyMs": 5442.073333,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 4951.739417000001,
+          "resourcesReadyMs": 10394.048332999999,
+          "warmProjectsMs": [
+            134.59495799999786,
+            849.2870420000036
+          ],
+          "warmModelMs": [
+            8416.798458000001,
+            9099.157875000004
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 6,
+          "handshakeMs": 534.6583749999991,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 598.0536659999998,
+          "projectsCallMs": 227.6185829999995,
+          "projectsReadyMs": 825.6727079999982,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 7246.437666999998,
+          "modelReadyMs": 8072.135833,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 2322.6218750000007,
+          "resourcesReadyMs": 10394.773083,
+          "warmProjectsMs": [
+            126.41520800000217,
+            836.7418749999997
+          ],
+          "warmModelMs": [
+            8423.607791999999,
+            3667.813750000001
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 7,
+          "handshakeMs": 535.0062499999985,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 610.2413329999981,
+          "projectsCallMs": 217.5341249999983,
+          "projectsReadyMs": 827.775999999998,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 7244.921750000001,
+          "modelReadyMs": 8072.708082999998,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 2314.7779169999994,
+          "resourcesReadyMs": 10387.495625,
+          "warmProjectsMs": [
+            129.8082089999989,
+            797.4697500000038
+          ],
+          "warmModelMs": [
+            8428.916625000002,
+            3705.4241249999977
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 8,
+          "handshakeMs": 535.3810830000002,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 623.359790999999,
+          "projectsCallMs": 205.03633400000035,
+          "projectsReadyMs": 828.3966660000006,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 9415.751624999997,
+          "modelReadyMs": 10244.156958,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 147.9003330000014,
+          "resourcesReadyMs": 10392.067832999997,
+          "warmProjectsMs": [
+            128.81291599999895,
+            845.749917000001
+          ],
+          "warmModelMs": [
+            8421.442125000001,
+            6886.606165999998
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 9,
+          "handshakeMs": 535.7000829999997,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 639.5833329999987,
+          "projectsCallMs": 189.15558299999975,
+          "projectsReadyMs": 828.739540999999,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 9414.025416,
+          "modelReadyMs": 10242.781583,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 148.28833299999678,
+          "resourcesReadyMs": 10391.099415999997,
+          "warmProjectsMs": [
+            128.5978329999998,
+            805.5668750000041
+          ],
+          "warmModelMs": [
+            8421.841041,
+            9146.371792000005
+          ],
+          "status": "passed"
+        }
+      ],
+      "listenerReadyMs": 479.63816600000064,
+      "postReads": {
+        "rssMiB": 941.78125,
+        "cpuSeconds": 29.36
+      },
+      "status": "passed",
+      "sampledPeakSumRssMiB": 942.484375,
+      "workloadCompletedMs": 28902.207833,
+      "cleanupConfirmed": true,
+      "cleanupCompletedMs": 29003.327291,
+      "loadAverageAtEnd": [
+        12.0859375,
+        11.013671875,
+        15.5810546875
+      ]
+    },
+    {
+      "mode": "http-headers",
+      "count": 1,
+      "trial": 1,
+      "loadAverageAtStart": [
+        12.0859375,
+        11.013671875,
+        15.5810546875
+      ],
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 537.2667499999952,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 545.1889589999992,
+          "projectsCallMs": 172.81354199999623,
+          "projectsReadyMs": 718.0032090000022,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1316.6129169999986,
+          "modelReadyMs": 2034.6503749999974,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 65.703207999999,
+          "resourcesReadyMs": 2100.3824590000004,
+          "warmProjectsMs": [
+            81.84483300000284,
+            104.05012500000157
+          ],
+          "warmModelMs": [
+            1229.0924589999995,
+            1499.800374999999
+          ],
+          "status": "passed"
+        }
+      ],
+      "listenerReadyMs": 524.5619589999988,
+      "postReads": {
+        "rssMiB": 724.125,
+        "cpuSeconds": 4.06
+      },
+      "status": "passed",
+      "sampledPeakSumRssMiB": 724.125,
+      "workloadCompletedMs": 5021.834125000001,
+      "cleanupConfirmed": true,
+      "cleanupCompletedMs": 5123.33425,
+      "loadAverageAtEnd": [
+        11.67822265625,
+        10.94677734375,
+        15.53076171875
+      ]
+    },
+    {
+      "mode": "http-env",
+      "count": 1,
+      "trial": 1,
+      "loadAverageAtStart": [
+        11.67822265625,
+        10.94677734375,
+        15.53076171875
+      ],
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 510.0787500000006,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 517.7050000000017,
+          "projectsCallMs": 184.97891700000037,
+          "projectsReadyMs": 702.6854590000003,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1171.9634579999984,
+          "modelReadyMs": 1874.6840420000008,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 48.53000000000611,
+          "resourcesReadyMs": 1923.2374590000036,
+          "warmProjectsMs": [
+            48.52799999999843,
+            44.22608300000138
+          ],
+          "warmModelMs": [
+            3.935542000006535,
+            3.213792000002286
+          ],
+          "status": "passed"
+        }
+      ],
+      "listenerReadyMs": 497.5899170000048,
+      "postReads": {
+        "rssMiB": 576.265625,
+        "cpuSeconds": 1.99
+      },
+      "status": "passed",
+      "sampledPeakSumRssMiB": 576.265625,
+      "workloadCompletedMs": 2031.8235420000055,
+      "cleanupConfirmed": true,
+      "cleanupCompletedMs": 2133.352334000003,
+      "loadAverageAtEnd": [
+        11.54345703125,
+        10.9306640625,
+        15.498046875
+      ]
+    },
+    {
+      "mode": "stdio",
+      "count": 1,
+      "trial": 1,
+      "loadAverageAtStart": [
+        11.54345703125,
+        10.9306640625,
+        15.498046875
+      ],
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 541.4200829999972,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 556.7906250000015,
+          "projectsCallMs": 117.89387500000157,
+          "projectsReadyMs": 674.6858330000032,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1246.8112499999988,
+          "modelReadyMs": 1921.5246669999979,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 42.20958300000348,
+          "resourcesReadyMs": 1963.7669170000008,
+          "warmProjectsMs": [
+            39.09883300000365,
+            39.94487500000105
+          ],
+          "warmModelMs": [
+            4.957875000000058,
+            2.2094579999975394
+          ],
+          "status": "passed"
+        }
+      ],
+      "postReads": {
+        "rssMiB": 574.453125,
+        "cpuSeconds": 2.1
+      },
+      "status": "passed",
+      "sampledPeakSumRssMiB": 574.453125,
+      "workloadCompletedMs": 2058.1062919999968,
+      "cleanupConfirmed": true,
+      "cleanupCompletedMs": 2079.7783750000017,
+      "loadAverageAtEnd": [
+        11.54345703125,
+        10.9306640625,
+        15.498046875
+      ]
+    },
+    {
+      "mode": "http-headers",
+      "count": 10,
+      "trial": 1,
+      "loadAverageAtStart": [
+        11.54345703125,
+        10.9306640625,
+        15.498046875
+      ],
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 536.1031250000015,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 587.8629159999982,
+          "projectsCallMs": 310.4887500000041,
+          "projectsReadyMs": 898.353458000005,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 8789.778542,
+          "modelReadyMs": 9688.167208000006,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 1695.351749999987,
+          "resourcesReadyMs": 11383.537291000008,
+          "warmProjectsMs": [
+            171.2074169999978,
+            3321.579958000002
+          ],
+          "warmModelMs": [
+            8662.753832999995,
+            10582.822459000003
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 1,
+          "handshakeMs": 538.3394160000025,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 545.9946249999994,
+          "projectsCallMs": 251.56554199999664,
+          "projectsReadyMs": 797.5613330000051,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 8887.330499999996,
+          "modelReadyMs": 9684.919041000008,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 1697.8376250000001,
+          "resourcesReadyMs": 11382.788374999996,
+          "warmProjectsMs": [
+            172.81170900000143,
+            3298.744000000006
+          ],
+          "warmModelMs": [
+            8675.00712499999,
+            10592.957917000007
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 2,
+          "handshakeMs": 539.2219580000019,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 566.9356249999983,
+          "projectsCallMs": 315.28775000000314,
+          "projectsReadyMs": 882.2245410000032,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 4642.118166,
+          "modelReadyMs": 5524.369458000001,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 5859.414875000002,
+          "resourcesReadyMs": 11383.838666000003,
+          "warmProjectsMs": [
+            175.14150000001246,
+            247.708209000004
+          ],
+          "warmModelMs": [
+            11730.133000000002,
+            3632.1599579999893
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 3,
+          "handshakeMs": 565.846083000004,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 606.4783749999988,
+          "projectsCallMs": 186.22058300000208,
+          "projectsReadyMs": 792.7013330000045,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 9662.503999999994,
+          "modelReadyMs": 10455.228083000002,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 928.9000419999938,
+          "resourcesReadyMs": 11384.158375000006,
+          "warmProjectsMs": [
+            175.2685000000056,
+            249.99400000000605
+          ],
+          "warmModelMs": [
+            11730.698625000005,
+            12657.373959000004
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 4,
+          "handshakeMs": 583.1151660000032,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 657.348582999999,
+          "projectsCallMs": 219.19154200000048,
+          "projectsReadyMs": 876.541250000002,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 8809.228958999993,
+          "modelReadyMs": 9685.798875,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 1696.2047499999899,
+          "resourcesReadyMs": 11382.018166000002,
+          "warmProjectsMs": [
+            168.23416700000234,
+            248.09758300000976
+          ],
+          "warmModelMs": [
+            11736.101624999996,
+            10589.392916000012
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 5,
+          "handshakeMs": 583.5697080000027,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 676.0946660000045,
+          "projectsCallMs": 223.16712499999994,
+          "projectsReadyMs": 899.2625410000037,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 4626.451917000006,
+          "modelReadyMs": 5525.731707999999,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 5851.647208000002,
+          "resourcesReadyMs": 11377.402999999998,
+          "warmProjectsMs": [
+            174.18883300000743,
+            244.13816699999734
+          ],
+          "warmModelMs": [
+            11736.444209000008,
+            12666.391334
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 6,
+          "handshakeMs": 583.9489160000012,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 697.9817079999993,
+          "projectsCallMs": 198.3642919999984,
+          "projectsReadyMs": 896.3478749999995,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 4629.880666999998,
+          "modelReadyMs": 5526.277666000002,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 5858.147499999999,
+          "resourcesReadyMs": 11384.436125,
+          "warmProjectsMs": [
+            171.64783299999544,
+            3303.8408330000093
+          ],
+          "warmModelMs": [
+            8676.40470900001,
+            10585.861084000004
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 7,
+          "handshakeMs": 584.2807910000047,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 719.7307080000028,
+          "projectsCallMs": 179.92229200000293,
+          "projectsReadyMs": 899.6542079999999,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 8789.345417000004,
+          "modelReadyMs": 9689.008208000007,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 1693.430582999994,
+          "resourcesReadyMs": 11382.449125000006,
+          "warmProjectsMs": [
+            170.52883300000394,
+            3306.0754999999917
+          ],
+          "warmModelMs": [
+            8667.690625000003,
+            10595.300415999998
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 8,
+          "handshakeMs": 584.5801659999997,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 763.1574160000018,
+          "projectsCallMs": 211.252625000001,
+          "projectsReadyMs": 974.4124159999992,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 10193.124499999998,
+          "modelReadyMs": 11167.589832999998,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 213.65041600000404,
+          "resourcesReadyMs": 11381.423916000007,
+          "warmProjectsMs": [
+            165.32854200000293,
+            3312.2241249999934
+          ],
+          "warmModelMs": [
+            8665.523042,
+            10597.235667
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 9,
+          "handshakeMs": 586.007875000003,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 780.2955000000002,
+          "projectsCallMs": 196.388291999996,
+          "projectsReadyMs": 976.6853330000013,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 8712.666417,
+          "modelReadyMs": 9689.388207999997,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 1693.8079590000125,
+          "resourcesReadyMs": 11383.203958000006,
+          "warmProjectsMs": [
+            173.3494580000115,
+            3301.251457999999
+          ],
+          "warmModelMs": [
+            8677.853833000001,
+            10585.679875000002
+          ],
+          "status": "passed"
+        }
+      ],
+      "listenerReadyMs": 519.8246660000004,
+      "postReads": {
+        "rssMiB": 872.859375,
+        "cpuSeconds": 32.3
+      },
+      "status": "passed",
+      "sampledPeakSumRssMiB": 921.078125,
+      "workloadCompletedMs": 36253.20325,
+      "cleanupConfirmed": true,
+      "cleanupCompletedMs": 36358.330582999995,
+      "loadAverageAtEnd": [
+        19.64794921875,
+        12.84619140625,
+        16
+      ]
+    },
+    {
+      "mode": "http-env",
+      "count": 10,
+      "trial": 1,
+      "loadAverageAtStart": [
+        19.64794921875,
+        12.84619140625,
+        16
+      ],
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 888.0681669999904,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1017.3760829999956,
+          "projectsCallMs": 431.2231660000107,
+          "projectsReadyMs": 1448.6005420000001,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1909.1214159999945,
+          "modelReadyMs": 3357.7477079999953,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 76.98066699999617,
+          "resourcesReadyMs": 3434.7357499999925,
+          "warmProjectsMs": [
+            63.29624999999942,
+            84.73225000000093
+          ],
+          "warmModelMs": [
+            21.302874999993946,
+            8.751458000013372
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 1,
+          "handshakeMs": 894.9379169999884,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 906.9317499999888,
+          "projectsCallMs": 540.4733750000014,
+          "projectsReadyMs": 1447.4067499999946,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1910.0265419999923,
+          "modelReadyMs": 3357.4635419999977,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 76.04475000000093,
+          "resourcesReadyMs": 3433.516082999995,
+          "warmProjectsMs": [
+            63.759040999997524,
+            83.1601670000091
+          ],
+          "warmModelMs": [
+            20.832666999995126,
+            10.493916999999783
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 2,
+          "handshakeMs": 897.1632079999981,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 987.2737079999933,
+          "projectsCallMs": 444.03225000000384,
+          "projectsReadyMs": 1431.3090419999935,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1924.1657500000001,
+          "modelReadyMs": 3355.5234169999894,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 68.33208300000115,
+          "resourcesReadyMs": 3423.886957999988,
+          "warmProjectsMs": [
+            61.76308400000562,
+            95.81308399999398
+          ],
+          "warmModelMs": [
+            7.769874999998137,
+            11.672375000009197
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 3,
+          "handshakeMs": 898.2857919999951,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1050.2041249999893,
+          "projectsCallMs": 395.75800000000163,
+          "projectsReadyMs": 1445.963791999995,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1911.1592079999973,
+          "modelReadyMs": 3357.1585829999967,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 74.86000000000058,
+          "resourcesReadyMs": 3432.0274169999902,
+          "warmProjectsMs": [
+            61.78995800000848,
+            99.1797910000023
+          ],
+          "warmModelMs": [
+            9.828000000008615,
+            9.59541700000409
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 4,
+          "handshakeMs": 986.3048750000016,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1152.9148749999877,
+          "projectsCallMs": 287.90550000000803,
+          "projectsReadyMs": 1440.8242499999906,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1915.5350840000028,
+          "modelReadyMs": 3356.4150419999933,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 72.94379099999787,
+          "resourcesReadyMs": 3429.3771669999987,
+          "warmProjectsMs": [
+            57.79695799999172,
+            101.81095899999491
+          ],
+          "warmModelMs": [
+            10.550540999989607,
+            10.85175000000163
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 5,
+          "handshakeMs": 1013.751041999989,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1214.865832999989,
+          "projectsCallMs": 228.58562500000698,
+          "projectsReadyMs": 1443.4540419999976,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1913.3455410000024,
+          "modelReadyMs": 3356.8363329999993,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 73.20145899998897,
+          "resourcesReadyMs": 3430.048125000001,
+          "warmProjectsMs": [
+            62.26774999999907,
+            98.7127909999981
+          ],
+          "warmModelMs": [
+            9.385332999998354,
+            10.711291999992682
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 6,
+          "handshakeMs": 1014.5061669999996,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1274.6050829999876,
+          "projectsCallMs": 210.447250000012,
+          "projectsReadyMs": 1485.0534579999949,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1873.3430840000074,
+          "modelReadyMs": 3358.427416999999,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 76.83454100000381,
+          "resourcesReadyMs": 3435.2758329999924,
+          "warmProjectsMs": [
+            63.04508299998997,
+            84.87937500000407
+          ],
+          "warmModelMs": [
+            21.943167000004905,
+            7.9487910000025295
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 7,
+          "handshakeMs": 1015.297166999997,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1304.8957079999964,
+          "projectsCallMs": 181.21762499999022,
+          "projectsReadyMs": 1486.1145829999878,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1873.6063329999888,
+          "modelReadyMs": 3359.740082999997,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 75.841207999998,
+          "resourcesReadyMs": 3435.6269579999935,
+          "warmProjectsMs": [
+            62.97220799999195,
+            85.82787499998813
+          ],
+          "warmModelMs": [
+            22.16791699999885,
+            6.787041000003228
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 8,
+          "handshakeMs": 1015.937666999991,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1338.489207999999,
+          "projectsCallMs": 148.10399999999208,
+          "projectsReadyMs": 1486.5941669999884,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1874.3163340000028,
+          "modelReadyMs": 3360.9197920000006,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 74.98462499999732,
+          "resourcesReadyMs": 3435.9254169999913,
+          "warmProjectsMs": [
+            63.17091600000276,
+            87.24283299999661
+          ],
+          "warmModelMs": [
+            22.788417000003392,
+            5.774208999995608
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 9,
+          "handshakeMs": 1016.3774999999878,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1379.4943749999948,
+          "projectsCallMs": 178.69825000000128,
+          "projectsReadyMs": 1558.1943749999919,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1803.1740410000057,
+          "modelReadyMs": 3361.403707999998,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 74.83524999998917,
+          "resourcesReadyMs": 3436.2668330000015,
+          "warmProjectsMs": [
+            62.58420900000783,
+            86.56133299999055
+          ],
+          "warmModelMs": [
+            22.564584000007017,
+            5.966082999992068
+          ],
+          "status": "passed"
+        }
+      ],
+      "listenerReadyMs": 857.8764169999922,
+      "postReads": {
+        "rssMiB": 579.984375,
+        "cpuSeconds": 2.79
+      },
+      "status": "passed",
+      "sampledPeakSumRssMiB": 579.984375,
+      "workloadCompletedMs": 3643.372749999995,
+      "cleanupConfirmed": true,
+      "cleanupCompletedMs": 3745.6557919999905,
+      "loadAverageAtEnd": [
+        21.197265625,
+        13.2802734375,
+        16.134765625
+      ]
+    },
+    {
+      "mode": "stdio",
+      "count": 10,
+      "trial": 1,
+      "loadAverageAtStart": [
+        21.197265625,
+        13.2802734375,
+        16.134765625
+      ],
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 1840.4716250000056,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1896.7092499999999,
+          "projectsCallMs": 1339.343458000003,
+          "projectsReadyMs": 3236.053709,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 4724.166916999995,
+          "modelReadyMs": 7960.22825,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 81.98095899999316,
+          "resourcesReadyMs": 8042.240084000005,
+          "warmProjectsMs": [
+            122.20262500000536,
+            78.03170799999498
+          ],
+          "warmModelMs": [
+            7.00145799999882,
+            2.6026249999995343
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 1,
+          "handshakeMs": 1990.005667000005,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 2137.6461249999993,
+          "projectsCallMs": 1099.04508299999,
+          "projectsReadyMs": 3236.6929170000076,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 4603.579125000004,
+          "modelReadyMs": 7840.311417000004,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 75.48616699999548,
+          "resourcesReadyMs": 7915.900750000001,
+          "warmProjectsMs": [
+            248.20154199999524,
+            75.23362499999348
+          ],
+          "warmModelMs": [
+            7.604458000001614,
+            3.9350419999973383
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 2,
+          "handshakeMs": 819.8368340000015,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 841.1287920000032,
+          "projectsCallMs": 531.6217500000057,
+          "projectsReadyMs": 1372.752209000013,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 2931.6277499999997,
+          "modelReadyMs": 4304.413917000013,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 2027.4491659999912,
+          "resourcesReadyMs": 6331.891125000009,
+          "warmProjectsMs": [
+            131.29516700000386,
+            315.24054199999955
+          ],
+          "warmModelMs": [
+            14.613333000001148,
+            11.147291999994195
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 3,
+          "handshakeMs": 2137.2462090000045,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 2217.1951670000126,
+          "projectsCallMs": 1018.9602920000034,
+          "projectsReadyMs": 3236.156750000009,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 4770.954124999989,
+          "modelReadyMs": 8007.11729200001,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 157.66445799999929,
+          "resourcesReadyMs": 8164.844834000003,
+          "warmProjectsMs": [
+            77.11800000000221,
+            59.980083000002196
+          ],
+          "warmModelMs": [
+            4.526542000006884,
+            5.414082999996026
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 4,
+          "handshakeMs": 2116.2186670000083,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 2183.7646670000104,
+          "projectsCallMs": 1052.0739580000081,
+          "projectsReadyMs": 3235.83941700001,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 4928.483042000007,
+          "modelReadyMs": 8164.345209000006,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 86.17854100000113,
+          "resourcesReadyMs": 8250.532500000001,
+          "warmProjectsMs": [
+            56.72125000000233,
+            66.94483399999444
+          ],
+          "warmModelMs": [
+            5.16387499999837,
+            2.4227500000124564
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 5,
+          "handshakeMs": 820.2615420000075,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 865.7220000000088,
+          "projectsCallMs": 502.88816699999734,
+          "projectsReadyMs": 1368.6109170000127,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 2769.248624999993,
+          "modelReadyMs": 4137.886375000002,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 2193.4776249999995,
+          "resourcesReadyMs": 6331.598542000007,
+          "warmProjectsMs": [
+            131.2706659999967,
+            324.99458300000697
+          ],
+          "warmModelMs": [
+            4.933707999996841,
+            11.096374999993714
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 6,
+          "handshakeMs": 1918.7250000000058,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 2117.337667,
+          "projectsCallMs": 1118.895875000002,
+          "projectsReadyMs": 3236.2350000000006,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 4670.618625000003,
+          "modelReadyMs": 7906.858709000007,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 135.7117500000022,
+          "resourcesReadyMs": 8042.669000000009,
+          "warmProjectsMs": [
+            121.84937500000524,
+            74.25158399999782
+          ],
+          "warmModelMs": [
+            7.9333750000078,
+            4.902916999999434
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 7,
+          "handshakeMs": 2276.787875000009,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 2337.382334000009,
+          "projectsCallMs": 898.923959000007,
+          "projectsReadyMs": 3236.307209000006,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 4806.51400000001,
+          "modelReadyMs": 8042.825500000006,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 121.8775830000086,
+          "resourcesReadyMs": 8164.713375000007,
+          "warmProjectsMs": [
+            84.24004099999729,
+            54.74945899999875
+          ],
+          "warmModelMs": [
+            3.269083999999566,
+            5.16737500000454
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 8,
+          "handshakeMs": 2183.372875000001,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 2236.6894170000014,
+          "projectsCallMs": 996.802125000002,
+          "projectsReadyMs": 3233.493917,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 4587.822166999991,
+          "modelReadyMs": 7821.370125000001,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 92.92925000000105,
+          "resourcesReadyMs": 7914.331375000009,
+          "warmProjectsMs": [
+            249.3490840000013,
+            77.62245900000562
+          ],
+          "warmModelMs": [
+            8.590583999990486,
+            8.538583000001381
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 9,
+          "handshakeMs": 2216.4404170000053,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 2250.9184999999998,
+          "projectsCallMs": 986.3994579999999,
+          "projectsReadyMs": 3237.3195000000123,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 4625.918082999997,
+          "modelReadyMs": 7863.265375000003,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 51.60583299999416,
+          "resourcesReadyMs": 7914.8994999999995,
+          "warmProjectsMs": [
+            249.34920799999963,
+            79.12391700000444
+          ],
+          "warmModelMs": [
+            6.746665999991819,
+            8.208916000003228
+          ],
+          "status": "passed"
+        }
+      ],
+      "postReads": {
+        "rssMiB": 5185.171875,
+        "cpuSeconds": 23.369999999999997
+      },
+      "status": "passed",
+      "sampledPeakSumRssMiB": 5185.171875,
+      "workloadCompletedMs": 8470.182167000006,
+      "cleanupConfirmed": true,
+      "cleanupCompletedMs": 8596.967917000002,
+      "loadAverageAtEnd": [
+        31.39990234375,
+        15.75048828125,
+        16.97900390625
+      ]
+    },
+    {
+      "mode": "stdio",
+      "count": 1,
+      "trial": 2,
+      "loadAverageAtStart": [
+        31.39990234375,
+        15.75048828125,
+        16.97900390625
+      ],
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 552.9230830000015,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 568.460500000001,
+          "projectsCallMs": 150.0356669999892,
+          "projectsReadyMs": 718.497915999993,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1377.7101669999975,
+          "modelReadyMs": 2096.2390000000014,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 59.85829200000444,
+          "resourcesReadyMs": 2156.1227079999953,
+          "warmProjectsMs": [
+            50.27554200000304,
+            56.75325000000885
+          ],
+          "warmModelMs": [
+            4.460124999997788,
+            2.8847079999977723
+          ],
+          "status": "passed"
+        }
+      ],
+      "postReads": {
+        "rssMiB": 573.703125,
+        "cpuSeconds": 2.08
+      },
+      "status": "passed",
+      "sampledPeakSumRssMiB": 573.703125,
+      "workloadCompletedMs": 2278.1912500000035,
+      "cleanupConfirmed": true,
+      "cleanupCompletedMs": 2305.169332999998,
+      "loadAverageAtEnd": [
+        31.39990234375,
+        15.75048828125,
+        16.97900390625
+      ]
+    },
+    {
+      "mode": "http-env",
+      "count": 1,
+      "trial": 2,
+      "loadAverageAtStart": [
+        31.39990234375,
+        15.75048828125,
+        16.97900390625
+      ],
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 568.3329999999987,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 575.8561250000057,
+          "projectsCallMs": 188.76745800000208,
+          "projectsReadyMs": 764.625749999992,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1557.2903329999972,
+          "modelReadyMs": 2322.2861249999987,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 47.89175000000978,
+          "resourcesReadyMs": 2370.254124999992,
+          "warmProjectsMs": [
+            49.18912499998987,
+            48.409124999991036
+          ],
+          "warmModelMs": [
+            3.7042079999955604,
+            3.6947090000030585
+          ],
+          "status": "passed"
+        }
+      ],
+      "listenerReadyMs": 555.838499999998,
+      "postReads": {
+        "rssMiB": 573.515625,
+        "cpuSeconds": 2.18
+      },
+      "status": "passed",
+      "sampledPeakSumRssMiB": 573.515625,
+      "workloadCompletedMs": 2485.5321660000045,
+      "cleanupConfirmed": true,
+      "cleanupCompletedMs": 2585.8566659999924,
+      "loadAverageAtEnd": [
+        29.84619140625,
+        15.68798828125,
+        16.94970703125
+      ]
+    },
+    {
+      "mode": "http-headers",
+      "count": 1,
+      "trial": 2,
+      "loadAverageAtStart": [
+        29.84619140625,
+        15.68798828125,
+        16.94970703125
+      ],
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 506.1392499999929,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 514.1152079999883,
+          "projectsCallMs": 131.19279099999403,
+          "projectsReadyMs": 645.3091249999998,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1313.7879169999942,
+          "modelReadyMs": 1959.1237079999992,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 72.82087500000489,
+          "resourcesReadyMs": 2031.9727080000011,
+          "warmProjectsMs": [
+            70.34712500000023,
+            85.7954999999929
+          ],
+          "warmModelMs": [
+            1360.4111250000133,
+            1700.5274169999902
+          ],
+          "status": "passed"
+        }
+      ],
+      "listenerReadyMs": 494.2261659999931,
+      "postReads": {
+        "rssMiB": 722.40625,
+        "cpuSeconds": 4.12
+      },
+      "status": "passed",
+      "sampledPeakSumRssMiB": 722.40625,
+      "workloadCompletedMs": 5256.7492499999935,
+      "cleanupConfirmed": true,
+      "cleanupCompletedMs": 5357.156582999989,
+      "loadAverageAtEnd": [
+        28.1767578125,
+        15.57666015625,
+        16.90283203125
+      ]
+    },
+    {
+      "mode": "stdio",
+      "count": 10,
+      "trial": 2,
+      "loadAverageAtStart": [
+        28.1767578125,
+        15.57666015625,
+        16.90283203125
+      ],
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 1472.2315829999861,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1672.8322919999919,
+          "projectsCallMs": 368.7281660000008,
+          "projectsReadyMs": 2041.5617499999935,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 2191.2006249999977,
+          "modelReadyMs": 4232.7827499999985,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 1473.844041999997,
+          "resourcesReadyMs": 5706.685791999989,
+          "warmProjectsMs": [
+            93.05766600000788,
+            183.452833000003
+          ],
+          "warmModelMs": [
+            8.74666599999182,
+            5.705707999994047
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 1,
+          "handshakeMs": 1697.2637079999986,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1830.084124999994,
+          "projectsCallMs": 1155.7793749999983,
+          "projectsReadyMs": 2985.8652919999877,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 5905.853166000001,
+          "modelReadyMs": 8891.736374999993,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 167.64337499999965,
+          "resourcesReadyMs": 9059.40512499999,
+          "warmProjectsMs": [
+            232.75416700000642,
+            179.09916700000758
+          ],
+          "warmModelMs": [
+            20.928625000000466,
+            5.057999999989988
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 2,
+          "handshakeMs": 1697.2083749999874,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 2030.18299999999,
+          "projectsCallMs": 949.8659159999952,
+          "projectsReadyMs": 2980.0499999999884,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 5910.69795799999,
+          "modelReadyMs": 8890.75275,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 166.13695899999584,
+          "resourcesReadyMs": 9056.898833,
+          "warmProjectsMs": [
+            234.5149170000077,
+            187.10258299999987
+          ],
+          "warmModelMs": [
+            12.189707999990787,
+            5.770250000001397
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 3,
+          "handshakeMs": 1696.570499999987,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1864.147874999995,
+          "projectsCallMs": 1112.304708999989,
+          "projectsReadyMs": 2976.4543749999866,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 5915.787917000009,
+          "modelReadyMs": 8892.275291999991,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 163.1264999999985,
+          "resourcesReadyMs": 9055.415374999997,
+          "warmProjectsMs": [
+            236.57600000000093,
+            180.95795799999905
+          ],
+          "warmModelMs": [
+            15.637957999992068,
+            3.96404099999927
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 4,
+          "handshakeMs": 1426.0752499999944,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1649.9205829999992,
+          "projectsCallMs": 391.7780829999974,
+          "projectsReadyMs": 2041.6998749999912,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 2137.7689580000006,
+          "modelReadyMs": 4179.476291999992,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 1526.2256669999915,
+          "resourcesReadyMs": 5705.746374999988,
+          "warmProjectsMs": [
+            94.30512499999895,
+            188.72391700001026
+          ],
+          "warmModelMs": [
+            3.5082499999989523,
+            8.372707999995328
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 5,
+          "handshakeMs": 1672.4362919999985,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1697.7489579999965,
+          "projectsCallMs": 1282.1320839999971,
+          "projectsReadyMs": 2979.881666999994,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 5934.34375,
+          "modelReadyMs": 8914.232832999987,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 142.24804199999198,
+          "resourcesReadyMs": 9056.509666999991,
+          "warmProjectsMs": [
+            235.21554199999082,
+            183.21820799999114
+          ],
+          "warmModelMs": [
+            12.9096669999999,
+            3.013790999990306
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 6,
+          "handshakeMs": 1697.3628749999916,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1940.3132919999916,
+          "projectsCallMs": 1039.6612909999967,
+          "projectsReadyMs": 2979.975874999989,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 5912.042874999999,
+          "modelReadyMs": 8892.024207999988,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 164.013208999997,
+          "resourcesReadyMs": 9056.05254199999,
+          "warmProjectsMs": [
+            235.12208299999475,
+            184.98270900000352
+          ],
+          "warmModelMs": [
+            12.230457999990904,
+            5.674083999998402
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 7,
+          "handshakeMs": 1697.142749999999,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1776.168249999988,
+          "projectsCallMs": 1203.5128330000007,
+          "projectsReadyMs": 2979.6820829999924,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 5911.438832999993,
+          "modelReadyMs": 8891.142666999993,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 170.31674999999814,
+          "resourcesReadyMs": 9061.499582999997,
+          "warmProjectsMs": [
+            230.30604199999652,
+            183.67941700000665
+          ],
+          "warmModelMs": [
+            13.180999999996857,
+            5.44404200000281
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 8,
+          "handshakeMs": 1697.3147499999905,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1988.821957999986,
+          "projectsCallMs": 996.5797089999978,
+          "projectsReadyMs": 2985.4042079999927,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 6044.568999999989,
+          "modelReadyMs": 9030.015916999997,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 260.87220899999375,
+          "resourcesReadyMs": 9290.915374999997,
+          "warmProjectsMs": [
+            197.3262500000128,
+            186.63145800000348
+          ],
+          "warmModelMs": [
+            4.376875000001746,
+            3.150999999998021
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 9,
+          "handshakeMs": 1697.0399999999936,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1733.1462919999904,
+          "projectsCallMs": 1246.9729170000064,
+          "projectsReadyMs": 2980.1197079999984,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 5910.276459000001,
+          "modelReadyMs": 8890.400999999998,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 161.65795799999614,
+          "resourcesReadyMs": 9052.08924999999,
+          "warmProjectsMs": [
+            239.53916699999536,
+            184.80583399999887
+          ],
+          "warmModelMs": [
+            12.068583000000217,
+            3.465416000006371
+          ],
+          "status": "passed"
+        }
+      ],
+      "postReads": {
+        "rssMiB": 4616.703125,
+        "cpuSeconds": 25.07
+      },
+      "status": "passed",
+      "sampledPeakSumRssMiB": 5073.125,
+      "workloadCompletedMs": 9857.511666999999,
+      "cleanupConfirmed": true,
+      "cleanupCompletedMs": 9993.683166999996,
+      "loadAverageAtEnd": [
+        28.70654296875,
+        16.08837890625,
+        17.06787109375
+      ]
+    },
+    {
+      "mode": "http-env",
+      "count": 10,
+      "trial": 2,
+      "loadAverageAtStart": [
+        28.70654296875,
+        16.08837890625,
+        17.06787109375
+      ],
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 933.9730829999899,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1024.793749999997,
+          "projectsCallMs": 277.4365839999955,
+          "projectsReadyMs": 1302.2313329999888,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1587.1333749999903,
+          "modelReadyMs": 2889.3718329999974,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 64.10370800000965,
+          "resourcesReadyMs": 2953.4876249999943,
+          "warmProjectsMs": [
+            63.72637499999837,
+            83.92499999998836
+          ],
+          "warmModelMs": [
+            20.81258299999172,
+            8.18495900000562
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 1,
+          "handshakeMs": 938.045374999987,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 952.2705829999904,
+          "projectsCallMs": 348.54754099999263,
+          "projectsReadyMs": 1300.8201659999904,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1585.611791999996,
+          "modelReadyMs": 2886.4542079999956,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 62.21337500002119,
+          "resourcesReadyMs": 2948.6948330000014,
+          "warmProjectsMs": [
+            62.199208000005456,
+            95.37437500001397
+          ],
+          "warmModelMs": [
+            11.802333999978146,
+            4.454583999991883
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 2,
+          "handshakeMs": 940.0438749999885,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 987.331290999995,
+          "projectsCallMs": 313.9967079999915,
+          "projectsReadyMs": 1301.328582999995,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1586.578874999992,
+          "modelReadyMs": 2887.9184579999855,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 64.42508399998769,
+          "resourcesReadyMs": 2952.378958000001,
+          "warmProjectsMs": [
+            63.404208000021754,
+            85.48370899999281
+          ],
+          "warmModelMs": [
+            18.56974999999511,
+            7.55449999999837
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 3,
+          "handshakeMs": 986.35487499999,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1076.3615829999908,
+          "projectsCallMs": 225.32441699999617,
+          "projectsReadyMs": 1301.687082999997,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1586.8186249999999,
+          "modelReadyMs": 2888.6883749999834,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 64.33633400002145,
+          "resourcesReadyMs": 2953.044624999995,
+          "warmProjectsMs": [
+            63.73945900000399,
+            83.71883399999933
+          ],
+          "warmModelMs": [
+            20.017416000016965,
+            7.663499999995111
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 4,
+          "handshakeMs": 1018.0120829999942,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1116.9660000000003,
+          "projectsCallMs": 185.58366699999897,
+          "projectsReadyMs": 1302.5511249999981,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1587.807124999992,
+          "modelReadyMs": 2890.364415999982,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 63.45554200001061,
+          "resourcesReadyMs": 2953.8330409999908,
+          "warmProjectsMs": [
+            63.71475000001374,
+            82.21691600000486
+          ],
+          "warmModelMs": [
+            22.90649999998277,
+            7.605458000005456
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 5,
+          "handshakeMs": 1018.523165999999,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1153.698332999993,
+          "projectsCallMs": 149.12320800000452,
+          "projectsReadyMs": 1302.8220829999918,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1588.0012080000015,
+          "modelReadyMs": 2890.8285409999808,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 63.31487499998184,
+          "resourcesReadyMs": 2954.1520410000085,
+          "warmProjectsMs": [
+            66.04533399999491,
+            84.59316700001364
+          ],
+          "warmModelMs": [
+            22.085499999986496,
+            5.414292000001296
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 6,
+          "handshakeMs": 1018.9127079999889,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1170.5984999999928,
+          "projectsCallMs": 132.4943750000093,
+          "projectsReadyMs": 1303.0938749999914,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1588.0519170000189,
+          "modelReadyMs": 2891.1510829999897,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 63.28474999999162,
+          "resourcesReadyMs": 2954.4429159999854,
+          "warmProjectsMs": [
+            67.06566699998803,
+            73.77445799999987
+          ],
+          "warmModelMs": [
+            32.23358300002292,
+            4.996584000007715
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 7,
+          "handshakeMs": 1019.2586659999943,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1213.5175409999938,
+          "projectsCallMs": 167.33112500001153,
+          "projectsReadyMs": 1380.8503329999949,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1510.5600410000188,
+          "modelReadyMs": 2891.4600409999985,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 63.2549589999835,
+          "resourcesReadyMs": 2954.7217499999824,
+          "warmProjectsMs": [
+            69.33337499998743,
+            72.41033300000709
+          ],
+          "warmModelMs": [
+            31.398667000001296,
+            4.773290999990422
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 8,
+          "handshakeMs": 1020.3270409999968,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1237.1022079999966,
+          "projectsCallMs": 147.22158299999137,
+          "projectsReadyMs": 1384.3252499999944,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1507.7239580000023,
+          "modelReadyMs": 2892.087041000006,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 63.58237499999814,
+          "resourcesReadyMs": 2955.7042079999956,
+          "warmProjectsMs": [
+            69.4381669999857,
+            71.51350000000093
+          ],
+          "warmModelMs": [
+            31.626416999992216,
+            4.4594579999975394
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 9,
+          "handshakeMs": 1022.0252079999918,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 1274.3800829999964,
+          "projectsCallMs": 183.34308299999975,
+          "projectsReadyMs": 1457.7251249999972,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 1434.952375000008,
+          "modelReadyMs": 2892.7284159999836,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 66.92599999997765,
+          "resourcesReadyMs": 2959.6847500000003,
+          "warmProjectsMs": [
+            66.7929169999843,
+            71.47358399999212
+          ],
+          "warmModelMs": [
+            31.518207999994047,
+            3.8168749999895226
+          ],
+          "status": "passed"
+        }
+      ],
+      "listenerReadyMs": 904.7799999999988,
+      "postReads": {
+        "rssMiB": 577.859375,
+        "cpuSeconds": 2.8
+      },
+      "status": "passed",
+      "sampledPeakSumRssMiB": 577.859375,
+      "workloadCompletedMs": 3140.981958000004,
+      "cleanupConfirmed": true,
+      "cleanupCompletedMs": 3243.150125,
+      "loadAverageAtEnd": [
+        27.04833984375,
+        15.95361328125,
+        17.0146484375
+      ]
+    },
+    {
+      "mode": "http-headers",
+      "count": 10,
+      "trial": 2,
+      "loadAverageAtStart": [
+        27.04833984375,
+        15.95361328125,
+        17.0146484375
+      ],
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 633.5089999999909,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 692.4124580000062,
+          "projectsCallMs": 320.9427499999874,
+          "projectsReadyMs": 1013.3571250000095,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 9457.020374999993,
+          "modelReadyMs": 10470.41737499999,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 5642.893875000009,
+          "resourcesReadyMs": 16113.325249999994,
+          "warmProjectsMs": [
+            522.1609579999931,
+            196.91062499998952
+          ],
+          "warmModelMs": [
+            10010.208874999982,
+            8286.808709000004
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 1,
+          "handshakeMs": 635.6546249999956,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 650.6427079999994,
+          "projectsCallMs": 305.4876670000085,
+          "projectsReadyMs": 956.1320410000044,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 6074.131250000006,
+          "modelReadyMs": 7030.295707999991,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 8998.050458000012,
+          "resourcesReadyMs": 16028.358083,
+          "warmProjectsMs": [
+            430.68162499999744,
+            6840.439666999999
+          ],
+          "warmModelMs": [
+            2636.650290999998,
+            2518.681041999982
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 2,
+          "handshakeMs": 637.921875,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 671.9114579999878,
+          "projectsCallMs": 282.00645800001803,
+          "projectsReadyMs": 953.9194579999894,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 6074.628832999995,
+          "modelReadyMs": 7028.59825000001,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 8989.950833999988,
+          "resourcesReadyMs": 16018.577832999988,
+          "warmProjectsMs": [
+            590.4794589999947,
+            916.6417920000094
+          ],
+          "warmModelMs": [
+            9320.821625000011,
+            8284.88837500001
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 3,
+          "handshakeMs": 670.9572080000071,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 734.0844159999979,
+          "projectsCallMs": 391.8414169999887,
+          "projectsReadyMs": 1125.9274159999914,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 5903.79458300001,
+          "modelReadyMs": 7029.765374999988,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 9000.424416999973,
+          "resourcesReadyMs": 16030.210583000007,
+          "warmProjectsMs": [
+            567.5048749999842,
+            6786.352041000006
+          ],
+          "warmModelMs": [
+            3455.494584,
+            8292.289667000005
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 4,
+          "handshakeMs": 689.6479999999865,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 712.8145829999994,
+          "projectsCallMs": 245.17191699999967,
+          "projectsReadyMs": 957.9881659999955,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 12680.886708000005,
+          "modelReadyMs": 13638.909541,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 2396.283374999999,
+          "resourcesReadyMs": 16035.215666000004,
+          "warmProjectsMs": [
+            593.1501250000147,
+            3043.7602919999918
+          ],
+          "warmModelMs": [
+            7176.019333000004,
+            9092.287875000009
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 5,
+          "handshakeMs": 690.1825409999874,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 762.4484159999993,
+          "projectsCallMs": 236.28645800001686,
+          "projectsReadyMs": 998.7372080000059,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 9470.827458000014,
+          "modelReadyMs": 10469.609333,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 5563.963208000001,
+          "resourcesReadyMs": 16033.604916000011,
+          "warmProjectsMs": [
+            576.7285830000183,
+            3049.0222080000094
+          ],
+          "warmModelMs": [
+            7192.356208000012,
+            8278.647457999992
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 6,
+          "handshakeMs": 690.6304999999993,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 793.1812499999942,
+          "projectsCallMs": 218.36283299999195,
+          "projectsReadyMs": 1011.5464159999974,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 9459.269333000004,
+          "modelReadyMs": 10470.844916000002,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 5561.0641659999965,
+          "resourcesReadyMs": 16031.918249999988,
+          "warmProjectsMs": [
+            572.98558399998,
+            3033.8285840000026
+          ],
+          "warmModelMs": [
+            7198.643500000006,
+            3778.550707999995
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 7,
+          "handshakeMs": 691.0259159999841,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 813.2618329999968,
+          "projectsCallMs": 314.9908329999889,
+          "projectsReadyMs": 1128.2552079999878,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 5902.411125000013,
+          "modelReadyMs": 7030.696540999983,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 9079.616459000012,
+          "resourcesReadyMs": 16110.321708000003,
+          "warmProjectsMs": [
+            521.272707999975,
+            5542.703959000006
+          ],
+          "warmModelMs": [
+            4547.639041000017,
+            2454.7609999999986
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 8,
+          "handshakeMs": 691.3620829999854,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 859.490374999994,
+          "projectsCallMs": 381.87924999999814,
+          "projectsReadyMs": 1241.3726660000102,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 14404.77566699998,
+          "modelReadyMs": 15646.193207999982,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 390.0798749999958,
+          "resourcesReadyMs": 16036.301040999999,
+          "warmProjectsMs": [
+            570.9533330000122,
+            915.806500000006
+          ],
+          "warmModelMs": [
+            9326.585707999999,
+            8282.041790999996
+          ],
+          "status": "passed"
+        },
+        {
+          "index": 9,
+          "handshakeMs": 691.6726250000065,
+          "protocol": "2026-07-28",
+          "catalogHash": "aad4c842c8f9c8730236775ff969dcb8be8a66e020d1256ab69fe34381b09cc6",
+          "catalogMs": 903.5689579999889,
+          "projectsCallMs": 339.8723750000063,
+          "projectsReadyMs": 1243.4437080000062,
+          "projectsHash": "45dcf0402bb2b01d79153250addfd6f6f066e7763df9ff9d0e57098df4c5e17e",
+          "modelCallMs": 12391.193709000014,
+          "modelReadyMs": 13634.688250000007,
+          "modelHash": "7e75ea9a47d27b74fe0594ffbba6020c75ebd796db60fda51582162764eb5c21",
+          "resourcesHash": "304069e4594f52880493c9f7fa01820e0f36f674a9adbf7224099252a274ef78",
+          "resourcesCallMs": 2401.144042,
+          "resourcesReadyMs": 16035.863332999987,
+          "warmProjectsMs": [
+            597.3137920000008,
+            908.880124999996
+          ],
+          "warmModelMs": [
+            9298.856666000007,
+            8291.062249999988
+          ],
+          "status": "passed"
+        }
+      ],
+      "listenerReadyMs": 615.1682079999882,
+      "postReads": {
+        "rssMiB": 858.1875,
+        "cpuSeconds": 32.4
+      },
+      "status": "passed",
+      "sampledPeakSumRssMiB": 897.078125,
+      "workloadCompletedMs": 35952.559958,
+      "cleanupConfirmed": true,
+      "cleanupCompletedMs": 36056.05475000001,
+      "loadAverageAtEnd": [
+        52.42919921875,
+        23.4384765625,
+        19.69287109375
+      ]
+    }
+  ],
+  "completed": true,
+  "allPassed": true,
+  "method": {
+    "trialsPerCell": 3,
+    "order": "stdio/env/headers, reversed in middle trial; one-client controls and ten-client fleets",
+    "workload": "fresh handshake, six-tool catalog, list_projects, list_notification_providers, eight resources, then two repeat projects/provider pairs per client",
+    "readOnly": true,
+    "client": "@modelcontextprotocol/client 2.0.0, synthetic codex0.163.0, modern protocol pinned2026-07-28 on all transports",
+    "stdio": "SDK stdio subclass solely to probe in-place; exactly one process per client, no disposable negotiation sibling",
+    "http": "stock StreamableHTTPClientTransport; ten independent SDK Client objects, one fresh loopback daemon per fleet; environment identity shared or token headers request-isolated",
+    "daemonReadiness": "wait for application server-listening event, not just open TCP port; launch time included",
+    "cache": "warm filesystem; preflight pilot warms OS/backend caches; no cold-disk/desktop/download claims",
+    "timeouts": "20 seconds per RPC, unchanged; report all failed attempts separately",
+    "sampling": "sum owned server-process RSS sampled every500ms using ps, plus final post-workload RSS and process CPU time; observer overhead present and scales with process count; not peak/PSS or parent/backend CPU",
+    "cleanup": "close clients then owned PID termination and confirmed absence; all processes stopped",
+    "statisticalUnit": "three fleet trials per mode/concurrency cell; client operations are not independent repetitions"
+  },
+  "runnerSha256": "759642885c63df5f193a963db695339375de97171caa86c1ca315d7d71efbfdd"
+}

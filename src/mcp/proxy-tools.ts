@@ -1,6 +1,6 @@
 import { Effect, Result, Schema } from "effect"
 
-import { Count } from "../domain/schemas/index.js"
+import { Count } from "../domain/schemas/shared.js"
 import type { HulyStorageClient } from "../huly/storage.js"
 import type { WorkspaceClientOperations } from "../huly/workspace-client.js"
 import {

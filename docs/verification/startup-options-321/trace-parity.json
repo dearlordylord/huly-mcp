@@ -1,0 +1,48 @@
+[
+  {
+    "mode": "auto",
+    "variant": "baseline",
+    "before": [],
+    "after": []
+  },
+  {
+    "mode": "auto",
+    "variant": "trace",
+    "before": [
+      "domain-failure-classification.ts",
+      "operation-failure.ts",
+      "tool-annotations.ts",
+      "registry.ts"
+    ],
+    "after": [
+      "domain-failure-classification.ts",
+      "operation-failure.ts",
+      "tool-annotations.ts",
+      "registry.ts",
+      "projects.ts"
+    ]
+  },
+  {
+    "mode": "native",
+    "variant": "baseline",
+    "before": [],
+    "after": []
+  },
+  {
+    "mode": "native",
+    "variant": "trace",
+    "before": [
+      "domain-failure-classification.ts",
+      "operation-failure.ts",
+      "tool-annotations.ts",
+      "registry.ts"
+    ],
+    "after": [
+      "domain-failure-classification.ts",
+      "operation-failure.ts",
+      "tool-annotations.ts",
+      "registry.ts",
+      "projects.ts"
+    ]
+  }
+]

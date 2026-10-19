@@ -12,7 +12,18 @@ import {
   makeFileMovementStageObserver
 } from "../mcp/movement-stage-report.js"
 
-import { Config, ConfigProvider, type Duration, Effect, Exit, Layer, Option, type Redacted, Schema } from "effect"
+import {
+  Config,
+  ConfigProvider,
+  type Duration,
+  Effect,
+  type Exit,
+  Layer,
+  Option,
+  type Redacted,
+  Result,
+  Schema
+} from "effect"
 
 import {
   type ConfigValidationError,
@@ -30,9 +41,11 @@ import {
   HttpServerFactoryService
 } from "../mcp/http-transport.js"
 import type { RequestClientLease } from "../mcp/request-client-lifecycle.js"
-import { type McpServerError, McpServerService, type McpTransportType } from "../mcp/server.js"
+import { McpServerError, McpServerService, type McpTransportType } from "../mcp/server.js"
 import { type ConsoleRedirectHandle, redirectConsoleToStderr } from "../mcp/stdio-output.js"
-import { buildCombinedClientLayer, createClientResolver, isRecoverableClientUnavailableCause } from "./huly-clients.js"
+import { buildCombinedClientLayer, createClientResolver } from "./huly-clients.js"
+import { preloadToolHandlers } from "../mcp/tools/index.js"
+import { runProfileStartupDiagnostic } from "../profiles/startup-diagnostic.js"
 import type { ClientBundle, ClientResolver, HulyClientBundleError } from "./client-resolver.js"
 import { createHttpClientLeaseResolver } from "./http-client-leases.js"
 import { TelemetryService } from "../telemetry/telemetry.js"
@@ -160,6 +173,13 @@ export const buildAppLayer = (
     ...(mcpAuthToken === undefined ? {} : { mcpAuthToken }),
     authMethod,
     resolveClients,
+    ...(transport === "stdio"
+      ? {
+          onDiscovery: () => {
+            void resolveClients()
+          }
+        }
+      : {}),
     ...(observeMovement === undefined ? {} : { observeMovement }),
     ...httpPolicy,
     ...(closeClients === undefined ? {} : { closeClients }),
@@ -214,17 +234,24 @@ const runConfiguredServer = (
 ): Effect.Effect<void, AppError> =>
   Effect.gen(function* () {
     const { httpHost, httpPort, mcpAuthToken } = yield* configureListener(transport, resident)
-    const { authMethod, configLayer, lazyEnvs, runtimeConfigContext } = yield* resolveProcessConfiguration(
-      transport,
-      environment,
-      captured
-    )
+    const configuration = yield* Effect.result(resolveProcessConfiguration(transport, environment, captured))
+    if (Result.isFailure(configuration)) {
+      if (transport === "stdio" && configuration.failure._tag === "CliProfileStoreError")
+        return yield* runProfileStartupDiagnostic(configuration.failure, PKG_VERSION)
+      return yield* Effect.fail(configuration.failure)
+    }
+    const { authMethod, configLayer, runtimeConfigContext } = configuration.success
     const observeMovement = yield* configureMovementObserver()
+    if (yield* Config.Boolean("MCP_PRELOAD_TOOLS").pipe(Config.withDefault(false)))
+      yield* preloadToolHandlers.pipe(Effect.mapError((error) => new McpServerError({ message: error.message })))
     const combinedClientLayer = buildCombinedClientLayer(configLayer)
     yield* Effect.acquireUseRelease(
       Effect.sync(() => createClientResolver(combinedClientLayer)),
       ({ close: closeClients, resolve: resolveClients, status: clientStatus }) => {
-        const resolveHttpClientLease = createHttpClientLeaseResolver(combinedClientLayer, resolveClients)
+        const resolveHttpClientLease = createHttpClientLeaseResolver(
+          buildCombinedClientLayer(configLayer, "on-demand"),
+          resolveClients
+        )
         return Effect.gen(function* () {
           const context = yield* Effect.context<never>()
           const guardedClose =
@@ -234,15 +261,6 @@ const runConfiguredServer = (
                   Effect.runPromiseWith(context)(
                     resident.beforeClientsClose.pipe(Effect.andThen(closeResidentClients(closeClients)))
                   )
-          if (!lazyEnvs && transport === "stdio") {
-            // Eager init uses the same process-owned resolver as subsequent tool calls.
-            yield* Effect.gen(function* () {
-              const clientExit = yield* Effect.promise(resolveClients)
-              if (Exit.isSuccess(clientExit) || isRecoverableClientUnavailableCause(clientExit.cause)) return
-              return yield* Effect.failCause(clientExit.cause)
-            })
-          }
-
           // stdout reserved for MCP protocol in stdio mode - no console output here
           const appLayer = buildAppLayer(
             transport,

@@ -1,0 +1,2797 @@
+{
+  "node": "v24.14.0",
+  "platform": "darwin",
+  "architecture": "arm64",
+  "darwinRelease": "27.0.0",
+  "logicalCpuCount": 12,
+  "totalMemoryGiB": 96,
+  "artifacts": {
+    "baseline": "1207ec1cb4469132be528f91a42f432def4d2ba18b6a6584bd56e041014b6ef6",
+    "production": "95bb2826e50607159f10241650be38341b54e06de18777f8fd7466614d9c4cac"
+  },
+  "baseline": {
+    "sourceCommit": "938560796df0f6d868ecc6c1214adc0e66119569",
+    "node": "v24.14.0",
+    "version": "0.53.1",
+    "sha256": "1207ec1cb4469132be528f91a42f432def4d2ba18b6a6584bd56e041014b6ef6"
+  },
+  "candidateSourceCommit": "ce0b1d6f4514935b2c83d7b4f5b30e3b1e8e1f95",
+  "observations": [
+    {
+      "trial": 0,
+      "concurrency": 1,
+      "variant": "baseline",
+      "workload": "tools-first",
+      "loadAverageAtStart": [
+        26.71142578125,
+        24.259765625,
+        35.4169921875
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 1049.6280419999998,
+          "catalogMs": 1062.805959,
+          "requestedInventoryReadyMs": 1062.805959,
+          "firstProjectsCompletedMs": 2926.2686249999997,
+          "firstProjectsCallMs": 1863.434166,
+          "modelReadCompletedMs": 2928.993459,
+          "warmProjectsCallMs": 57.68987500000003,
+          "warmModelReadCallMs": 2.945416000000023
+        }
+      ],
+      "catalogFleetReadyMs": 1062.805959,
+      "requestedInventoryFleetReadyMs": 1062.805959,
+      "projectsFleetReadyMs": 2926.2686249999997,
+      "modelReadFleetReadyMs": 2928.993459,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 561.03125,
+        "cpuSeconds": 2.76
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        26.09375,
+        24.17236328125,
+        35.3203125
+      ]
+    },
+    {
+      "trial": 0,
+      "concurrency": 1,
+      "variant": "production",
+      "workload": "tools-first",
+      "loadAverageAtStart": [
+        26.09375,
+        24.17236328125,
+        35.3203125
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 550.9042079999999,
+          "catalogMs": 567.1333750000003,
+          "requestedInventoryReadyMs": 567.1333750000003,
+          "firstProjectsCompletedMs": 697.4277499999998,
+          "firstProjectsCallMs": 129.93954100000064,
+          "modelReadCompletedMs": 2057.258167,
+          "warmProjectsCallMs": 63.66258400000061,
+          "warmModelReadCallMs": 1.372415999999248
+        }
+      ],
+      "catalogFleetReadyMs": 567.1333750000003,
+      "requestedInventoryFleetReadyMs": 567.1333750000003,
+      "projectsFleetReadyMs": 697.4277499999998,
+      "modelReadFleetReadyMs": 2057.258167,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 573.65625,
+        "cpuSeconds": 2.13
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        25.205078125,
+        24.02001953125,
+        35.201171875
+      ]
+    },
+    {
+      "trial": 0,
+      "concurrency": 10,
+      "variant": "baseline",
+      "workload": "tools-first",
+      "loadAverageAtStart": [
+        25.205078125,
+        24.02001953125,
+        35.201171875
+      ],
+      "status": "failed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 3156.0513329999994,
+          "catalogMs": 3167.887790999999,
+          "requestedInventoryReadyMs": 3167.887790999999,
+          "firstProjectsCompletedMs": 9480.382541,
+          "firstProjectsCallMs": 6312.3400839999995,
+          "modelReadCompletedMs": 9484.311457999998
+        },
+        {
+          "index": 1,
+          "handshakeMs": 3118.379499999999,
+          "catalogMs": 3139.741333,
+          "requestedInventoryReadyMs": 3139.741333,
+          "firstProjectsCompletedMs": 9604.571875,
+          "firstProjectsCallMs": 6464.5075,
+          "modelReadCompletedMs": 9607.360374999998
+        },
+        {
+          "index": 2,
+          "handshakeMs": 3300.6440000000002,
+          "catalogMs": 3378.3452909999996,
+          "requestedInventoryReadyMs": 3378.3452909999996,
+          "firstProjectsCompletedMs": 9480.626665999998,
+          "firstProjectsCallMs": 6101.794167,
+          "modelReadCompletedMs": 9484.589875
+        },
+        {
+          "index": 3,
+          "handshakeMs": 1191.1967079999995,
+          "catalogMs": 1201.9555830000008,
+          "requestedInventoryReadyMs": 1201.9555830000008,
+          "firstProjectsCompletedMs": 6958.595208000001,
+          "firstProjectsCallMs": 5756.347834,
+          "modelReadCompletedMs": 6960.908041000001
+        },
+        {
+          "index": 4,
+          "handshakeMs": 3558.911249999999,
+          "catalogMs": 3699.444707999999,
+          "requestedInventoryReadyMs": 3699.444707999999,
+          "firstProjectsCompletedMs": 9682.121874999999,
+          "firstProjectsCallMs": 5971.9285,
+          "modelReadCompletedMs": 9685.385875000002
+        },
+        {
+          "index": 5,
+          "handshakeMs": 3163.1895829999994,
+          "catalogMs": 3187.842041,
+          "requestedInventoryReadyMs": 3187.842041,
+          "firstProjectsCompletedMs": 9702.695000000002,
+          "firstProjectsCallMs": 6514.705165999998,
+          "modelReadCompletedMs": 9706.310707999999
+        },
+        {
+          "index": 6,
+          "handshakeMs": 3558.583375,
+          "catalogMs": 3573.266625,
+          "requestedInventoryReadyMs": 3573.266625,
+          "phase": "first-projects",
+          "failedPhaseElapsedMs": 20024.290708,
+          "errorName": "SdkError",
+          "errorTimeout": true
+        },
+        {
+          "index": 7,
+          "handshakeMs": 3304.505166000001,
+          "catalogMs": 3314.2062079999996,
+          "requestedInventoryReadyMs": 3314.2062079999996,
+          "firstProjectsCompletedMs": 9603.803833,
+          "firstProjectsCallMs": 6289.261667000001,
+          "modelReadCompletedMs": 9606.242124999999
+        },
+        {
+          "index": 8,
+          "handshakeMs": 3558.0474159999994,
+          "catalogMs": 3597.2962499999994,
+          "requestedInventoryReadyMs": 3597.2962499999994,
+          "phase": "first-projects",
+          "failedPhaseElapsedMs": 20094.779959,
+          "errorName": "SdkError",
+          "errorTimeout": true
+        },
+        {
+          "index": 9,
+          "handshakeMs": 3489.0278749999998,
+          "catalogMs": 3520.9437500000004,
+          "requestedInventoryReadyMs": 3520.9437500000004,
+          "firstProjectsCompletedMs": 9480.776583,
+          "firstProjectsCallMs": 5959.363625,
+          "modelReadCompletedMs": 9484.486166
+        }
+      ],
+      "catalogFleetReadyMs": 3699.444707999999,
+      "requestedInventoryFleetReadyMs": 3699.444707999999,
+      "failureName": "AssertionError",
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        26.900390625,
+        24.5146484375,
+        35.0556640625
+      ]
+    },
+    {
+      "trial": 0,
+      "concurrency": 10,
+      "variant": "production",
+      "workload": "tools-first",
+      "loadAverageAtStart": [
+        26.107421875,
+        24.3896484375,
+        34.94970703125
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 2192.399624999998,
+          "catalogMs": 2221.9542500000025,
+          "requestedInventoryReadyMs": 2221.9542500000025,
+          "firstProjectsCompletedMs": 2807.8605000000025,
+          "firstProjectsCallMs": 585.7884170000034,
+          "modelReadCompletedMs": 10753.663874999998,
+          "warmProjectsCallMs": 121.08345800000097,
+          "warmModelReadCallMs": 2.070625000000291
+        },
+        {
+          "index": 1,
+          "handshakeMs": 2355.566375000002,
+          "catalogMs": 2437.2743340000015,
+          "requestedInventoryReadyMs": 2437.2743340000015,
+          "firstProjectsCompletedMs": 3897.015916999997,
+          "firstProjectsCallMs": 1459.4601669999975,
+          "modelReadCompletedMs": 10814.139292,
+          "warmProjectsCallMs": 120.01133400000253,
+          "warmModelReadCallMs": 8.79491699999926
+        },
+        {
+          "index": 2,
+          "handshakeMs": 2136.799500000001,
+          "catalogMs": 2177.1218339999978,
+          "requestedInventoryReadyMs": 2177.1218339999978,
+          "firstProjectsCompletedMs": 3851.1277499999997,
+          "firstProjectsCallMs": 1673.5649580000027,
+          "modelReadCompletedMs": 10894.417792,
+          "warmProjectsCallMs": 121.40812500000175,
+          "warmModelReadCallMs": 10.23566700000083
+        },
+        {
+          "index": 3,
+          "handshakeMs": 2066.880167000003,
+          "catalogMs": 2107.8380840000027,
+          "requestedInventoryReadyMs": 2107.8380840000027,
+          "firstProjectsCompletedMs": 2483.066500000001,
+          "firstProjectsCallMs": 375.0324169999949,
+          "modelReadCompletedMs": 6307.629916999998,
+          "warmProjectsCallMs": 130.02174999999988,
+          "warmModelReadCallMs": 10.19812500000262
+        },
+        {
+          "index": 4,
+          "handshakeMs": 2197.2588749999995,
+          "catalogMs": 2336.1424590000024,
+          "requestedInventoryReadyMs": 2336.1424590000024,
+          "firstProjectsCompletedMs": 2812.447124999999,
+          "firstProjectsCallMs": 476.16220800000156,
+          "modelReadCompletedMs": 10743.691041999999,
+          "warmProjectsCallMs": 122.00808400000096,
+          "warmModelReadCallMs": 9.794290999998339
+        },
+        {
+          "index": 5,
+          "handshakeMs": 2175.4354590000003,
+          "catalogMs": 2210.2352919999976,
+          "requestedInventoryReadyMs": 2210.2352919999976,
+          "firstProjectsCompletedMs": 3850.369375000002,
+          "firstProjectsCallMs": 1639.9936670000025,
+          "modelReadCompletedMs": 10517.287792000003,
+          "warmProjectsCallMs": 121.83179099999688,
+          "warmModelReadCallMs": 8.96308300000237
+        },
+        {
+          "index": 6,
+          "handshakeMs": 2192.124708999996,
+          "catalogMs": 2239.7384999999995,
+          "requestedInventoryReadyMs": 2239.7384999999995,
+          "firstProjectsCompletedMs": 2627.669750000001,
+          "firstProjectsCallMs": 387.8081669999956,
+          "modelReadCompletedMs": 6209.434500000003,
+          "warmProjectsCallMs": 121.6217089999991,
+          "warmModelReadCallMs": 9.826415999996243
+        },
+        {
+          "index": 7,
+          "handshakeMs": 2002.1342089999962,
+          "catalogMs": 2027.1549169999998,
+          "requestedInventoryReadyMs": 2027.1549169999998,
+          "firstProjectsCompletedMs": 2482.0994169999976,
+          "firstProjectsCallMs": 454.81954199999745,
+          "modelReadCompletedMs": 6231.661749999999,
+          "warmProjectsCallMs": 139.54437500000495,
+          "warmModelReadCallMs": 3.380790999995952
+        },
+        {
+          "index": 8,
+          "handshakeMs": 2147.117917000003,
+          "catalogMs": 2164.734083999996,
+          "requestedInventoryReadyMs": 2164.734083999996,
+          "firstProjectsCompletedMs": 2483.5632499999992,
+          "firstProjectsCallMs": 318.3492499999993,
+          "modelReadCompletedMs": 6337.380417,
+          "warmProjectsCallMs": 122.73799999999756,
+          "warmModelReadCallMs": 9.174082999998063
+        },
+        {
+          "index": 9,
+          "handshakeMs": 2238.443124999998,
+          "catalogMs": 2286.6594590000022,
+          "requestedInventoryReadyMs": 2286.6594590000022,
+          "firstProjectsCompletedMs": 3896.3454589999965,
+          "firstProjectsCallMs": 1609.5560839999962,
+          "modelReadCompletedMs": 10733.956833999997,
+          "warmProjectsCallMs": 122.34587500000634,
+          "warmModelReadCallMs": 9.5090410000048
+        }
+      ],
+      "catalogFleetReadyMs": 2437.2743340000015,
+      "requestedInventoryFleetReadyMs": 2437.2743340000015,
+      "projectsFleetReadyMs": 3897.015916999997,
+      "modelReadFleetReadyMs": 10894.417792,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 5156.71875,
+        "cpuSeconds": 24.84
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        27.92236328125,
+        24.83642578125,
+        34.98486328125
+      ]
+    },
+    {
+      "trial": 0,
+      "concurrency": 1,
+      "variant": "baseline",
+      "workload": "full-inventory",
+      "loadAverageAtStart": [
+        27.92236328125,
+        24.83642578125,
+        34.98486328125
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 1257.9464169999992,
+          "catalogMs": 1265.7047919999968,
+          "requestedInventoryReadyMs": 3261.7393329999977,
+          "firstProjectsCompletedMs": 3341.976416999998,
+          "firstProjectsCallMs": 80.23650000000634,
+          "modelReadCompletedMs": 3346.752625000001,
+          "warmProjectsCallMs": 56.36370899999747,
+          "warmModelReadCallMs": 1.4885829999984708
+        }
+      ],
+      "catalogFleetReadyMs": 1265.7047919999968,
+      "requestedInventoryFleetReadyMs": 3261.7393329999977,
+      "projectsFleetReadyMs": 3341.976416999998,
+      "modelReadFleetReadyMs": 3346.752625000001,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 558.3125,
+        "cpuSeconds": 3.03
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        28.08837890625,
+        24.921875,
+        34.95556640625
+      ]
+    },
+    {
+      "trial": 0,
+      "concurrency": 1,
+      "variant": "production",
+      "workload": "full-inventory",
+      "loadAverageAtStart": [
+        28.08837890625,
+        24.921875,
+        34.95556640625
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 569.9042499999996,
+          "catalogMs": 586.4095830000006,
+          "requestedInventoryReadyMs": 736.7512500000012,
+          "firstProjectsCompletedMs": 843.9256250000035,
+          "firstProjectsCallMs": 107.17283300000418,
+          "modelReadCompletedMs": 2246.4503330000007,
+          "warmProjectsCallMs": 45.93841700000485,
+          "warmModelReadCallMs": 1.7058749999996508
+        }
+      ],
+      "catalogFleetReadyMs": 586.4095830000006,
+      "requestedInventoryFleetReadyMs": 736.7512500000012,
+      "projectsFleetReadyMs": 843.9256250000035,
+      "modelReadFleetReadyMs": 2246.4503330000007,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 573.171875,
+        "cpuSeconds": 2.04
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        28.08837890625,
+        24.921875,
+        34.95556640625
+      ]
+    },
+    {
+      "trial": 0,
+      "concurrency": 10,
+      "variant": "baseline",
+      "workload": "full-inventory",
+      "loadAverageAtStart": [
+        27.8408203125,
+        24.9228515625,
+        34.89697265625
+      ],
+      "status": "failed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 3880.5550409999996,
+          "catalogMs": 3890.441874999997,
+          "requestedInventoryReadyMs": 12151.125416000003,
+          "firstProjectsCompletedMs": 12369.946665999996,
+          "firstProjectsCallMs": 218.82062500000757,
+          "modelReadCompletedMs": 12377.006915999991
+        },
+        {
+          "index": 1,
+          "handshakeMs": 4156.024416,
+          "catalogMs": 4186.154082999994,
+          "requestedInventoryReadyMs": 12125.268583000005,
+          "firstProjectsCompletedMs": 12369.454999999994,
+          "firstProjectsCallMs": 244.18641599999683,
+          "modelReadCompletedMs": 12373.732041000003
+        },
+        {
+          "index": 2,
+          "handshakeMs": 3269.0297079999946,
+          "catalogMs": 3302.462707999999,
+          "requestedInventoryReadyMs": 12485.283875000001,
+          "firstProjectsCompletedMs": 12605.634499999993,
+          "firstProjectsCallMs": 120.35000000000582,
+          "modelReadCompletedMs": 12607.605040999995
+        },
+        {
+          "index": 3,
+          "handshakeMs": 3185.7937909999964,
+          "catalogMs": 3231.0118749999965,
+          "requestedInventoryReadyMs": 12415.727458000001,
+          "firstProjectsCompletedMs": 12594.477040999998,
+          "firstProjectsCallMs": 178.7483329999959,
+          "modelReadCompletedMs": 12598.202207999995
+        },
+        {
+          "index": 4,
+          "handshakeMs": 3440.760540999996,
+          "catalogMs": 3498.5337909999944,
+          "requestedInventoryReadyMs": 11764.501291,
+          "firstProjectsCompletedMs": 11931.290874999999,
+          "firstProjectsCallMs": 166.78949999999895,
+          "modelReadCompletedMs": 11953.329915999995
+        },
+        {
+          "index": 5,
+          "handshakeMs": 3441.1821659999987,
+          "catalogMs": 3454.910250000001,
+          "phase": "startup-resources",
+          "failedPhaseElapsedMs": 20001.863541999992,
+          "errorName": "SdkError",
+          "errorTimeout": true
+        },
+        {
+          "index": 6,
+          "handshakeMs": 4007.3816249999945,
+          "catalogMs": 4028.880790999996,
+          "requestedInventoryReadyMs": 12527.436708000001,
+          "firstProjectsCompletedMs": 12683.179249999994,
+          "firstProjectsCallMs": 155.74208300000464,
+          "modelReadCompletedMs": 12687.433790999996
+        },
+        {
+          "index": 7,
+          "handshakeMs": 3527.4590409999946,
+          "catalogMs": 3569.982624999997,
+          "phase": "startup-resources",
+          "failedPhaseElapsedMs": 20000.733,
+          "errorName": "SdkError",
+          "errorTimeout": true
+        },
+        {
+          "index": 8,
+          "handshakeMs": 4061.538041,
+          "catalogMs": 4085.956707999998,
+          "requestedInventoryReadyMs": 11565.654208,
+          "firstProjectsCompletedMs": 11953.670332999995,
+          "firstProjectsCallMs": 388.01549999999406,
+          "modelReadCompletedMs": 11967.519165999991
+        },
+        {
+          "index": 9,
+          "handshakeMs": 3816.104124999998,
+          "catalogMs": 3895.8602079999982,
+          "requestedInventoryReadyMs": 12448.452125000003,
+          "firstProjectsCompletedMs": 12594.742416000001,
+          "firstProjectsCallMs": 146.28991599999426,
+          "modelReadCompletedMs": 12605.535666000003
+        }
+      ],
+      "catalogFleetReadyMs": 4186.154082999994,
+      "failureName": "AssertionError",
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        35.57958984375,
+        27.12548828125,
+        35.40966796875
+      ]
+    },
+    {
+      "trial": 0,
+      "concurrency": 10,
+      "variant": "production",
+      "workload": "full-inventory",
+      "loadAverageAtStart": [
+        35.57958984375,
+        27.12548828125,
+        35.40966796875
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 1515.7558750000026,
+          "catalogMs": 1586.1572500000038,
+          "requestedInventoryReadyMs": 2386.567332999999,
+          "firstProjectsCompletedMs": 3006.464500000002,
+          "firstProjectsCallMs": 619.8959160000086,
+          "modelReadCompletedMs": 7873.076291999998,
+          "warmProjectsCallMs": 85.29725000000326,
+          "warmModelReadCallMs": 2.446624999996857
+        },
+        {
+          "index": 1,
+          "handshakeMs": 3471.8307080000086,
+          "catalogMs": 3501.102542000008,
+          "requestedInventoryReadyMs": 5535.8868749999965,
+          "firstProjectsCompletedMs": 5668.281000000003,
+          "firstProjectsCallMs": 132.3935419999907,
+          "modelReadCompletedMs": 11234.140792000006,
+          "warmProjectsCallMs": 122.12283300000126,
+          "warmModelReadCallMs": 2.2355829999869457
+        },
+        {
+          "index": 2,
+          "handshakeMs": 3200.429166999995,
+          "catalogMs": 3329.360375000004,
+          "requestedInventoryReadyMs": 5369.778667000006,
+          "firstProjectsCompletedMs": 5559.339791999999,
+          "firstProjectsCallMs": 189.56033300000126,
+          "modelReadCompletedMs": 10860.032625000007,
+          "warmProjectsCallMs": 81.2501670000056,
+          "warmModelReadCallMs": 5.0303750000020955
+        },
+        {
+          "index": 3,
+          "handshakeMs": 3468.193750000006,
+          "catalogMs": 3532.915000000008,
+          "requestedInventoryReadyMs": 5588.276041999998,
+          "firstProjectsCompletedMs": 5668.428792000006,
+          "firstProjectsCallMs": 80.15195899999526,
+          "modelReadCompletedMs": 11132.051124999998,
+          "warmProjectsCallMs": 89.83620900000096,
+          "warmModelReadCallMs": 1.707416999997804
+        },
+        {
+          "index": 4,
+          "handshakeMs": 3502.0287499999977,
+          "catalogMs": 3548.172417000009,
+          "requestedInventoryReadyMs": 5411.5793330000015,
+          "firstProjectsCompletedMs": 5667.442458000005,
+          "firstProjectsCallMs": 255.86241699999664,
+          "modelReadCompletedMs": 11211.998250000004,
+          "warmProjectsCallMs": 88.56074999998964,
+          "warmModelReadCallMs": 6.000457999994978
+        },
+        {
+          "index": 5,
+          "handshakeMs": 1662.128917000009,
+          "catalogMs": 1997.0217919999996,
+          "requestedInventoryReadyMs": 3506.2596670000057,
+          "firstProjectsCompletedMs": 5321.901582999999,
+          "firstProjectsCallMs": 1815.6417500000098,
+          "modelReadCompletedMs": 7891.548332999999,
+          "warmProjectsCallMs": 84.59649999999965,
+          "warmModelReadCallMs": 2.62354200000118
+        },
+        {
+          "index": 6,
+          "handshakeMs": 3705.678832999998,
+          "catalogMs": 3742.064916999996,
+          "requestedInventoryReadyMs": 5559.5067500000005,
+          "firstProjectsCompletedMs": 5685.837667,
+          "firstProjectsCallMs": 126.33062500000233,
+          "modelReadCompletedMs": 11203.150250000006,
+          "warmProjectsCallMs": 121.76258399999642,
+          "warmModelReadCallMs": 3.5189580000005662
+        },
+        {
+          "index": 7,
+          "handshakeMs": 3712.2075420000037,
+          "catalogMs": 3740.574667000008,
+          "requestedInventoryReadyMs": 5499.909792000006,
+          "firstProjectsCompletedMs": 5666.825542000006,
+          "firstProjectsCallMs": 166.91529099999752,
+          "modelReadCompletedMs": 10976.363375,
+          "warmProjectsCallMs": 88.68341699999291,
+          "warmModelReadCallMs": 2.389041999995243
+        },
+        {
+          "index": 8,
+          "handshakeMs": 1549.0954579999961,
+          "catalogMs": 1638.7664170000062,
+          "requestedInventoryReadyMs": 2329.6787500000064,
+          "firstProjectsCompletedMs": 2998.461750000002,
+          "firstProjectsCallMs": 668.7823340000032,
+          "modelReadCompletedMs": 7831.2794580000045,
+          "warmProjectsCallMs": 85.01524999999674,
+          "warmModelReadCallMs": 2.2390829999931157
+        },
+        {
+          "index": 9,
+          "handshakeMs": 2505.8854580000043,
+          "catalogMs": 2529.8913750000065,
+          "requestedInventoryReadyMs": 3518.935666999998,
+          "firstProjectsCompletedMs": 5312.9332920000015,
+          "firstProjectsCallMs": 1793.9972909999924,
+          "modelReadCompletedMs": 7806.428042,
+          "warmProjectsCallMs": 84.82241700000304,
+          "warmModelReadCallMs": 2.7134159999986878
+        }
+      ],
+      "catalogFleetReadyMs": 3742.064916999996,
+      "requestedInventoryFleetReadyMs": 5588.276041999998,
+      "projectsFleetReadyMs": 5685.837667,
+      "modelReadFleetReadyMs": 11234.140792000006,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 5660.421875,
+        "cpuSeconds": 22.5
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        44.67626953125,
+        29.33203125,
+        36.0947265625
+      ]
+    },
+    {
+      "trial": 1,
+      "concurrency": 10,
+      "variant": "production",
+      "workload": "full-inventory",
+      "loadAverageAtStart": [
+        49.4267578125,
+        30.5712890625,
+        36.4921875
+      ],
+      "status": "failed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 2294.8574999999983,
+          "catalogMs": 2327.880375000008,
+          "phase": "startup-resources",
+          "failedPhaseElapsedMs": 20001.716375000004,
+          "errorName": "SdkError",
+          "errorTimeout": true
+        },
+        {
+          "index": 1,
+          "handshakeMs": 894.0290410000016,
+          "catalogMs": 912.7923330000049,
+          "requestedInventoryReadyMs": 1407.5609580000018,
+          "firstProjectsCompletedMs": 1824.1102910000045,
+          "firstProjectsCallMs": 416.5482079999929,
+          "modelReadCompletedMs": 4099.304583000005
+        },
+        {
+          "index": 2,
+          "handshakeMs": 2308.0263330000016,
+          "catalogMs": 2362.2602909999987,
+          "requestedInventoryReadyMs": 3016.035499999998,
+          "firstProjectsCompletedMs": 6884.938290999999,
+          "firstProjectsCallMs": 3868.9009169999918,
+          "modelReadCompletedMs": 6944.501791000002
+        },
+        {
+          "index": 3,
+          "handshakeMs": 2259.7142909999966,
+          "catalogMs": 2281.9199999999983,
+          "requestedInventoryReadyMs": 2747.777166,
+          "firstProjectsCompletedMs": 2928.397790999996,
+          "firstProjectsCallMs": 180.62033400000655,
+          "modelReadCompletedMs": 6640.422875000004
+        },
+        {
+          "index": 4,
+          "handshakeMs": 2276.6960830000025,
+          "catalogMs": 2350.422458000001,
+          "requestedInventoryReadyMs": 2999.7450830000016,
+          "firstProjectsCompletedMs": 6670.441208000004,
+          "firstProjectsCallMs": 3670.6958749999903,
+          "modelReadCompletedMs": 6884.817290999999
+        },
+        {
+          "index": 5,
+          "handshakeMs": 1972.018624999997,
+          "catalogMs": 2077.662750000003,
+          "requestedInventoryReadyMs": 2720.1554160000087,
+          "firstProjectsCompletedMs": 2928.7455000000045,
+          "firstProjectsCallMs": 208.5888330000016,
+          "modelReadCompletedMs": 6983.414124999996
+        },
+        {
+          "index": 6,
+          "handshakeMs": 2577.6013749999984,
+          "catalogMs": 2602.4341660000064,
+          "requestedInventoryReadyMs": 3224.0169160000078,
+          "firstProjectsCompletedMs": 4892.729082999998,
+          "firstProjectsCallMs": 1668.7101669999975,
+          "modelReadCompletedMs": 9174.992207999996
+        },
+        {
+          "index": 7,
+          "handshakeMs": 2528.194208000001,
+          "catalogMs": 2586.8195410000044,
+          "requestedInventoryReadyMs": 3257.7382910000015,
+          "firstProjectsCompletedMs": 4856.8369999999995,
+          "firstProjectsCallMs": 1599.0982089999889,
+          "modelReadCompletedMs": 9194.744707999998
+        },
+        {
+          "index": 8,
+          "handshakeMs": 2435.024749999997,
+          "catalogMs": 2568.3902910000033,
+          "phase": "startup-resources",
+          "failedPhaseElapsedMs": 20000.369458,
+          "errorName": "SdkError",
+          "errorTimeout": true
+        },
+        {
+          "index": 9,
+          "handshakeMs": 2561.7260410000017,
+          "catalogMs": 2585.9657910000096,
+          "requestedInventoryReadyMs": 4628.215750000003,
+          "firstProjectsCompletedMs": 5133.707999999999,
+          "firstProjectsCallMs": 505.49187499999243,
+          "modelReadCompletedMs": 9314.314874999996
+        }
+      ],
+      "catalogFleetReadyMs": 2602.4341660000064,
+      "failureName": "AssertionError",
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        54.52490234375,
+        33.02490234375,
+        37.23828125
+      ]
+    },
+    {
+      "trial": 1,
+      "concurrency": 10,
+      "variant": "baseline",
+      "workload": "full-inventory",
+      "loadAverageAtStart": [
+        55.603515625,
+        33.60546875,
+        37.41845703125
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 3500.1734170000127,
+          "catalogMs": 3617.3872919999994,
+          "requestedInventoryReadyMs": 12786.892500000016,
+          "firstProjectsCompletedMs": 13040.062458,
+          "firstProjectsCallMs": 253.16795899998397,
+          "modelReadCompletedMs": 13044.579375000001,
+          "warmProjectsCallMs": 74.48237499999232,
+          "warmModelReadCallMs": 3.394750000006752
+        },
+        {
+          "index": 1,
+          "handshakeMs": 3633.7178330000024,
+          "catalogMs": 3657.7355830000015,
+          "requestedInventoryReadyMs": 13104.265333000018,
+          "firstProjectsCompletedMs": 13192.834375000006,
+          "firstProjectsCallMs": 88.56862500001444,
+          "modelReadCompletedMs": 13198.028332999995,
+          "warmProjectsCallMs": 81.5918750000128,
+          "warmModelReadCallMs": 2.7424579999933485
+        },
+        {
+          "index": 2,
+          "handshakeMs": 3848.592625000005,
+          "catalogMs": 3865.252708,
+          "requestedInventoryReadyMs": 13134.286208000005,
+          "firstProjectsCompletedMs": 13198.337583000015,
+          "firstProjectsCallMs": 64.05120800001896,
+          "modelReadCompletedMs": 13201.451750000007,
+          "warmProjectsCallMs": 76.33037499999045,
+          "warmModelReadCallMs": 2.4882919999945443
+        },
+        {
+          "index": 3,
+          "handshakeMs": 3748.5814580000006,
+          "catalogMs": 3805.566500000001,
+          "requestedInventoryReadyMs": 13118.013708000013,
+          "firstProjectsCompletedMs": 13196.593374999997,
+          "firstProjectsCallMs": 78.57895799999824,
+          "modelReadCompletedMs": 13199.462792000006,
+          "warmProjectsCallMs": 76.05862500000512,
+          "warmModelReadCallMs": 3.9355829999840353
+        },
+        {
+          "index": 4,
+          "handshakeMs": 3295.183625000005,
+          "catalogMs": 3348.4810419999994,
+          "requestedInventoryReadyMs": 8910.427417000014,
+          "firstProjectsCompletedMs": 9059.015250000011,
+          "firstProjectsCallMs": 148.58766600000672,
+          "modelReadCompletedMs": 9064.865667000005,
+          "warmProjectsCallMs": 87.97375000000466,
+          "warmModelReadCallMs": 2.5646249999990687
+        },
+        {
+          "index": 5,
+          "handshakeMs": 3723.4918330000073,
+          "catalogMs": 3740.241167,
+          "requestedInventoryReadyMs": 13160.421750000009,
+          "firstProjectsCompletedMs": 13260.132624999998,
+          "firstProjectsCallMs": 99.71020800000406,
+          "modelReadCompletedMs": 13264.623958000011,
+          "warmProjectsCallMs": 76.23058299999684,
+          "warmModelReadCallMs": 2.6312920000054874
+        },
+        {
+          "index": 6,
+          "handshakeMs": 3669.841875000013,
+          "catalogMs": 3681.1606670000037,
+          "requestedInventoryReadyMs": 12839.16620800001,
+          "firstProjectsCompletedMs": 13039.955208,
+          "firstProjectsCallMs": 200.78820800001267,
+          "modelReadCompletedMs": 13044.413625000016,
+          "warmProjectsCallMs": 89.3887500000128,
+          "warmModelReadCallMs": 1.561290999990888
+        },
+        {
+          "index": 7,
+          "handshakeMs": 3555.367167000004,
+          "catalogMs": 3579.0205000000133,
+          "requestedInventoryReadyMs": 12893.653542000015,
+          "firstProjectsCompletedMs": 13181.973541999992,
+          "firstProjectsCallMs": 288.31958300000406,
+          "modelReadCompletedMs": 13186.164707999997,
+          "warmProjectsCallMs": 87.5561250000028,
+          "warmModelReadCallMs": 1.7775829999882262
+        },
+        {
+          "index": 8,
+          "handshakeMs": 3669.993917,
+          "catalogMs": 3690.8749170000083,
+          "requestedInventoryReadyMs": 13084.632207999995,
+          "firstProjectsCompletedMs": 13186.258082999993,
+          "firstProjectsCallMs": 101.62454200000502,
+          "modelReadCompletedMs": 13192.634416999994,
+          "warmProjectsCallMs": 87.01870900002541,
+          "warmModelReadCallMs": 2.462082999991253
+        },
+        {
+          "index": 9,
+          "handshakeMs": 3496.7395420000103,
+          "catalogMs": 3553.625250000012,
+          "requestedInventoryReadyMs": 12807.645917000016,
+          "firstProjectsCompletedMs": 13039.646708000015,
+          "firstProjectsCallMs": 232.00049999999464,
+          "modelReadCompletedMs": 13042.249167000002,
+          "warmProjectsCallMs": 86.81937499999185,
+          "warmModelReadCallMs": 1.9800000000104774
+        }
+      ],
+      "catalogFleetReadyMs": 3865.252708,
+      "requestedInventoryFleetReadyMs": 13160.421750000009,
+      "projectsFleetReadyMs": 13260.132624999998,
+      "modelReadFleetReadyMs": 13264.623958000011,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 4942.65625,
+        "cpuSeconds": 27.790000000000003
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        64.0048828125,
+        36.1484375,
+        38.27685546875
+      ]
+    },
+    {
+      "trial": 1,
+      "concurrency": 1,
+      "variant": "production",
+      "workload": "full-inventory",
+      "loadAverageAtStart": [
+        61.20166015625,
+        36.029296875,
+        38.22216796875
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 722.4740420000162,
+          "catalogMs": 737.8156250000175,
+          "requestedInventoryReadyMs": 890.9061670000083,
+          "firstProjectsCompletedMs": 972.8065420000057,
+          "firstProjectsCallMs": 81.89945900000748,
+          "modelReadCompletedMs": 2841.7604170000122,
+          "warmProjectsCallMs": 79.36320800002431,
+          "warmModelReadCallMs": 2.139041999995243
+        }
+      ],
+      "catalogFleetReadyMs": 737.8156250000175,
+      "requestedInventoryFleetReadyMs": 890.9061670000083,
+      "projectsFleetReadyMs": 972.8065420000057,
+      "modelReadFleetReadyMs": 2841.7604170000122,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 566.8125,
+        "cpuSeconds": 2.09
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        61.20166015625,
+        36.029296875,
+        38.22216796875
+      ]
+    },
+    {
+      "trial": 1,
+      "concurrency": 1,
+      "variant": "baseline",
+      "workload": "full-inventory",
+      "loadAverageAtStart": [
+        61.20166015625,
+        36.029296875,
+        38.22216796875
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 926.6104580000101,
+          "catalogMs": 935.9017920000188,
+          "requestedInventoryReadyMs": 2595.61158300002,
+          "firstProjectsCompletedMs": 2656.2316670000146,
+          "firstProjectsCallMs": 60.6195000000007,
+          "modelReadCompletedMs": 2660.804583000019,
+          "warmProjectsCallMs": 49.88399999999092,
+          "warmModelReadCallMs": 1.5077920000185259
+        }
+      ],
+      "catalogFleetReadyMs": 935.9017920000188,
+      "requestedInventoryFleetReadyMs": 2595.61158300002,
+      "projectsFleetReadyMs": 2656.2316670000146,
+      "modelReadFleetReadyMs": 2660.804583000019,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 561.75,
+        "cpuSeconds": 2.69
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        60.62451171875,
+        36.32763671875,
+        38.314453125
+      ]
+    },
+    {
+      "trial": 1,
+      "concurrency": 10,
+      "variant": "production",
+      "workload": "tools-first",
+      "loadAverageAtStart": [
+        60.62451171875,
+        36.32763671875,
+        38.314453125
+      ],
+      "status": "failed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 1837.1757090000028,
+          "catalogMs": 2065.1875839999993,
+          "requestedInventoryReadyMs": 2065.1875839999993,
+          "phase": "first-projects",
+          "failedPhaseElapsedMs": 20018.779041,
+          "errorName": "SdkError",
+          "errorTimeout": true
+        },
+        {
+          "index": 1,
+          "handshakeMs": 2082.809459000011,
+          "catalogMs": 2175.1308340000105,
+          "requestedInventoryReadyMs": 2175.1308340000105,
+          "phase": "first-projects",
+          "failedPhaseElapsedMs": 20110.527624999988,
+          "errorName": "SdkError",
+          "errorTimeout": true
+        },
+        {
+          "index": 2,
+          "handshakeMs": 2006.1002920000174,
+          "catalogMs": 2104.760667000024,
+          "requestedInventoryReadyMs": 2104.760667000024,
+          "firstProjectsCompletedMs": 2913.8312090000254,
+          "firstProjectsCallMs": 808.8095829999947,
+          "modelReadCompletedMs": 9679.587834000005
+        },
+        {
+          "index": 3,
+          "handshakeMs": 2100.9566670000204,
+          "catalogMs": 2380.9998750000086,
+          "requestedInventoryReadyMs": 2380.9998750000086,
+          "firstProjectsCompletedMs": 2916.2772920000134,
+          "firstProjectsCallMs": 535.1668329999957,
+          "modelReadCompletedMs": 9709.174375000002
+        },
+        {
+          "index": 4,
+          "handshakeMs": 2150.3147500000196,
+          "catalogMs": 2409.102042000013,
+          "requestedInventoryReadyMs": 2409.102042000013,
+          "firstProjectsCompletedMs": 2922.4628750000265,
+          "firstProjectsCallMs": 513.127542000002,
+          "modelReadCompletedMs": 9480.323292000015
+        },
+        {
+          "index": 5,
+          "handshakeMs": 2083.01583400002,
+          "catalogMs": 2288.3997090000194,
+          "requestedInventoryReadyMs": 2288.3997090000194,
+          "firstProjectsCompletedMs": 2484.7665420000267,
+          "firstProjectsCallMs": 194.47154200001387,
+          "modelReadCompletedMs": 9839.550084000017
+        },
+        {
+          "index": 6,
+          "handshakeMs": 2467.302250000008,
+          "catalogMs": 2509.7327920000243,
+          "requestedInventoryReadyMs": 2509.7327920000243,
+          "firstProjectsCompletedMs": 2916.6127500000002,
+          "firstProjectsCallMs": 406.6008750000037,
+          "modelReadCompletedMs": 9746.451000000001
+        },
+        {
+          "index": 7,
+          "handshakeMs": 2082.9003750000265,
+          "catalogMs": 2309.8198340000235,
+          "requestedInventoryReadyMs": 2309.8198340000235,
+          "firstProjectsCompletedMs": 2916.498917000019,
+          "firstProjectsCallMs": 606.5774589999928,
+          "modelReadCompletedMs": 9468.085750000027
+        },
+        {
+          "index": 8,
+          "handshakeMs": 2082.965917000023,
+          "catalogMs": 2150.860875000013,
+          "requestedInventoryReadyMs": 2150.860875000013,
+          "firstProjectsCompletedMs": 2913.6383750000095,
+          "firstProjectsCallMs": 762.6697910000221,
+          "modelReadCompletedMs": 9601.370750000002
+        },
+        {
+          "index": 9,
+          "handshakeMs": 1807.3234999999986,
+          "catalogMs": 1897.9781250000233,
+          "requestedInventoryReadyMs": 1897.9781250000233,
+          "firstProjectsCompletedMs": 2492.165000000008,
+          "firstProjectsCallMs": 594.0563339999935,
+          "modelReadCompletedMs": 9630.205875000014
+        }
+      ],
+      "catalogFleetReadyMs": 2509.7327920000243,
+      "requestedInventoryFleetReadyMs": 2509.7327920000243,
+      "failureName": "AssertionError",
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        51.0537109375,
+        36.1796875,
+        38.212890625
+      ]
+    },
+    {
+      "trial": 1,
+      "concurrency": 10,
+      "variant": "baseline",
+      "workload": "tools-first",
+      "loadAverageAtStart": [
+        51.0537109375,
+        36.1796875,
+        38.212890625
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 2832.9082920000073,
+          "catalogMs": 2841.4609169999894,
+          "requestedInventoryReadyMs": 2841.4609169999894,
+          "firstProjectsCompletedMs": 9727.404291999992,
+          "firstProjectsCallMs": 6885.827416000015,
+          "modelReadCompletedMs": 9734.412416999985,
+          "warmProjectsCallMs": 75.06912499997998,
+          "warmModelReadCallMs": 2.9972079999861307
+        },
+        {
+          "index": 1,
+          "handshakeMs": 2889.175041999988,
+          "catalogMs": 2930.2972080000036,
+          "requestedInventoryReadyMs": 2930.2972080000036,
+          "firstProjectsCompletedMs": 11868.712208000012,
+          "firstProjectsCallMs": 8938.306000000011,
+          "modelReadCompletedMs": 11873.419999999984,
+          "warmProjectsCallMs": 82.82045900000958,
+          "warmModelReadCallMs": 4.3420420000038575
+        },
+        {
+          "index": 2,
+          "handshakeMs": 2888.935582999984,
+          "catalogMs": 2918.334541999997,
+          "requestedInventoryReadyMs": 2918.334541999997,
+          "firstProjectsCompletedMs": 9717.211749999988,
+          "firstProjectsCallMs": 6798.76337500001,
+          "modelReadCompletedMs": 9730.770541999984,
+          "warmProjectsCallMs": 75.45050000000629,
+          "warmModelReadCallMs": 4.2138750000158325
+        },
+        {
+          "index": 3,
+          "handshakeMs": 2798.3957919999957,
+          "catalogMs": 2810.415083,
+          "requestedInventoryReadyMs": 2810.415083,
+          "firstProjectsCompletedMs": 9727.663042,
+          "firstProjectsCallMs": 6916.926915999997,
+          "modelReadCompletedMs": 9734.72454200001,
+          "warmProjectsCallMs": 75.33554200001527,
+          "warmModelReadCallMs": 5.0353330000070855
+        },
+        {
+          "index": 4,
+          "handshakeMs": 2661.48324999999,
+          "catalogMs": 2681.136582999985,
+          "requestedInventoryReadyMs": 2681.136582999985,
+          "firstProjectsCompletedMs": 9733.302250000008,
+          "firstProjectsCallMs": 7052.051792000013,
+          "modelReadCompletedMs": 9746.992375000002,
+          "warmProjectsCallMs": 87.50179099998786,
+          "warmModelReadCallMs": 3.2534579999919515
+        },
+        {
+          "index": 5,
+          "handshakeMs": 3150.137208,
+          "catalogMs": 3326.2379579999833,
+          "requestedInventoryReadyMs": 3326.2379579999833,
+          "firstProjectsCompletedMs": 11871.326375000004,
+          "firstProjectsCallMs": 8544.927541000012,
+          "modelReadCompletedMs": 11876.151207999996,
+          "warmProjectsCallMs": 82.67162499998813,
+          "warmModelReadCallMs": 2.4844169999996666
+        },
+        {
+          "index": 6,
+          "handshakeMs": 2840.182375000004,
+          "catalogMs": 2865.1120829999854,
+          "requestedInventoryReadyMs": 2865.1120829999854,
+          "firstProjectsCompletedMs": 9673.562707999983,
+          "firstProjectsCallMs": 6808.334917,
+          "modelReadCompletedMs": 9680.453417000012,
+          "warmProjectsCallMs": 77.78529100000742,
+          "warmModelReadCallMs": 2.6182499999995343
+        },
+        {
+          "index": 7,
+          "handshakeMs": 2958.087041999999,
+          "catalogMs": 2987.0256250000093,
+          "requestedInventoryReadyMs": 2987.0256250000093,
+          "firstProjectsCompletedMs": 11871.091832999984,
+          "firstProjectsCallMs": 8883.94425,
+          "modelReadCompletedMs": 11876.034667,
+          "warmProjectsCallMs": 83.87058399998932,
+          "warmModelReadCallMs": 2.2053329999907874
+        },
+        {
+          "index": 8,
+          "handshakeMs": 2888.3466670000053,
+          "catalogMs": 2899.0576669999864,
+          "requestedInventoryReadyMs": 2899.0576669999864,
+          "firstProjectsCompletedMs": 11871.222083,
+          "firstProjectsCallMs": 8971.442917000008,
+          "modelReadCompletedMs": 11876.221292000002,
+          "warmProjectsCallMs": 84.3434169999964,
+          "warmModelReadCallMs": 2.7282080000150017
+        },
+        {
+          "index": 9,
+          "handshakeMs": 2891.8169580000103,
+          "catalogMs": 2944.6370830000087,
+          "requestedInventoryReadyMs": 2944.6370830000087,
+          "firstProjectsCompletedMs": 11868.920542000007,
+          "firstProjectsCallMs": 8924.168291999988,
+          "modelReadCompletedMs": 11874.403083000012,
+          "warmProjectsCallMs": 79.99908300000243,
+          "warmModelReadCallMs": 4.198833000002196
+        }
+      ],
+      "catalogFleetReadyMs": 3326.2379579999833,
+      "requestedInventoryFleetReadyMs": 3326.2379579999833,
+      "projectsFleetReadyMs": 11871.326375000004,
+      "modelReadFleetReadyMs": 11876.221292000002,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 4845.96875,
+        "cpuSeconds": 28.819999999999997
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        48.34326171875,
+        36.2890625,
+        38.21484375
+      ]
+    },
+    {
+      "trial": 1,
+      "concurrency": 1,
+      "variant": "production",
+      "workload": "tools-first",
+      "loadAverageAtStart": [
+        48.34326171875,
+        36.2890625,
+        38.21484375
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 1049.679334000015,
+          "catalogMs": 1070.4137920000067,
+          "requestedInventoryReadyMs": 1070.4137920000067,
+          "firstProjectsCompletedMs": 1231.9710000000196,
+          "firstProjectsCallMs": 161.4072499999893,
+          "modelReadCompletedMs": 3174.3746670000255,
+          "warmProjectsCallMs": 44.62262500001816,
+          "warmModelReadCallMs": 1.5769169999985024
+        }
+      ],
+      "catalogFleetReadyMs": 1070.4137920000067,
+      "requestedInventoryFleetReadyMs": 1070.4137920000067,
+      "projectsFleetReadyMs": 1231.9710000000196,
+      "modelReadFleetReadyMs": 3174.3746670000255,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 568.6875,
+        "cpuSeconds": 2.31
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        45.7529296875,
+        35.9521484375,
+        38.08447265625
+      ]
+    },
+    {
+      "trial": 1,
+      "concurrency": 1,
+      "variant": "baseline",
+      "workload": "tools-first",
+      "loadAverageAtStart": [
+        45.7529296875,
+        35.9521484375,
+        38.08447265625
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 1009.0982080000103,
+          "catalogMs": 1016.1708750000107,
+          "requestedInventoryReadyMs": 1016.1708750000107,
+          "firstProjectsCompletedMs": 3398.8181669999904,
+          "firstProjectsCallMs": 2382.4970829999947,
+          "modelReadCompletedMs": 3402.130750000011,
+          "warmProjectsCallMs": 75.17499999998836,
+          "warmModelReadCallMs": 2.3084170000220183
+        }
+      ],
+      "catalogFleetReadyMs": 1016.1708750000107,
+      "requestedInventoryFleetReadyMs": 1016.1708750000107,
+      "projectsFleetReadyMs": 3398.8181669999904,
+      "modelReadFleetReadyMs": 3402.130750000011,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 559.421875,
+        "cpuSeconds": 2.68
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        45.7529296875,
+        35.9521484375,
+        38.08447265625
+      ]
+    },
+    {
+      "trial": 2,
+      "concurrency": 1,
+      "variant": "baseline",
+      "workload": "tools-first",
+      "loadAverageAtStart": [
+        46.9736328125,
+        36.36767578125,
+        38.21826171875
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 1830.6317080000008,
+          "catalogMs": 1842.3083330000227,
+          "requestedInventoryReadyMs": 1842.3083330000227,
+          "firstProjectsCompletedMs": 4139.606832999998,
+          "firstProjectsCallMs": 2297.021083999978,
+          "modelReadCompletedMs": 4144.4176670000015,
+          "warmProjectsCallMs": 167.373333000025,
+          "warmModelReadCallMs": 4.510332999983802
+        }
+      ],
+      "catalogFleetReadyMs": 1842.3083330000227,
+      "requestedInventoryFleetReadyMs": 1842.3083330000227,
+      "projectsFleetReadyMs": 4139.606832999998,
+      "modelReadFleetReadyMs": 4144.4176670000015,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 561.171875,
+        "cpuSeconds": 3.27
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        51.2197265625,
+        37.423828125,
+        38.580078125
+      ]
+    },
+    {
+      "trial": 2,
+      "concurrency": 1,
+      "variant": "production",
+      "workload": "tools-first",
+      "loadAverageAtStart": [
+        51.2197265625,
+        37.423828125,
+        38.580078125
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 1103.259625000006,
+          "catalogMs": 1136.560415999993,
+          "requestedInventoryReadyMs": 1136.560415999993,
+          "firstProjectsCompletedMs": 1313.3396249999932,
+          "firstProjectsCallMs": 176.21649999998044,
+          "modelReadCompletedMs": 3147.5936660000007,
+          "warmProjectsCallMs": 56.75220799999079,
+          "warmModelReadCallMs": 2.33866599999601
+        }
+      ],
+      "catalogFleetReadyMs": 1136.560415999993,
+      "requestedInventoryFleetReadyMs": 1136.560415999993,
+      "projectsFleetReadyMs": 1313.3396249999932,
+      "modelReadFleetReadyMs": 3147.5936660000007,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 566.390625,
+        "cpuSeconds": 2.34
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        51.2197265625,
+        37.423828125,
+        38.580078125
+      ]
+    },
+    {
+      "trial": 2,
+      "concurrency": 10,
+      "variant": "baseline",
+      "workload": "tools-first",
+      "loadAverageAtStart": [
+        50.96142578125,
+        37.59912109375,
+        38.63525390625
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 4879.060499999992,
+          "catalogMs": 4948.349542000011,
+          "requestedInventoryReadyMs": 4948.349542000011,
+          "firstProjectsCompletedMs": 13702.521582999994,
+          "firstProjectsCallMs": 8748.570542000001,
+          "modelReadCompletedMs": 13708.952875000017,
+          "warmProjectsCallMs": 93.4018329999817,
+          "warmModelReadCallMs": 3.137749999994412
+        },
+        {
+          "index": 1,
+          "handshakeMs": 4220.099332999991,
+          "catalogMs": 4229.125375000003,
+          "requestedInventoryReadyMs": 4229.125375000003,
+          "firstProjectsCompletedMs": 10650.974791999994,
+          "firstProjectsCallMs": 6421.714332999982,
+          "modelReadCompletedMs": 10675.556249999994,
+          "warmProjectsCallMs": 112.48720800000592,
+          "warmModelReadCallMs": 3.2430829999793787
+        },
+        {
+          "index": 2,
+          "handshakeMs": 4129.140791999991,
+          "catalogMs": 4343.914374999993,
+          "requestedInventoryReadyMs": 4343.914374999993,
+          "firstProjectsCompletedMs": 10641.857374999992,
+          "firstProjectsCallMs": 6297.824916000012,
+          "modelReadCompletedMs": 10651.353667000018,
+          "warmProjectsCallMs": 109.77716699999291,
+          "warmModelReadCallMs": 6.017083000013372
+        },
+        {
+          "index": 3,
+          "handshakeMs": 4878.96420799999,
+          "catalogMs": 5063.354667000007,
+          "requestedInventoryReadyMs": 5063.354667000007,
+          "firstProjectsCompletedMs": 13704.323875000002,
+          "firstProjectsCallMs": 8640.715999999986,
+          "modelReadCompletedMs": 13710.437708000012,
+          "warmProjectsCallMs": 112.5734999999986,
+          "warmModelReadCallMs": 3.256708000000799
+        },
+        {
+          "index": 4,
+          "handshakeMs": 4785.132042000012,
+          "catalogMs": 4860.487792,
+          "requestedInventoryReadyMs": 4860.487792,
+          "firstProjectsCompletedMs": 13704.006458000018,
+          "firstProjectsCallMs": 8843.315666999988,
+          "modelReadCompletedMs": 13710.27904200001,
+          "warmProjectsCallMs": 105.85729100002209,
+          "warmModelReadCallMs": 6.8289999999979045
+        },
+        {
+          "index": 5,
+          "handshakeMs": 4668.008916999999,
+          "catalogMs": 4679.907792000013,
+          "requestedInventoryReadyMs": 4679.907792000013,
+          "firstProjectsCompletedMs": 13708.77016700001,
+          "firstProjectsCallMs": 9028.746458000009,
+          "modelReadCompletedMs": 13716.288417000003,
+          "warmProjectsCallMs": 105.70483399997465,
+          "warmModelReadCallMs": 8.109583999990718
+        },
+        {
+          "index": 6,
+          "handshakeMs": 4497.1132919999945,
+          "catalogMs": 4589.898291999998,
+          "requestedInventoryReadyMs": 4589.898291999998,
+          "firstProjectsCompletedMs": 13709.154958,
+          "firstProjectsCallMs": 9119.117709000013,
+          "modelReadCompletedMs": 13716.406707999995,
+          "warmProjectsCallMs": 112.34941700001946,
+          "warmModelReadCallMs": 5.181249999994179
+        },
+        {
+          "index": 7,
+          "handshakeMs": 4785.307874999999,
+          "catalogMs": 4797.696499999991,
+          "requestedInventoryReadyMs": 4797.696499999991,
+          "firstProjectsCompletedMs": 13856.628041999997,
+          "firstProjectsCallMs": 9058.81129099999,
+          "modelReadCompletedMs": 13861.153458000015,
+          "warmProjectsCallMs": 104.00395899999421,
+          "warmModelReadCallMs": 9.730959000007715
+        },
+        {
+          "index": 8,
+          "handshakeMs": 4785.243000000017,
+          "catalogMs": 4830.1882500000065,
+          "requestedInventoryReadyMs": 4830.1882500000065,
+          "firstProjectsCompletedMs": 13702.14495799999,
+          "firstProjectsCallMs": 8871.847624999995,
+          "modelReadCompletedMs": 13709.882375000016,
+          "warmProjectsCallMs": 104.76054199997452,
+          "warmModelReadCallMs": 7.8779170000052545
+        },
+        {
+          "index": 9,
+          "handshakeMs": 4879.133375000005,
+          "catalogMs": 4910.394874999998,
+          "requestedInventoryReadyMs": 4910.394874999998,
+          "firstProjectsCompletedMs": 13704.236875000002,
+          "firstProjectsCallMs": 8793.720750000008,
+          "modelReadCompletedMs": 13715.95745799999,
+          "warmProjectsCallMs": 105.35283299998264,
+          "warmModelReadCallMs": 7.6029169999819715
+        }
+      ],
+      "catalogFleetReadyMs": 5063.354667000007,
+      "requestedInventoryFleetReadyMs": 5063.354667000007,
+      "projectsFleetReadyMs": 13856.628041999997,
+      "modelReadFleetReadyMs": 13861.153458000015,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 5100.640625,
+        "cpuSeconds": 29.19
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        57.80126953125,
+        39.78564453125,
+        39.39794921875
+      ]
+    },
+    {
+      "trial": 2,
+      "concurrency": 10,
+      "variant": "production",
+      "workload": "tools-first",
+      "loadAverageAtStart": [
+        57.80126953125,
+        39.78564453125,
+        39.39794921875
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 2707.5182090000017,
+          "catalogMs": 2748.7675839999865,
+          "requestedInventoryReadyMs": 2748.7675839999865,
+          "firstProjectsCompletedMs": 3635.1432499999937,
+          "firstProjectsCallMs": 886.1173749999725,
+          "modelReadCompletedMs": 7522.850917000003,
+          "warmProjectsCallMs": 124.3237079999817,
+          "warmModelReadCallMs": 7.196458000020357
+        },
+        {
+          "index": 1,
+          "handshakeMs": 2545.5159170000115,
+          "catalogMs": 2708.0560000000114,
+          "requestedInventoryReadyMs": 2708.0560000000114,
+          "firstProjectsCompletedMs": 3502.7006669999973,
+          "firstProjectsCallMs": 794.5344999999797,
+          "modelReadCompletedMs": 7482.19975,
+          "warmProjectsCallMs": 110.86116699999548,
+          "warmModelReadCallMs": 12.539332999993348
+        },
+        {
+          "index": 2,
+          "handshakeMs": 2733.2080000000133,
+          "catalogMs": 2820.9391250000044,
+          "requestedInventoryReadyMs": 2820.9391250000044,
+          "firstProjectsCompletedMs": 3958.2422500000102,
+          "firstProjectsCallMs": 1137.1858750000247,
+          "modelReadCompletedMs": 10639.874584000005,
+          "warmProjectsCallMs": 78.27754199999617,
+          "warmModelReadCallMs": 32.69083400000818
+        },
+        {
+          "index": 3,
+          "handshakeMs": 2505.1480420000153,
+          "catalogMs": 2588.2135000000126,
+          "requestedInventoryReadyMs": 2588.2135000000126,
+          "firstProjectsCompletedMs": 3497.6457919999957,
+          "firstProjectsCallMs": 909.1337080000085,
+          "modelReadCompletedMs": 7472.966709,
+          "warmProjectsCallMs": 118.49400000000605,
+          "warmModelReadCallMs": 9.396791000006488
+        },
+        {
+          "index": 4,
+          "handshakeMs": 2972.198875000002,
+          "catalogMs": 3031.501458999992,
+          "requestedInventoryReadyMs": 3031.501458999992,
+          "firstProjectsCompletedMs": 5673.683833999996,
+          "firstProjectsCallMs": 2642.051542000001,
+          "modelReadCompletedMs": 10692.712083999999,
+          "warmProjectsCallMs": 99.60799999997835,
+          "warmModelReadCallMs": 11.032707999984268
+        },
+        {
+          "index": 5,
+          "handshakeMs": 2458.3027090000105,
+          "catalogMs": 2626.6027919999906,
+          "requestedInventoryReadyMs": 2626.6027919999906,
+          "firstProjectsCompletedMs": 3887.8977500000037,
+          "firstProjectsCallMs": 1261.1888749999925,
+          "modelReadCompletedMs": 7612.252750000014,
+          "warmProjectsCallMs": 127.73749999998836,
+          "warmModelReadCallMs": 3.8677089999837335
+        },
+        {
+          "index": 6,
+          "handshakeMs": 2707.423791999987,
+          "catalogMs": 2945.292167000007,
+          "requestedInventoryReadyMs": 2945.292167000007,
+          "firstProjectsCompletedMs": 5659.397916999995,
+          "firstProjectsCallMs": 2713.9836249999935,
+          "modelReadCompletedMs": 10553.302458999999,
+          "warmProjectsCallMs": 99.67812500000582,
+          "warmModelReadCallMs": 11.238832999981241
+        },
+        {
+          "index": 7,
+          "handshakeMs": 2452.886459000001,
+          "catalogMs": 2663.0431249999965,
+          "requestedInventoryReadyMs": 2663.0431249999965,
+          "firstProjectsCompletedMs": 3495.662666999997,
+          "firstProjectsCallMs": 832.499416000006,
+          "modelReadCompletedMs": 7405.7624589999905,
+          "warmProjectsCallMs": 110.69266699999571,
+          "warmModelReadCallMs": 8.011250000010477
+        },
+        {
+          "index": 8,
+          "handshakeMs": 2733.364750000008,
+          "catalogMs": 2972.8429999999935,
+          "requestedInventoryReadyMs": 2972.8429999999935,
+          "firstProjectsCompletedMs": 3885.937208999996,
+          "firstProjectsCallMs": 912.974166,
+          "modelReadCompletedMs": 10814.037500000006,
+          "warmProjectsCallMs": 99.4122090000019,
+          "warmModelReadCallMs": 11.562957999994978
+        },
+        {
+          "index": 9,
+          "handshakeMs": 2733.3012089999975,
+          "catalogMs": 2789.8599169999943,
+          "requestedInventoryReadyMs": 2789.8599169999943,
+          "firstProjectsCompletedMs": 3955.536083999992,
+          "firstProjectsCallMs": 1165.563374999998,
+          "modelReadCompletedMs": 10464.669292000006,
+          "warmProjectsCallMs": 99.73787499999162,
+          "warmModelReadCallMs": 11.27262500001234
+        }
+      ],
+      "catalogFleetReadyMs": 3031.501458999992,
+      "requestedInventoryFleetReadyMs": 3031.501458999992,
+      "projectsFleetReadyMs": 5673.683833999996,
+      "modelReadFleetReadyMs": 10814.037500000006,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 4055.609375,
+        "cpuSeconds": 23.54
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        60.35546875,
+        40.91455078125,
+        39.80224609375
+      ]
+    },
+    {
+      "trial": 2,
+      "concurrency": 1,
+      "variant": "baseline",
+      "workload": "full-inventory",
+      "loadAverageAtStart": [
+        60.35546875,
+        40.91455078125,
+        39.80224609375
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 1313.9533750000119,
+          "catalogMs": 1323.8507500000123,
+          "requestedInventoryReadyMs": 3636.1795409999904,
+          "firstProjectsCompletedMs": 3750.500250000012,
+          "firstProjectsCallMs": 114.31891699999687,
+          "modelReadCompletedMs": 3758.5142909999995,
+          "warmProjectsCallMs": 70.91508400000748,
+          "warmModelReadCallMs": 9.276749999989988
+        }
+      ],
+      "catalogFleetReadyMs": 1323.8507500000123,
+      "requestedInventoryFleetReadyMs": 3636.1795409999904,
+      "projectsFleetReadyMs": 3750.500250000012,
+      "modelReadFleetReadyMs": 3758.5142909999995,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 562.09375,
+        "cpuSeconds": 2.87
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        61.60791015625,
+        41.49658203125,
+        40.01416015625
+      ]
+    },
+    {
+      "trial": 2,
+      "concurrency": 1,
+      "variant": "production",
+      "workload": "full-inventory",
+      "loadAverageAtStart": [
+        61.60791015625,
+        41.49658203125,
+        40.01416015625
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 767.244915999996,
+          "catalogMs": 786.8632079999952,
+          "requestedInventoryReadyMs": 965.6302499999874,
+          "firstProjectsCompletedMs": 1118.7011659999844,
+          "firstProjectsCallMs": 153.06945800001267,
+          "modelReadCompletedMs": 2399.9795829999784,
+          "warmProjectsCallMs": 82.47999999998137,
+          "warmModelReadCallMs": 4.004707999993116
+        }
+      ],
+      "catalogFleetReadyMs": 786.8632079999952,
+      "requestedInventoryFleetReadyMs": 965.6302499999874,
+      "projectsFleetReadyMs": 1118.7011659999844,
+      "modelReadFleetReadyMs": 2399.9795829999784,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 565.671875,
+        "cpuSeconds": 2.24
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        58.11572265625,
+        41.1064453125,
+        39.884765625
+      ]
+    },
+    {
+      "trial": 2,
+      "concurrency": 10,
+      "variant": "baseline",
+      "workload": "full-inventory",
+      "loadAverageAtStart": [
+        58.11572265625,
+        41.1064453125,
+        39.884765625
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 2880.2938330000034,
+          "catalogMs": 2905.9470000000147,
+          "requestedInventoryReadyMs": 10856.827500000014,
+          "firstProjectsCompletedMs": 10951.909250000026,
+          "firstProjectsCallMs": 95.08016700000735,
+          "modelReadCompletedMs": 10956.549166000012,
+          "warmProjectsCallMs": 99.81450000000768,
+          "warmModelReadCallMs": 6.653041999990819
+        },
+        {
+          "index": 1,
+          "handshakeMs": 2623.776958000002,
+          "catalogMs": 2660.509625000006,
+          "requestedInventoryReadyMs": 9630.385625000024,
+          "firstProjectsCompletedMs": 9829.613500000007,
+          "firstProjectsCallMs": 199.22687499999302,
+          "modelReadCompletedMs": 9866.768750000017,
+          "warmProjectsCallMs": 99.59162500000093,
+          "warmModelReadCallMs": 7.175917000015033
+        },
+        {
+          "index": 2,
+          "handshakeMs": 2880.453666000016,
+          "catalogMs": 2890.128458000021,
+          "requestedInventoryReadyMs": 10097.609333,
+          "firstProjectsCompletedMs": 10459.911958000012,
+          "firstProjectsCallMs": 362.30145800000173,
+          "modelReadCompletedMs": 10465.318208000012,
+          "warmProjectsCallMs": 99.65625,
+          "warmModelReadCallMs": 7.494458000001032
+        },
+        {
+          "index": 3,
+          "handshakeMs": 2855.2685000000056,
+          "catalogMs": 2887.479083000013,
+          "requestedInventoryReadyMs": 10696.843958000012,
+          "firstProjectsCompletedMs": 10952.089000000007,
+          "firstProjectsCallMs": 255.24433300000965,
+          "modelReadCompletedMs": 10956.633083000022,
+          "warmProjectsCallMs": 99.40187500001048,
+          "warmModelReadCallMs": 4.2997920000052545
+        },
+        {
+          "index": 4,
+          "handshakeMs": 3095.988458000007,
+          "catalogMs": 3115.237625000009,
+          "requestedInventoryReadyMs": 9866.910833000002,
+          "firstProjectsCompletedMs": 10241.753958000016,
+          "firstProjectsCallMs": 374.8432089999842,
+          "modelReadCompletedMs": 10248.955625000002,
+          "warmProjectsCallMs": 99.50750000000698,
+          "warmModelReadCallMs": 7.445624999993015
+        },
+        {
+          "index": 5,
+          "handshakeMs": 2817.430625000008,
+          "catalogMs": 2827.686000000016,
+          "requestedInventoryReadyMs": 10742.142208000005,
+          "firstProjectsCompletedMs": 10952.14616600002,
+          "firstProjectsCallMs": 210.00245900001028,
+          "modelReadCompletedMs": 10956.48550000001,
+          "warmProjectsCallMs": 99.75820800001384,
+          "warmModelReadCallMs": 7.27058300000499
+        },
+        {
+          "index": 6,
+          "handshakeMs": 2848.213666000025,
+          "catalogMs": 2954.440708000009,
+          "requestedInventoryReadyMs": 10883.008333000005,
+          "firstProjectsCompletedMs": 10952.01779100002,
+          "firstProjectsCallMs": 69.008582999988,
+          "modelReadCompletedMs": 10956.599833000015,
+          "warmProjectsCallMs": 96.98183400000562,
+          "warmModelReadCallMs": 10.082915999984834
+        },
+        {
+          "index": 7,
+          "handshakeMs": 3108.9320830000215,
+          "catalogMs": 3127.486958000023,
+          "requestedInventoryReadyMs": 9830.980750000017,
+          "firstProjectsCompletedMs": 10242.068375000003,
+          "firstProjectsCallMs": 411.0871660000121,
+          "modelReadCompletedMs": 10248.29125000001,
+          "warmProjectsCallMs": 103.2944580000185,
+          "warmModelReadCallMs": 3.8066669999971054
+        },
+        {
+          "index": 8,
+          "handshakeMs": 2950.374666000018,
+          "catalogMs": 2957.4474580000096,
+          "requestedInventoryReadyMs": 10914.427041000017,
+          "firstProjectsCompletedMs": 11027.948958000023,
+          "firstProjectsCallMs": 113.52016600000206,
+          "modelReadCompletedMs": 11039.50770800002,
+          "warmProjectsCallMs": 99.18183299998054,
+          "warmModelReadCallMs": 4.287291000015102
+        },
+        {
+          "index": 9,
+          "handshakeMs": 2756.61154100002,
+          "catalogMs": 2785.159916000004,
+          "requestedInventoryReadyMs": 10202.803708000021,
+          "firstProjectsCompletedMs": 10438.932375000004,
+          "firstProjectsCallMs": 236.12812500001746,
+          "modelReadCompletedMs": 10447.681250000023,
+          "warmProjectsCallMs": 103.00662500000908,
+          "warmModelReadCallMs": 4.15066700000898
+        }
+      ],
+      "catalogFleetReadyMs": 3127.486958000023,
+      "requestedInventoryFleetReadyMs": 10914.427041000017,
+      "projectsFleetReadyMs": 11027.948958000023,
+      "modelReadFleetReadyMs": 11039.50770800002,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 4747.5625,
+        "cpuSeconds": 26.389999999999997
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        62.412109375,
+        42.59765625,
+        40.4287109375
+      ]
+    },
+    {
+      "trial": 2,
+      "concurrency": 10,
+      "variant": "production",
+      "workload": "full-inventory",
+      "loadAverageAtStart": [
+        59.255859375,
+        42.27197265625,
+        40.326171875
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 2196.3844160000153,
+          "catalogMs": 2212.813166000007,
+          "requestedInventoryReadyMs": 3755.199541000009,
+          "firstProjectsCompletedMs": 3936.7005409999983,
+          "firstProjectsCallMs": 181.5,
+          "modelReadCompletedMs": 11195.13479099999,
+          "warmProjectsCallMs": 123.55224999994971,
+          "warmModelReadCallMs": 8.096874999988358
+        },
+        {
+          "index": 1,
+          "handshakeMs": 2173.2004580000066,
+          "catalogMs": 2191.775083000015,
+          "requestedInventoryReadyMs": 2858.1846660000156,
+          "firstProjectsCompletedMs": 3812.496375000017,
+          "firstProjectsCallMs": 954.3101249999891,
+          "modelReadCompletedMs": 4873.990374999994,
+          "warmProjectsCallMs": 123.13133399997605,
+          "warmModelReadCallMs": 4.8501670000259764
+        },
+        {
+          "index": 2,
+          "handshakeMs": 2153.5519579999964,
+          "catalogMs": 2215.1142910000053,
+          "requestedInventoryReadyMs": 3553.4707500000077,
+          "firstProjectsCompletedMs": 3938.7493330000143,
+          "firstProjectsCallMs": 385.2767079999903,
+          "modelReadCompletedMs": 10996.886791000026,
+          "warmProjectsCallMs": 123.69337499997346,
+          "warmModelReadCallMs": 7.889082999958191
+        },
+        {
+          "index": 3,
+          "handshakeMs": 2223.8477910000074,
+          "catalogMs": 2255.1630000000005,
+          "requestedInventoryReadyMs": 3694.4896250000165,
+          "firstProjectsCompletedMs": 3936.596958000009,
+          "firstProjectsCallMs": 242.1064999999944,
+          "modelReadCompletedMs": 10977.423249999993,
+          "warmProjectsCallMs": 127.42404199996963,
+          "warmModelReadCallMs": 4.036707999999635
+        },
+        {
+          "index": 4,
+          "handshakeMs": 2169.1323750000156,
+          "catalogMs": 2203.7993330000027,
+          "requestedInventoryReadyMs": 3081.638250000018,
+          "firstProjectsCompletedMs": 3812.573208000016,
+          "firstProjectsCallMs": 730.9341249999998,
+          "modelReadCompletedMs": 11039.664583000005,
+          "warmProjectsCallMs": 122.87508299999172,
+          "warmModelReadCallMs": 4.934708999993745
+        },
+        {
+          "index": 5,
+          "handshakeMs": 2222.4515830000164,
+          "catalogMs": 2300.761415999994,
+          "requestedInventoryReadyMs": 3794.761375000002,
+          "firstProjectsCompletedMs": 6618.571250000008,
+          "firstProjectsCallMs": 2823.8085409999767,
+          "modelReadCompletedMs": 11080.587165999983,
+          "warmProjectsCallMs": 123.86062500003027,
+          "warmModelReadCallMs": 12.645957999979146
+        },
+        {
+          "index": 6,
+          "handshakeMs": 2135.128625000012,
+          "catalogMs": 2199.107290999993,
+          "requestedInventoryReadyMs": 3103.767374999996,
+          "firstProjectsCompletedMs": 3812.6347079999978,
+          "firstProjectsCallMs": 708.8664160000044,
+          "modelReadCompletedMs": 11014.291666000034,
+          "warmProjectsCallMs": 123.60462500003632,
+          "warmModelReadCallMs": 8.81479199999012
+        },
+        {
+          "index": 7,
+          "handshakeMs": 2173.0592910000123,
+          "catalogMs": 2216.0386660000077,
+          "requestedInventoryReadyMs": 3716.6890830000048,
+          "firstProjectsCompletedMs": 3936.3250410000037,
+          "firstProjectsCallMs": 219.63429099999485,
+          "modelReadCompletedMs": 11040.278125000012,
+          "warmProjectsCallMs": 123.19908299995586,
+          "warmModelReadCallMs": 8.327375000051688
+        },
+        {
+          "index": 8,
+          "handshakeMs": 2152.0966659999976,
+          "catalogMs": 2189.284916000004,
+          "requestedInventoryReadyMs": 3121.5528329999943,
+          "firstProjectsCompletedMs": 3812.381916000013,
+          "firstProjectsCallMs": 690.8284580000036,
+          "modelReadCompletedMs": 10895.450583000027,
+          "warmProjectsCallMs": 123.77929199999198,
+          "warmModelReadCallMs": 7.593165999976918
+        },
+        {
+          "index": 9,
+          "handshakeMs": 2177.775708000001,
+          "catalogMs": 2211.8500829999975,
+          "requestedInventoryReadyMs": 2871.029165999993,
+          "firstProjectsCompletedMs": 3812.6951249999984,
+          "firstProjectsCallMs": 941.6650829999999,
+          "modelReadCompletedMs": 11083.497916000022,
+          "warmProjectsCallMs": 123.71824999997625,
+          "warmModelReadCallMs": 7.748833000019658
+        }
+      ],
+      "catalogFleetReadyMs": 2300.761415999994,
+      "requestedInventoryFleetReadyMs": 3794.761375000002,
+      "projectsFleetReadyMs": 6618.571250000008,
+      "modelReadFleetReadyMs": 11195.13479099999,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 4772.96875,
+        "cpuSeconds": 23.44
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        58.201171875,
+        42.5810546875,
+        40.45703125
+      ]
+    },
+    {
+      "trial": 3,
+      "concurrency": 10,
+      "variant": "production",
+      "workload": "full-inventory",
+      "loadAverageAtStart": [
+        58.201171875,
+        42.5810546875,
+        40.45703125
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 2585.3073330000043,
+          "catalogMs": 2689.555249999976,
+          "requestedInventoryReadyMs": 3621.7023329999647,
+          "firstProjectsCompletedMs": 9217.30816700001,
+          "firstProjectsCallMs": 5595.605833999987,
+          "modelReadCompletedMs": 14878.769874999998,
+          "warmProjectsCallMs": 110.64937500003725,
+          "warmModelReadCallMs": 9.097208000021055
+        },
+        {
+          "index": 1,
+          "handshakeMs": 2633.3822079999954,
+          "catalogMs": 2653.2119999999995,
+          "requestedInventoryReadyMs": 3364.5251249999856,
+          "firstProjectsCompletedMs": 3806.7625830000034,
+          "firstProjectsCallMs": 442.2372079999768,
+          "modelReadCompletedMs": 13556.19779200002,
+          "warmProjectsCallMs": 110.72649999998976,
+          "warmModelReadCallMs": 6.136375000001863
+        },
+        {
+          "index": 2,
+          "handshakeMs": 2607.5252919999766,
+          "catalogMs": 2630.0711669999873,
+          "requestedInventoryReadyMs": 3430.4810830000206,
+          "firstProjectsCompletedMs": 3834.476250000007,
+          "firstProjectsCallMs": 403.99345799995353,
+          "modelReadCompletedMs": 14220.532000000007,
+          "warmProjectsCallMs": 109.81541699997615,
+          "warmModelReadCallMs": 11.234041000017896
+        },
+        {
+          "index": 3,
+          "handshakeMs": 2619.3749579999712,
+          "catalogMs": 2669.9258750000154,
+          "requestedInventoryReadyMs": 3530.3462079999736,
+          "firstProjectsCompletedMs": 9039.031416999991,
+          "firstProjectsCallMs": 5508.683917000017,
+          "modelReadCompletedMs": 14888.253041999997,
+          "warmProjectsCallMs": 108.90200000000186,
+          "warmModelReadCallMs": 12.091625000000931
+        },
+        {
+          "index": 4,
+          "handshakeMs": 2523.2650830000057,
+          "catalogMs": 2561.280625000014,
+          "requestedInventoryReadyMs": 3442.8678329999675,
+          "firstProjectsCompletedMs": 9023.412375000014,
+          "firstProjectsCallMs": 5580.543249999988,
+          "modelReadCompletedMs": 14354.52012499998,
+          "warmProjectsCallMs": 110.3059999999823,
+          "warmModelReadCallMs": 10.446082999987993
+        },
+        {
+          "index": 5,
+          "handshakeMs": 2566.122792000009,
+          "catalogMs": 2597.488624999998,
+          "requestedInventoryReadyMs": 3404.2601249999716,
+          "firstProjectsCompletedMs": 3830.4123329999857,
+          "firstProjectsCallMs": 426.152041000023,
+          "modelReadCompletedMs": 14659.757792000019,
+          "warmProjectsCallMs": 110.50979099998949,
+          "warmModelReadCallMs": 6.4372089999960735
+        },
+        {
+          "index": 6,
+          "handshakeMs": 2578.7755420000176,
+          "catalogMs": 2647.0565419999766,
+          "requestedInventoryReadyMs": 3653.5347499999916,
+          "firstProjectsCompletedMs": 9226.54233299999,
+          "firstProjectsCallMs": 5573.006082999986,
+          "modelReadCompletedMs": 14711.243124999979,
+          "warmProjectsCallMs": 110.64958299999125,
+          "warmModelReadCallMs": 6.250832999998238
+        },
+        {
+          "index": 7,
+          "handshakeMs": 2586.2335420000018,
+          "catalogMs": 2685.9415000000154,
+          "requestedInventoryReadyMs": 3599.2505830000155,
+          "firstProjectsCompletedMs": 9053.986749999982,
+          "firstProjectsCallMs": 5454.7342499999795,
+          "modelReadCompletedMs": 18773.782833000005,
+          "warmProjectsCallMs": 109.32145799999125,
+          "warmModelReadCallMs": 11.536000000021886
+        },
+        {
+          "index": 8,
+          "handshakeMs": 2742.8958749999874,
+          "catalogMs": 2791.400041999994,
+          "requestedInventoryReadyMs": 3688.0473749999655,
+          "firstProjectsCompletedMs": 14639.085124999983,
+          "firstProjectsCallMs": 10951.037208000023,
+          "modelReadCompletedMs": 14674.924332999974,
+          "warmProjectsCallMs": 110.41437499999302,
+          "warmModelReadCallMs": 9.307667000044603
+        },
+        {
+          "index": 9,
+          "handshakeMs": 2583.7597499999683,
+          "catalogMs": 2698.6993749999674,
+          "requestedInventoryReadyMs": 3480.044125000015,
+          "firstProjectsCompletedMs": 9027.886624999985,
+          "firstProjectsCallMs": 5547.841791000043,
+          "modelReadCompletedMs": 14940.338749999995,
+          "warmProjectsCallMs": 109.43954200000735,
+          "warmModelReadCallMs": 7.318124999990687
+        }
+      ],
+      "catalogFleetReadyMs": 2791.400041999994,
+      "requestedInventoryFleetReadyMs": 3688.0473749999655,
+      "projectsFleetReadyMs": 14639.085124999983,
+      "modelReadFleetReadyMs": 18773.782833000005,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 4397.8125,
+        "cpuSeconds": 25.42
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        67.5908203125,
+        45.9013671875,
+        41.70654296875
+      ]
+    },
+    {
+      "trial": 3,
+      "concurrency": 10,
+      "variant": "baseline",
+      "workload": "full-inventory",
+      "loadAverageAtStart": [
+        67.5908203125,
+        45.9013671875,
+        41.70654296875
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 4890.506500000018,
+          "catalogMs": 4910.23470900004,
+          "requestedInventoryReadyMs": 12533.666125000047,
+          "firstProjectsCompletedMs": 12752.896834000014,
+          "firstProjectsCallMs": 219.22904200002085,
+          "modelReadCompletedMs": 12756.639334000007,
+          "warmProjectsCallMs": 99.49283300002571,
+          "warmModelReadCallMs": 2.4911250000004657
+        },
+        {
+          "index": 1,
+          "handshakeMs": 4408.417042000045,
+          "catalogMs": 4524.197667,
+          "requestedInventoryReadyMs": 13704.151292000024,
+          "firstProjectsCompletedMs": 13836.25800000003,
+          "firstProjectsCallMs": 132.1059589999495,
+          "modelReadCompletedMs": 13896.703625000024,
+          "warmProjectsCallMs": 99.97041599999648,
+          "warmModelReadCallMs": 3.695000000006985
+        },
+        {
+          "index": 2,
+          "handshakeMs": 4257.579292000039,
+          "catalogMs": 4363.816749999998,
+          "requestedInventoryReadyMs": 12518.581959000032,
+          "firstProjectsCompletedMs": 12753.082292000006,
+          "firstProjectsCallMs": 234.49179200001527,
+          "modelReadCompletedMs": 12764.043750000012,
+          "warmProjectsCallMs": 99.29433300002711,
+          "warmModelReadCallMs": 2.5965420000138693
+        },
+        {
+          "index": 3,
+          "handshakeMs": 4416.223916999996,
+          "catalogMs": 4429.155583999993,
+          "requestedInventoryReadyMs": 13850.373750000028,
+          "firstProjectsCompletedMs": 13984.020542000013,
+          "firstProjectsCallMs": 133.64541699999245,
+          "modelReadCompletedMs": 13996.293459000008,
+          "warmProjectsCallMs": 99.72258400003193,
+          "warmModelReadCallMs": 2.2884590000030585
+        },
+        {
+          "index": 4,
+          "handshakeMs": 4053.7229170000064,
+          "catalogMs": 4071.1468340000138,
+          "requestedInventoryReadyMs": 13596.87645900005,
+          "firstProjectsCompletedMs": 13846.644834000035,
+          "firstProjectsCallMs": 249.76774999999907,
+          "modelReadCompletedMs": 13897.393542000034,
+          "warmProjectsCallMs": 99.09087499999441,
+          "warmModelReadCallMs": 4.599624999973457
+        },
+        {
+          "index": 5,
+          "handshakeMs": 4416.940875000029,
+          "catalogMs": 4423.986834000039,
+          "requestedInventoryReadyMs": 13567.150792,
+          "firstProjectsCompletedMs": 13835.088917000045,
+          "firstProjectsCallMs": 267.93733300000895,
+          "modelReadCompletedMs": 13897.340584000049,
+          "warmProjectsCallMs": 98.83158300002106,
+          "warmModelReadCallMs": 3.2561669999849983
+        },
+        {
+          "index": 6,
+          "handshakeMs": 3984.811000000045,
+          "catalogMs": 4003.555250000034,
+          "requestedInventoryReadyMs": 13641.74808400002,
+          "firstProjectsCompletedMs": 13835.670625000028,
+          "firstProjectsCallMs": 193.92225000000326,
+          "modelReadCompletedMs": 13872.469792000018,
+          "warmProjectsCallMs": 99.89299999998184,
+          "warmModelReadCallMs": 3.657666999963112
+        },
+        {
+          "index": 7,
+          "handshakeMs": 4724.848250000039,
+          "catalogMs": 4741.621417000017,
+          "requestedInventoryReadyMs": 13683.415750000044,
+          "firstProjectsCompletedMs": 13844.673667000025,
+          "firstProjectsCallMs": 161.2573749999865,
+          "modelReadCompletedMs": 13896.788750000007,
+          "warmProjectsCallMs": 99.16899999999441,
+          "warmModelReadCallMs": 4.423041999980342
+        },
+        {
+          "index": 8,
+          "handshakeMs": 4058.383167000022,
+          "catalogMs": 4066.4770420000423,
+          "requestedInventoryReadyMs": 13619.725875000004,
+          "firstProjectsCompletedMs": 13836.053542000009,
+          "firstProjectsCallMs": 216.32737499999348,
+          "modelReadCompletedMs": 13845.025584000046,
+          "warmProjectsCallMs": 98.74591699999291,
+          "warmModelReadCallMs": 2.6247909999801777
+        },
+        {
+          "index": 9,
+          "handshakeMs": 4409.059375000012,
+          "catalogMs": 4470.873750000028,
+          "requestedInventoryReadyMs": 13872.580333999998,
+          "firstProjectsCompletedMs": 13983.786791999999,
+          "firstProjectsCallMs": 111.2062089999672,
+          "modelReadCompletedMs": 13992.918959000031,
+          "warmProjectsCallMs": 99.10725000000093,
+          "warmModelReadCallMs": 2.209833000029903
+        }
+      ],
+      "catalogFleetReadyMs": 4910.23470900004,
+      "requestedInventoryFleetReadyMs": 13872.580333999998,
+      "projectsFleetReadyMs": 13984.020542000013,
+      "modelReadFleetReadyMs": 13996.293459000008,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 5523.4375,
+        "cpuSeconds": 28.13
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        68.15283203125,
+        47.08251953125,
+        42.20068359375
+      ]
+    },
+    {
+      "trial": 3,
+      "concurrency": 1,
+      "variant": "production",
+      "workload": "full-inventory",
+      "loadAverageAtStart": [
+        68.15283203125,
+        47.08251953125,
+        42.20068359375
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 1397.165624999965,
+          "catalogMs": 1431.1019579999847,
+          "requestedInventoryReadyMs": 1664.6284579999628,
+          "firstProjectsCompletedMs": 1821.6894999999786,
+          "firstProjectsCallMs": 157.06020800000988,
+          "modelReadCompletedMs": 4047.464457999973,
+          "warmProjectsCallMs": 85.58583400002681,
+          "warmModelReadCallMs": 5.419125000014901
+        }
+      ],
+      "catalogFleetReadyMs": 1431.1019579999847,
+      "requestedInventoryFleetReadyMs": 1664.6284579999628,
+      "projectsFleetReadyMs": 1821.6894999999786,
+      "modelReadFleetReadyMs": 4047.464457999973,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 571.859375,
+        "cpuSeconds": 2.61
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        70.06201171875,
+        47.828125,
+        42.4921875
+      ]
+    },
+    {
+      "trial": 3,
+      "concurrency": 1,
+      "variant": "baseline",
+      "workload": "full-inventory",
+      "loadAverageAtStart": [
+        70.06201171875,
+        47.828125,
+        42.4921875
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 1532.1022500000545,
+          "catalogMs": 1542.4265000000014,
+          "requestedInventoryReadyMs": 3889.0449160000426,
+          "firstProjectsCompletedMs": 3964.7073750000563,
+          "firstProjectsCallMs": 75.6619579999824,
+          "modelReadCompletedMs": 3967.985875000013,
+          "warmProjectsCallMs": 55.4237500000163,
+          "warmModelReadCallMs": 1.5748339999699965
+        }
+      ],
+      "catalogFleetReadyMs": 1542.4265000000014,
+      "requestedInventoryFleetReadyMs": 3889.0449160000426,
+      "projectsFleetReadyMs": 3964.7073750000563,
+      "modelReadFleetReadyMs": 3967.985875000013,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 562.453125,
+        "cpuSeconds": 3.02
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        74.541015625,
+        49.12548828125,
+        42.9814453125
+      ]
+    },
+    {
+      "trial": 3,
+      "concurrency": 10,
+      "variant": "production",
+      "workload": "tools-first",
+      "loadAverageAtStart": [
+        70.41357421875,
+        48.69140625,
+        42.8642578125
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 2166.738540999999,
+          "catalogMs": 2204.035499999998,
+          "requestedInventoryReadyMs": 2204.035499999998,
+          "firstProjectsCompletedMs": 2712.620583000011,
+          "firstProjectsCallMs": 508.4826250000042,
+          "modelReadCompletedMs": 12767.501500000013,
+          "warmProjectsCallMs": 117.17587499995716,
+          "warmModelReadCallMs": 7.346000000019558
+        },
+        {
+          "index": 1,
+          "handshakeMs": 2268.7097080000094,
+          "catalogMs": 2327.936832999985,
+          "requestedInventoryReadyMs": 2327.936832999985,
+          "firstProjectsCompletedMs": 2853.4450829999987,
+          "firstProjectsCallMs": 525.4056669999845,
+          "modelReadCompletedMs": 12506.128499999992,
+          "warmProjectsCallMs": 114.14949999999953,
+          "warmModelReadCallMs": 9.56895899999654
+        },
+        {
+          "index": 2,
+          "handshakeMs": 2175.3216249999823,
+          "catalogMs": 2294.6227499999804,
+          "requestedInventoryReadyMs": 2294.6227499999804,
+          "firstProjectsCompletedMs": 2710.1385829999927,
+          "firstProjectsCallMs": 415.4145000000135,
+          "modelReadCompletedMs": 12664.803207999968,
+          "warmProjectsCallMs": 108.79208300000755,
+          "warmModelReadCallMs": 3.1947909999871626
+        },
+        {
+          "index": 3,
+          "handshakeMs": 2141.0629999999655,
+          "catalogMs": 2271.0166660000104,
+          "requestedInventoryReadyMs": 2271.0166660000104,
+          "firstProjectsCompletedMs": 2851.2093749999767,
+          "firstProjectsCallMs": 580.0874579999945,
+          "modelReadCompletedMs": 12762.913624999986,
+          "warmProjectsCallMs": 110.37287500000093,
+          "warmModelReadCallMs": 3.696291999949608
+        },
+        {
+          "index": 4,
+          "handshakeMs": 2259.590166000009,
+          "catalogMs": 2366.652582999959,
+          "requestedInventoryReadyMs": 2366.652582999959,
+          "firstProjectsCompletedMs": 2851.1109580000048,
+          "firstProjectsCallMs": 484.359375,
+          "modelReadCompletedMs": 12361.281458000012,
+          "warmProjectsCallMs": 115.9007500000298,
+          "warmModelReadCallMs": 5.078999999968801
+        },
+        {
+          "index": 5,
+          "handshakeMs": 2032.9909159999806,
+          "catalogMs": 2126.2000000000116,
+          "requestedInventoryReadyMs": 2126.2000000000116,
+          "firstProjectsCompletedMs": 2708.1558749999967,
+          "firstProjectsCallMs": 581.8483339999802,
+          "modelReadCompletedMs": 12001.887707999966,
+          "warmProjectsCallMs": 117.25712500000373,
+          "warmModelReadCallMs": 6.529999999969732
+        },
+        {
+          "index": 6,
+          "handshakeMs": 2257.8730409999844,
+          "catalogMs": 2343.485875000013,
+          "requestedInventoryReadyMs": 2343.485875000013,
+          "firstProjectsCompletedMs": 2850.939874999982,
+          "firstProjectsCallMs": 507.35383399995044,
+          "modelReadCompletedMs": 11958.930999999982,
+          "warmProjectsCallMs": 118.7769580000313,
+          "warmModelReadCallMs": 1.2982919999631122
+        },
+        {
+          "index": 7,
+          "handshakeMs": 2249.053083000006,
+          "catalogMs": 2317.230333000014,
+          "requestedInventoryReadyMs": 2317.230333000014,
+          "firstProjectsCompletedMs": 2847.596124999982,
+          "firstProjectsCallMs": 530.251333000022,
+          "modelReadCompletedMs": 13026.915708000015,
+          "warmProjectsCallMs": 116.76429199997801,
+          "warmModelReadCallMs": 5.121916999982204
+        },
+        {
+          "index": 8,
+          "handshakeMs": 2166.6415829999605,
+          "catalogMs": 2190.643041000003,
+          "requestedInventoryReadyMs": 2190.643041000003,
+          "firstProjectsCompletedMs": 2709.017374999996,
+          "firstProjectsCallMs": 518.2526669999934,
+          "modelReadCompletedMs": 12683.093249999976,
+          "warmProjectsCallMs": 118.94650000002002,
+          "warmModelReadCallMs": 4.299750000005588
+        },
+        {
+          "index": 9,
+          "handshakeMs": 2050.407790999976,
+          "catalogMs": 2141.8362079999642,
+          "requestedInventoryReadyMs": 2141.8362079999642,
+          "firstProjectsCompletedMs": 2584.999833000009,
+          "firstProjectsCallMs": 443.062249999959,
+          "modelReadCompletedMs": 11731.826249999984,
+          "warmProjectsCallMs": 123.48545900004683,
+          "warmModelReadCallMs": 1.7211670000106096
+        }
+      ],
+      "catalogFleetReadyMs": 2366.652582999959,
+      "requestedInventoryFleetReadyMs": 2366.652582999959,
+      "projectsFleetReadyMs": 2853.4450829999987,
+      "modelReadFleetReadyMs": 13026.915708000015,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 5067.71875,
+        "cpuSeconds": 24.339999999999996
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        66.18603515625,
+        48.4765625,
+        42.8544921875
+      ]
+    },
+    {
+      "trial": 3,
+      "concurrency": 10,
+      "variant": "baseline",
+      "workload": "tools-first",
+      "loadAverageAtStart": [
+        66.18603515625,
+        48.4765625,
+        42.8544921875
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 3231.350416000001,
+          "catalogMs": 3279.3159159999923,
+          "requestedInventoryReadyMs": 3279.3159159999923,
+          "firstProjectsCompletedMs": 11934.842332999979,
+          "firstProjectsCallMs": 8655.41625000001,
+          "modelReadCompletedMs": 11942.23537499999,
+          "warmProjectsCallMs": 107.09133299998939,
+          "warmModelReadCallMs": 3.879125000035856
+        },
+        {
+          "index": 1,
+          "handshakeMs": 3211.2048330000252,
+          "catalogMs": 3244.515291000018,
+          "requestedInventoryReadyMs": 3244.515291000018,
+          "firstProjectsCompletedMs": 11704.90724999999,
+          "firstProjectsCallMs": 8460.283666000003,
+          "modelReadCompletedMs": 11720.201000000001,
+          "warmProjectsCallMs": 106.02225000003818,
+          "warmModelReadCallMs": 2.601250000006985
+        },
+        {
+          "index": 2,
+          "handshakeMs": 3370.512250000029,
+          "catalogMs": 3380.145375000022,
+          "requestedInventoryReadyMs": 3380.145375000022,
+          "firstProjectsCompletedMs": 11931.537415999977,
+          "firstProjectsCallMs": 8551.275332999998,
+          "modelReadCompletedMs": 11936.001416000014,
+          "warmProjectsCallMs": 107.40741699998034,
+          "warmModelReadCallMs": 3.7838750000228174
+        },
+        {
+          "index": 3,
+          "handshakeMs": 3149.629790999985,
+          "catalogMs": 3185.6059160000295,
+          "requestedInventoryReadyMs": 3185.6059160000295,
+          "firstProjectsCompletedMs": 11933.292666000023,
+          "firstProjectsCallMs": 8747.533707999974,
+          "modelReadCompletedMs": 11942.848791000026,
+          "warmProjectsCallMs": 105.95995799999218,
+          "warmModelReadCallMs": 3.706417000037618
+        },
+        {
+          "index": 4,
+          "handshakeMs": 3532.8909579999745,
+          "catalogMs": 3545.2306659999886,
+          "requestedInventoryReadyMs": 3545.2306659999886,
+          "firstProjectsCompletedMs": 11703.97320800001,
+          "firstProjectsCallMs": 8158.6319169999915,
+          "modelReadCompletedMs": 11708.958290999988,
+          "warmProjectsCallMs": 106.85345900000539,
+          "warmModelReadCallMs": 3.080041999986861
+        },
+        {
+          "index": 5,
+          "handshakeMs": 3130.0727910000132,
+          "catalogMs": 3163.234041000018,
+          "requestedInventoryReadyMs": 3163.234041000018,
+          "firstProjectsCompletedMs": 11930.763250000018,
+          "firstProjectsCallMs": 8767.379709,
+          "modelReadCompletedMs": 11934.433124999981,
+          "warmProjectsCallMs": 105.74183299997821,
+          "warmModelReadCallMs": 3.076792000036221
+        },
+        {
+          "index": 6,
+          "handshakeMs": 3410.948083000025,
+          "catalogMs": 3420.7334580000024,
+          "requestedInventoryReadyMs": 3420.7334580000024,
+          "firstProjectsCompletedMs": 12097.429915999994,
+          "firstProjectsCallMs": 8676.55137500004,
+          "modelReadCompletedMs": 12101.407624999993,
+          "warmProjectsCallMs": 105.48891600000206,
+          "warmModelReadCallMs": 2.865958000009414
+        },
+        {
+          "index": 7,
+          "handshakeMs": 3240.533457999991,
+          "catalogMs": 3260.9625000000233,
+          "requestedInventoryReadyMs": 3260.9625000000233,
+          "firstProjectsCompletedMs": 11662.30462499999,
+          "firstProjectsCallMs": 8401.24304099998,
+          "modelReadCompletedMs": 11676.62599999999,
+          "warmProjectsCallMs": 106.07920899998862,
+          "warmModelReadCallMs": 3.1170419999980368
+        },
+        {
+          "index": 8,
+          "handshakeMs": 3202.709582999989,
+          "catalogMs": 3217.4031250000116,
+          "requestedInventoryReadyMs": 3217.4031250000116,
+          "firstProjectsCompletedMs": 11935.584083000023,
+          "firstProjectsCallMs": 8718.056666999997,
+          "modelReadCompletedMs": 11939.387665999995,
+          "warmProjectsCallMs": 105.79783399996813,
+          "warmModelReadCallMs": 2.6235410000081174
+        },
+        {
+          "index": 9,
+          "handshakeMs": 3292.276332999987,
+          "catalogMs": 3306.2248329999857,
+          "requestedInventoryReadyMs": 3306.2248329999857,
+          "firstProjectsCompletedMs": 11933.985333000019,
+          "firstProjectsCallMs": 8627.660000000033,
+          "modelReadCompletedMs": 11938.887416000012,
+          "warmProjectsCallMs": 105.65187499998137,
+          "warmModelReadCallMs": 2.810916999995243
+        }
+      ],
+      "catalogFleetReadyMs": 3545.2306659999886,
+      "requestedInventoryFleetReadyMs": 3545.2306659999886,
+      "projectsFleetReadyMs": 12097.429915999994,
+      "modelReadFleetReadyMs": 12101.407624999993,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 5449.65625,
+        "cpuSeconds": 28.26
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        69.845703125,
+        50.05908203125,
+        43.51123046875
+      ]
+    },
+    {
+      "trial": 3,
+      "concurrency": 1,
+      "variant": "production",
+      "workload": "tools-first",
+      "loadAverageAtStart": [
+        69.845703125,
+        50.05908203125,
+        43.51123046875
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 767.2109579999815,
+          "catalogMs": 795.5352499999572,
+          "requestedInventoryReadyMs": 795.5352499999572,
+          "firstProjectsCompletedMs": 951.587165999983,
+          "firstProjectsCallMs": 155.8328750000219,
+          "modelReadCompletedMs": 2728.4008329999633,
+          "warmProjectsCallMs": 53.836375000013504,
+          "warmModelReadCallMs": 1.7509589999681339
+        }
+      ],
+      "catalogFleetReadyMs": 795.5352499999572,
+      "requestedInventoryFleetReadyMs": 795.5352499999572,
+      "projectsFleetReadyMs": 951.587165999983,
+      "modelReadFleetReadyMs": 2728.4008329999633,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 550.9375,
+        "cpuSeconds": 2.4
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        68.33642578125,
+        50.07421875,
+        43.5546875
+      ]
+    },
+    {
+      "trial": 3,
+      "concurrency": 1,
+      "variant": "baseline",
+      "workload": "tools-first",
+      "loadAverageAtStart": [
+        68.33642578125,
+        50.07421875,
+        43.5546875
+      ],
+      "status": "passed",
+      "rows": [
+        {
+          "index": 0,
+          "handshakeMs": 1271.4941250000265,
+          "catalogMs": 1281.978041000024,
+          "requestedInventoryReadyMs": 1281.978041000024,
+          "firstProjectsCompletedMs": 3504.309791000036,
+          "firstProjectsCallMs": 2222.2170419999748,
+          "modelReadCompletedMs": 3507.5960830000113,
+          "warmProjectsCallMs": 44.12733300001128,
+          "warmModelReadCallMs": 1.372665999981109
+        }
+      ],
+      "catalogFleetReadyMs": 1281.978041000024,
+      "requestedInventoryFleetReadyMs": 1281.978041000024,
+      "projectsFleetReadyMs": 3504.309791000036,
+      "modelReadFleetReadyMs": 3507.5960830000113,
+      "warmErrors": [],
+      "postReadResources": {
+        "rssMiB": 540.53125,
+        "cpuSeconds": 3.03
+      },
+      "cleanupConfirmed": true,
+      "loadAverageAtEnd": [
+        65.90673828125,
+        49.87353515625,
+        43.52197265625
+      ]
+    }
+  ],
+  "completedComparison": true,
+  "exactCatalogAndReadParity": false,
+  "method": {
+    "client": "@modelcontextprotocol/client 2.0.0, stdio, synthetic codex client identity, legacy negotiation, six proxy tools",
+    "trialsPerCell": 4,
+    "order": "balanced alternating baseline/production",
+    "cache": "warm filesystem; both artifact hashes read before trials; parent SDK warm",
+    "requestTimeoutMs": 20000,
+    "endpoint": "local Docker Huly",
+    "validation": "exact catalog and project/provider/resource parity checked before successful metrics admitted",
+    "failurePolicy": "retain failed fleets and censored deadlines, continue other arms; no timeout increase",
+    "memory": "sum process RSS after successful reads; not peak, idle, or PSS",
+    "scope": "fresh-process SDK comparison, not actual Codex UI latency; fleet is statistical unit"
+  }
+}

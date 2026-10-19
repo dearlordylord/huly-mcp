@@ -1,29 +1,26 @@
-import type { Doc } from "@hcengineering/core"
-import { SortingOrder } from "@hcengineering/core"
+import { type Doc, SortingOrder } from "@hcengineering/core"
+
 import type { FilteredView, Viewlet, ViewletDescriptor, ViewletPreference } from "@hcengineering/view"
 import { Effect } from "effect"
 
-import type {
-  FilteredViewDetail,
-  FilteredViewIdentifier,
-  FilteredViewSummary,
-  GetFilteredViewParams,
-  ListFilteredViewsParams,
-  ListFilteredViewsResult,
-  ListViewletsParams,
-  ListViewletsResult,
-  ViewletIdentifier,
-  ViewletSummary
-} from "../../domain/schemas.js"
 import {
-  Count,
+  type FilteredViewDetail,
+  type FilteredViewIdentifier,
+  type FilteredViewSummary,
+  type GetFilteredViewParams,
+  type ListFilteredViewsParams,
+  type ListFilteredViewsResult,
+  type ListViewletsParams,
+  type ListViewletsResult,
+  type ViewletIdentifier,
+  type ViewletSummary,
   FilteredViewId,
-  ObjectClassName,
-  PersonId,
   ViewletDescriptorId,
   ViewletId,
   ViewletPreferenceId
-} from "../../domain/schemas.js"
+} from "../../domain/schemas/views.js"
+import { Count, ObjectClassName, PersonId } from "../../domain/schemas/shared.js"
+
 import { ViewletDescriptorMetadataDegradedWarningCode } from "../../domain/schemas/tool-warnings.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { Diagnostics } from "../diagnostics.js"

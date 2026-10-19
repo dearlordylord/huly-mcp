@@ -1,11 +1,16 @@
 import { Result, Schema } from "effect"
 
-import { Count } from "../domain/schemas/index.js"
+import { Count } from "../domain/schemas/shared.js"
 import { createSuccessResponse, type McpToolResponse } from "./error-mapping.js"
 import { toClientCompatibleInputSchema } from "./input-schema-compat.js"
 import type { ToolRegistry } from "./tools/index.js"
-import { makeToolCategory, makeToolDescription, ToolDescription } from "./tools/registry.js"
-import type { ToolCategory, ToolDefinition } from "./tools/registry.js"
+import {
+  makeToolCategory,
+  makeToolDescription,
+  ToolDescription,
+  type ToolCategory,
+  type ToolDefinition
+} from "./tools/registry.js"
 
 const SEARCH_DEFAULT_LIMIT = 10
 export const SEARCH_MAX_LIMIT = 50

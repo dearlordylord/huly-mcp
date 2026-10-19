@@ -1,10 +1,15 @@
+import { matchesCredentialDestination } from "../../../src/profiles/credential-destination.js"
 import { type CredentialStoreSelector, selectCredentialStore } from "../../../src/profiles/credential-store.js"
-import { Effect, type Redacted, Schema } from "effect"
+import { Effect, Record, type Redacted, Schema } from "effect"
 
 import {
   type CliProfile,
+  type CredentialStorage,
+  CredentialStorageSchema,
+  type NativeCredentialReference,
   CliProfileSchema,
   type CliProfilesFile,
+  type CliCredentialsFile,
   type CliProfileStore,
   CliProfileStoreError,
   type ProfileName,
@@ -14,6 +19,8 @@ import {
 } from "./profile-store.js"
 
 const CliAuthStatusFields = {
+  verified: Schema.Literal(false),
+  credentialStorage: Schema.optionalKey(CliProfileSchema.fields.credentialStorage),
   profile: Schema.optionalKey(ProfileNameSchema),
   url: Schema.optionalKey(CliProfileSchema.fields.url),
   workspace: Schema.optionalKey(CliProfileSchema.fields.workspace),
@@ -26,14 +33,70 @@ const CliAuthStatusFields = {
 }
 
 export const CliAuthStatusSchema = Schema.Union([
-  Schema.Struct({ ...CliAuthStatusFields, authenticated: Schema.Literal(false), authMethod: Schema.Literal("none") }),
+  Schema.Struct({
+    ...CliAuthStatusFields,
+    authenticated: Schema.Literal(false),
+    configured: Schema.Literal(false),
+    authMethod: Schema.Literal("none")
+  }),
   Schema.Struct({
     ...CliAuthStatusFields,
     authenticated: Schema.Literal(true),
+    configured: Schema.Literal(true),
     authMethod: Schema.Literals(["token", "password"])
   })
 ])
 export type CliAuthStatus = Schema.Schema.Type<typeof CliAuthStatusSchema>
+
+const ProfileSummaryFields = {
+  ...CliProfileSchema.fields,
+  name: ProfileNameSchema,
+  active: Schema.Boolean,
+  verified: Schema.Literal(false),
+  credentialStorage: CredentialStorageSchema
+}
+export const CliProfileSummariesSchema = Schema.Array(
+  Schema.Union([
+    Schema.Struct({ ...ProfileSummaryFields, configured: Schema.Literal(true), authenticated: Schema.Literal(true) }),
+    Schema.Struct({ ...ProfileSummaryFields, configured: Schema.Literal(false), authenticated: Schema.Literal(false) })
+  ])
+)
+
+const fileCredentialConfigured = (credentials: CliCredentialsFile, name: ProfileName, profile: CliProfile): boolean => {
+  const binding = credentials.destinations?.[name]
+  return (
+    credentials.tokens[name] !== undefined && binding !== undefined && matchesCredentialDestination(binding, profile)
+  )
+}
+
+const profileCredentialConfigured = (
+  credentials: CliCredentialsFile,
+  name: ProfileName,
+  profile: CliProfile
+): boolean => {
+  if ((profile.credentialStorage ?? "file") === "file") return fileCredentialConfigured(credentials, name, profile)
+  return nativeReferenceMatches(credentials.native?.[name], profile.credentialStorage, profile)
+}
+
+export const getProfileSummaries = Effect.fn("Profiles.summaries")(function* (store: CliProfileStore) {
+  const profiles = yield* store.readProfiles()
+  const credentials = yield* store.readCredentials()
+  return Schema.decodeUnknownSync(CliProfileSummariesSchema)(
+    Record.toEntries(profiles.profiles).map(([name, profile]) => {
+      const backend = profile.credentialStorage ?? "file"
+      const configured = profileCredentialConfigured(credentials, name, profile)
+      return {
+        ...profile,
+        name,
+        active: name === profiles.activeProfile,
+        credentialStorage: backend,
+        verified: false,
+        configured,
+        authenticated: configured
+      }
+    })
+  )
+})
 
 export const CliProfilePatchSchema = Schema.Struct({
   defaultProject: Schema.optionalKey(
@@ -68,6 +131,7 @@ export const createProfile = (
   })
 
 const applyProfilePatch = (profile: CliProfile, patch: CliProfilePatch): CliProfile => ({
+  ...(profile.credentialStorage === undefined ? {} : { credentialStorage: profile.credentialStorage }),
   url: patch.url ?? profile.url,
   workspace: patch.workspace ?? profile.workspace,
   ...(patch.defaultProject === null
@@ -113,7 +177,9 @@ export const saveLogin = (
   Effect.gen(function* () {
     const profiles = yield* store.readProfiles()
     yield* store.writeProfiles({ ...withActiveProfile(profiles, name, profile), activeProfile: name })
-    yield* credentialStore(store).save(name, profile, token)
+    yield* credentialStore(store)
+      .save(name, profile, token, profile.credentialStorage)
+      .pipe(Effect.catch((error) => store.writeProfiles(profiles).pipe(Effect.andThen(Effect.fail(error)))))
   })
 
 export const logoutProfile = (
@@ -152,27 +218,59 @@ const optionalStatusFields = (resolved: ResolvedCliConfiguration) => {
   }
 }
 
+const authStatusSources = (
+  environment: NodeJS.ProcessEnv,
+  profile: CliProfile | undefined,
+  selected: ProfileName | undefined,
+  method: CliAuthStatus["authMethod"]
+): CliAuthStatus["sources"] => ({
+  url: source(environment["HULY_URL"], profile?.url),
+  workspace: source(environment["HULY_WORKSPACE"], profile?.workspace),
+  authentication: source(
+    environment["HULY_TOKEN"] ?? environment["HULY_EMAIL"] ?? environment["HULY_PASSWORD"],
+    method === "token" ? selected : undefined
+  )
+})
+
 const makeAuthStatus = (
   profiles: CliProfilesFile,
   resolved: ResolvedCliConfiguration,
-  environment: NodeJS.ProcessEnv
+  environment: NodeJS.ProcessEnv,
+  nativeConfigured = false
 ): CliAuthStatus => {
   const profile = resolved.profile === undefined ? undefined : profiles.profiles[resolved.profile]
-  const method = authMethod(resolved)
+  const method = nativeConfigured && resolved.auth.method === "none" ? "token" : authMethod(resolved)
   return Schema.decodeUnknownSync(CliAuthStatusSchema)({
+    verified: false,
     authenticated: method !== "none",
+    configured: method !== "none",
     authMethod: method,
     ...optionalStatusFields(resolved),
-    sources: {
-      url: source(environment["HULY_URL"], profile?.url),
-      workspace: source(environment["HULY_WORKSPACE"], profile?.workspace),
-      authentication: source(
-        environment["HULY_TOKEN"] ?? environment["HULY_EMAIL"] ?? environment["HULY_PASSWORD"],
-        resolved.profile === undefined || resolved.auth.method !== "token" ? undefined : resolved.profile
-      )
-    }
+    ...(profile === undefined ? {} : { credentialStorage: profile.credentialStorage ?? "file" }),
+    sources: authStatusSources(environment, profile, resolved.profile, method)
   })
 }
+
+const nativeReferenceMatches = (
+  reference: NativeCredentialReference | undefined,
+  storage: CredentialStorage | undefined,
+  configuration: Pick<ResolvedCliConfiguration, "url" | "workspace">
+): boolean =>
+  reference !== undefined &&
+  reference.backend === storage &&
+  matchesCredentialDestination(reference.destination, configuration)
+
+const nativeConfiguredForStatus = Effect.fn("Profiles.nativeConfiguredForStatus")(function* (
+  store: CliProfileStore,
+  configuration: ResolvedCliConfiguration,
+  profile: CliProfile | undefined
+) {
+  if (configuration.auth.method !== "none") return false
+  if (configuration.profile === undefined) return false
+  if ((profile?.credentialStorage ?? "file") === "file") return false
+  const credentials = yield* store.readCredentials()
+  return nativeReferenceMatches(credentials.native?.[configuration.profile], profile?.credentialStorage, configuration)
+})
 
 export const getAuthStatus = (
   store: CliProfileStore,
@@ -186,8 +284,18 @@ export const getAuthStatus = (
       environment,
       requestedName,
       true,
-      selectCredentialStore,
+      (storage) => ({
+        ...selectCredentialStore(storage),
+        read: (name, destination) =>
+          Effect.gen(function* () {
+            const selected = profiles.profiles[name]
+            if (selected?.credentialStorage !== undefined && selected.credentialStorage !== "file") return undefined
+            return yield* selectCredentialStore(storage).read(name, destination)
+          })
+      }),
       false
     )
-    return makeAuthStatus(profiles, resolved, environment)
+    const selected = resolved.profile === undefined ? undefined : profiles.profiles[resolved.profile]
+    const configured = yield* nativeConfiguredForStatus(store, resolved, selected)
+    return makeAuthStatus(profiles, resolved, environment, configured)
   })

@@ -1,3 +1,4 @@
+import { expectRegisteredMetadata } from "../../helpers/registered-tool.js"
 import { describe, it } from "@effect/vitest"
 import type { Channel, Person as HulyPerson } from "@hcengineering/contact"
 import { AvatarType } from "@hcengineering/contact"
@@ -163,7 +164,7 @@ describe("approvalRequestTools", () => {
       ])
       for (const tool of approvalRequestTools) {
         expect(tool.category).toBe("approvals")
-        expect(TOOL_DEFINITIONS[tool.name]).toBe(tool)
+        expectRegisteredMetadata(TOOL_DEFINITIONS[tool.name], tool)
       }
       expect(resolveAnnotations(findTool("list_approval_requests")).readOnlyHint).toBe(true)
       expect(resolveAnnotations(findTool("get_approval_request")).readOnlyHint).toBe(true)

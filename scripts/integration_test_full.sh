@@ -2762,7 +2762,7 @@ if run_result_to_var LIST_STATUSES_RESULT "list_statuses($PROJECT)" \
   # The raw-ref regex below remains defense in depth if an ID format changes.
   if printf '%s\n' "$LIST_STATUSES_RESULT" | jq -e '
     ((.structuredContent.warnings? // []) | length == 0)
-    and ([.content[]? | select((.text | fromjson? | has("warnings")) == true)] | length == 0)
+    and ([.content[]? | select((.text | fromjson? | objects | has("warnings")) == true)] | length == 0)
   ' >/dev/null 2>&1; then
     echo "PASS: list_statuses($PROJECT) emits no degradation warnings"
     PASSED=$((PASSED + 1))
@@ -4305,8 +4305,9 @@ else
           "not empty"
         run_capture_to_var INV_DELETE_VARIANT_TEXT "delete_inventory_variant($INVENTORY_CLEANUP_VARIANT_ID)" \
           "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_inventory_variant\",\"arguments\":{\"variant\":$INV_VARIANT_ID_JSON}},\"id\":2}"
-        assert_json_field_equals "delete_inventory_variant deleted" "$INV_DELETE_VARIANT_TEXT" ".deleted" "true"
-        INVENTORY_CLEANUP_VARIANT_ID=""
+        if assert_json_field_equals "delete_inventory_variant deleted" "$INV_DELETE_VARIANT_TEXT" ".deleted" "true"; then
+          INVENTORY_CLEANUP_VARIANT_ID=""
+        fi
       else
         skip_test "get/update/delete inventory variant" "create_inventory_variant did not return an id"
       fi
@@ -4323,13 +4324,15 @@ else
     if [ -n "$INVENTORY_CLEANUP_CHILD_CATEGORY_ID" ]; then
       run_capture_to_var INV_DELETE_CHILD_CATEGORY_TEXT "delete_inventory_category($INVENTORY_CLEANUP_CHILD_CATEGORY_ID)" \
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_inventory_category\",\"arguments\":{\"category\":$INV_CHILD_CATEGORY_ID_JSON}},\"id\":2}"
-      assert_json_field_equals "delete_inventory_category(child) deleted" "$INV_DELETE_CHILD_CATEGORY_TEXT" ".deleted" "true"
-      INVENTORY_CLEANUP_CHILD_CATEGORY_ID=""
+      if assert_json_field_equals "delete_inventory_category(child) deleted" "$INV_DELETE_CHILD_CATEGORY_TEXT" ".deleted" "true"; then
+        INVENTORY_CLEANUP_CHILD_CATEGORY_ID=""
+      fi
     fi
     run_capture_to_var INV_DELETE_CATEGORY_TEXT "delete_inventory_category($INVENTORY_CLEANUP_CATEGORY_ID)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_inventory_category\",\"arguments\":{\"category\":$INV_CATEGORY_ID_JSON}},\"id\":2}"
-    assert_json_field_equals "delete_inventory_category deleted" "$INV_DELETE_CATEGORY_TEXT" ".deleted" "true"
-    INVENTORY_CLEANUP_CATEGORY_ID=""
+    if assert_json_field_equals "delete_inventory_category deleted" "$INV_DELETE_CATEGORY_TEXT" ".deleted" "true"; then
+      INVENTORY_CLEANUP_CATEGORY_ID=""
+    fi
   else
     skip_test "get/update/delete inventory category" "create_inventory_category did not return an id"
   fi
@@ -7392,8 +7395,8 @@ for METADATA_TOOL in list_notification_providers list_notification_types; do
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"$METADATA_TOOL\",\"arguments\":{}},\"id\":2}"; then
     if printf '%s\n' "$METADATA_RESULT" | jq -e '
       ((.structuredContent.warnings? // []) | length == 0)
-      and ([.content[]? | select((.text | fromjson? | has("warnings")) == true)] | length == 0)
-      and ((.content[0].text | fromjson | length) > 0)
+      and ([.content[]? | select((.text | fromjson? | objects | has("warnings")) == true)] | length == 0)
+      and (.content[0].text | fromjson | type == "array" and length > 0)
     ' >/dev/null 2>&1; then
       echo "PASS: $METADATA_TOOL resolves authoritative model metadata without warnings"
       PASSED=$((PASSED + 1))

@@ -6,7 +6,7 @@ import { promisify } from "node:util"
 import { Schema } from "effect"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
-import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { residentSelectionEnvironment } from "../helpers/resident-selection-environment.js"
 import { ConfigFaultInput, ConfigFaultMode, ConfigFaultReceipt, ConfigFaultLaunch } from "./config-fault-contract.js"
 
@@ -36,7 +36,7 @@ describe.skipIf(process.platform !== "linux")("packaged configuration fault isol
           "--bundle",
           "--platform=node",
           "--format=cjs",
-          "--external:ws",
+          ...NATIVE_RUNTIME_EXTERNALS,
           `--outfile=${output}`
         ],
         { timeout: PROCESS_BOUND }

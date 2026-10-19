@@ -2,11 +2,9 @@ import {
   completeTodoParamsJsonSchema,
   createTodoParamsJsonSchema,
   CreateTodoResultSchema,
-  DEFAULT_LIMIT,
   deleteTodoParamsJsonSchema,
   DeleteTodoResultSchema,
   getTodoParamsJsonSchema,
-  HULY_NATIVE_REFERENCE_MARKDOWN_INPUT,
   listTodosParamsJsonSchema,
   parseCompleteTodoParams,
   parseCreateTodoParams,
@@ -23,14 +21,14 @@ import {
   TodoDetailSchema,
   unscheduleTodoParamsJsonSchema,
   UnscheduleTodoResultSchema,
-  updateTodoParamsJsonSchema
-} from "../../domain/schemas.js"
-import {
+  updateTodoParamsJsonSchema,
   CompleteTodoResultSchema,
   ListTodosResultSchema,
   ReopenTodoResultSchema,
   UpdateTodoResultSchema
 } from "../../domain/schemas/planner.js"
+import { DEFAULT_LIMIT } from "../../domain/schemas/shared.js"
+import { HULY_NATIVE_REFERENCE_MARKDOWN_INPUT } from "../../domain/schemas/document-native-references.js"
 import {
   completeTodo,
   createTodo,

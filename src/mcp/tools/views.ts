@@ -8,7 +8,7 @@ import {
   parseGetFilteredViewParams,
   parseListFilteredViewsParams,
   parseListViewletsParams
-} from "../../domain/schemas.js"
+} from "../../domain/schemas/views.js"
 import { getFilteredView, listFilteredViews, listViewlets } from "../../huly/operations/views.js"
 import { defineTool, type RegisteredTool } from "./registry.js"
 
