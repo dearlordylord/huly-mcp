@@ -4,6 +4,8 @@
 
 On 2026-10-18 the user made native macOS execution optional and nonblocking for this delivery, and will run it on their own computer. The amendment is recorded in GitHub issues #322 and #328. macOS support remains in scope. Native macOS scenarios remain deferred and unexecuted; Linux results do not qualify macOS. Linux requirements and all other behavioral cases, coverage thresholds, diagnostics, inventory, deadlines and cleanup obligations remain required. No denied SSH access was bypassed.
 
+The completion audit retains all 170 rows. Only the dedicated Mac execution story `322.41` may be nonblocking `deferred`, and only when both frozen #322/#328 bodies contain the explicit approved amendment. Mixed Linux/macOS criteria still require their Linux portion. An arbitrary deferred requirement cannot produce completion. The checker self-tests cover complete proof, incomplete proof, authorized Mac deferral, missing authorization and still-required Linux deferral.
+
 ## Focused coverage-cohort comparison
 
 The full quality gate on `4a7362be` stopped at the unchanged 300-second coverage limit. Its saved V8 chunks showed completion of 145 of 520 test files; there were no final coverage totals. This was a failed gate.

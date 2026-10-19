@@ -55,7 +55,21 @@ def inventory(directory):
         rows.extend({"id": f"{number}.{index}", "requirement": text} for index, text in enumerate(texts, 1))
     if child_count != 68:
         raise ValueError("Expected 68 child criteria")
-    return {"issues": issues, "requirements": rows}
+    macos_amendment = "### Native macOS qualification deferral — 2026-10-18"
+    optional = ["322.41"] if all(
+        macos_amendment in bodies[number]
+        and "native macOS execution is optional and nonblocking for completion" in bodies[number]
+        for number in (322, 328)
+    ) else []
+    return {"issues": issues, "requirements": rows, "optionalRequirements": optional}
+
+
+def is_complete(audit, expected):
+    """Keep every row; only the frozen, explicitly amended Mac run may defer."""
+    optional = set(expected["optionalRequirements"])
+    return all(row["status"] == "proven" or
+        (row["status"] == "deferred" and row["id"] in optional)
+        for row in audit["rows"])
 
 
 def check(audit, expected, repo, check_paths=True):
@@ -117,6 +131,19 @@ def self_test(expected):
         for row in expected["requirements"]
     ]}
     check(sample, expected, pathlib.Path.cwd(), False)
+    assert not is_complete(sample, expected)
+    finished = copy.deepcopy(sample)
+    for row in finished["rows"]:
+        row.update(status="proven", evidence=["self-test-evidence"], gap="")
+    assert is_complete(finished, expected)
+    macos = next(row for row in finished["rows"] if row["id"] == "322.41")
+    macos.update(status="deferred", gap="Explicit user deferral")
+    assert is_complete(finished, expected) == ("322.41" in expected["optionalRequirements"])
+    blocking = {**expected, "optionalRequirements": []}
+    assert not is_complete(finished, blocking)
+    linux = next(row for row in finished["rows"] if row["id"] == "322.42")
+    linux.update(status="deferred", gap="Still required")
+    assert not is_complete(finished, expected)
     broken = []
     missing = copy.deepcopy(sample)
     missing["rows"].pop()
@@ -160,7 +187,7 @@ def self_test(expected):
         except ValueError:
             continue
         raise ValueError("Self-test accepted changed/missing evidence")
-    return {"acceptedInventories": 2, "rejectedInvalidAudits": len(broken) + len(physical)}
+    return {"acceptedInventories": 2, "rejectedInvalidAudits": len(broken) + len(physical), "scopeDeferralChecks": 5}
 
 
 def main():
@@ -181,9 +208,11 @@ def main():
         return 0
     if args.audit is None:
         parser.error("--audit is required unless emitting inventory or running self-tests")
-    counts = check(json.loads(args.audit.read_text()), expected, args.repo_root)
-    complete = counts["proven"] == len(expected["requirements"])
+    audit = json.loads(args.audit.read_text())
+    counts = check(audit, expected, args.repo_root)
+    complete = is_complete(audit, expected)
     print(json.dumps({"inventoryConsistent": True, "counts": counts, "complete": complete,
+                      "optionalRequirements": expected["optionalRequirements"],
                       "limitation": "Inventory, content identity and artifact availability do not prove semantic claims."}))
     return 1 if args.require_complete and not complete else 0
 
