@@ -131,3 +131,43 @@ failure. No coherent-gate retry is admitted from this result. Spec review found
 no weakened business, ownership, idle/lease, or retirement assertions in the six
 migrations. The Standards finding about control outliving a rejected owned-exit
 observation was fixed by settling both operations before returning.
+
+### Current isolated actual-Codex observation
+
+The fresh package built from 19bd9b76 has SHA-256
+`22f5655a8a2b04483efa3ff628b64b1dc32d58a06171730707a276c522fd9a13`.
+An actual Codex 0.163.0 app-server used isolated HOME/CODEX_HOME, a disposable
+no-generation model configuration and this packaged managed adapter. Its auto
+mode selected proxy exposure with strict output handling, six expected listed
+tools and one allowed project-operation candidate. First and continued
+`invoke_tool(get_project)` calls returned the expected existing local-Huly
+project identifier/name. No Huly mutation, model generation or recipient
+messaging was performed.
+
+Evidence is private at `/tmp/resident-codex-auto-live-19bd-w9lxdify`.
+`verify.mts` decoded the catalog/context/project/ownership/exit records against
+the current Effect schemas and produced `verified-schema.json`. Host exit0,
+matching backend kernel exit0, supervisor exit0 and empty private state were
+observed. Cleanup used authenticated exact-generation stop after host closure;
+acknowledgement was not substituted for the owned exit. Calls retained five
+seconds, cleanup retained seven seconds, and the supervisor retained25 seconds.
+`inputs-sha256.json` binds the probe and package; `manifest.json` binds retained
+artifacts. The configured-secret scan found zero matching files among114 files.
+Raw ownership/configuration records remain private rather than public evidence.
+
+This is current actual-host discovery and two-read evidence, not a native-mode
+Claude qualification or a passing coherent gate. Historical comparison333 keeps
+its own exact bytes and performance scope.
+
+### Startup diagnostic retained separately
+
+`/tmp/resident-startup-profile-19bd-corrected-0xinj2_6` contains one private
+inspector-instrumented ten-reader diagnostic. It completed, but its modified
+package is not qualification evidence for the production artifact. The profile
+contains module initialization, schema transformation and transport work rather
+than one identified dominant failing function. It does not establish the cause
+of the uninstrumented five-second discovery failure or a measured speedup.
+The preceding diagnostic mistakenly placed its prefix before the executable
+shebang and failed parsing before backend startup; that separate failed attempt
+is preserved at `/tmp/resident-startup-profile-19bd-p3lt9s0l` and supplies no
+profile or functional qualification.
