@@ -57,6 +57,7 @@ def main():
     out = args.out or Path(tempfile.mkdtemp(prefix="resident-launch-model-"))
     out.mkdir(parents=True, exist_ok=True)
     sources = sorted((root / "quint-specs").glob("resident-launch*.qnt"))
+    sources += sorted((root / "quint-specs").glob("resident-recovery*.qnt"))
     sources += [root / "test/helpers/resident-launch-replay.ts", root / "test/resident/launch-model-alignment.test.ts"]
     hashes = {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources}
     model = "quint-specs/resident-launch.qnt"
@@ -81,7 +82,8 @@ def main():
             raise SystemExit("Quint failed; retained evidence: " + str(out))
         return result["output"]
 
-    for name, path in [("scenarios", scenarios), ("observations", "quint-specs/resident-launch-observations_test.qnt")]:
+    for name, path in [("scenarios", scenarios), ("observations", "quint-specs/resident-launch-observations_test.qnt"),
+                       ("recovery-observations", "quint-specs/resident-recovery-observations_test.qnt")]:
         run(name + "-typecheck", ["typecheck", path])
         run(name + "-tests", ["test", path, "--backend=rust", "--match=Test$", "--max-samples=1"])
     schedules = [

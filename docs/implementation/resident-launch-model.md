@@ -93,3 +93,20 @@ Fresh Spec review found no further actionable defect in the pending model,
 projection and scoped issue-326 report. Reviews and checks do not complete
 #323–328. Native macOS, OS ownership/authentication, live Huly write/reconciliation,
 performance controls and the final coherent project gate remain independent.
+
+## Native recovery correspondence
+
+`resident-recovery-observations*.qnt` maps the retained current Linux process observations into guarded model actions. Native receipt manifests are `retired-commit-observed-cases.json` and `version-coexistence-observed-cases.json` under the evidence root above. Opaque generation IDs become fresh model generations 10/11; package implementation identity becomes distinct selection keys. Wire IDs do not establish ownership.
+
+| Native ordering | Executable model correspondence |
+| --- | --- |
+| Old write dispatched once; stop drains; cancellation/cleanup; owned old backend exits; old adapter closes | `observedPendingWrite`, `requestDrain`, `cancelRequest`, `finishCleanup`, attachment cleanup, `confirmRetirement`, `releaseCaller` |
+| Replacement launches; read sees 0; delayed old remote commit; continued read sees 1 | `readyObservedOwner`, first read, `commitRemote(OLD_WRITE)`, second read |
+| Backend SIGKILL; two recovering callers refuse; old metadata retained; delayed remote effect | `crashBackend`, `killCaller`, two guarded `refuseUnavailable` actions, retained registry/unverified retirement, `commitRemote` |
+| Two installed versions coexist; old retirement leaves surviving locator unchanged; both eventually retire | Distinct implementation selection keys, `retireObservedOwner`, exact surviving `Current` locator assertion |
+
+Five explicit correspondence tests pass. They check uncertainty and one dispatch before and after the late commit, reject non-dispatch inference after retirement/read, and reject a second dispatch. Ten additional sampled recovery-prefix traces satisfy `safety` at a maximum of 32 post-prefix steps. Their guided prefix executes real actions; this is sampled evidence, not exhaustive proof.
+
+The native disposable REST counter establishes read values 0/1. The model abstracts these as reads separated by an independent remote-commit transition; it does not model Huly storage consistency. Model-ready actions are internal abstraction steps, not evidence that the counter fixture loads the actual Huly model. Native kernel exits, filesystem permissions and network behavior remain established by their process receipts, not Quint. Existing lifecycle expiry/work protection correspondence remains separate. No automatic replay of every receipt or production operation history is introduced.
+
+A private contradictory trace replaces the original uncertain outcome with `NotDispatched` after that same retirement/read prefix. Both Rust and TypeScript evaluators exit 1 with the specific `QNT511` result `contradictoryFailureTest returned false`; logs are `recovery-contradiction.log` and `recovery-contradiction-typescript.log`. This is a guard contradiction, not a timeout/parser failure. The private failing module remains outside the production test inventory.

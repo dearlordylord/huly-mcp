@@ -6,6 +6,12 @@ const portTestFiles = [
   'test/huly/**/*.test.ts',
   'test/config/**/*.test.ts',
   'test/utils/**/*.test.ts',
+  'src/domain/**/*.test.ts',
+  'src/huly/operations/**/*.test.ts',
+  'src/utils/**/*.test.ts',
+  'test/runtime/**/*.test.ts',
+  // Subprocess stdio suites retain fresh module graphs in the boundaries project.
+  'test/mcp/**/!(stdio-process-lifecycle|stdio-transport|stdio-output-drain).test.ts',
 ]
 
 const residentLaunchTestFiles = ['test/resident/managed-backend-process.test.ts']
