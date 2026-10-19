@@ -29,17 +29,33 @@ declare -A COMPONENTS
 source "$(dirname "${BASH_SOURCE[0]}")/integration-mcp-adapter.sh" || exit 1
 mcp() { movement_mcp_call "$1" "$2"; }
 cleanup() {
-  local project ids id
+  local project ids id remaining observation cleanup_status=0
   for project in "${PROJECTS[@]}"; do
-    ids=$("${CLI[@]}" issues list --project "$project" --limit 200 --json 2>/dev/null | jq -r 'reverse | .[].issueId') || ids=''
+    ids=$("${CLI[@]}" issues list --project "$project" --limit 200 --json | jq -er 'if type == "array" then reverse | map(.issueId) | join("\n") else error("Invalid issue list") end') || { cleanup_status=1; continue; }
     while IFS= read -r id; do
       [[ -n "$id" ]] || continue
-      mcp delete_issue "$(jq -nc --arg project "$project" --arg identifier "$id" '{project:$project,identifier:$identifier}')" >/dev/null 2>&1 || true
+      # Cleanup uses the same operation through CLI, avoiding fresh MCP discovery per deletion.
+      "${CLI[@]}" issues delete "$project" "$id" --yes --json >/dev/null || true
     done <<<"$ids"
-    mcp delete_project "$(jq -nc --arg project "$project" '{project:$project}')" >/dev/null 2>&1 || true
+    remaining=$("${CLI[@]}" issues list --project "$project" --limit 200 --json) || { cleanup_status=1; continue; }
+    if ! jq -e 'type == "array" and length == 0' >/dev/null <<<"$remaining"; then cleanup_status=1; continue; fi
+    "${CLI[@]}" projects delete "$project" --yes --json >/dev/null || true
+    if observation=$("${CLI[@]}" projects get "$project" --json 2>&1); then
+      cleanup_status=1
+    elif ! jq -e '.code == "NOT_FOUND" and .retryable == false' >/dev/null <<<"$observation"; then
+      cleanup_status=1
+    else
+      jq -nc --arg project "$project" '{phase:"concurrency-cleanup",project:$project,status:"absence-confirmed"}'
+    fi
   done
+  return "$cleanup_status"
 }
-trap cleanup EXIT
+finish() {
+  local fixture_exit_status=$1
+  if ! cleanup && (( fixture_exit_status == 0 )); then fixture_exit_status=1; fi
+  exit "$fixture_exit_status"
+}
+trap 'finish "$?"' EXIT
 VERSION=$("${TSX[@]}" scripts/issue-movement-concurrency/version.ts "$HULY_URL")
 jq -nc --argjson server "$VERSION" '{server:$server,transportBoundary:"ordinary REST; no custom extension",unobservable:["inside server batch execution; request boundaries do not prove partial-write isolation","config.json VERSION and model APIs do not establish transactor image identity"]}'
 for project in "$SOURCE" "$DESTINATION"; do

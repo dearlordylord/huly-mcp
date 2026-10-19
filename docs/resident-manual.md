@@ -1,8 +1,8 @@
 # Run adapters against an explicitly started resident backend
 
 This experimental path currently has Linux process evidence with Node 24.20.0.
-Full local Huly and platform qualification remains pending. Track remaining
-implementation and qualification in
+Qualification receipts distinguish actual local-Huly observations from native
+macOS execution, which is explicitly deferred. Track remaining acceptance in
 [the resident feature issue](https://github.com/dearlordylord/huly-mcp/issues/322).
 
 ## Start the backend
@@ -89,8 +89,8 @@ all launchers that are meant to share that backend.
 Ownership records contain discovery and authorization state, not an operation
 journal. Do not delete live state or infer retirement from a missing PID.
 Unexpected owner loss retains evidence and requires verified local retirement
-before replacement. Native platform and final local-Huly qualification of the
-combined managed path remain pending.
+before replacement. Qualification applies only to the source, artifacts and
+platform named in a retained receipt.
 
 ## Managed identity and credential handoff
 
@@ -172,8 +172,35 @@ cleanup never authorizes replay of an uncertain Huly write. There is no durable
 operation journal or cross-session operation-status lookup.
 
 Foreground/manual backends use attachment leases but do not use managed idle
-retirement. Native lifecycle measurements and the combined delivery gate remain
-separate qualification work.
+retirement. Retain native lifecycle observations separately from the quality gate;
+a passing gate alone does not establish live Huly or platform behavior.
+
+## Adapter message and queue limits
+
+| Guard | Limit |
+| --- | --- |
+| Stdio input message | 1 MiB |
+| HTTP response body per request | 128 MiB |
+| Concurrent adapter requests | 8 |
+| Queued output frames | 16 |
+| Output write deadline | 10 seconds per output write |
+
+These are enforced protocol guards, not a qualified process memory budget or a
+promise that every ordinary-stdio payload fits resident mode. Queue capacity
+counts frames, not bytes. A blocked output can retain large frames; request,
+response, decoded-object and transport allocations add further memory costs.
+
+The Linux comparison on `0fe6f918` observed 585 requests with a maximum of 312
+bytes and 504 responses with a maximum of 2,586,921 bytes, including the full
+606-tool catalog. It did not size arbitrary documents, uploads, worst-case
+parallel responses or suspended clients. The 1 MiB input limit can refuse large
+inline arguments before dispatch, including arguments accepted by other
+transports. Do not infer upload-size parity from these read-only measurements.
+
+The original quantitative selection basis for all these provisional values,
+and the historical change from a fifteen-second to five-second idle interval,
+remains incompletely evidenced. Current enforcement tests and successful
+lifecycle observations do not retroactively establish that design chronology.
 
 ## Managed package versions
 

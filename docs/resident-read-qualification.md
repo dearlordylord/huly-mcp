@@ -105,6 +105,11 @@ Replace `attachment` in the private input file with `directory`, naming an
 existing empty directory owned by the current user with mode 0700. The probe
 refuses an occupied directory and does not remove existing ownership evidence.
 
+The input `clients[].configuredMode` describes the mode the probe expects; it
+does not configure the adapter environment. For an automatic native/proxy pair,
+set `HULY_TOOL_MODE=auto` in the supervised command environment and keep each
+client's expected exposure in the private input.
+
 Run the same supervised command with `managed-pair` in place of `pair`. Require
 exit zero and a decoded `ManagedLiveReadPairReceipt`. Both readers must report
 the same generation and backend PID, correlated with their actual context
