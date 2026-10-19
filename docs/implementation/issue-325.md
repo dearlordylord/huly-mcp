@@ -43,3 +43,31 @@ This observation uses MCP revision `2025-06-18`, supported by the recorded actua
 Codex consumer. It establishes this Linux authentication scenario. It does not
 establish modern protocol startup, macOS qualification, performance, a full
 quality gate or completion of issue 325.
+
+## Saved-profile changes — criterion 5, partial evidence
+
+The focused packaged native-HTTP profile lifecycle scenario passed on
+2026-10-18. It checks token rotation, logout, URL and workspace changes, profile
+deletion, another selected profile and a missing profile. Each incompatible new
+explicit attachment is refused, while the original adapter retains its catalog,
+context and expected project read. Restoring the original profile allows a new
+attachment. The scenario asserts nine project reads, no writes and no invalid
+REST requests. It uses the disposable local REST fixture, rather than live Huly.
+
+`/tmp/resident-auth-config-0db836c2/profile-lifecycle-phase-observed.json`
+contains the passing result. `phase-first-source.json` and the two
+`phase-first-*.ts` files preserve the exact observed test sources. A subsequent
+diagnostic-only correction places the `close` phase after successful reads so
+cleanup cannot hide the stage of an earlier failure.
+
+Two earlier failures remain preserved: `profile-lifecycle-current.json` timed
+out in the shared preparation hook; `profile-lifecycle-deferred-host.json`
+completed preparation but timed out in the scenario. No deadline was increased.
+The unrelated native-host fixture now builds only in its consuming tests.
+Failed profile scenarios retain their last fixed phase in the owned bundle's
+`profile-lifecycle-phase.json`; that diagnostic contains no profile or credential
+values. One later success does not establish stable startup or explain the
+earlier intermittent failures.
+
+This observation does not prove credential invalidation during an in-flight
+operation or every concurrent-adapter case. Criterion 5 remains partial.

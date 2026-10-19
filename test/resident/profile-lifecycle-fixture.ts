@@ -43,10 +43,26 @@ const RefusedProcess = Schema.Struct({
 const ATTACHMENT_REFUSAL = "Resident configuration is incompatible; no Huly request was dispatched"
 const PROFILE_MISSING = "Selected Huly profile does not exist."
 
+export const ProfileLifecyclePhase = Schema.Literals([
+  "connect",
+  "baseline-read",
+  "rotation",
+  "logout",
+  "url",
+  "workspace",
+  "deletion",
+  "other-profile",
+  "missing-profile",
+  "restored-connect",
+  "restored-read",
+  "close"
+])
+
 export const exercisePackagedProfileLifecycle = async (
   bundle: string,
   attachment: string,
-  endpoint: Schema.Schema.Type<typeof ProfileUrlSchema>
+  endpoint: Schema.Schema.Type<typeof ProfileUrlSchema>,
+  observe: (phase: Schema.Schema.Type<typeof ProfileLifecyclePhase>) => void
 ) => {
   const directory = await fs.mkdtemp(join(await fs.realpath(tmpdir()), "resident-profile-lifecycle-"))
   const environment = {
@@ -103,6 +119,7 @@ export const exercisePackagedProfileLifecycle = async (
   const existing = connect()
   try {
     await save(original, base.HULY_TOKEN)
+    observe("connect")
     await existing.client.connect(existing.transport, { timeout: RESPONSE_BOUND })
     const catalog = await existing.client.listTools(undefined, { timeout: RESPONSE_BOUND })
     const read = async (client: Client, tools: typeof catalog) => {
@@ -122,6 +139,7 @@ export const exercisePackagedProfileLifecycle = async (
       expect(project.name).toBe(ProfileLifecycleProject.name)
       return context
     }
+    observe("baseline-read")
     const context = await read(existing.client, catalog)
     expect(context.isError ?? false).toBe(false)
     const refused = async (diagnostic = ATTACHMENT_REFUSAL, profile = "selected") => {
@@ -151,25 +169,35 @@ export const exercisePackagedProfileLifecycle = async (
       expect(currentCatalog).toEqual(catalog)
       expect(await read(existing.client, currentCatalog)).toEqual(context)
     }
+    observe("rotation")
     await save(original, "rotated-private-fixture-token")
     await refused()
+    observe("logout")
     await save(original, undefined)
     await refused("Selected Huly profile has no usable credentials.")
+    observe("url")
     await save({ ...original, url: "http://127.0.0.1:2" }, base.HULY_TOKEN)
     await refused()
+    observe("workspace")
     await save({ ...original, workspace: "replacement" }, base.HULY_TOKEN)
     await refused()
+    observe("deletion")
     await save(original, base.HULY_TOKEN, true)
     await refused(PROFILE_MISSING)
     await save(original, base.HULY_TOKEN)
+    observe("other-profile")
     await refused(ATTACHMENT_REFUSAL, "other")
+    observe("missing-profile")
     await refused(PROFILE_MISSING, "missing")
     const restored = connect()
     try {
+      observe("restored-connect")
       await restored.client.connect(restored.transport, { timeout: RESPONSE_BOUND })
       const restoredCatalog = await restored.client.listTools(undefined, { timeout: RESPONSE_BOUND })
       expect(restoredCatalog).toEqual(catalog)
+      observe("restored-read")
       expect((await read(restored.client, restoredCatalog)).isError ?? false).toBe(false)
+      observe("close")
     } finally {
       await restored.close()
     }

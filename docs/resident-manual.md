@@ -121,6 +121,19 @@ retain their own storage and selection rules.
 Resident HTTP spans redact all `x-huly-*` header values, including rejected
 override headers.
 
+Selections are snapshots. Rotating credentials, logging out, deleting a profile
+or changing its URL or workspace does not retarget an existing adapter or an
+operation it has already admitted. A subsequent adapter resolves its selection
+again. Missing profiles or credentials are refused. A changed valid selection
+requires a separate compatible managed backend; an explicit attachment to an
+incompatible backend is refused before Huly dispatch. Restoring the original
+selection permits attachment to its compatible backend again.
+
+Existing adapters retain their captured authority. Revoking that credential in
+Huly can make their requests fail; keeping a local snapshot does not bypass
+upstream revocation. An existing operation is never retried under credentials
+from a newly selected profile.
+
 ## Managed package versions
 
 Automatic attachment requires an exact implementation-version match as well as

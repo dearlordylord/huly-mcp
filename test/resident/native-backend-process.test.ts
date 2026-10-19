@@ -15,7 +15,11 @@ import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { residentSelectionEnvironment } from "../helpers/resident-selection-environment.js"
 import { NativeHostObservation } from "./native-host-observation.js"
-import { exercisePackagedProfileLifecycle, ProfileLifecycleProject } from "./profile-lifecycle-fixture.js"
+import {
+  exercisePackagedProfileLifecycle,
+  ProfileLifecyclePhase,
+  ProfileLifecycleProject
+} from "./profile-lifecycle-fixture.js"
 import { startDisposableRestFixture } from "./disposable-rest-fixture.js"
 import { ProfileUrlSchema } from "../../src/profiles/model.js"
 
@@ -37,6 +41,7 @@ let rest: Awaited<ReturnType<typeof startDisposableRestFixture>>
 let profileUrl: Schema.Schema.Type<typeof ProfileUrlSchema>
 let prepared = false
 let failed = false
+let nativeHostPrepared = false
 const backendEnvironment = () => ({ ...residentSelectionEnvironment(), HULY_URL: profileUrl })
 
 beforeEach(() =>
@@ -50,19 +55,6 @@ beforeAll(async () => {
   rest = await startDisposableRestFixture({ projects: [ProfileLifecycleProject] })
   profileUrl = Schema.decodeUnknownSync(ProfileUrlSchema)(rest.endpoint)
   stateDirectory = await fs.mkdtemp(join(await fs.realpath(tmpdir()), "resident-native-process-"))
-  await runFile(
-    "pnpm",
-    [
-      "exec",
-      "esbuild",
-      "test/resident/fixtures/native-host.ts",
-      "--bundle",
-      "--platform=node",
-      "--format=cjs",
-      `--outfile=${join(dirname(bundle.path), "native-host.cjs")}`
-    ],
-    { timeout: PROCESS_BOUND }
-  )
   backend = spawn(process.execPath, [bundle.path], {
     env: {
       ...backendEnvironment(),
@@ -114,8 +106,17 @@ describe("manual adapters against the packaged native HTTP backend", { timeout: 
   it.skipIf(process.platform !== "linux")(
     "keeps admitted profile authority through saved-profile changes",
     async () => {
+      let phase: Schema.Schema.Type<typeof ProfileLifecyclePhase> = "connect"
+      onTestFailed(() =>
+        fs.writeFile(
+          join(dirname(bundle.path), "profile-lifecycle-phase.json"),
+          Schema.encodeSync(Schema.fromJsonString(ProfileLifecyclePhase))(phase)
+        )
+      )
       const readsBefore = rest.observed.projectReads
-      await exercisePackagedProfileLifecycle(bundle.path, attachmentFile, profileUrl)
+      await exercisePackagedProfileLifecycle(bundle.path, attachmentFile, profileUrl, (observed) => {
+        phase = observed
+      })
       expect(rest.observed.projectReads - readsBefore).toBe(9)
       expect(rest.observed.projectWrites).toBe(0)
       expect(rest.observed.invalidRequests).toBe(0)
@@ -241,6 +242,22 @@ describe("manual adapters against the packaged native HTTP backend", { timeout: 
   )
 
   it.each(["modern", "legacy"])("serves %s catalogs to adapters owned by independent parents", async (mode) => {
+    if (!nativeHostPrepared) {
+      await runFile(
+        "pnpm",
+        [
+          "exec",
+          "esbuild",
+          "test/resident/fixtures/native-host.ts",
+          "--bundle",
+          "--platform=node",
+          "--format=cjs",
+          `--outfile=${join(dirname(bundle.path), "native-host.cjs")}`
+        ],
+        { timeout: PROCESS_BOUND }
+      )
+      nativeHostPrepared = true
+    }
     const observations = await Promise.all(
       ["claude-code", "codex-mcp-client"].map(async (host) => {
         const { stdout } = await runFile(
