@@ -31,6 +31,7 @@ export default defineConfig({
       {
         test: {
           name: 'resident-launch',
+          globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
           include: residentLaunchTestFiles,
           isolate: true,
           // Ten independent parents already compete inside this fixture; keep unrelated suites out of its deadline.
@@ -49,6 +50,7 @@ export default defineConfig({
       {
         test: {
           name: 'boundaries',
+          globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
           include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
           exclude: [...portTestFiles, ...residentLaunchTestFiles],
           isolate: true,
