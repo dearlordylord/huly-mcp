@@ -21,6 +21,7 @@ import type {
   ProjectNotFoundError
 } from "../errors.js"
 import { tracker } from "../huly-plugins.js"
+import type { ScheduledIssue } from "../types/tracker.js"
 import { textContentOrClear } from "./clear-field-updates.js"
 import { repairIssueTreeAncestry } from "./issue-tree-ancestry-repair.js"
 import { renderIssueDescriptionForWrite } from "./issue-native-references.js"
@@ -48,8 +49,8 @@ type UpdateIssueError =
   | IssueReferenceError
 
 type UpdateIssueField = (typeof UPDATE_ISSUE_FIELDS)[number]
-type UpdateIssueDirectEffect<Field extends UpdateIssueField & keyof DocumentUpdate<HulyIssue>> = Effect.Effect<
-  CoveredUpdateEntry<Field, DirectUpdateEntry<UpdateIssueField, DocumentUpdate<HulyIssue>, Field>>,
+type UpdateIssueDirectEffect<Field extends UpdateIssueField & keyof DocumentUpdate<ScheduledIssue>> = Effect.Effect<
+  CoveredUpdateEntry<Field, DirectUpdateEntry<UpdateIssueField, DocumentUpdate<ScheduledIssue>, Field>>,
   | ConnectionError
   | HulyError
   | InvalidStatusError
@@ -57,8 +58,8 @@ type UpdateIssueDirectEffect<Field extends UpdateIssueField & keyof DocumentUpda
   | PersonNotFoundError
   | IssueReferenceError
 >
-type IssueTaskTypeUpdateEntry = DirectUpdateSubsetEntry<"kind" | "status", DocumentUpdate<HulyIssue>>
-type IssueDescriptionUpdateEntry = DirectUpdateEntry<UpdateIssueField, DocumentUpdate<HulyIssue>, "description">
+type IssueTaskTypeUpdateEntry = DirectUpdateSubsetEntry<"kind" | "status", DocumentUpdate<ScheduledIssue>>
+type IssueDescriptionUpdateEntry = DirectUpdateEntry<UpdateIssueField, DocumentUpdate<ScheduledIssue>, "description">
 type UpdateWorkflowData = Effect.Success<ReturnType<typeof findProjectWithStatuses>>
 type TaskTypeWorkflow = Effect.Success<ReturnType<typeof resolveTaskTypeWorkflow>>
 type UpdateIssueEntries = {
@@ -75,6 +76,7 @@ type UpdateIssueEntries = {
     CoveredUpdateEntry<"taskType", IssueTaskTypeUpdateEntry>,
     HulyClientError | HulyError | InvalidStatusError | PersonNotFoundError
   >
+  readonly startDate: UpdateIssueDirectEffect<"startDate">
   readonly dueDate: UpdateIssueDirectEffect<"dueDate">
   readonly estimation: UpdateIssueDirectEffect<"estimation">
 }
@@ -138,6 +140,9 @@ const issueUpdateEntries = (
     }
     return coveredUpdateEntry("taskType", taskTypeOps)
   }),
+  startDate: Effect.succeed(
+    coveredUpdateEntry("startDate", params.startDate === undefined ? {} : { startDate: params.startDate })
+  ),
   dueDate: Effect.succeed(
     coveredUpdateEntry("dueDate", params.dueDate === undefined ? {} : { dueDate: params.dueDate })
   ),
@@ -189,7 +194,7 @@ export const updateIssue = (
     const descriptionUpdatedInPlace = isDescriptionUpdatedInPlace(params, issue)
 
     const updateEntries = issueUpdateEntries(client, issue, params, workflowData, taskTypeWorkflow)
-    const updateOps: DocumentUpdate<HulyIssue> = mergeCoveredUpdateEntries(
+    const updateOps: DocumentUpdate<ScheduledIssue> = mergeCoveredUpdateEntries(
       yield* Effect.all(Object.values(updateEntries))
     )
 

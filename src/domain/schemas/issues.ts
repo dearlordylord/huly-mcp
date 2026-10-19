@@ -92,6 +92,12 @@ export const PersonRefSchema = Schema.Struct({
 
 export type PersonRef = Schema.Schema.Type<typeof PersonRefSchema>
 
+const timestampDescription = (label: string, clearHint: string) =>
+  `${label} as Unix timestamp in milliseconds (e.g., 1719792000000 for 2024-07-01), ${clearHint}`
+
+const timestampParam = (label: string, clearHint: string) =>
+  Schema.optional(Schema.NullOr(Timestamp).annotate({ description: timestampDescription(label, clearHint) }))
+
 export const IssueMilestoneRefSchema = Schema.Struct({ id: MilestoneId, label: MilestoneLabel }).annotate({
   title: "IssueMilestoneRef",
   description: "Stable ID and human-readable label for the issue's assigned milestone."
@@ -147,6 +153,7 @@ export const IssueSchema = Schema.Struct({
   subIssues: Schema.optional(Count),
   modifiedOn: Schema.optional(Timestamp),
   createdOn: Schema.optional(Timestamp),
+  startDate: Schema.optional(Schema.NullOr(Timestamp)),
   dueDate: Schema.optional(Schema.NullOr(Timestamp)),
   estimation: Schema.optional(PositiveTimeHours.annotate({ description: timeHoursDescription("Issue estimation") }))
 }).annotate({ title: "Issue", description: "Full issue with all fields" })
@@ -335,11 +342,8 @@ export const CreateIssueParamsSchema = Schema.Struct({
         "Parent issue identifier (e.g., 'HULY-42') to create as a sub-issue. Omit to create a native top-level issue."
     })
   ),
-  dueDate: Schema.optional(
-    Schema.NullOr(Timestamp).annotate({
-      description: "Due date as Unix timestamp in milliseconds (e.g., 1719792000000 for 2024-07-01), or null to clear"
-    })
-  ),
+  startDate: timestampParam("Issue start date", "or null to leave unscheduled"),
+  dueDate: timestampParam("Due date", "or null to clear"),
   estimation: Schema.optional(PositiveTimeHours.annotate({ description: timeHoursDescription("Time estimation") }))
 }).annotate({ title: "CreateIssueParams", description: "Parameters for creating an issue" })
 
@@ -352,10 +356,11 @@ export const UPDATE_ISSUE_FIELDS = [
   "assignee",
   "status",
   "taskType",
+  "startDate",
   "dueDate",
   "estimation"
 ] as const satisfies ReadonlyArray<
-  "title" | "description" | "priority" | "assignee" | "status" | "taskType" | "dueDate" | "estimation"
+  "title" | "description" | "priority" | "assignee" | "status" | "taskType" | "startDate" | "dueDate" | "estimation"
 >
 
 export const UpdateIssueParamsSchema = Schema.Struct({
@@ -380,11 +385,8 @@ export const UpdateIssueParamsSchema = Schema.Struct({
         "New issue/task type ID or display name. Resolved within the target project's project type; status is preserved only if valid for that task type. Use list_task_types or get_project_type to discover valid values."
     })
   ),
-  dueDate: Schema.optional(
-    Schema.NullOr(Timestamp).annotate({
-      description: "Due date as Unix timestamp in milliseconds (e.g., 1719792000000 for 2024-07-01), or null to clear"
-    })
-  ),
+  startDate: timestampParam("New issue start date", "or null to unschedule"),
+  dueDate: timestampParam("Due date", "or null to clear"),
   estimation: Schema.optional(
     Schema.NullOr(PositiveTimeHours).annotate({
       description: `${timeHoursDescription("Time estimation")} Use null to clear.`

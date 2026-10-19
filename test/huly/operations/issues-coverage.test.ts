@@ -26,6 +26,7 @@ import type { ListIssuesInput } from "../../../src/domain/schemas/issues.js"
 import type { StatusName } from "../../../src/domain/schemas/shared.js"
 import { Timestamp } from "../../../src/domain/schemas/shared.js"
 import { HulyClient, type HulyClientOperations } from "../../../src/huly/client.js"
+import type { ScheduledIssue } from "../../../src/huly/types/tracker.js"
 import { Diagnostics, makeDiagnosticsScope } from "../../../src/huly/diagnostics.js"
 import { HulyConnectionError, type InvalidStatusError, type PersonNotFoundError } from "../../../src/huly/errors.js"
 import { contact, core, task, tracker } from "../../../src/huly/huly-plugins.js"
@@ -38,6 +39,7 @@ import {
 } from "../../../src/huly/operations/issues.js"
 import { assertAt, assertExists } from "../../../src/utils/assertions.js"
 import { componentIdentifier, email, issueIdentifier, projectIdentifier, statusName } from "../../helpers/brands.js"
+import { docRef } from "../../helpers/huly-sdk.js"
 import { withDiagnostics } from "../../helpers/diagnostics.js"
 import { listIssuesParams } from "../../helpers/parsed-params.js"
 
@@ -75,7 +77,7 @@ const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
   return base as HulyProject
 }
 
-const makeIssue = (overrides?: Partial<HulyIssue>): HulyIssue => ({
+const makeIssue = (overrides?: Partial<ScheduledIssue>): ScheduledIssue => ({
   _id: "issue-1" as Ref<HulyIssue>,
   _class: tracker.class.Issue,
   space: "project-1" as Ref<HulyProject>,
@@ -1259,6 +1261,63 @@ describe("Issues Coverage - updateIssue branches", () => {
     })
   )
 
+  it.effect("updates startDate", () =>
+    Effect.gen(function* () {
+      const project = makeProject({ identifier: "TEST" })
+      const issue = makeIssue({ identifier: "TEST-1", number: 1 })
+      const statuses = [makeStatus({ _id: docRef<Status>("status-open"), name: "Open" })]
+      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+
+      const testLayer = createTestLayerWithMocks({ projects: [project], issues: [issue], statuses, captureUpdateDoc })
+
+      yield* updateIssue({
+        project: projectIdentifier("TEST"),
+        identifier: issueIdentifier("TEST-1"),
+        startDate: Timestamp.make(1700000000000)
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+      expect(captureUpdateDoc.operations?.startDate).toBe(1700000000000)
+    })
+  )
+
+  it.effect("unschedules an issue when startDate is null", () =>
+    Effect.gen(function* () {
+      const project = makeProject({ identifier: "TEST" })
+      const issue = makeIssue({ identifier: "TEST-1", number: 1 })
+      const statuses = [makeStatus({ _id: docRef<Status>("status-open"), name: "Open" })]
+      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+
+      const testLayer = createTestLayerWithMocks({ projects: [project], issues: [issue], statuses, captureUpdateDoc })
+
+      yield* updateIssue({
+        project: projectIdentifier("TEST"),
+        identifier: issueIdentifier("TEST-1"),
+        startDate: null
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+      expect(captureUpdateDoc.operations?.startDate).toBeNull()
+    })
+  )
+
+  it.effect("leaves an existing startDate untouched when the update omits it", () =>
+    Effect.gen(function* () {
+      const project = makeProject({ identifier: "TEST" })
+      const issue = makeIssue({ identifier: "TEST-1", number: 1, startDate: Timestamp.make(1700000000000) })
+      const statuses = [makeStatus({ _id: docRef<Status>("status-open"), name: "Open" })]
+      const captureUpdateDoc: MockConfig["captureUpdateDoc"] = {}
+
+      const testLayer = createTestLayerWithMocks({ projects: [project], issues: [issue], statuses, captureUpdateDoc })
+
+      yield* updateIssue({
+        project: projectIdentifier("TEST"),
+        identifier: issueIdentifier("TEST-1"),
+        title: "Renamed"
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+      expect(captureUpdateDoc.operations).not.toHaveProperty("startDate")
+    })
+  )
+
   it.effect("clears estimation with null", () =>
     Effect.gen(function* () {
       const project = makeProject({ identifier: "TEST" })
@@ -1599,6 +1658,118 @@ describe("Issues Coverage - getIssue detail branches", () => {
       }).pipe(Effect.provide(testLayer), withDiagnostics)
 
       expect(result.status).toBe("status-open")
+    })
+  )
+})
+
+describe("Issues Coverage - startDate operation paths", () => {
+  it.effect("writes an explicitly supplied startDate on create", () =>
+    Effect.gen(function* () {
+      const project = makeProject({ identifier: "TEST", sequence: 1 })
+      const captureAddCollection: MockConfig["captureAddCollection"] = {}
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [project],
+        issues: [],
+        statuses: [],
+        captureAddCollection,
+        updateDocResult: { object: { sequence: 2 } }
+      })
+
+      yield* createIssue({
+        project: projectIdentifier("TEST"),
+        title: "Scheduled",
+        startDate: Timestamp.make(1700000000000)
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+      expect(captureAddCollection.attributes?.startDate).toBe(1700000000000)
+    })
+  )
+
+  it.effect("writes an explicit null startDate on create", () =>
+    Effect.gen(function* () {
+      const project = makeProject({ identifier: "TEST", sequence: 1 })
+      const captureAddCollection: MockConfig["captureAddCollection"] = {}
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [project],
+        issues: [],
+        statuses: [],
+        captureAddCollection,
+        updateDocResult: { object: { sequence: 2 } }
+      })
+
+      yield* createIssue({ project: projectIdentifier("TEST"), title: "Unscheduled", startDate: null }).pipe(
+        Effect.provide(testLayer),
+        withDiagnostics
+      )
+
+      expect(captureAddCollection.attributes).toHaveProperty("startDate", null)
+    })
+  )
+
+  it.effect("omits startDate entirely on create when it is not supplied", () =>
+    Effect.gen(function* () {
+      const project = makeProject({ identifier: "TEST", sequence: 1 })
+      const captureAddCollection: MockConfig["captureAddCollection"] = {}
+
+      const testLayer = createTestLayerWithMocks({
+        projects: [project],
+        issues: [],
+        statuses: [],
+        captureAddCollection,
+        updateDocResult: { object: { sequence: 2 } }
+      })
+
+      yield* createIssue({ project: projectIdentifier("TEST"), title: "No schedule" }).pipe(
+        Effect.provide(testLayer),
+        withDiagnostics
+      )
+
+      // A Huly build predating the upstream attribute must not receive the key at all.
+      expect(captureAddCollection.attributes).not.toHaveProperty("startDate")
+    })
+  )
+
+  it.effect("projects a stored startDate on the issue detail read", () =>
+    Effect.gen(function* () {
+      const project = makeProject({ identifier: "TEST" })
+      const issue = makeIssue({ identifier: "TEST-1", number: 1, startDate: Timestamp.make(1700000000000) })
+      const statuses = [makeStatus({ _id: docRef<Status>("status-open"), name: "Open" })]
+
+      const testLayer = createTestLayerWithMocks({ projects: [project], issues: [issue], statuses })
+
+      const result = yield* getIssue({
+        project: projectIdentifier("TEST"),
+        identifier: issueIdentifier("TEST-1")
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+      expect(result.startDate).toBe(1700000000000)
+    })
+  )
+
+  it.effect("omits startDate from the detail read for a stored null and for a missing attribute alike", () =>
+    Effect.gen(function* () {
+      const project = makeProject({ identifier: "TEST" })
+      const storedNull = makeIssue({ identifier: "TEST-1", number: 1, startDate: null })
+      const absent = makeIssue({ identifier: "TEST-2", number: 2 })
+      const statuses = [makeStatus({ _id: docRef<Status>("status-open"), name: "Open" })]
+
+      const testLayer = createTestLayerWithMocks({ projects: [project], issues: [storedNull, absent], statuses })
+
+      const nullResult = yield* getIssue({
+        project: projectIdentifier("TEST"),
+        identifier: issueIdentifier("TEST-1")
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
+      const absentResult = yield* getIssue({
+        project: projectIdentifier("TEST"),
+        identifier: issueIdentifier("TEST-2")
+      }).pipe(Effect.provide(testLayer), withDiagnostics)
+
+      // Documented behaviour, mirroring dueDate: the projection collapses a stored
+      // null and an absent attribute into the same omitted field.
+      expect(nullResult.startDate).toBeUndefined()
+      expect(absentResult.startDate).toBeUndefined()
     })
   )
 })
