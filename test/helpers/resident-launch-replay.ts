@@ -4,6 +4,8 @@ import { join } from "node:path"
 import { promisify } from "node:util"
 import { Exit, Schema } from "effect"
 
+import type { ResidentPackagePath } from "../../src/resident/managed-contract.js"
+
 export const AdmissionObservation = Schema.Struct({
   event: Schema.Literals(["Begin", "Finish", "Fence", "LateOwner", "Closed"]),
   allowed: Schema.Boolean,
@@ -25,7 +27,10 @@ export class ResidentObservationRejected extends Error {
   }
 }
 
-export const replayResidentAdmissions = async (input: ReadonlyArray<AdmissionObservation>) => {
+export const replayResidentAdmissions = async (
+  input: ReadonlyArray<AdmissionObservation>,
+  cli: Schema.Schema.Type<typeof ResidentPackagePath>
+) => {
   const observations = Schema.decodeUnknownSync(Schema.Array(AdmissionObservation))(input)
   if (observations.length === 0) throw new Error("Missing resident admission observations")
   const steps = observations.map(
@@ -46,15 +51,7 @@ export const replayResidentAdmissions = async (input: ReadonlyArray<AdmissionObs
     // One owned Node process: no package-manager wrapper or Rust evaluator child.
     await runFile(
       process.execPath,
-      [
-        join(process.cwd(), "node_modules/@informalsystems/quint/dist/src/cli.js"),
-        "test",
-        path,
-        "--backend=typescript",
-        "--match",
-        "Test$",
-        "--max-samples=1"
-      ],
+      [cli, "test", path, "--backend=typescript", "--match", "Test$", "--max-samples=1"],
       { timeout: 4_000, killSignal: "SIGKILL" }
     )
   } catch (error) {

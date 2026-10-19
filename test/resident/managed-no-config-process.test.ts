@@ -93,7 +93,8 @@ it("does not disclose invalid authority bytes through startup diagnostics", { ti
     },
     (failure: unknown) => Schema.decodeUnknownSync(Schema.Struct({ stderr: Schema.String }))(failure)
   )
-  expect(error.stderr).toContain("Managed resident attachment failed")
+  expect(error.stderr).toContain("Configuration error:")
+  expect(error.stderr).toContain('["HULY_URL"]')
   expect(error.stderr).not.toContain("fixture-url-secret")
   expect(error.stderr).not.toContain("fixture-token-secret")
   passed++

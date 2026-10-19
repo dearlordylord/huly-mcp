@@ -3,6 +3,7 @@ import { HttpServerResponse } from "effect/http"
 import { expect, it } from "vitest"
 
 import { ResidentAttachment } from "../../src/resident/attachment-file.js"
+import { ResidentLiveStatus } from "../../src/resident/status-contract.js"
 import { readResidentLiveStatus } from "../../src/resident/status-client.js"
 import { VERSION } from "../../src/version.js"
 import { AUTHORIZATION, withNativeServer, type Owner, type OwnerName } from "../helpers/resident-native-fixture.js"
@@ -23,10 +24,11 @@ it("refuses malformed, mismatched, oversized and unauthorized status without lea
               authorization: AUTHORIZATION,
               implementation: { name: "@firfi/huly-mcp", version: VERSION }
             })
-            const valid = {
+            const valid = ResidentLiveStatus.make({
               statusWire: 1,
               generation: identity.generation,
               readiness: "ready",
+              hulyInitialization: "ready",
               work: {
                 admission: "accepting",
                 attachments: 0,
@@ -36,7 +38,7 @@ it("refuses malformed, mismatched, oversized and unauthorized status without lea
                 drain: "idle"
               },
               retirement: "unconfirmed"
-            }
+            })
             const replies = [
               HttpServerResponse.empty({ status: 503 }),
               HttpServerResponse.text("private-invalid-json", { status: 200 }),

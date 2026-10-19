@@ -13,6 +13,7 @@ import { CliCredentialsFileSchema, CliProfilesFileSchema } from "../../../src/pr
 import { ResidentPackagePath, ResidentRegistryEnvelope } from "../../../src/resident/managed-contract.js"
 import { ResidentDirectory } from "../../../src/resident/protected-path.js"
 import { openKernelReapedEvents, ReapedEventsFd } from "../../helpers/kernel-reaped-events.js"
+import { retireFunctionalResident } from "../../helpers/resident-retirement.js"
 import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
 import { testStdioEnvironment } from "../../helpers/stdio-environment.js"
 import { ManagedAuthObservation } from "../managed-auth-observation.js"
@@ -209,7 +210,11 @@ const main = async () => {
       )
       const backendExits = []
       for (const owner of owners) {
-        const exit = await kernel.wait(owner.diagnostics.processId)
+        const exit = await retireFunctionalResident(
+          { directory: ResidentDirectory.make(state), generation: owner.generation },
+          owner.diagnostics.processId,
+          kernel
+        )
         assert.equal(exit.exitCode, 0)
         backendExits.push(exit)
       }

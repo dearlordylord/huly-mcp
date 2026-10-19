@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { expect, it } from "vitest"
+import { afterAll, beforeAll, expect, it } from "vitest"
 
 import { AdmissionPolicy, DEFAULT_LEASE_POLICY } from "../../src/resident/admission-contract.js"
 import { advanceAdmission } from "../../src/resident/admission-attempt-state.js"
@@ -16,6 +16,16 @@ import {
   replayResidentAdmissions,
   ResidentObservationRejected
 } from "../helpers/resident-launch-replay.js"
+
+import { prepareResidentQuintCli } from "../helpers/resident-quint-cli.js"
+
+let quint: Awaited<ReturnType<typeof prepareResidentQuintCli>>
+beforeAll(async () => {
+  quint = await prepareResidentQuintCli()
+}, 30_000)
+afterAll(async () => {
+  await quint?.cleanup()
+})
 
 const policy = Schema.decodeUnknownSync(AdmissionPolicy)({
   capacity: 2,
@@ -58,11 +68,11 @@ const actualAdmission = (late: boolean): ReadonlyArray<AdmissionObservation> => 
 }
 
 it.each([false, true])("replays actual admission inventory through owner cleanup (late=%s)", async (late) => {
-  await replayResidentAdmissions(actualAdmission(late))
+  await replayResidentAdmissions(actualAdmission(late), quint.cli)
 })
 it("rejects a contradictory inventory observation from the same real transition trace", async () => {
   const contradictory = actualAdmission(true).map((observation) =>
     observation.event === "LateOwner" ? { ...observation, members: 0 } : observation
   )
-  await expect(replayResidentAdmissions(contradictory)).rejects.toBeInstanceOf(ResidentObservationRejected)
+  await expect(replayResidentAdmissions(contradictory, quint.cli)).rejects.toBeInstanceOf(ResidentObservationRejected)
 })

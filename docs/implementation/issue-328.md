@@ -232,3 +232,40 @@ certification. Restart preserves both ordinary idle cycles, distinct generations
 matching owned backend exits0 and empty state. No timeouts, protocol cases or
 idle/lease/drain policies changed. Relevant actual-Huly mutations still await a
 passing coherent gate.
+
+### Completed failing coherent run and focused repairs
+
+`check-all-50def37a-terminal.json` records a completed failing coherent gate.
+Tests/coverage finished in286.05 seconds inside the unchanged300-second stage:
+523 files,516 passed/7 failed;5882 tests,5873 passed/9 failed. This is not a gate
+pass or coverage-threshold acceptance. The full log retains all failures. They
+include four discovery observations, two Quint subprocess outcomes, one auth
+fixture supervisor expiry and two stale expectations after the diagnostic/status
+changes. No project worker cap, deadline, inventory or coverage threshold changed.
+
+The stale status test now constructs its valid payload from `ResidentLiveStatus`,
+including required initialization status. The configuration test expects the
+useful sanitized configuration diagnostic and HULY_URL field path while retaining
+both credential nondisclosure assertions. The successful auth fixture now stops
+and joins its three exact owners sequentially after all authority/rotation/logout
+assertions, using the already reviewed functional cleanup helper; ordinary idle
+qualification remains in its dedicated fixtures.
+
+The admission-observation tests prepare a bundled copy of the installed Quint
+CLI and its unmodified builtin/protocol assets once per suite. Each replay still
+runs a fresh owned Node process with the same four-second guard, TypeScript
+backend, one sample and generated observation model. No model, observation,
+positive/negative assertion or rejection classification was weakened. This
+removes repeated package-module resolution from replay execution; it is not a
+measured speedup claim. Preparation cleanup preserves its primary failure and
+reports any independent cleanup failure.
+
+Focused evidence: `gate-local-repairs-first.json`7 passes,
+`quint-bundled-replay-final.json`3 passes without the earlier asset warning,
+and `auth-functional-cleanup-current.json`1 pass. The exact four failed discovery
+cases separately passed in `discovery-failed-cases-diagnostic.json`; the10 other
+cases were deliberately unselected for that diagnostic, not removed from the
+suite. It uses verified package22f565… copies with unchanged request bounds.
+Their full-run failures remain unexplained and are not relabeled as repaired
+startup reliability. A future coherent gate is still required before live-write
+certification and final delivery.
