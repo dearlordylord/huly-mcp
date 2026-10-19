@@ -24,6 +24,12 @@ import {
   RequestLossUpdatedName
 } from "../managed-request-loss-observation.js"
 
+const ObservationCounters = Schema.Struct({
+  modelRequests: Schema.Int,
+  queryDispatches: Schema.Int,
+  writeDispatches: Schema.Int,
+  committedWrites: Schema.Int
+})
 const RESPONSE_BOUND = 5_000
 const ANNOUNCEMENT = "Resident attachment: "
 const PROC_FIELDS_SEPARATOR = ") "
@@ -180,7 +186,7 @@ const main = async () => {
     assert.deepEqual(await fs.readdir(join(input.directory, "generations")), [name])
     process.stderr.write("Managed loss: discover tools\n")
     const writing = input.point === "write" || input.point === "drain"
-    const toolName = writing ? "update_project" : input.point === "model" ? "get_project" : "list_projects"
+    const toolName = writing ? "update_project" : "get_project"
     const definition = (await client.listTools(undefined, { timeout: RESPONSE_BOUND })).tools.find(
       (tool) => tool.name === toolName
     )
@@ -190,11 +196,7 @@ const main = async () => {
       client.callTool(
         {
           name: toolName,
-          arguments: writing
-            ? { project: "LOSS", name: RequestLossUpdatedName }
-            : input.point === "model"
-              ? { project: "LOSS" }
-              : {}
+          arguments: writing ? { project: "LOSS", name: RequestLossUpdatedName } : { project: "LOSS" }
         },
         { timeout: RESPONSE_BOUND, toolDefinition: definition }
       )
@@ -268,6 +270,14 @@ const main = async () => {
       }
     }
     assert.equal(rest.observed.invalidRequests, 0)
+    process.stderr.write(
+      `${Schema.encodeSync(Schema.fromJsonString(ObservationCounters))({
+        modelRequests: rest.observed.modelRequests,
+        queryDispatches: rest.observed.projectReads,
+        writeDispatches: rest.observed.projectWrites,
+        committedWrites: rest.observed.committedProjectWrites
+      })}\n`
+    )
     const observation = Schema.decodeUnknownSync(ManagedRequestLossObservation)({
       mcpSha256: await hash(input.bundle),
       backendSha256: await hash(input.backendProgram),
