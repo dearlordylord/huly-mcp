@@ -3,7 +3,11 @@ import { Schema } from "effect"
 export const ManagedRequestLossPoint = Schema.Literals(["model", "query", "write", "drain"])
 export const RequestLossProjectName = "Initial request-loss project"
 export const RequestLossUpdatedName = "Committed request-loss project"
+const Digest = Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/u))
 const Common = Schema.Struct({
+  mcpSha256: Digest,
+  backendSha256: Digest,
+  driverSha256: Digest,
   modelRequests: Schema.Literal(1),
   backendClosed: Schema.Literal(true),
   adapterClosed: Schema.Literal(true),

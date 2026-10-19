@@ -1,4 +1,5 @@
 import { strict as assert } from "node:assert"
+import { createHash } from "node:crypto"
 import * as fs from "node:fs/promises"
 import { join } from "node:path"
 import { Schema } from "effect"
@@ -14,7 +15,12 @@ import {
 } from "../idle-restart-observation.js"
 import type { ManagedNativeHostObservation } from "../native-host-observation.js"
 
+const hash = async (file: Schema.Schema.Type<typeof ResidentPackagePath>) =>
+  createHash("sha256")
+    .update(await fs.readFile(file))
+    .digest("hex")
 const Input = Schema.Struct({
+  driver: ResidentPackagePath,
   bundle: ResidentPackagePath,
   fixture: ResidentPackagePath,
   directory: ResidentDirectory,
@@ -79,6 +85,7 @@ const cycle = async (
 
 const main = async () => {
   const input = Schema.decodeUnknownSync(Input)({
+    driver: process.argv[1],
     bundle: process.argv[2],
     fixture: process.argv[3],
     directory: process.argv[4],
@@ -98,6 +105,9 @@ const main = async () => {
     }
     process.stdout.write(
       Schema.encodeSync(Schema.fromJsonString(IdleRestartObservation))({
+        mcpSha256: await hash(input.bundle),
+        hostSha256: await hash(input.fixture),
+        driverSha256: await hash(input.driver),
         cycles: [first, second],
         privateStateRemoved: true
       })

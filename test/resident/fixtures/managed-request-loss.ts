@@ -1,6 +1,7 @@
 import { AssertionError, strict as assert } from "node:assert"
 import { spawn } from "node:child_process"
 import { once } from "node:events"
+import { createHash } from "node:crypto"
 import * as fs from "node:fs/promises"
 import { join } from "node:path"
 import { createInterface } from "node:readline"
@@ -26,7 +27,12 @@ import {
 const RESPONSE_BOUND = 5_000
 const ANNOUNCEMENT = "Resident attachment: "
 const PROC_FIELDS_SEPARATOR = ") "
+const hash = async (file: Schema.Schema.Type<typeof ResidentPackagePath>) =>
+  createHash("sha256")
+    .update(await fs.readFile(file))
+    .digest("hex")
 const Input = Schema.Struct({
+  driver: ResidentPackagePath,
   bundle: ResidentPackagePath,
   directory: ResidentDirectory,
   backendProgram: ResidentPackagePath,
@@ -37,6 +43,7 @@ const bounded = <A>(promise: Promise<A>) =>
 
 const main = async () => {
   const input = Schema.decodeUnknownSync(Input)({
+    driver: process.argv[1],
     bundle: process.argv[2],
     directory: process.argv[3],
     point: process.argv[4],
@@ -255,6 +262,9 @@ const main = async () => {
     }
     assert.equal(rest.observed.invalidRequests, 0)
     const observation = Schema.decodeUnknownSync(ManagedRequestLossObservation)({
+      mcpSha256: await hash(input.bundle),
+      backendSha256: await hash(input.backendProgram),
+      driverSha256: await hash(input.driver),
       point: input.point,
       stopAcknowledgment,
       drainEntry,

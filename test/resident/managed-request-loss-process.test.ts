@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process"
+import { createHash } from "node:crypto"
 import * as fs from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
@@ -6,6 +7,7 @@ import { promisify } from "node:util"
 import { Schema } from "effect"
 import { expect, it } from "vitest"
 
+import { ResidentPackagePath } from "../../src/resident/managed-contract.js"
 import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import {
@@ -16,6 +18,10 @@ import {
 } from "./managed-request-loss-observation.js"
 
 const PROCESS_BOUND = 30_000
+const hash = async (file: Schema.Schema.Type<typeof ResidentPackagePath>) =>
+  createHash("sha256")
+    .update(await fs.readFile(file))
+    .digest("hex")
 const runFile = promisify(execFile)
 
 it.skipIf(process.platform !== "linux").each(ManagedRequestLossPoint.literals)(
@@ -74,6 +80,9 @@ it.skipIf(process.platform !== "linux").each(ManagedRequestLossPoint.literals)(
         { timeout: PROCESS_BOUND, env: testStdioEnvironment() }
       )
       const receipt = Schema.decodeUnknownSync(Schema.fromJsonString(ManagedRequestLossObservation))(stdout)
+      expect(receipt.mcpSha256).toBe(await hash(ResidentPackagePath.make(bundle.path)))
+      expect(receipt.backendSha256).toBe(await hash(ResidentPackagePath.make(backendProgram)))
+      expect(receipt.driverSha256).toBe(await hash(ResidentPackagePath.make(fixture)))
       await fs.writeFile(
         `${root}.receipt.json`,
         Schema.encodeSync(Schema.fromJsonString(ManagedRequestLossObservation))(receipt),

@@ -201,3 +201,34 @@ receipt/driver hashes. Standards review also required independently settling
 cleanup operations and preserving the primary error, plus keeping package paths
 typed and parsing driver argv at the boundary; these corrections are included.
 This is focused native race evidence, not a passing complete Linux matrix/gate.
+
+### Bound fault and replacement observations
+
+The b7ba455d coherent gate stopped at lint before tests: one injected fault-backend
+caller still spread the former `httpPolicy` object instead of invoking the new
+getter. The caller now supplies ready after constructing its injected client
+bundle. All callers were searched; no compatibility fallback was introduced.
+The affected idle-fence process check passed in `fault-policy-api-current.json`.
+Full lint then passed in `fault-digests-lint.log`; the earlier gate remains failed.
+
+The four historical loss receipts and the historical one-to-ten restart receipt
+could not be uniquely bound to the current artifact. Their retained passing
+historical qualification has material intervening ownership changes, so it was
+not relabeled. The smallest fresh scope was executed instead: the existing four
+loss points and existing single restart scenario. Their receipt schemas now
+require package/backend/host/driver SHA fields as applicable, and parent tests
+compare those hashes with the files they actually launched. Historical receipt
+shapes are not accepted by the new parsers.
+
+`four-loss-digests-current.json` records four passes for model/query/write/drain
+loss; `restart-digests-current.json` records one pass for actual old-generation
+idle retirement followed by ten independent replacement parents. The indexed
+receipts and their content hashes are in `fault-restart-digest-receipts.json`.
+All identify MCP22f565…; drain separately identifies its deliberate fault backend
+094ceae3…. Existing dispatch/commit counts, truthful unknown-outcome diagnostics,
+no-replay assertions, retained unresolved ownership and refused replacement stay
+required. These are disposable REST writes, not actual local-Huly mutation
+certification. Restart preserves both ordinary idle cycles, distinct generations,
+matching owned backend exits0 and empty state. No timeouts, protocol cases or
+idle/lease/drain policies changed. Relevant actual-Huly mutations still await a
+passing coherent gate.

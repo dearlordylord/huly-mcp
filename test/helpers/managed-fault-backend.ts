@@ -53,7 +53,7 @@ export const runManagedFaultBackend = Effect.fn("runManagedFaultBackend")(functi
                 httpPort: 0,
                 registry: options.registry,
                 mcpAuthToken: backend.authorization,
-                ...backend.httpPolicy,
+                ...backend.httpPolicy(Effect.succeed("ready")),
                 resolveClients: async () => Exit.succeed(bundle),
                 getRuntimeConfigContext: () => options.capture.runtimeContext,
                 closeClients: () =>
