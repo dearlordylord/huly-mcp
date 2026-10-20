@@ -1,5 +1,4 @@
 import { defineConfig } from 'vitest/config'
-import { availableParallelism } from 'node:os'
 import { ORACLE_INFRASTRUCTURE_TAG } from './test/helpers/test-tags.js'
 
 const portTestFiles = [
@@ -39,8 +38,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    // Bundled CLI subprocesses compete with coverage workers for CPU and memory.
-    maxWorkers: Math.min(3, availableParallelism()),
+    // Overlap kernel/subprocess waits; intrinsic client fleets keep their separate single-worker cohort.
+    maxWorkers: 5,
     // Persist transforms locally; every test still executes on each run.
     fsModuleCache: true,
     fsModuleCachePath: '.vitest-cache',
