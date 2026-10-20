@@ -3,7 +3,7 @@ import { ORACLE_INFRASTRUCTURE_TAG } from './test/helpers/test-tags.js'
 import { DeadlineFirstSequencer } from './test/helpers/deadline-first-sequencer.js'
 
 const DARWIN_WORKERS = 4
-const DEFAULT_WORKERS = 5
+const DEFAULT_WORKERS = 6
 
 const portTestFiles = [
   'test/domain/**/*.test.ts',
@@ -25,11 +25,7 @@ const portTestFiles = [
 
 const residentLaunchTestFiles = ['test/resident/managed-backend-process.test.ts']
 const residentModelTestFiles = ['test/resident/launch-model-alignment.test.ts']
-const residentWaitTestFiles = [
-  'test/resident/managed-owner.test.ts',
-  'test/resident/model-wait-process.test.ts',
-  'test/cli/process-failures.test.ts',
-]
+const residentWaitTestFiles = ['test/resident/model-wait-process.test.ts']
 const residentFleetTestFiles = [
   'test/resident/ten-reader-process.test.ts',
   'test/resident/config-fault-process.test.ts',
@@ -84,7 +80,7 @@ export default defineConfig({
           name: 'resident-model-wait',
           include: residentWaitTestFiles,
           isolate: true,
-          // Overlap filesystem and held-request waits with single-child CLI checks; client fleets stay separate.
+          // Keep independent-parent startup and held-request bounds free from unrelated CPU work.
           sequence: { groupOrder: 2 },
         },
       },
@@ -93,8 +89,7 @@ export default defineConfig({
           name: 'ports',
           include: portTestFiles,
           exclude: [...residentModelTestFiles, ...residentWaitTestFiles],
-          // Reuse CPU while the independently owned resident requests wait on I/O.
-          sequence: { groupOrder: 2 },
+          sequence: { groupOrder: 4 },
           // The oracle adapter registers its guard at import, so it needs a fresh module graph per file.
           isolate: Boolean(process.env.QUINT_ORACLE_URL?.trim()),
         },
