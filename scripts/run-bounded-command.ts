@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto"
 
 import { NonNegativeInteger } from "../src/domain/schemas/shared.js"
 import { OutputLineCount } from "./quality-output-budget.js"
+import { isProcessGroupAbsent, signalProcessGroup } from "./process-group.js"
 
 export const Milliseconds = NonNegativeInteger.pipe(Schema.brand("QualityGateMilliseconds")).annotate({
   identifier: "QualityGateMilliseconds",
@@ -77,24 +78,9 @@ const terminate = (child: ReturnType<typeof spawn>, signal: NodeJS.Signals): voi
   }
   /* v8 ignore stop */
 
-  try {
-    process.kill(-child.pid, signal)
-  } catch (error) {
-    /* v8 ignore start -- POSIX process-group exit race and unexpected kill defects. */
-    if (!isErrnoException(error) || error.code !== "ESRCH") throw error
-    /* v8 ignore stop */
-  }
+  signalProcessGroup(child.pid, signal)
 }
 
-const groupStopped = (pid: number): boolean => {
-  try {
-    process.kill(-pid, 0)
-    return false
-  } catch (error) {
-    if (isErrnoException(error) && error.code === "ESRCH") return true
-    throw error
-  }
-}
 const proveStoppedGroup = async (
   child: ReturnType<typeof spawn>,
   cleanup: CleanupPorts,
@@ -104,11 +90,11 @@ const proveStoppedGroup = async (
 ): Promise<void> => {
   if (process.platform === "win32" || child.pid === undefined) return
   const pid = child.pid
-  if (groupStopped(pid)) return
+  if (isProcessGroupAbsent(pid)) return
   stop()
   const deadline = cleanup.now() + grace + GROUP_CLEANUP_PROOF_MILLISECONDS
-  while (!groupStopped(pid) && cleanup.now() < deadline) await cleanup.pause(GROUP_POLL_MILLISECONDS)
-  if (!groupStopped(pid)) throw new Error(`${name} process-group cleanup is unconfirmed`)
+  while (!isProcessGroupAbsent(pid) && cleanup.now() < deadline) await cleanup.pause(GROUP_POLL_MILLISECONDS)
+  if (!isProcessGroupAbsent(pid)) throw new Error(`${name} process-group cleanup is unconfirmed`)
 }
 
 export const runBoundedCommand = ({

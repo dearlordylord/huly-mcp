@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config'
 import { ORACLE_INFRASTRUCTURE_TAG } from './test/helpers/test-tags.js'
+import { DeadlineFirstSequencer } from './test/helpers/deadline-first-sequencer.js'
 
 const portTestFiles = [
   'test/domain/**/*.test.ts',
@@ -42,6 +43,7 @@ export default defineConfig({
     environment: 'node',
     // Keep ordinary I/O overlap bounded; intrinsic client fleets have a separate single-worker cohort.
     maxWorkers: 4,
+    sequence: { sequencer: DeadlineFirstSequencer },
     // Persist transforms locally; every test still executes on each run.
     fsModuleCache: true,
     fsModuleCachePath: '.vitest-cache',
