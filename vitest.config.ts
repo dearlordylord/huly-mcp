@@ -124,6 +124,7 @@ export default defineConfig({
     silent: 'passed-only',
     coverage: {
       provider: 'v8',
+      reportOnFailure: true,
       reporter: ['text-summary', 'json', 'html'],
       skipFull: true,
       exclude: [

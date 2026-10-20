@@ -244,7 +244,16 @@ it("retires its listener while a peer withholds the TLS handshake", { timeout: 1
     await Effect.runPromise(Deferred.succeed(retire, undefined))
     const exit = await Effect.runPromiseExit(Fiber.join(fiber).pipe(Effect.timeout(RESPONSE_BOUND)))
     expect(Exit.isSuccess(exit)).toBe(true)
-    if (peer !== undefined && !peer.closed) await once(peer, "close", { signal: AbortSignal.timeout(RESPONSE_BOUND) })
+    const ownedPeer = peer
+    if (ownedPeer !== undefined && !ownedPeer.closed)
+      await Effect.runPromise(
+        Effect.callback<void>((resume) => {
+          // TLS retirement may reset the withheld handshake before emitting close.
+          const closed = () => resume(Effect.void)
+          ownedPeer.once("close", closed)
+          return Effect.sync(() => ownedPeer.off("close", closed))
+        }).pipe(Effect.timeout(RESPONSE_BOUND))
+      )
     expect(peer?.destroyed).toBe(true)
   } finally {
     peer?.destroy()
