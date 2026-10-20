@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config'
+import { availableParallelism } from 'node:os'
 import { ORACLE_INFRASTRUCTURE_TAG } from './test/helpers/test-tags.js'
 
 const portTestFiles = [
@@ -33,7 +34,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     // Bundled CLI subprocesses compete with coverage workers for CPU and memory.
-    maxWorkers: 4,
+    maxWorkers: Math.min(4, availableParallelism()),
     // Persist transforms locally; every test still executes on each run.
     fsModuleCache: true,
     fsModuleCachePath: '.vitest-cache',
@@ -65,7 +66,7 @@ export default defineConfig({
           globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
           include: residentWaitTestFiles,
           isolate: true,
-          // Preserve held-request deadlines while pure port tests run alongside; keep process fleets in the next group.
+          // Preserve held-request deadlines without competing test workers on small CI runners.
           sequence: { groupOrder: 2 },
         },
       },
@@ -73,7 +74,7 @@ export default defineConfig({
         test: {
           name: 'ports',
           include: portTestFiles,
-          sequence: { groupOrder: 2 },
+          sequence: { groupOrder: 3 },
           // The oracle adapter registers its guard at import, so it needs a fresh module graph per file.
           isolate: Boolean(process.env.QUINT_ORACLE_URL?.trim()),
         },
@@ -85,7 +86,7 @@ export default defineConfig({
           include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
           exclude: [...portTestFiles, ...residentLaunchTestFiles, ...residentModelTestFiles, ...residentWaitTestFiles, ...processTestFiles],
           isolate: true,
-          sequence: { groupOrder: 2 },
+          sequence: { groupOrder: 3 },
         },
       },
       {
@@ -95,7 +96,9 @@ export default defineConfig({
           include: processTestFiles,
           exclude: [...residentLaunchTestFiles, ...residentWaitTestFiles],
           isolate: true,
-          sequence: { groupOrder: 3 },
+          // Each fixture already launches several independent processes internally.
+          maxWorkers: 2,
+          sequence: { groupOrder: 4 },
         },
       },
     ],

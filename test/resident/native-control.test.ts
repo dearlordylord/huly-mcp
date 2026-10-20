@@ -6,6 +6,17 @@ import { readNativeControl, writeNativeControl } from "../../src/resident/native
 import { NATIVE_CONTROL_BYTES } from "../../src/resident/native-contract.js"
 
 describe("native bootstrap control channel", () => {
+  it("keeps a completed handshake when pausing the input synchronously closes it", async () => {
+    const input = new PassThrough()
+    input.once("pause", () => input.emit("close"))
+    const parsed = Effect.runPromise(readNativeControl(input))
+    input.write("attached\n")
+    expect(await parsed).toBe("attached")
+    expect(input.listenerCount("data")).toBe(0)
+    expect(input.listenerCount("close")).toBe(0)
+    input.destroy()
+  })
+
   it("assembles a fragmented bounded handshake and relinquishes the stream", async () => {
     const input = new PassThrough()
     const parsed = Effect.runPromise(readNativeControl(input))
