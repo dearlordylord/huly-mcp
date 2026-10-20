@@ -137,9 +137,7 @@ export const makeManualResidentBackend = Effect.fn("makeManualResidentBackend")(
                   )
                 )
               )
-            return yield* configuration.mode === "configured" &&
-            configuration.lifetime === "managed" &&
-            authority !== undefined
+            return yield* configuration.mode === "configured" && authority !== undefined
               ? withNativeResidentSocket(descriptor, admissions, authority, capacity, (nativeSocket) =>
                   publishDescriptor({ ...descriptor, nativeSocket })
                 )

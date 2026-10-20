@@ -1,5 +1,5 @@
 import * as fs from "node:fs/promises"
-import { createServer, type Socket } from "node:net"
+import { createServer, type Server, type Socket } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Deferred, Effect, Fiber, Schema } from "effect"
@@ -16,13 +16,17 @@ import { BackendResponseError } from "./response-stream.js"
 import { runNativeSession } from "./native-session.js"
 
 const CONNECTIONS_PER_ATTACHMENT = 2
+// Internal resource factory; callers can supply an owned listener without patching Node modules.
+type NativeSocketFactory = (accept: (socket: Socket) => void) => Server
+const makeSocketServer: NativeSocketFactory = (accept) => createServer({ allowHalfOpen: false }, accept)
 
 export const withNativeResidentSocket = <A, E, R>(
   attachment: ResidentAttachment,
   admissions: Effect.Success<ReturnType<typeof makeResidentAdmissions>>,
   authority: Effect.Success<ReturnType<typeof makeCompatibilityAuthority>>,
   capacity: AdmissionPolicy["capacity"],
-  use: (path: NativeSocketPath) => Effect.Effect<A, E, R>
+  use: (path: NativeSocketPath) => Effect.Effect<A, E, R>,
+  factory: NativeSocketFactory = makeSocketServer
 ) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -39,7 +43,7 @@ export const withNativeResidentSocket = <A, E, R>(
       )
       const sockets = new Set<Socket>()
       const claimed = new Set<Effect.Success<ReturnType<typeof makeAttachmentOwner>>>()
-      const server = createServer({ allowHalfOpen: false }, (socket) => {
+      const server = factory((socket) => {
         sockets.add(socket)
         socket.on("error", () => {})
         const session = runNativeSession(socket, attachment, admissions, authority, claimed).pipe(

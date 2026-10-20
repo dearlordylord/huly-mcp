@@ -17,6 +17,8 @@ import (
 const relayChunkBytes = NATIVE_FRAME_BYTES
 const relayQueuedChunks = 4
 
+var errOutput = errors.New("native stdout failed")
+
 func pumpInput(ctx context.Context, input io.Reader) (<-chan []byte, <-chan error, *atomic.Bool) {
 	closed := new(atomic.Bool)
 	chunks := make(chan []byte, relayQueuedChunks)
@@ -135,11 +137,11 @@ func copyNativeOutput(output *os.File, input io.Reader) (int64, error) {
 			if deadlineErr := output.SetWriteDeadline(time.Now().Add(time.Duration(NATIVE_OUTPUT_MILLIS) * time.Millisecond)); deadlineErr != nil {
 				stat, statErr := output.Stat()
 				if statErr != nil || !stat.Mode().IsRegular() {
-					return total, deadlineErr
+					return total, errors.Join(errOutput, deadlineErr)
 				}
 			}
 			if writeErr := writeAll(output, buffer[:n]); writeErr != nil {
-				return total, writeErr
+				return total, errors.Join(errOutput, writeErr)
 			}
 			total += int64(n)
 		}

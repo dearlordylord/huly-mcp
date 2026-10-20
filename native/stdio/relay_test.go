@@ -12,6 +12,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -296,5 +297,34 @@ func TestStartupInputErrorFails(t *testing.T) {
 	defer cancel()
 	if err := run(ctx, []string{helper, "unused"}, input, output); !errors.Is(err, os.ErrClosed) {
 		t.Fatalf("stdin error lost: %v", err)
+	}
+}
+
+func TestQueuedInputEOFStillReportsBootstrapRefusal(t *testing.T) {
+	helper := filepath.Join(t.TempDir(), "refusing-helper")
+	script := "#!/bin/sh\nprintf 'configured\\n' >&3\ndd bs=1 count=1 >/dev/null 2>/dev/null\nexit 1\n"
+	if err := os.WriteFile(helper, []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	input, writer, _, output := ownPipes(t)
+	writer.WriteString("opaque request\n")
+	writer.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := run(ctx, []string{helper, "unused"}, input, output); err == nil {
+		t.Fatal("queued EOF hid startup refusal")
+	}
+}
+
+func TestClosedOutputReturnsTypedWriteFailure(t *testing.T) {
+	reader, output, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer output.Close()
+	reader.Close()
+	_, err = copyNativeOutput(output, bytes.NewReader([]byte("opaque reply")))
+	if !errors.Is(err, errOutput) || !errors.Is(err, syscall.EPIPE) {
+		t.Fatalf("stdout failure cause lost: %v", err)
 	}
 }

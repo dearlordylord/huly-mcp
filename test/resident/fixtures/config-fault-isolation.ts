@@ -32,6 +32,7 @@ const CONFIGURATIONS = 2
 const SIGKILL_EXIT = -9
 const RESPONSE_BOUND = 5_000
 const runFile = promisify(execFile)
+const OwnedSignalFailure = Schema.Struct({ stderr: Schema.String })
 let stage = "input"
 const main = async () => {
   const input = Schema.decodeUnknownSync(Schema.fromJsonString(ConfigFaultInput))(process.argv[2])
@@ -118,7 +119,10 @@ const main = async () => {
           ...(adapterPid === undefined ? [] : [String(adapterPid)])
         ],
         { timeout: RESPONSE_BOUND }
-      )
+      ).catch((error: unknown) => {
+        if (Schema.is(OwnedSignalFailure)(error)) process.stderr.write(error.stderr)
+        throw error
+      })
       const signal = Schema.decodeUnknownSync(Schema.fromJsonString(OwnedBackendSignal))(output.stdout)
       assert.equal(signal.processId, ownerA.envelope.diagnostics.processId)
       return signal

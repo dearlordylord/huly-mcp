@@ -22,6 +22,7 @@ func main() {
 	defer cancel()
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+	signal.Ignore(syscall.SIGPIPE)
 	defer signal.Stop(signals)
 	var signalStatus atomic.Int32
 	go func() {
@@ -44,10 +45,10 @@ func main() {
 		os.Exit(int(status))
 	}
 	if err != nil {
-		if errors.Is(err, os.ErrDeadlineExceeded) {
+		if errors.Is(err, errOutput) {
 			fmt.Fprintln(os.Stderr, "Stdio output failed or exceeded its 10 second write allowance")
 		}
-		fmt.Fprintln(os.Stderr, "Native resident channel failed; in-flight outcomes may be unknown. No request was replayed.")
+		fmt.Fprintln(os.Stderr, "Native resident channel failed; an in-flight operation outcome may be unknown. No request was replayed.")
 		os.Exit(1)
 	}
 }
@@ -89,7 +90,7 @@ func run(ctx context.Context, args []string, input, output *os.File) error {
 	}
 	ready := make(chan outcome, 1)
 	go func() {
-		launch, err := prepare(ctx, args[0], args[1], func() bool { configured.Store(true); return !inputClosed.Load() })
+		launch, err := prepare(ctx, args[0], args[1], func() bool { configured.Store(true); return !inputClosed.Load() || len(chunks) > 0 })
 		ready <- outcome{launch, err}
 	}()
 	var launch preparedLaunch
@@ -97,7 +98,7 @@ func run(ctx context.Context, args []string, input, output *os.File) error {
 	for launch == nil {
 		select {
 		case inputErr := <-watchEnd:
-			if errors.Is(inputErr, io.EOF) && !configured.Load() {
+			if errors.Is(inputErr, io.EOF) && (!configured.Load() || len(chunks) > 0) {
 				replay := make(chan error, 1)
 				replay <- inputErr
 				ended = replay

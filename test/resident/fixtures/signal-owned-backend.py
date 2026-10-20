@@ -42,8 +42,27 @@ def main():
             adapter_fd = os.pidfd_open(adapter)
             adapter_poll = select.poll()
             adapter_poll.register(adapter_fd, select.POLLIN)
-            if original[0] != adapter or adapter_poll.poll(0):
-                raise ValueError("Target adapter is not its live parent")
+            adapter_original = identity(adapter)
+            current = adapter
+            for _ in range(32):
+                parent, _ = identity(current)
+                if parent == supervisor:
+                    break
+                if parent <= 1 or parent == current:
+                    raise ValueError("Adapter is outside fixture supervisor ancestry")
+                current = parent
+            else:
+                raise ValueError("Adapter ancestry exceeds bound")
+            adapter_arguments = pathlib.Path(f"/proc/{adapter}/cmdline").read_bytes().split(b"\0")
+            def namespace(pid):
+                entries = pathlib.Path(f"/proc/{pid}/environ").read_bytes().split(b"\0")
+                return next((entry for entry in entries if entry.startswith(b"MCP_RESIDENT_STATE_DIRECTORY=")), None)
+            if bundle not in adapter_arguments or adapter_poll.poll(0):
+                raise ValueError("Adapter is not a live owned package process")
+            if namespace(target) is None or namespace(adapter) != namespace(target):
+                raise ValueError("Adapter and backend namespaces differ")
+            if identity(adapter) != adapter_original or identity(target) != original:
+                raise ValueError("Owned process identity changed before fault")
         signal.pidfd_send_signal(with_pidfd, signal.SIGKILL)
         closed = select.poll()
         closed.register(with_pidfd, select.POLLIN)
@@ -62,6 +81,9 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except (OSError, ValueError, IndexError):
-        print("Owned backend fault refused", file=sys.stderr)
+    except ValueError as error:
+        print(f"Owned backend fault refused: {error}", file=sys.stderr)
+        sys.exit(1)
+    except (OSError, IndexError):
+        print("Owned backend fault refused: process identity unavailable", file=sys.stderr)
         sys.exit(1)

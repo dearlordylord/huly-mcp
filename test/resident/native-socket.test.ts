@@ -1,14 +1,15 @@
 import { once } from "node:events"
 import * as fs from "node:fs/promises"
-import { connect, type Socket } from "node:net"
+import { connect, createServer, type Server, type Socket } from "node:net"
 import { dirname } from "node:path"
 import * as NodeStream from "@effect/platform-node/NodeStream"
-import { Deferred, Effect, Schema, Stream } from "effect"
+import { Deferred, Effect, Result, Schema, Stream } from "effect"
 import { expect, it } from "vitest"
 
 import { ResidentAttachment } from "../../src/resident/attachment-file.js"
 import { AdmissionPolicy, DEFAULT_LEASE_POLICY } from "../../src/resident/admission-contract.js"
 import { residentAdmissionMiddleware } from "../../src/resident/admission-http.js"
+import { withAdapterAttachment } from "../../src/resident/adapter-attachment.js"
 import { makeResidentAdmissions } from "../../src/resident/admissions.js"
 import { makeCompatibilityAuthority } from "../../src/resident/compatibility-authority.js"
 import { makeCompatibilityProof } from "../../src/resident/compatibility-crypto.js"
@@ -21,7 +22,7 @@ import { BackendMessage } from "../../src/resident/response-stream.js"
 import { withNativeServer, AUTHORIZATION, type OwnerName, type Owner } from "../helpers/resident-native-fixture.js"
 
 const policy = Schema.decodeUnknownSync(AdmissionPolicy)({
-  capacity: 2,
+  capacity: 1,
   closeAllowanceMillis: 1_000,
   lease: DEFAULT_LEASE_POLICY
 })
@@ -77,7 +78,12 @@ it("owns a private native channel, authenticates once, forwards a request and re
               authorization: AUTHORIZATION
             })
             const proof = yield* makeCompatibilityProof(capture.selection, yield* authority.challenge, AUTHORIZATION)
-            const lease = yield* admissions.admit
+            const lease = yield* withAdapterAttachment(
+              descriptor,
+              (_exchange, admission) => admission.transfer.pipe(Effect.as(admission.admitted)),
+              capture.selection
+            )
+            expect((yield* admissions.status).attachments).toBe(1)
             const hello = Schema.encodeSync(Schema.fromJsonString(NativeHello))({
               version: 1,
               authorization: AUTHORIZATION,
@@ -116,6 +122,7 @@ it("owns a private native channel, authenticates once, forwards a request and re
                       closeOnDone: false
                     }).pipe(decodeNativeFrames, Stream.take(1), Stream.runCollect)
                   )
+                  socket.write(Buffer.alloc(4))
                   const request = Buffer.from(
                     '{"jsonrpc":"2.0","id":41,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"first","version":"1.0"}}}}\n'
                   )
@@ -154,4 +161,73 @@ it("owns a private native channel, authenticates once, forwards a request and re
   expect(ownedPath).toBeDefined()
   await expect(fs.access(String(ownedPath))).rejects.toThrow()
   await expect(fs.access(dirname(String(ownedPath)))).rejects.toThrow()
+})
+
+it("isolates socket errors and retires an owned listener after an infrastructure failure", async () => {
+  let ownedPath: NativeSocketPath | undefined
+  const result = await Effect.runPromise(
+    Effect.gen(function* () {
+      const capture = yield* captureResidentSelection({
+        HULY_URL: "https://native.invalid",
+        HULY_TOKEN: "fixture-native-token",
+        HULY_WORKSPACE: "native"
+      })
+      const admissions = yield* makeResidentAdmissions(policy)
+      // These are internal listener resources, never serialized.
+      const accepted = yield* Deferred.make<{ readonly server: Server; readonly socket: Socket }>()
+      yield* withNativeServer(new Map<OwnerName, Owner>(), (endpoint, identity) =>
+        Effect.gen(function* () {
+          const authority = yield* makeCompatibilityAuthority(capture.selection, identity.generation, AUTHORIZATION)
+          const descriptor = ResidentAttachment.make({
+            version: 1,
+            transport: "tls13-external-psk-v1",
+            implementation: { name: "@firfi/huly-mcp", version: "fixture" },
+            endpoint,
+            identity,
+            authorization: AUTHORIZATION
+          })
+          yield* withNativeResidentSocket(
+            descriptor,
+            admissions,
+            authority,
+            policy.capacity,
+            (path) =>
+              Effect.gen(function* () {
+                ownedPath = path
+                const client = yield* Effect.promise(() => connection(path))
+                const closed = once(client, "close")
+                const owned = yield* Deferred.await(accepted)
+                owned.socket.destroy(new Error("private-socket-failure"))
+                yield* Effect.promise(() => closed)
+                expect((yield* admissions.status).attachments).toBe(0)
+                owned.server.emit("error", new Error("private-listener-failure"))
+                return yield* Effect.never
+              }),
+            (accept) => {
+              const server = createServer({ allowHalfOpen: false }, (socket) => {
+                accept(socket)
+                Deferred.doneUnsafe(accepted, Effect.succeed({ server, socket }))
+              })
+              return server
+            }
+          )
+        })
+      )
+    }).pipe(Effect.scoped, Effect.result, Effect.timeout("5 seconds"))
+  )
+  expect(Result.isFailure(result)).toBe(true)
+  if (Result.isFailure(result))
+    expect(result.failure.message).toBe("Native resident channel failed; no request was replayed")
+  expect(ownedPath).toBeDefined()
+  await expect(fs.access(String(ownedPath))).rejects.toThrow()
+  await expect(fs.access(dirname(String(ownedPath)))).rejects.toThrow()
+})
+
+it("translates a real native socket connection error into a typed stdio failure", async () => {
+  const socket = connect("/tmp/huly-native-absent-parent/socket")
+  socket.on("error", () => {})
+  const result = await Effect.runPromise(nativeSocketStdio(socket).stdin.pipe(Stream.runDrain, Effect.result))
+  expect(Result.isFailure(result)).toBe(true)
+  if (Result.isFailure(result)) expect(result.failure._tag).toBe("PlatformError")
+  socket.destroy()
 })
