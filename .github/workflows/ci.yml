@@ -13,7 +13,7 @@ permissions:
 jobs:
   check-all:
     name: check-all (Node ${{ matrix.node-version }})
-    # Cover both packaged Linux architectures; Package Smoke retains x64 on both Node versions.
+    # Full gates use arm64; Package Smoke covers x64 packages and native process lifecycles on both Node versions.
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -22,7 +22,7 @@ jobs:
           - node-version: 22.22.2
             runner: ubuntu-24.04-arm
           - node-version: 24.15.0
-            runner: ubuntu-latest
+            runner: ubuntu-24.04-arm
 
     steps:
       - name: Checkout

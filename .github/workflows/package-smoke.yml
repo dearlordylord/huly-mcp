@@ -112,6 +112,16 @@ jobs:
       - name: Verify bundled version
         run: pnpm verify-version
 
+      - name: Verify x64 native bridge and shared backend lifecycles
+        run: |
+          set -euo pipefail
+          pnpm test:native
+          child_cache="$(mktemp -d)"
+          trap 'rm -rf "$child_cache"' EXIT
+          HULY_TEST_SUBPROCESS_COMPILE_CACHE="$child_cache" pnpm exec vitest run \
+            test/resident/managed-backend-process.test.ts \
+            test/resident/native-backend-process.test.ts
+
       - name: Smoke HTTP no-config resource inspection
         run: pnpm smoke:http-no-config
 

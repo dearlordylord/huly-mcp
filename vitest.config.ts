@@ -43,6 +43,7 @@ const processTestFiles = [
 export default defineConfig({
   test: {
     globals: true,
+    globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
     environment: 'node',
     // Keep ordinary I/O overlap bounded; intrinsic client fleets have a separate single-worker cohort.
     maxWorkers: 4,
@@ -65,7 +66,6 @@ export default defineConfig({
       {
         test: {
           name: 'resident-launch',
-          globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
           include: residentLaunchTestFiles,
           isolate: true,
           // Ten independent parents already compete inside this fixture; keep unrelated suites out of its deadline.
@@ -75,7 +75,6 @@ export default defineConfig({
       {
         test: {
           name: 'resident-model-wait',
-          globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
           include: residentWaitTestFiles,
           isolate: true,
           // Preserve held-request deadlines without competing test workers on small CI runners.
@@ -94,7 +93,6 @@ export default defineConfig({
       {
         test: {
           name: 'units',
-          globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
           include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
           exclude: [...portTestFiles, ...residentLaunchTestFiles, ...residentModelTestFiles, ...residentWaitTestFiles, ...processTestFiles],
           isolate: true,
@@ -105,7 +103,6 @@ export default defineConfig({
       {
         test: {
           name: 'resident-fleets',
-          globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
           include: residentFleetTestFiles,
           isolate: true,
           // Keep intrinsic client fleets independent; their own concurrency remains unchanged.
@@ -116,7 +113,6 @@ export default defineConfig({
       {
         test: {
           name: 'boundaries',
-          globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
           include: processTestFiles,
           exclude: [...residentLaunchTestFiles, ...residentWaitTestFiles, ...residentFleetTestFiles],
           isolate: true,

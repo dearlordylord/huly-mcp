@@ -15,11 +15,17 @@ export default async function setup(project: TestProject) {
     await source.cleanup()
     throw error
   })
-  const previous = project.config.env.HULY_TEST_STDIO_BUNDLE
-  const previousCache = project.config.env.HULY_TEST_SUBPROCESS_COMPILE_CACHE
+  const previous = project.vitest.projects.map((target) => ({
+    target,
+    bundle: target.config.env.HULY_TEST_STDIO_BUNDLE,
+    cache: target.config.env.HULY_TEST_SUBPROCESS_COMPILE_CACHE
+  }))
   try {
-    project.config.env.HULY_TEST_STDIO_BUNDLE = await makeStdioBundleGrant(source.path)
-    project.config.env.HULY_TEST_SUBPROCESS_COMPILE_CACHE = cache
+    const grant = await makeStdioBundleGrant(source.path)
+    for (const { target } of previous) {
+      target.config.env.HULY_TEST_STDIO_BUNDLE = grant
+      target.config.env.HULY_TEST_SUBPROCESS_COMPILE_CACHE = cache
+    }
   } catch (error) {
     try {
       await source.cleanup()
@@ -29,10 +35,12 @@ export default async function setup(project: TestProject) {
     throw error
   }
   return async () => {
-    if (previous === undefined) delete project.config.env.HULY_TEST_STDIO_BUNDLE
-    else project.config.env.HULY_TEST_STDIO_BUNDLE = previous
-    if (previousCache === undefined) delete project.config.env.HULY_TEST_SUBPROCESS_COMPILE_CACHE
-    else project.config.env.HULY_TEST_SUBPROCESS_COMPILE_CACHE = previousCache
+    for (const { target, bundle, cache: previousCache } of previous) {
+      if (bundle === undefined) delete target.config.env.HULY_TEST_STDIO_BUNDLE
+      else target.config.env.HULY_TEST_STDIO_BUNDLE = bundle
+      if (previousCache === undefined) delete target.config.env.HULY_TEST_SUBPROCESS_COMPILE_CACHE
+      else target.config.env.HULY_TEST_SUBPROCESS_COMPILE_CACHE = previousCache
+    }
     // Only the setup-owned source is removed; each suite owns its executable copy.
     try {
       await source.cleanup()
