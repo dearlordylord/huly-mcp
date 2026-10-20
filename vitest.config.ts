@@ -50,7 +50,7 @@ export default defineConfig({
     globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
     environment: 'node',
     // Keep ordinary I/O overlap bounded; intrinsic client fleets have a separate single-worker cohort.
-    maxWorkers: 4,
+    maxWorkers: 5,
     sequence: { sequencer: DeadlineFirstSequencer },
     // Persist transforms locally; every test still executes on each run.
     fsModuleCache: true,
