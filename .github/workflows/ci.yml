@@ -13,7 +13,8 @@ permissions:
 jobs:
   check-all:
     name: check-all (Node ${{ matrix.node-version }})
-    runs-on: ubuntu-latest
+    # Execute Linux arm64 binaries here; Package Smoke retains Linux x64 on both Node versions.
+    runs-on: ubuntu-24.04-arm
     strategy:
       fail-fast: false
       matrix:
