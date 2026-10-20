@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { buildIsolatedStdioServer, ESBUILD_EXECUTABLE, NATIVE_RUNTIME_EXTERNALS } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { ManagedParentObservation } from "./managed-observation.js"
+import { prepareSubprocessBytecode, runPreparationFile } from "../helpers/subprocess-bytecode.js"
 
 const PROCESS_BOUND = 30_000
 const runFile = promisify(execFile)
@@ -20,38 +21,48 @@ describe.skipIf(process.platform !== "linux")("managed native backend", () => {
   let host: string
   let race: string
   let passed = false
+  let prepared = false
+  let preparation: Promise<void> | undefined
   beforeAll(async () => {
-    bundle = await buildIsolatedStdioServer(PROCESS_BOUND)
-    root = await fs.mkdtemp(join(await fs.realpath(tmpdir()), "resident-managed-parents-"))
-    host = join(dirname(bundle.path), "managed-native-host.cjs")
-    race = join(dirname(bundle.path), "managed-ten-parents.cjs")
-    await runFile(
-      ESBUILD_EXECUTABLE,
-      [
-        "test/resident/fixtures/managed-native-host.ts",
-        "--bundle",
-        "--platform=node",
-        "--format=cjs",
-        ...NATIVE_RUNTIME_EXTERNALS,
-        `--outfile=${host}`
-      ],
-      { timeout: PROCESS_BOUND }
-    )
-    await runFile(
-      ESBUILD_EXECUTABLE,
-      [
-        "test/resident/fixtures/managed-ten-parents.ts",
-        "--bundle",
-        "--platform=node",
-        "--format=cjs",
-        ...NATIVE_RUNTIME_EXTERNALS,
-        `--outfile=${race}`
-      ],
-      { timeout: PROCESS_BOUND }
-    )
+    const signal = AbortSignal.timeout(PROCESS_BOUND)
+    preparation = (async () => {
+      bundle = await buildIsolatedStdioServer(PROCESS_BOUND, undefined, signal)
+      root = await fs.mkdtemp(join(await fs.realpath(tmpdir()), "resident-managed-parents-"))
+      host = join(dirname(bundle.path), "managed-native-host.cjs")
+      race = join(dirname(bundle.path), "managed-ten-parents.cjs")
+      await runPreparationFile(
+        ESBUILD_EXECUTABLE,
+        [
+          "test/resident/fixtures/managed-native-host.ts",
+          "--bundle",
+          "--platform=node",
+          "--format=cjs",
+          ...NATIVE_RUNTIME_EXTERNALS,
+          `--outfile=${host}`
+        ],
+        signal
+      )
+      await runPreparationFile(
+        ESBUILD_EXECUTABLE,
+        [
+          "test/resident/fixtures/managed-ten-parents.ts",
+          "--bundle",
+          "--platform=node",
+          "--format=cjs",
+          ...NATIVE_RUNTIME_EXTERNALS,
+          `--outfile=${race}`
+        ],
+        signal
+      )
+      await prepareSubprocessBytecode(host, signal)
+      await prepareSubprocessBytecode(race, signal)
+      prepared = true
+    })()
+    await preparation
   }, PROCESS_BOUND)
   afterAll(async () => {
-    if (bundle !== undefined && passed) await bundle.cleanup()
+    await preparation?.catch(() => {})
+    if (bundle !== undefined && (passed || !prepared)) await bundle.cleanup()
     if (root !== undefined && (await fs.readdir(root)).length === 0) await fs.rmdir(root)
   })
   it(

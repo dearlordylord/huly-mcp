@@ -2,6 +2,7 @@ import type { Reporter, TestCase, TestModule } from "vitest/node"
 
 const SLOW_MODULE_MILLISECONDS = 10_000
 const MAXIMUM_SLOW_MODULE_REPORTS = 32
+const MAXIMUM_ERROR_MESSAGE_CHARACTERS = 2_000
 
 // The gate may terminate a campaign before Vitest prints its final failure summary.
 export default class CiFailureReporter implements Reporter {
@@ -15,6 +16,10 @@ export default class CiFailureReporter implements Reporter {
   }
 
   onTestCaseResult(testCase: TestCase): void {
-    if (testCase.result().state === "failed") process.stderr.write(`Failed test: ${testCase.fullName}\n`)
+    const result = testCase.result()
+    if (result.state !== "failed") return
+    process.stderr.write(`Failed test: ${testCase.fullName}\n`)
+    for (const error of result.errors)
+      process.stderr.write(`${error.message?.slice(0, MAXIMUM_ERROR_MESSAGE_CHARACTERS) ?? "No error message"}\n`)
   }
 }

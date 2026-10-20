@@ -6,6 +6,7 @@ import { promisify } from "node:util"
 import { createHash } from "node:crypto"
 import { Schema } from "effect"
 import { StdioBundleGrant } from "../../scripts/stdio-bundle-grant.js"
+import { prepareSubprocessBytecode } from "./subprocess-bytecode.js"
 
 const runFile = promisify(execFile)
 export const ESBUILD_EXECUTABLE = createRequire(import.meta.url).resolve("esbuild/bin/esbuild")
@@ -16,7 +17,8 @@ const parseGrant = Schema.decodeUnknownSync(Schema.UndefinedOr(Schema.fromJsonSt
 // Each suite owns its bundle: parallel builds cannot rewrite a running child's entrypoint.
 export const buildIsolatedStdioServer = async (
   timeout: number,
-  readGrant: () => string | undefined = () => process.env.HULY_TEST_STDIO_BUNDLE
+  readGrant: () => string | undefined = () => process.env.HULY_TEST_STDIO_BUNDLE,
+  signal = AbortSignal.timeout(timeout)
 ) => {
   const outputDirectory = join(process.cwd(), "dist")
   await mkdir(outputDirectory, { recursive: true })
@@ -40,6 +42,7 @@ export const buildIsolatedStdioServer = async (
         await writeFile(join(directory, companion.path), content, { flag: "wx", mode: companion.mode })
       }
     }
+    await prepareSubprocessBytecode(join(directory, "application.cjs"), signal)
     return { path, cleanup }
   } catch (error) {
     await cleanup()
