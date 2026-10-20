@@ -52,7 +52,7 @@ const awaitAbsent = (pid: number, allowance: number) =>
 const run = async (input: Schema.Schema.Type<typeof Input>, kernel: ReturnType<typeof openKernelReapedEvents>) => {
   const parents = Array.from({ length: PARENTS }, (_, index) => {
     const host = index % ALTERNATION === 0 ? "claude-code" : "codex-mcp-client"
-    const child = spawn(process.execPath, [input.fixture, input.bundle, input.directory, host], {
+    const child = spawn(process.execPath, [input.fixture, input.bundle, input.directory, host, "fixture", "command"], {
       env: residentSelectionEnvironment()
     })
     child.stderr.on("data", (chunk: Buffer) => process.stderr.write(chunk))
@@ -83,6 +83,7 @@ const run = async (input: Schema.Schema.Type<typeof Input>, kernel: ReturnType<t
     )
     await Promise.all(parents.map((parent) => parent.connected()))
     process.stderr.write("Managed race: waiting for ten observations\n")
+    for (const parent of parents) parent.child.stdin.write("read\n")
     const observations = await Promise.all(
       parents.map(async (parent) => ({ parent, observation: await parent.read() }))
     )
