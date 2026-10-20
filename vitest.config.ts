@@ -18,6 +18,12 @@ const portTestFiles = [
 const residentLaunchTestFiles = ['test/resident/managed-backend-process.test.ts']
 const residentModelTestFiles = ['test/resident/launch-model-alignment.test.ts']
 const residentWaitTestFiles = ['test/resident/model-wait-process.test.ts']
+const residentFleetTestFiles = [
+  'test/resident/ten-reader-process.test.ts',
+  'test/resident/config-fault-process.test.ts',
+  'test/resident/managed-version-process.test.ts',
+  'test/resident/mixed-launch-process.test.ts',
+]
 const processTestFiles = [
   'test/resident/*-process.test.ts',
   'test/mcp/stdio-process-lifecycle.test.ts',
@@ -91,14 +97,23 @@ export default defineConfig({
       },
       {
         test: {
+          name: 'resident-fleets',
+          globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
+          include: residentFleetTestFiles,
+          isolate: true,
+          // Keep intrinsic client fleets independent; their own concurrency remains unchanged.
+          maxWorkers: 1,
+          sequence: { groupOrder: 4 },
+        },
+      },
+      {
+        test: {
           name: 'boundaries',
           globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
           include: processTestFiles,
-          exclude: [...residentLaunchTestFiles, ...residentWaitTestFiles],
+          exclude: [...residentLaunchTestFiles, ...residentWaitTestFiles, ...residentFleetTestFiles],
           isolate: true,
-          // Each fixture already launches several independent processes internally.
-          maxWorkers: 2,
-          sequence: { groupOrder: 4 },
+          sequence: { groupOrder: 5 },
         },
       },
     ],
