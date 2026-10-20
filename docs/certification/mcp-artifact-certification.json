@@ -1,5 +1,5 @@
 {
-  "archiveBytes": 5993777,
+  "archiveBytes": 2588101,
   "bundleBytes": 9122864,
   "bundleGzipBytes": 1757450,
   "entryCount": 10,
@@ -10,6 +10,6 @@
     "ws"
   ],
   "name": "@firfi/huly-mcp",
-  "unpackedBytes": 19070072,
+  "unpackedBytes": 11174468,
   "version": "0.55.1"
 }
