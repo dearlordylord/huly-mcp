@@ -115,7 +115,8 @@ export default defineConfig({
           name: 'boundaries',
           include: processTestFiles,
           exclude: [...residentLaunchTestFiles, ...residentWaitTestFiles, ...residentFleetTestFiles],
-          isolate: true,
+          // Probe state belongs to each file; the observed servers and hosts still start fresh Node processes.
+          isolate: Boolean(process.env.QUINT_ORACLE_URL?.trim()),
           sequence: { groupOrder: 4 },
         },
       },

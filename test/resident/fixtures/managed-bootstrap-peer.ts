@@ -45,12 +45,18 @@ const main = Effect.gen(function* () {
     )
   })
   const write = (file: string, value: PeerObservation) =>
-    Effect.promise(() =>
-      fs.writeFile(join(directory, file), Schema.encodeSync(Schema.fromJsonString(PeerObservation))(value), {
+    Effect.promise(async () => {
+      const pending = join(directory, `${file}.pending`)
+      await fs.writeFile(pending, Schema.encodeSync(Schema.fromJsonString(PeerObservation))(value), {
         mode: 0o600,
         flag: "wx"
       })
-    )
+      try {
+        await fs.link(pending, join(directory, file))
+      } finally {
+        await fs.unlink(pending)
+      }
+    })
   yield* write("prepared.json", observation)
   if (mode === "exit-before-prepared") return
   const prepared = yield* encodeChildReply({
