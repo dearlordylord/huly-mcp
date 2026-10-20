@@ -324,6 +324,48 @@ fn unread_stdout_has_the_original_ten_second_bound() {
     fixture.finish();
 }
 
+// Linux exposes per-process CPU ticks, so this exercises the real HUP plus
+// blocked-stdout regression without mixing CPU consumed by parallel test peers.
+#[cfg(target_os = "linux")]
+#[test]
+fn backend_hangup_during_stdout_backpressure_does_not_spin() {
+    use std::os::fd::AsRawFd;
+    let (sent, received) = mpsc::channel();
+    let mut fixture = Server::new(move |mut socket| {
+        admit(&mut socket);
+        write_frame(&mut socket, &vec![b'x'; FRAME_BYTES]).unwrap();
+        drop(socket);
+        sent.send(()).unwrap();
+    });
+    let mut process = Process::start(&fixture.helper);
+    let output = process.0.stdout.as_ref().unwrap().as_raw_fd();
+    // SAFETY: output is a live owned pipe descriptor; this only bounds capacity.
+    assert!(unsafe { libc::fcntl(output, libc::F_SETPIPE_SZ, 4096) } > 0);
+    received.recv_timeout(Duration::from_secs(5)).unwrap();
+    let cpu_ticks = || {
+        let stat = fs::read_to_string(format!("/proc/{}/stat", process.0.id())).unwrap();
+        let fields: Vec<_> = stat
+            .rsplit_once(')')
+            .unwrap()
+            .1
+            .split_whitespace()
+            .collect();
+        fields[11].parse::<u64>().unwrap() + fields[12].parse::<u64>().unwrap()
+    };
+    let before = cpu_ticks();
+    thread::sleep(Duration::from_millis(500));
+    let consumed = cpu_ticks() - before;
+    // SAFETY: sysconf reads the platform clock-tick constant and owns no pointer.
+    let ticks_per_second = u64::try_from(unsafe { libc::sysconf(libc::_SC_CLK_TCK) }).unwrap();
+    assert!(
+        consumed < ticks_per_second / 4,
+        "blocked bridge consumed {consumed} CPU ticks"
+    );
+    process.signal(libc::SIGTERM);
+    assert_eq!(process.wait(Duration::from_secs(2)).code(), Some(143));
+    fixture.finish();
+}
+
 #[test]
 fn idle_bridge_sends_the_original_five_second_heartbeat() {
     let (sent, received) = mpsc::channel();
