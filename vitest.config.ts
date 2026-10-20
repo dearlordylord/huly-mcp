@@ -21,11 +21,9 @@ const portTestFiles = [
 ]
 
 const residentLaunchTestFiles = ['test/resident/managed-backend-process.test.ts']
-const residentModelTestFiles = [
-  'test/resident/launch-model-alignment.test.ts',
-  'test/resident/managed-owner.test.ts',
-]
+const residentModelTestFiles = ['test/resident/launch-model-alignment.test.ts']
 const residentWaitTestFiles = [
+  'test/resident/managed-owner.test.ts',
   'test/resident/model-wait-process.test.ts',
   'test/cli/process-failures.test.ts',
 ]
@@ -65,7 +63,7 @@ export default defineConfig({
           name: 'resident-model',
           include: residentModelTestFiles,
           isolate: true,
-          // Overlap owned filesystem deadlines with replay preparation; native client fleets stay separate.
+          // Keep bounded Quint replays independent from process startup and filesystem polling.
           sequence: { groupOrder: 0 },
         },
       },
@@ -83,7 +81,7 @@ export default defineConfig({
           name: 'resident-model-wait',
           include: residentWaitTestFiles,
           isolate: true,
-          // Overlap single-child CLI checks with held-request waits; native client fleets stay separate.
+          // Overlap filesystem and held-request waits with single-child CLI checks; client fleets stay separate.
           sequence: { groupOrder: 2 },
         },
       },
