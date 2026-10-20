@@ -14,6 +14,12 @@ export const quintSubprocessEnvironment = (cli: Schema.Schema.Type<typeof Reside
   return { ...env, NODE_COMPILE_CACHE: join(dirname(cli), "compile-cache") }
 }
 
+// Keep parser allocation pressure inside the tool child, leaving backend and coverage worker flags alone.
+export const quintNodeArguments = (
+  cli: Schema.Schema.Type<typeof ResidentPackagePath>,
+  args: ReadonlyArray<string>
+) => ["--max-semi-space-size=64", cli, ...args]
+
 // Preparation is separate from the unchanged four-second model execution bound.
 export const prepareResidentQuintCli = async () => {
   const source = join(process.cwd(), "node_modules/@informalsystems/quint/dist/src/cli.js")
@@ -36,15 +42,14 @@ export const prepareResidentQuintCli = async () => {
     // Warm the evaluator too; each real replay still runs fresh within its four-second bound.
     await promisify(execFile)(
       process.execPath,
-      [
-        cli,
+      quintNodeArguments(cli, [
         "test",
         join(process.cwd(), "quint-specs/resident-launch-observations_test.qnt"),
         "--backend=typescript",
         "--match",
         "ordinaryOwnerObservationTest$",
         "--max-samples=1"
-      ],
+      ]),
       { timeout: 30_000, killSignal: "SIGKILL", env: quintSubprocessEnvironment(cli) }
     )
     const cached = await readdir(join(directory, "compile-cache"), { recursive: true, withFileTypes: true })

@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { promisify } from "node:util"
 import type { Schema } from "effect"
 import type { ResidentPackagePath } from "../../src/resident/managed-contract.js"
-import { quintSubprocessEnvironment } from "./resident-quint-cli.js"
+import { quintNodeArguments, quintSubprocessEnvironment } from "./resident-quint-cli.js"
 
 import type { ResidentResponseObservation } from "../../src/resident/response-observations.js"
 
@@ -44,7 +44,7 @@ export const replayResidentResponses = async (
   run observedTest = init${steps.join("")}.expect(safety)
 }\n`
     )
-    await runFile(process.execPath, [cli, "test", path, "--backend=typescript"], {
+    await runFile(process.execPath, quintNodeArguments(cli, ["test", path, "--backend=typescript"]), {
       timeout: REPLAY_BOUND,
       killSignal: "SIGKILL",
       env: quintSubprocessEnvironment(cli)
