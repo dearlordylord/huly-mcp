@@ -25,6 +25,7 @@ export const prepareResidentQuintCli = async () => {
       entryPoints: [source],
       outfile: cli,
       bundle: true,
+      minify: true,
       platform: "node",
       format: "cjs",
       external: ["./reflection.proto"],

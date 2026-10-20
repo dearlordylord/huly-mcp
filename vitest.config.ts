@@ -2,6 +2,9 @@ import { defineConfig } from 'vitest/config'
 import { ORACLE_INFRASTRUCTURE_TAG } from './test/helpers/test-tags.js'
 import { DeadlineFirstSequencer } from './test/helpers/deadline-first-sequencer.js'
 
+const DARWIN_WORKERS = 4
+const DEFAULT_WORKERS = 5
+
 const portTestFiles = [
   'test/domain/**/*.test.ts',
   'test/huly/**/*.test.ts',
@@ -50,7 +53,7 @@ export default defineConfig({
     globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
     environment: 'node',
     // Keep ordinary I/O overlap bounded; intrinsic client fleets have a separate single-worker cohort.
-    maxWorkers: 5,
+    maxWorkers: process.platform === 'darwin' ? DARWIN_WORKERS : DEFAULT_WORKERS,
     sequence: { sequencer: DeadlineFirstSequencer },
     // Persist transforms locally; every test still executes on each run.
     fsModuleCache: true,

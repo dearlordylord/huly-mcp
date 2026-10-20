@@ -2,6 +2,9 @@ import { execFile } from "node:child_process"
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { promisify } from "node:util"
+import type { Schema } from "effect"
+import type { ResidentPackagePath } from "../../src/resident/managed-contract.js"
+import { quintSubprocessEnvironment } from "./resident-quint-cli.js"
 
 import type { ResidentResponseObservation } from "../../src/resident/response-observations.js"
 
@@ -9,7 +12,10 @@ const runFile = promisify(execFile)
 const MODEL_CONTEXTS = 4
 const REPLAY_BOUND = 5_000
 
-export const replayResidentResponses = async (streams: ReadonlyArray<ReadonlyArray<ResidentResponseObservation>>) => {
+export const replayResidentResponses = async (
+  streams: ReadonlyArray<ReadonlyArray<ResidentResponseObservation>>,
+  cli: Schema.Schema.Type<typeof ResidentPackagePath>
+) => {
   const steps: Array<string> = []
   let nextContext = 0
   for (const stream of streams) {
@@ -38,7 +44,11 @@ export const replayResidentResponses = async (streams: ReadonlyArray<ReadonlyArr
   run observedTest = init${steps.join("")}.expect(safety)
 }\n`
     )
-    await runFile("pnpm", ["exec", "quint", "test", path, "--backend=typescript"], { timeout: REPLAY_BOUND })
+    await runFile(process.execPath, [cli, "test", path, "--backend=typescript"], {
+      timeout: REPLAY_BOUND,
+      killSignal: "SIGKILL",
+      env: quintSubprocessEnvironment(cli)
+    })
   } finally {
     await rm(directory, { recursive: true, force: true })
   }

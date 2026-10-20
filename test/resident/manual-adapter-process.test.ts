@@ -11,6 +11,7 @@ import { makeByteDisclosureDetector } from "../helpers/byte-disclosure.js"
 import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
 import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { replayResidentResponses } from "../helpers/resident-response-replay.js"
+import { prepareResidentQuintCli } from "../helpers/resident-quint-cli.js"
 import { ResidentResponseObservation } from "../../src/resident/response-observations.js"
 import { fixturePackageVersion, startResidentFixture } from "../helpers/resident-fixture.js"
 import { ResidentAttachment } from "../../src/resident/attachment-file.js"
@@ -47,13 +48,26 @@ const requestFor = (host: string, method = "server/discover") =>
       }
     }
   })}\n`
-let bundle: Awaited<ReturnType<typeof buildIsolatedStdioServer>>
-
+const prepareResources = async () => {
+  const bundle = await buildIsolatedStdioServer(PROCESS_BOUND)
+  try {
+    return { bundle, quint: await prepareResidentQuintCli() }
+  } catch (error) {
+    await bundle.cleanup()
+    throw error
+  }
+}
+let resources: Awaited<ReturnType<typeof prepareResources>>
+let preparation: ReturnType<typeof prepareResources> | undefined
 beforeAll(async () => {
-  bundle = await buildIsolatedStdioServer(PROCESS_BOUND)
-})
+  preparation = prepareResources()
+  resources = await preparation
+}, PROCESS_BOUND)
 afterAll(async () => {
-  await bundle.cleanup()
+  await preparation?.then(
+    ({ bundle, quint }) => Promise.all([bundle.cleanup(), quint.cleanup()]),
+    () => undefined
+  )
 })
 
 describe("packaged manual adapter", { timeout: PROCESS_BOUND }, () => {
@@ -87,7 +101,7 @@ describe("packaged manual adapter", { timeout: PROCESS_BOUND }, () => {
       )
       replacement.listen(Number(descriptor.endpoint.port), "127.0.0.1")
       await once(replacement, "listening")
-      const child = spawn(process.execPath, [bundle.path], {
+      const child = spawn(process.execPath, [resources.bundle.path], {
         env: { ...testStdioEnvironment(), MCP_TRANSPORT: "stdio-http", MCP_RESIDENT_ATTACHMENT_FILE: fixture.file }
       })
       const closed = once(child, "close", { signal: AbortSignal.timeout(RESPONSE_BOUND) })
@@ -158,7 +172,7 @@ describe("packaged manual adapter", { timeout: PROCESS_BOUND }, () => {
     const adapters = ["first", "second"].map((host) => {
       const child = spawn(
         process.execPath,
-        ["--import", resolve("test/resident/fixtures/observe-responses.mjs"), bundle.path],
+        ["--import", resolve("test/resident/fixtures/observe-responses.mjs"), resources.bundle.path],
         {
           stdio: ["pipe", "pipe", "pipe", "ipc"],
           env: { ...testStdioEnvironment(), MCP_TRANSPORT: "stdio-http", MCP_RESIDENT_ATTACHMENT_FILE: fixture.file }
@@ -238,14 +252,17 @@ describe("packaged manual adapter", { timeout: PROCESS_BOUND }, () => {
       expect(
         adapters.at(0)?.observations.some((observation) => observation.event === "End" && !observation.accepted)
       ).toBe(true)
-    await replayResidentResponses(adapters.map((adapter) => adapter.observations))
+    await replayResidentResponses(
+      adapters.map((adapter) => adapter.observations),
+      resources.quint.cli
+    )
     if (contentType === "application/json" && release === "none") {
       const contradicted = adapters.map((adapter) =>
         adapter.observations.map((observation) =>
           observation.event === "OwnReply" ? { ...observation, accepted: false } : observation
         )
       )
-      await expect(replayResidentResponses(contradicted)).rejects.toThrow("error: Tests failed")
+      await expect(replayResidentResponses(contradicted, resources.quint.cli)).rejects.toThrow("error: Tests failed")
     }
   })
 })
