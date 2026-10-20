@@ -35,7 +35,7 @@ export default async function setup(project: TestProject) {
     throw error
   }
   return async () => {
-    for (const { target, bundle, cache: previousCache } of previous) {
+    for (const { bundle, cache: previousCache, target } of previous) {
       if (bundle === undefined) delete target.config.env.HULY_TEST_STDIO_BUNDLE
       else target.config.env.HULY_TEST_STDIO_BUNDLE = bundle
       if (previousCache === undefined) delete target.config.env.HULY_TEST_SUBPROCESS_COMPILE_CACHE
