@@ -1,0 +1,15 @@
+{
+  "archiveBytes": 2588112,
+  "bundleBytes": 9122864,
+  "bundleGzipBytes": 1757450,
+  "entryCount": 10,
+  "executableMode": 493,
+  "externalModules": [
+    "@napi-rs/keyring",
+    "dbus-next",
+    "ws"
+  ],
+  "name": "@firfi/huly-mcp",
+  "unpackedBytes": 11174468,
+  "version": "0.55.1"
+}

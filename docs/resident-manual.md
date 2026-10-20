@@ -329,6 +329,10 @@ Zig and the macOS SDK; CI and Docker run the same setup explicitly.
 `pnpm build:native` cross-compiles the four binaries; Linux binaries use static musl.
 The Rust bridge uses one nonblocking I/O loop without an async runtime.
 `pnpm test:native` runs formatting, Clippy and real pipe/Unix-socket tests.
+Packed-artifact receipts are exact and scoped to the build host platform and
+architecture: Cargo metadata and Mach-O signatures can differ across compiler
+hosts. `certify-packed-artifact --write` records the current host receipt; a
+missing receipt fails verification rather than falling back to another host.
 
 ### Reproducing the split-build experiment
 

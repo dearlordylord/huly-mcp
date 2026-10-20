@@ -35,9 +35,6 @@ fi
 
 if ! $setup; then
   cd "$project_root/native/stdio"
-  # Cargo hashes linker paths into artifact metadata; keep that path relative
-  # so Darwin signatures and symbol ordering do not depend on the build user.
-  export CARGO_ZIGBUILD_CACHE_DIR=target/zig-linker-cache
   exec cargo "$@"
 fi
 # Entering the crate makes rustup use its pinned toolchain and target inventory.

@@ -67,7 +67,9 @@ const expected: Parameters<typeof certifyPackedArtifact>[1] =
 const main = async (): Promise<void> => {
   const certification = await certifyPackedArtifact(archivePath, expected)
   if (kind === "mcp") {
-    const evidencePath = "docs/certification/mcp-artifact-certification.json"
+    // Cargo dependency metadata and Mach-O signatures depend on the compiler host.
+    // Compare exact receipts from the same host platform, retaining every payload check.
+    const evidencePath = `docs/certification/mcp-artifact-certification-${process.platform}-${process.arch}.json`
     const parseEvidence = Schema.decodeUnknownSync(Schema.fromJsonString(PackedArtifactCertificationSchema))
     if (writeFlag === "--write") {
       writeFileSync(evidencePath, `${JSON.stringify(certification, undefined, jsonIndent)}\n`)
