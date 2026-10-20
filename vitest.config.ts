@@ -21,8 +21,14 @@ const portTestFiles = [
 ]
 
 const residentLaunchTestFiles = ['test/resident/managed-backend-process.test.ts']
-const residentModelTestFiles = ['test/resident/launch-model-alignment.test.ts']
-const residentWaitTestFiles = ['test/resident/model-wait-process.test.ts']
+const residentModelTestFiles = [
+  'test/resident/launch-model-alignment.test.ts',
+  'test/resident/managed-owner.test.ts',
+]
+const residentWaitTestFiles = [
+  'test/resident/model-wait-process.test.ts',
+  'test/cli/process-failures.test.ts',
+]
 const residentFleetTestFiles = [
   'test/resident/ten-reader-process.test.ts',
   'test/resident/config-fault-process.test.ts',
@@ -59,7 +65,7 @@ export default defineConfig({
           name: 'resident-model',
           include: residentModelTestFiles,
           isolate: true,
-          // Keep each four-second Quint replay independent of native process-race CPU load.
+          // Overlap owned filesystem deadlines with replay preparation; native client fleets stay separate.
           sequence: { groupOrder: 0 },
         },
       },
@@ -77,7 +83,7 @@ export default defineConfig({
           name: 'resident-model-wait',
           include: residentWaitTestFiles,
           isolate: true,
-          // Preserve held-request deadlines without competing test workers on small CI runners.
+          // Overlap single-child CLI checks with held-request waits; native client fleets stay separate.
           sequence: { groupOrder: 2 },
         },
       },
@@ -85,6 +91,7 @@ export default defineConfig({
         test: {
           name: 'ports',
           include: portTestFiles,
+          exclude: [...residentModelTestFiles, ...residentWaitTestFiles],
           sequence: { groupOrder: 4 },
           // The oracle adapter registers its guard at import, so it needs a fresh module graph per file.
           isolate: Boolean(process.env.QUINT_ORACLE_URL?.trim()),

@@ -1,16 +1,24 @@
-import { copyFile, mkdtemp, rm } from "node:fs/promises"
+import { copyFile, mkdtemp, readdir, rm } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import { execFile } from "node:child_process"
 import { promisify } from "node:util"
 import { build } from "esbuild"
+import type { Schema } from "effect"
 
 import { ResidentPackagePath } from "../../src/resident/managed-contract.js"
+
+export const quintSubprocessEnvironment = (cli: Schema.Schema.Type<typeof ResidentPackagePath>) => {
+  const env = { ...process.env }
+  // Quint is not instrumented; keep Vitest's coverage cache prohibition in the parent only.
+  delete env.NODE_DISABLE_COMPILE_CACHE
+  return { ...env, NODE_COMPILE_CACHE: join(dirname(cli), "compile-cache") }
+}
 
 // Preparation is separate from the unchanged four-second model execution bound.
 export const prepareResidentQuintCli = async () => {
   const source = join(process.cwd(), "node_modules/@informalsystems/quint/dist/src/cli.js")
   const directory = await mkdtemp(join(process.cwd(), "dist/resident-quint-cli-"))
-  const cli = join(directory, "cli.cjs")
+  const cli = ResidentPackagePath.make(join(directory, "cli.cjs"))
   const cleanup = () => rm(directory, { recursive: true, force: true })
   try {
     await build({
@@ -36,13 +44,11 @@ export const prepareResidentQuintCli = async () => {
         "ordinaryOwnerObservationTest$",
         "--max-samples=1"
       ],
-      {
-        timeout: 30_000,
-        killSignal: "SIGKILL",
-        env: { ...process.env, NODE_COMPILE_CACHE: join(directory, "compile-cache") }
-      }
+      { timeout: 30_000, killSignal: "SIGKILL", env: quintSubprocessEnvironment(cli) }
     )
-    return { cli: ResidentPackagePath.make(cli), cleanup }
+    const cached = await readdir(join(directory, "compile-cache"), { recursive: true, withFileTypes: true })
+    if (!cached.some((entry) => entry.isFile())) throw new Error("Quint preparation did not produce bytecode cache")
+    return { cli, cleanup }
   } catch (error) {
     await cleanup().catch(() => {
       process.stderr.write("Quint CLI preparation cleanup failed; private build directory retained\n")
