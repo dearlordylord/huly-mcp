@@ -89,7 +89,9 @@ impl Interest {
     pub fn new(fd: RawFd, read: bool, write: bool) -> Self {
         Self {
             descriptor: libc::pollfd {
-                fd,
+                // poll reports HUP even with no requested events. Suspend inactive
+                // descriptors while a bounded output queue is being drained.
+                fd: if read || write { fd } else { -1 },
                 events: if read { libc::POLLIN } else { 0 } | if write { libc::POLLOUT } else { 0 },
                 revents: 0,
             },
@@ -113,4 +115,23 @@ pub fn wait(interests: &[Interest], timeout: Duration) -> io::Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Interest;
+
+    #[test]
+    fn inactive_descriptor_is_suspended_even_after_peer_hangup() {
+        use std::os::fd::AsRawFd;
+        use std::os::unix::net::UnixStream;
+        let (socket, peer) = UnixStream::pair().unwrap();
+        drop(peer);
+        let interest = Interest::new(socket.as_raw_fd(), false, false);
+        assert_eq!(interest.descriptor.fd, -1);
+        assert_eq!(
+            Interest::new(socket.as_raw_fd(), true, false).descriptor.fd,
+            socket.as_raw_fd()
+        );
+    }
 }
