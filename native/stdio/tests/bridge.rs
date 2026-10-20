@@ -114,6 +114,9 @@ impl Server {
             while !ending.load(Ordering::Relaxed) {
                 match listener.accept() {
                     Ok((stream, _)) => {
+                        // Darwin inherits O_NONBLOCK from the listener; the real
+                        // fixture peer uses bounded blocking reads on every OS.
+                        stream.set_nonblocking(false).unwrap();
                         stream
                             .set_read_timeout(Some(Duration::from_secs(15)))
                             .unwrap();
