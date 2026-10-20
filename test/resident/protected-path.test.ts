@@ -40,12 +40,15 @@ it("checks the canonical target of a trusted OS alias and refuses an unsafe ance
   }
 })
 
-it.runIf(process.platform === "linux")("checks the canonical target of the root-owned run alias", async (context) => {
-  const entry = await fs.lstat("/var/run").catch(() => undefined)
-  if (entry === undefined || !entry.isSymbolicLink() || entry.uid !== 0)
-    return context.skip("Requires a root-owned /var/run alias")
-  const owner = await Effect.runPromise(currentPosixOwner)
-  await expect(Effect.runPromise(inspectPrivateDirectory(ResidentDirectory.make("/var/run"), owner))).rejects.toThrow(
-    "private files and directories"
-  )
-})
+it.skipIf(process.platform === "win32").for(["/var/run", "/var", "/tmp"])(
+  "checks the canonical target of root-owned OS alias %s",
+  async (alias, context) => {
+    const entry = await fs.lstat(alias).catch(() => undefined)
+    if (entry === undefined || !entry.isSymbolicLink() || entry.uid !== 0)
+      return context.skip("Requires a root-owned OS alias")
+    const owner = await Effect.runPromise(currentPosixOwner)
+    await expect(Effect.runPromise(inspectPrivateDirectory(ResidentDirectory.make(alias), owner))).rejects.toThrow(
+      "private files and directories"
+    )
+  }
+)

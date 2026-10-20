@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest"
 import {
   type LiveReadHostInput,
   LiveReadProtocol,
+  LiveReadTargets,
   resolveLiveReadProtocol
 } from "../../scripts/resident-live-read-contract.js"
 import { discoverLiveReadProtocol, liveReadMetadata } from "../../scripts/resident-live-protocol.js"
@@ -13,6 +14,19 @@ const legacy = { host: "first", protocol: "2025-06-18" } satisfies Pick<LiveRead
 const initialized = { protocolVersion: "2025-06-18", capabilities: {}, serverInfo: { name: "fixture", version: "1" } }
 
 describe("live read protocol qualification", () => {
+  it("refuses fixture targets sharing an identifier or name before a live read campaign", () => {
+    const first = { project: "ONE", name: "First owned project" }
+    for (const second of [
+      { project: "ONE", name: "Second owned project" },
+      { project: "TWO", name: first.name }
+    ]) {
+      expect(Schema.decodeUnknownResult(LiveReadTargets)([first, second])._tag).toBe("Failure")
+    }
+    expect(
+      Schema.decodeUnknownResult(LiveReadTargets)([first, { project: "TWO", name: "Second owned project" }])._tag
+    ).toBe("Success")
+  })
+
   it("selects modern by default and preserves either explicitly supported protocol", () => {
     expect(resolveLiveReadProtocol(undefined)).toBe("2026-07-28")
     for (const protocol of ["2026-07-28", "2025-06-18"]) {
