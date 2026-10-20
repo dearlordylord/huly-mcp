@@ -5,6 +5,11 @@ on:
   pull_request:
     paths:
       - src/profiles/**
+      - src/resident/**
+      - native/**
+      - scripts/build-mcp.mjs
+      - scripts/build-native-bridge.mjs
+      - package.json
       - packages/huly-cli/**
       - scripts/native-credentials-probe.ts
       - scripts/macos-logout-probe.ts

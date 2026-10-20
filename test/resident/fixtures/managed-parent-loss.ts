@@ -13,7 +13,12 @@ import { ChildGateMarker, ParentLossObservation } from "../parent-loss-observati
 
 const RESPONSE_BOUND = 5_000
 const POLL_MILLIS = 10
-const Input = Schema.Struct({ bundle: ResidentPackagePath, directory: ResidentDirectory, preload: ResidentPackagePath })
+const Input = Schema.Struct({
+  bundle: ResidentPackagePath,
+  directory: ResidentDirectory,
+  preload: ResidentPackagePath,
+  target: Schema.Literals(["bridge", "bootstrap"])
+})
 const MissingFile = Schema.Struct({ code: Schema.Literal("ENOENT") })
 const MissingProcess = Schema.Struct({ code: Schema.Literal("ESRCH") })
 class MarkerReadError extends Schema.TaggedError<MarkerReadError>()("MarkerReadError", {
@@ -53,7 +58,8 @@ const main = async () => {
   const input = Schema.decodeUnknownSync(Input)({
     bundle: process.argv[2],
     directory: process.argv[3],
-    preload: process.argv[4]
+    preload: process.argv[4],
+    target: process.argv[5]
   })
   const parent = spawn(process.execPath, [input.bundle], {
     env: {
@@ -74,7 +80,7 @@ const main = async () => {
     process.stderr.write("Parent loss: waiting for the real child entry gate\n")
     const held = await readGateMarker(input.directory, "held")
     assert.equal(held.phase, "held")
-    assert.equal(held.parentPid, parent.pid)
+    assert.notEqual(held.parentPid, parent.pid)
     assert.equal(held.privateFrames, 0)
     if (parent.pid === undefined) throw new Error("Owned parent did not spawn")
     const tasks = await fs.readdir(`/proc/${parent.pid}/task`)
@@ -82,28 +88,45 @@ const main = async () => {
       tasks.map((task) => fs.readFile(`/proc/${parent.pid}/task/${task}/children`, "utf8"))
     )
     const children = childLists.flatMap((list) => (list.trim() === "" ? [] : list.trim().split(/\s+/)))
-    assert.deepEqual(children, [String(held.childPid)])
+    assert.deepEqual(children, [String(held.parentPid)])
+    const bootstrapTasks = await fs.readdir(`/proc/${held.parentPid}/task`)
+    const bootstrapChildren = await Promise.all(
+      bootstrapTasks.map((task) => fs.readFile(`/proc/${held.parentPid}/task/${task}/children`, "utf8"))
+    )
+    assert.deepEqual(
+      bootstrapChildren.flatMap((list) => (list.trim() === "" ? [] : list.trim().split(/\s+/))),
+      [String(held.childPid)]
+    )
     assert.equal((await fs.stat(join(input.directory, "selection.claim"))).isDirectory(), true)
     process.stderr.write("Parent loss: killing only the owned parent before authorization\n")
-    parent.kill("SIGKILL")
-    assert.deepEqual(await bounded(closed), [null, "SIGKILL"])
-    const released = await readGateMarker(input.directory, "parent-disconnected")
-    assert.equal(released.childPid, held.childPid)
-    assert.equal(released.parentPid, held.parentPid)
-    assert.equal(released.privateFrames, 0)
+    const killedPid = input.target === "bridge" ? parent.pid : held.parentPid
+    process.kill(killedPid, "SIGKILL")
+    assert.deepEqual(await bounded(closed), input.target === "bridge" ? [null, "SIGKILL"] : [1, null])
+    if (input.target === "bootstrap") {
+      const released = await readGateMarker(input.directory, "parent-disconnected")
+      assert.equal(released.childPid, held.childPid)
+      assert.equal(released.parentPid, held.parentPid)
+      assert.equal(released.privateFrames, 0)
+    }
     await awaitAbsent(held.childPid)
+    await awaitAbsent(held.parentPid)
     assert.deepEqual(await fs.readdir(join(input.directory, "generations")), [])
-    assert.equal((await fs.stat(join(input.directory, "selection.claim"))).isDirectory(), true)
+    const retainedClaim = input.target === "bootstrap"
+    if (retainedClaim) assert.equal((await fs.stat(join(input.directory, "selection.claim"))).isDirectory(), true)
+    else await assert.rejects(fs.stat(join(input.directory, "selection.claim")), { code: "ENOENT" })
     process.stdout.write(
-      Schema.encodeSync(Schema.fromJsonString(ParentLossObservation))({
-        parentPid: parent.pid,
-        childPid: held.childPid,
-        parentExitSignal: "SIGKILL",
-        privateFrames: 0,
-        childExited: true,
-        retainedClaim: true,
-        publishedRecords: 0
-      })
+      Schema.encodeSync(Schema.fromJsonString(ParentLossObservation))(
+        Schema.decodeUnknownSync(ParentLossObservation)({
+          parentPid: killedPid,
+          childPid: held.childPid,
+          parentExitSignal: "SIGKILL",
+          privateFrames: 0,
+          childExited: true,
+          retainedClaim,
+          target: input.target,
+          publishedRecords: 0
+        })
+      )
     )
   } finally {
     if (parent.exitCode === null && parent.signalCode === null) {

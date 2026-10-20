@@ -311,7 +311,10 @@ control channel. The native socket takes over that same admission before the
 bootstrap exits; the handoff uses one capacity slot without an idle gap. Local NoConfig discovery and profile startup diagnostics retain their ordinary
 stdio behavior in a local Node child; they do not acquire resident ownership.
 The backend owns the native session's admission, renewal, protocol
-translation, cancellation and cleanup; the bridge forwards bytes without
+translation, cancellation and cleanup. A bounded binary frame carries opaque bytes,
+transport heartbeats and terminal diagnostics; the bridge does not parse MCP JSON.
+Only heartbeats received from the bridge renew its lease. Host stdout writes retain
+the ten-second deadline. The bridge forwards bytes without
 reconnecting or replaying requests.
 
 Each generation owns a private temporary directory (0700) and Unix socket

@@ -2,6 +2,7 @@ import { once } from "node:events"
 import * as fs from "node:fs/promises"
 import { connect, type Socket } from "node:net"
 import { dirname } from "node:path"
+import * as NodeStream from "@effect/platform-node/NodeStream"
 import { Deferred, Effect, Schema, Stream } from "effect"
 import { expect, it } from "vitest"
 
@@ -13,8 +14,8 @@ import { makeCompatibilityAuthority } from "../../src/resident/compatibility-aut
 import { makeCompatibilityProof } from "../../src/resident/compatibility-crypto.js"
 import { captureResidentSelection } from "../../src/resident/selection-config.js"
 import { NativeHello, type NativeSocketPath } from "../../src/resident/native-contract.js"
-import { readNativeControl } from "../../src/resident/native-control.js"
 import { withNativeResidentSocket } from "../../src/resident/native-server.js"
+import { decodeNativeFrames } from "../../src/resident/native-framing.js"
 import { nativeSocketStdio } from "../../src/resident/native-stdio.js"
 import { BackendMessage } from "../../src/resident/response-stream.js"
 import { withNativeServer, AUTHORIZATION, type OwnerName, type Owner } from "../helpers/resident-native-fixture.js"
@@ -44,7 +45,10 @@ const refused = async (path: NativeSocketPath, hello: string) => {
   const closed = once(socket, "close")
   socket.write(`${hello}\n`)
   await closed
-  expect(bytes).toEqual([])
+  const diagnostic = Buffer.concat(bytes)
+  expect(diagnostic.length).toBeGreaterThan(4)
+  expect(diagnostic.readUInt32BE(0)).toBeGreaterThanOrEqual(2_147_483_648)
+  expect(diagnostic.toString()).not.toContain("native-session-owner-fixture")
 }
 
 it("owns a private native channel, authenticates once, forwards a request and releases admission", async () => {
@@ -80,6 +84,17 @@ it("owns a private native channel, authenticates once, forwards a request and re
               proof,
               attachmentToken: lease.token
             })
+            const duplicateProof = yield* makeCompatibilityProof(
+              capture.selection,
+              yield* authority.challenge,
+              AUTHORIZATION
+            )
+            const duplicate = Schema.encodeSync(Schema.fromJsonString(NativeHello))({
+              version: 1,
+              authorization: AUTHORIZATION,
+              proof: duplicateProof,
+              attachmentToken: lease.token
+            })
             yield* withNativeResidentSocket(descriptor, admissions, authority, policy.capacity, (path) =>
               Effect.promise(async () => {
                 ownedPath = path
@@ -89,14 +104,27 @@ it("owns a private native channel, authenticates once, forwards a request and re
                 const socket = await connection(path)
                 try {
                   await admitted(socket, hello)
+                  await refused(path, duplicate)
+                  expect((await Effect.runPromise(admissions.status)).attachments).toBe(1)
                   const stdio = nativeSocketStdio(socket)
                   await Effect.runPromise(Stream.empty.pipe(Stream.run(stdio.stderr())))
                   await Effect.runPromise(Stream.empty.pipe(Stream.run(stdio.stdout())))
-                  const reply = Effect.runPromise(readNativeControl(socket))
-                  socket.write(
+                  const reply = Effect.runPromise(
+                    NodeStream.fromReadable({
+                      evaluate: () => socket,
+                      onError: (error) => error,
+                      closeOnDone: false
+                    }).pipe(decodeNativeFrames, Stream.take(1), Stream.runCollect)
+                  )
+                  const request = Buffer.from(
                     '{"jsonrpc":"2.0","id":41,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"first","version":"1.0"}}}}\n'
                   )
-                  const parsed = Schema.decodeUnknownSync(Schema.fromJsonString(BackendMessage))(await reply)
+                  const header = Buffer.alloc(4)
+                  header.writeUInt32BE(request.length)
+                  socket.write(Buffer.concat([header, request]))
+                  const parsed = Schema.decodeUnknownSync(Schema.fromJsonString(BackendMessage))(
+                    Buffer.concat(await reply).toString()
+                  )
                   expect(parsed).toMatchObject({
                     jsonrpc: "2.0",
                     id: 41,

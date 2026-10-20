@@ -8,12 +8,15 @@ export const ChildGateMarker = Schema.Struct({
   privateFrames: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 })
 
-export const ParentLossObservation = Schema.Struct({
+const parentLossFields = {
   parentPid: ProcessId,
   childPid: ProcessId,
   parentExitSignal: Schema.Literal("SIGKILL"),
   privateFrames: Schema.Literal(0),
   childExited: Schema.Literal(true),
-  retainedClaim: Schema.Literal(true),
   publishedRecords: Schema.Literal(0)
-})
+}
+export const ParentLossObservation = Schema.Union([
+  Schema.Struct({ ...parentLossFields, target: Schema.Literal("bridge"), retainedClaim: Schema.Literal(false) }),
+  Schema.Struct({ ...parentLossFields, target: Schema.Literal("bootstrap"), retainedClaim: Schema.Literal(true) })
+])

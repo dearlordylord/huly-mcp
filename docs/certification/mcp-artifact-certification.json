@@ -1,8 +1,8 @@
 {
-  "archiveBytes": 1796781,
-  "bundleBytes": 9081979,
-  "bundleGzipBytes": 1750167,
-  "entryCount": 4,
+  "archiveBytes": 5986049,
+  "bundleBytes": 9159055,
+  "bundleGzipBytes": 1758554,
+  "entryCount": 10,
   "executableMode": 493,
   "externalModules": [
     "@napi-rs/keyring",
@@ -10,6 +10,6 @@
     "ws"
   ],
   "name": "@firfi/huly-mcp",
-  "unpackedBytes": 9268351,
-  "version": "0.55.0"
+  "unpackedBytes": 19093799,
+  "version": "0.55.1"
 }

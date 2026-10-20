@@ -15,7 +15,14 @@
     "dist/application.cjs"
   ],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "executableFiles": [
+      "./dist/native/huly-stdio-linux-arm64",
+      "./dist/native/huly-stdio-linux-x64",
+      "./dist/native/huly-stdio-darwin-arm64",
+      "./dist/native/huly-stdio-darwin-x64",
+      "./dist/application.cjs"
+    ]
   },
   "repository": {
     "type": "git",

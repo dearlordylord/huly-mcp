@@ -70,6 +70,8 @@ func prepare(ctx context.Context, node, bundle string, allowConfigured func() bo
 	}
 	defer control.Close()
 	childCtx, cancel := context.WithCancel(ctx)
+	stopControl := context.AfterFunc(childCtx, func() { control.Close() })
+	defer stopControl()
 	command := exec.CommandContext(childCtx, node, bundle)
 	command.Cancel = func() error { return command.Process.Signal(syscall.SIGTERM) }
 	command.WaitDelay = 5 * time.Second

@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import { NATIVE_HEARTBEAT_MILLIS } from "./native-wire.js"
 
 export const RESIDENT_ATTACHMENTS_PATH = "/resident/attachments"
 export const RESIDENT_ATTACHMENT_HEADER = "x-huly-resident-attachment"
@@ -12,7 +13,7 @@ export const LeasePolicy = Schema.Struct({
 }).check(Schema.makeFilter((policy) => policy.renewEveryMillis < policy.durationMillis))
 export type LeasePolicy = Schema.Schema.Type<typeof LeasePolicy>
 const LEASE_DURATION_MILLIS = 30_000
-const RENEWAL_INTERVAL_MILLIS = 5_000
+const RENEWAL_INTERVAL_MILLIS = NATIVE_HEARTBEAT_MILLIS
 export const DEFAULT_LEASE_POLICY = Schema.decodeUnknownSync(LeasePolicy)({
   durationMillis: LEASE_DURATION_MILLIS,
   renewEveryMillis: RENEWAL_INTERVAL_MILLIS

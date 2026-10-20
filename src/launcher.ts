@@ -25,5 +25,8 @@ if (unsupportedRuntime) {
 } else if (process.env.MCP_TRANSPORT === "stdio-http") {
   void import("./resident/manual-adapter-main.js")
 } else {
-  void import("./index.js")
+  void import("./runtime/server-startup.js").then(async ({ main }) => {
+    const { runMain } = await import("@effect/platform-node/NodeRuntime")
+    runMain(main)
+  })
 }

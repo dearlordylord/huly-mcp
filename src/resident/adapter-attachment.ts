@@ -161,20 +161,14 @@ const releaseAdmission = (attachment: ResidentAttachment, admitted: AttachmentAd
 const runAttached = <A, E, R>(
   attachment: ResidentAttachment,
   admitted: AttachmentAdmitted,
-  use: (exchange: AdapterExchange) => Effect.Effect<A, E, R>,
-  localRenewal?: Effect.Effect<void, unknown>
+  use: (exchange: AdapterExchange) => Effect.Effect<A, E, R>
 ) =>
   Effect.scoped(
     Effect.gen(function* () {
-      const renewal = (
-        localRenewal ??
-        control(attachment, controlRequest(attachment, "PUT", admitted.token), (response) =>
-          response.status === HTTP_NO_CONTENT
-            ? Effect.void
-            : Effect.fail(
-                new BackendResponseError({ message: "Resident eligibility was lost; no request was replayed" })
-              )
-        )
+      const renewal = control(attachment, controlRequest(attachment, "PUT", admitted.token), (response) =>
+        response.status === HTTP_NO_CONTENT
+          ? Effect.void
+          : Effect.fail(new BackendResponseError({ message: "Resident eligibility was lost; no request was replayed" }))
       ).pipe(
         Effect.mapError(
           () =>
@@ -213,9 +207,9 @@ export const withNativeAdapterAttachment = <A, E, R>(
   use: (exchange: AdapterExchange) => Effect.Effect<A, E, R>
 ) =>
   Effect.acquireUseRelease(
-    Effect.succeed(AttachmentAdmitted.make({ version: 1, token, lease: admissions.leasePolicy })),
-    (admitted) => runAttached(attachment, admitted, use, admissions.renew(admitted.token)),
-    (admitted) => admissions.release(admitted.token)
+    Effect.void,
+    () => use(adapterExchange(attachment, token)),
+    () => admissions.release(token)
   )
 
 export const withAdapterCandidate = <A, E, R>(

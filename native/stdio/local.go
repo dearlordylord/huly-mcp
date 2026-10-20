@@ -18,7 +18,7 @@ func relayLocal(ctx context.Context, child *localLaunch, chunks <-chan []byte, e
 	writes := make(chan error, 1)
 	var workers sync.WaitGroup
 	workers.Add(2)
-	go func() { defer workers.Done(); _, err := io.Copy(output, child.output); replies <- err }()
+	go func() { defer workers.Done(); _, err := copyNativeOutput(output, child.output); replies <- err }()
 	go func() {
 		defer workers.Done()
 		for {

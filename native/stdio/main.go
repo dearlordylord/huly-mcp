@@ -36,11 +36,17 @@ func main() {
 		case <-ctx.Done():
 		}
 	}()
-	err := run(ctx, os.Args[1:], os.Stdin, os.Stdout)
+	output, err := pollableOutput(os.Stdout)
+	if err == nil {
+		err = run(ctx, os.Args[1:], os.Stdin, output)
+	}
 	if status := signalStatus.Load(); status != 0 {
 		os.Exit(int(status))
 	}
 	if err != nil {
+		if errors.Is(err, os.ErrDeadlineExceeded) {
+			fmt.Fprintln(os.Stderr, "Stdio output failed or exceeded its 10 second write allowance")
+		}
 		fmt.Fprintln(os.Stderr, "Native resident channel failed; in-flight outcomes may be unknown. No request was replayed.")
 		os.Exit(1)
 	}
@@ -103,6 +109,9 @@ func run(ctx context.Context, args []string, input, output *os.File) error {
 			result := <-ready
 			if result.launch != nil {
 				result.launch.close()
+			}
+			if !errors.Is(inputErr, io.EOF) {
+				return inputErr
 			}
 			return nil
 		case <-ctx.Done():
@@ -180,4 +189,19 @@ func run(ctx context.Context, args []string, input, output *os.File) error {
 	default:
 		return errors.New("invalid bootstrap decision")
 	}
+}
+
+func pollableOutput(output *os.File) (*os.File, error) {
+	stat, err := output.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if stat.Mode().IsRegular() {
+		return output, nil
+	}
+	fd := output.Fd()
+	if err = syscall.SetNonblock(int(fd), true); err != nil {
+		return nil, err
+	}
+	return os.NewFile(fd, output.Name()), nil
 }

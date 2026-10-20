@@ -31,8 +31,13 @@ export const runNativeSession = Effect.fn("runNativeSession")(function* (
     () =>
       withNativeAdapterAttachment(attachment, admissions, hello.attachmentToken, (exchange) =>
         writeNativeControl(socket, new Uint8Array([NATIVE_ACK])).pipe(
-          Effect.andThen(runAdapterBridge(exchange)),
-          Effect.provideService(Stdio.Stdio, nativeSocketStdio(socket))
+          Effect.andThen(
+            Effect.raceFirst(
+              runAdapterBridge(exchange),
+              owner.closed.pipe(Effect.andThen(Effect.fail(nativeBridgeFailure())))
+            )
+          ),
+          Effect.provideService(Stdio.Stdio, nativeSocketStdio(socket, admissions.renew(hello.attachmentToken)))
         )
       ),
     () =>

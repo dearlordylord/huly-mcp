@@ -11,6 +11,8 @@ import type { makeCompatibilityAuthority } from "./compatibility-authority.js"
 import { nativeBridgeFailure, NativeSocketPath } from "./native-contract.js"
 import { PRIVATE_FILE_MODE } from "./protected-path.js"
 import type { AdmissionPolicy } from "./admission-contract.js"
+import { writeNativeFrame } from "./native-framing.js"
+import { BackendResponseError } from "./response-stream.js"
 import { runNativeSession } from "./native-session.js"
 
 const CONNECTIONS_PER_ATTACHMENT = 2
@@ -25,6 +27,7 @@ export const withNativeResidentSocket = <A, E, R>(
   Effect.scoped(
     Effect.gen(function* () {
       const scope = yield* Effect.scope
+      const context = yield* Effect.context<never>()
       const failure = yield* Deferred.make<never, ReturnType<typeof nativeBridgeFailure>>()
       const directory = yield* Effect.acquireRelease(
         Effect.tryPromise({ try: () => fs.mkdtemp(join(tmpdir(), "huly-native-")), catch: nativeBridgeFailure }),
@@ -40,7 +43,13 @@ export const withNativeResidentSocket = <A, E, R>(
         sockets.add(socket)
         socket.on("error", () => {})
         const session = runNativeSession(socket, attachment, admissions, authority, claimed).pipe(
-          Effect.catch(() => Effect.void),
+          Effect.catch((error) =>
+            writeNativeFrame(
+              socket,
+              Buffer.from(error instanceof BackendResponseError ? error.message : nativeBridgeFailure().message),
+              true
+            ).pipe(Effect.ignore)
+          ),
           Effect.ensuring(
             Effect.sync(() => {
               sockets.delete(socket)
@@ -48,7 +57,7 @@ export const withNativeResidentSocket = <A, E, R>(
             })
           )
         )
-        Effect.runFork(Effect.forkIn(session, scope).pipe(Effect.flatMap(Fiber.await)))
+        Effect.runForkWith(context)(Effect.forkIn(session, scope).pipe(Effect.flatMap(Fiber.await)))
       })
       server.maxConnections = capacity * CONNECTIONS_PER_ATTACHMENT
       const failed = () => Deferred.doneUnsafe(failure, Effect.fail(nativeBridgeFailure()))

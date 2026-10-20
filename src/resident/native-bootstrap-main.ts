@@ -3,6 +3,7 @@ import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
 import * as NodeStdio from "@effect/platform-node/NodeStdio"
 import { Config, Effect, Schema } from "effect"
 
+import { McpProcessPolicyError } from "../mcp/process-policy.js"
 import { ConfigValidationError } from "../config/config.js"
 import { runProfileStartupDiagnostic } from "../profiles/startup-diagnostic.js"
 import { VERSION } from "../version.js"
@@ -93,7 +94,9 @@ const main = Effect.gen(function* () {
   Effect.catchTag("CliProfileStoreError", (error) =>
     publish(`${NATIVE_LOCAL_HEADER}\n`).pipe(Effect.andThen(runProfileStartupDiagnostic(error, PKG_VERSION)))
   ),
-  Effect.mapError((error) => (error instanceof ConfigValidationError ? error : nativeBridgeFailure())),
+  Effect.mapError((error) =>
+    error instanceof ConfigValidationError || error instanceof McpProcessPolicyError ? error : nativeBridgeFailure()
+  ),
   Effect.provide(NodeStdio.layer),
   Effect.tapError((error) => Effect.sync(() => process.stderr.write(`${error.message}\n`)))
 )

@@ -6,6 +6,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/binary"
+	"errors"
 	"io"
 	"net"
 	"os"
@@ -16,7 +18,15 @@ import (
 
 func fixture(t *testing.T, action func(*net.UnixConn)) (string, string) {
 	t.Helper()
-	dir := t.TempDir()
+	dir, err := os.MkdirTemp("", "huly-native-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	dir, err = filepath.EvalSymlinks(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := os.Chmod(dir, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +75,15 @@ func TestRelayPreservesFramingAndBackpressure(t *testing.T) {
 		hello, _ := r.ReadString('\n')
 		handshake <- hello
 		conn.Write([]byte{1})
-		io.Copy(conn, r)
+		for {
+			frame, err := readTestFrame(r)
+			if err != nil {
+				return
+			}
+			if err = writeFrame(conn, frame); err != nil {
+				return
+			}
+		}
 	})
 	input, writer, reader, output := ownPipes(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -105,8 +123,8 @@ func TestBackendLossFailsClosedWithoutReconnect(t *testing.T) {
 		r := bufio.NewReader(conn)
 		r.ReadString('\n')
 		conn.Write([]byte{1})
-		line, _ := r.ReadString('\n')
-		request <- line
+		frame, _ := readTestFrame(r)
+		request <- string(frame)
 	})
 	input, writer, _, output := ownPipes(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -199,5 +217,84 @@ func TestLocalFallbackPreservesRequestQueuedBeforeBootstrapEOF(t *testing.T) {
 	}
 	if err := <-done; err != nil {
 		t.Fatal(err)
+	}
+}
+
+func readTestFrame(input io.Reader) ([]byte, error) {
+	var header [4]byte
+	if _, err := io.ReadFull(input, header[:]); err != nil {
+		return nil, err
+	}
+	size := binary.BigEndian.Uint32(header[:])
+	if size > NATIVE_FRAME_BYTES {
+		return nil, errors.New("oversized transport frame")
+	}
+	body := make([]byte, size)
+	_, err := io.ReadFull(input, body)
+	return body, err
+}
+
+func TestUnreadOutputIsBoundedWithOpenInput(t *testing.T) {
+	helper, _ := fixture(t, func(conn *net.UnixConn) {
+		bufio.NewReader(conn).ReadString('\n')
+		conn.Write([]byte{NATIVE_ACK})
+		for i := 0; i < 16; i++ {
+			if err := writeFrame(conn, bytes.Repeat([]byte("x"), NATIVE_FRAME_BYTES)); err != nil {
+				return
+			}
+		}
+	})
+	input, _, _, output := ownPipes(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	err := run(ctx, []string{helper, "unused"}, input, output)
+	if !errors.Is(err, os.ErrDeadlineExceeded) {
+		t.Fatalf("unread output did not time out: %v", err)
+	}
+}
+
+func TestIdleBridgeSendsHeartbeat(t *testing.T) {
+	heartbeat := make(chan int, 1)
+	helper, _ := fixture(t, func(conn *net.UnixConn) {
+		r := bufio.NewReader(conn)
+		r.ReadString('\n')
+		conn.Write([]byte{NATIVE_ACK})
+		frame, err := readTestFrame(r)
+		if err == nil {
+			heartbeat <- len(frame)
+		}
+		io.Copy(io.Discard, r)
+	})
+	input, _, _, output := ownPipes(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- run(ctx, []string{helper, "unused"}, input, output) }()
+	select {
+	case size := <-heartbeat:
+		if size != 0 {
+			t.Fatal("heartbeat carried MCP data")
+		}
+	case <-time.After(7 * time.Second):
+		cancel()
+		<-done
+		t.Fatal("idle bridge failed to renew")
+	}
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestStartupInputErrorFails(t *testing.T) {
+	helper := filepath.Join(t.TempDir(), "wait-helper")
+	if err := os.WriteFile(helper, []byte("#!/bin/sh\nexec sleep 20\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	input, _, _, output := ownPipes(t)
+	input.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := run(ctx, []string{helper, "unused"}, input, output); !errors.Is(err, os.ErrClosed) {
+		t.Fatalf("stdin error lost: %v", err)
 	}
 }
