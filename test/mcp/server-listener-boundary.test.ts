@@ -4,11 +4,10 @@ import type { HttpServer } from "effect/http"
 import { NetAddress } from "effect/net"
 import { expect, it } from "vitest"
 
-import { type HttpServerFactory, HttpServerFactoryService } from "../../src/mcp/http-transport.js"
+import { DEFAULT_HTTP_PORT, type HttpServerFactory, HttpServerFactoryService } from "../../src/mcp/http-transport.js"
 import { McpServerService } from "../../src/mcp/server.js"
 import { TelemetryService } from "../../src/telemetry/telemetry.js"
 import { makeTestHttpServerFactory } from "./http-test-support.js"
-import { DEFAULT_HTTP_PORT } from "../../src/mcp/http-transport.js"
 
 it.each(["unix", "zero", "default-port"])(
   "refuses a %s listener address before application readiness and closes its listener",
