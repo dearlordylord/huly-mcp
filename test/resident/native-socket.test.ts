@@ -175,7 +175,7 @@ it("isolates socket errors and retires an owned listener after an infrastructure
       const admissions = yield* makeResidentAdmissions(policy)
       // These are internal listener resources, never serialized.
       const accepted = yield* Deferred.make<{ readonly server: Server; readonly socket: Socket }>()
-      yield* withNativeServer(new Map<OwnerName, Owner>(), (endpoint, identity) =>
+      return yield* withNativeServer(new Map<OwnerName, Owner>(), (endpoint, identity) =>
         Effect.gen(function* () {
           const authority = yield* makeCompatibilityAuthority(capture.selection, identity.generation, AUTHORIZATION)
           const descriptor = ResidentAttachment.make({
@@ -186,7 +186,7 @@ it("isolates socket errors and retires an owned listener after an infrastructure
             identity,
             authorization: AUTHORIZATION
           })
-          yield* withNativeResidentSocket(
+          return yield* withNativeResidentSocket(
             descriptor,
             admissions,
             authority,
