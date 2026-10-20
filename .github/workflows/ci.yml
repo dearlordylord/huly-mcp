@@ -46,7 +46,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Restore transformed test modules
+      - name: Restore Vitest compilation cache
         id: test-transforms
         uses: actions/cache/restore@v4
         with:
@@ -60,7 +60,7 @@ jobs:
 
       - name: Run quality gate (build, typecheck, circular, lint, test + coverage)
         run: pnpm check-all
-      - name: Save transformed test modules
+      - name: Save Vitest compilation cache
         if: always() && !cancelled() && steps.test-transforms.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
