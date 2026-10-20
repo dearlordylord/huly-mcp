@@ -1,9 +1,31 @@
+import { spawn } from "node:child_process"
+import { once } from "node:events"
 import { expect, it } from "vitest"
 
 import { isProcessGroupAbsent, signalProcessGroup } from "../../scripts/process-group.js"
 
 const GROUP_PID = 123
 const errno = (code: string) => Object.assign(new Error(`kill ${code}`), { code })
+
+it.skipIf(process.platform === "win32")(
+  "signals an owned kernel group and confirms its absence after reaping",
+  async () => {
+    const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { detached: true, stdio: "ignore" })
+    const closed = once(child, "close")
+    void closed.catch(() => {})
+    try {
+      await once(child, "spawn")
+      if (child.pid === undefined) throw new Error("Owned fixture has no PID after spawn")
+      expect(isProcessGroupAbsent(child.pid)).toBe(false)
+      signalProcessGroup(child.pid, "SIGTERM")
+      await closed
+      expect(isProcessGroupAbsent(child.pid)).toBe(true)
+    } finally {
+      child.kill("SIGKILL")
+      await closed
+    }
+  }
+)
 
 it("signals the owned process group", () => {
   signalProcessGroup(GROUP_PID, "SIGKILL", (pid, signal) => {

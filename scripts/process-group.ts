@@ -4,8 +4,11 @@ const parseGroupRace = Schema.decodeUnknownResult(Schema.Struct({ code: Schema.L
 
 // Internal kernel-control port; the schema owns errors received from the OS.
 type SendSignal = (pid: number, signal: NodeJS.Signals | 0) => void
+const sendKernelSignal: SendSignal = (pid, signal) => {
+  process.kill(pid, signal)
+}
 
-export const signalProcessGroup = (pid: number, signal: NodeJS.Signals, send: SendSignal = process.kill): void => {
+export const signalProcessGroup = (pid: number, signal: NodeJS.Signals, send: SendSignal = sendKernelSignal): void => {
   try {
     send(-pid, signal)
   } catch (error) {
@@ -14,7 +17,7 @@ export const signalProcessGroup = (pid: number, signal: NodeJS.Signals, send: Se
   }
 }
 
-export const isProcessGroupAbsent = (pid: number, send: SendSignal = process.kill): boolean => {
+export const isProcessGroupAbsent = (pid: number, send: SendSignal = sendKernelSignal): boolean => {
   try {
     send(-pid, 0)
     return false
