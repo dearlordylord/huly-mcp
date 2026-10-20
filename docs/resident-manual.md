@@ -301,7 +301,7 @@ platform qualification remain pending for this command.
 ## Native stdio bridge
 
 Managed `stdio-resident` uses a packaged native bridge on Linux and macOS,
-for arm64 and x64. Users do not need Go or a compiler. Ordinary stdio remains
+for arm64 and x64. Users do not need Rust or a compiler. Ordinary stdio remains
 unchanged and remains the default.
 
 The small Node launcher replaces itself with the native executable. A
@@ -323,9 +323,12 @@ The backend verifies the generation's private bearer and consumes the one-use
 configuration proof before acknowledging admission or accepting MCP messages.
 The socket and temporary directory are removed when the generation retires.
 
-Source builds require Go 1.27.2 on PATH; CI and Docker provide it explicitly.
-`pnpm build:native` cross-compiles the four binaries with CGO disabled.
-`pnpm test:native` checks the transport with real pipes and Unix sockets.
+Source builds require Rustup, Python 3 and Bash. Run `pnpm setup:native`
+to install the pinned Rust toolchain, cross-compilation targets, cargo-zigbuild,
+Zig and the macOS SDK; CI and Docker run the same setup explicitly.
+`pnpm build:native` cross-compiles the four binaries; Linux binaries use static musl.
+The Rust bridge uses one nonblocking I/O loop without an async runtime.
+`pnpm test:native` runs formatting, Clippy and real pipe/Unix-socket tests.
 
 ### Reproducing the split-build experiment
 
