@@ -24,12 +24,24 @@ export const prepareResidentQuintCli = async () => {
     })
     for (const asset of ["builtin.qnt", "reflection.proto"])
       await copyFile(join(dirname(source), asset), join(directory, asset))
-    // Prepare Node bytecode separately; each real replay retains its four-second execution bound.
-    await promisify(execFile)(process.execPath, [cli, "--version"], {
-      timeout: 30_000,
-      killSignal: "SIGKILL",
-      env: { ...process.env, NODE_COMPILE_CACHE: join(directory, "compile-cache") }
-    })
+    // Warm the evaluator too; each real replay still runs fresh within its four-second bound.
+    await promisify(execFile)(
+      process.execPath,
+      [
+        cli,
+        "test",
+        join(process.cwd(), "quint-specs/resident-launch-observations_test.qnt"),
+        "--backend=typescript",
+        "--match",
+        "ordinaryOwnerObservationTest$",
+        "--max-samples=1"
+      ],
+      {
+        timeout: 30_000,
+        killSignal: "SIGKILL",
+        env: { ...process.env, NODE_COMPILE_CACHE: join(directory, "compile-cache") }
+      }
+    )
     return { cli: ResidentPackagePath.make(cli), cleanup }
   } catch (error) {
     await cleanup().catch(() => {

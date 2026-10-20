@@ -6,6 +6,9 @@ const portTestFiles = [
   'test/domain/**/*.test.ts',
   'test/huly/**/*.test.ts',
   'test/config/**/*.test.ts',
+  'test/scripts/**/*.test.ts',
+  // Parent-side CLI tests own their ports; the real terminal and full process campaign stay isolated.
+  'test/cli/**/!(full-integration-adapter|local-cli-terminal).test.ts',
   // These resident suites keep state in test-owned ports/scopes; entrypoint and process fixtures stay isolated.
   'test/resident/!(*-process|launch-model-alignment|configured-startup|managed-process|packaged-output-validation).test.ts',
   'test/utils/**/*.test.ts',
