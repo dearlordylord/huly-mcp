@@ -241,7 +241,12 @@ fn signal_closes_the_admitted_connection_and_joins_helper() {
         admit(&mut socket);
         sent.send(()).unwrap();
         let mut rest = Vec::new();
-        socket.read_to_end(&mut rest).unwrap();
+        // SIGTERM can arrive before the bridge consumes our admission ACK.
+        // Closing a Unix socket with unread bytes may reset the peer instead
+        // of delivering EOF; both prove the owned connection was closed.
+        if let Err(error) = socket.read_to_end(&mut rest) {
+            assert_eq!(error.kind(), io::ErrorKind::ConnectionReset);
+        }
     });
     let mut process = Process::start(&fixture.helper);
     received.recv_timeout(Duration::from_secs(5)).unwrap();
