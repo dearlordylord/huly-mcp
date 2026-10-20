@@ -40,7 +40,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     // Bundled CLI subprocesses compete with coverage workers for CPU and memory.
-    maxWorkers: Math.min(4, availableParallelism()),
+    maxWorkers: Math.min(3, availableParallelism()),
     // Persist transforms locally; every test still executes on each run.
     fsModuleCache: true,
     fsModuleCachePath: '.vitest-cache',
