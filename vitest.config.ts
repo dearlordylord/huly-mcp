@@ -101,7 +101,8 @@ export default defineConfig({
     ],
     setupFiles: ['./test/setup/quint-oracle.ts'],
     tags: [{ name: ORACLE_INFRASTRUCTURE_TAG, description: 'Tests the observation channel itself without model forwarding.' }],
-    reporters: ['dot'],
+    // Preserve the last completed case when the bounded CI runner stops a suite.
+    reporters: process.env.CI ? ['verbose'] : ['dot'],
     silent: 'passed-only',
     coverage: {
       provider: 'v8',
