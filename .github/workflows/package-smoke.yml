@@ -127,6 +127,14 @@ jobs:
           version="$(node -p "require('./package.json').version")"
           node scripts/run-bundled.mjs scripts/certify-packed-artifact.ts "$tarball" mcp "$version"
 
+      - name: Preserve failed packed-artifact diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: packed-artifact-diagnostics-${{ matrix.node-version }}
+          path: .package-smoke/*.tgz
+          retention-days: 7
+
       - name: Install and discover packed package
         run: |
           set -euo pipefail
