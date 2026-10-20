@@ -5,6 +5,8 @@ const portTestFiles = [
   'test/domain/**/*.test.ts',
   'test/huly/**/*.test.ts',
   'test/config/**/*.test.ts',
+  // These resident suites keep state in test-owned ports/scopes; entrypoint and process fixtures stay isolated.
+  'test/resident/!(*-process|launch-model-alignment|configured-startup|managed-process|packaged-output-validation).test.ts',
   'test/utils/**/*.test.ts',
   'src/domain/**/*.test.ts',
   'src/huly/operations/**/*.test.ts',
@@ -38,8 +40,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    // Overlap kernel/subprocess waits; intrinsic client fleets keep their separate single-worker cohort.
-    maxWorkers: 5,
+    // Keep ordinary I/O overlap bounded; intrinsic client fleets have a separate single-worker cohort.
+    maxWorkers: 4,
     // Persist transforms locally; every test still executes on each run.
     fsModuleCache: true,
     fsModuleCachePath: '.vitest-cache',
