@@ -6,7 +6,10 @@ const PROJECT_ORDER_BEFORE = -1
 const longProcessWaits = new Set([
   "native-backend-process.test.ts",
   "managed-live-read-pair-process.test.ts",
-  "output-isolation-process.test.ts"
+  "output-isolation-process.test.ts",
+  "managed-owner.test.ts",
+  "model-wait-process.test.ts",
+  "process-failures.test.ts"
 ])
 const waitPriority = (file: string): number => {
   const name = basename(file)
@@ -21,9 +24,11 @@ export class DeadlineFirstSequencer extends BaseSequencer {
     return sorted.toSorted((left, right) => {
       const cohort = left.project.config.sequence.groupOrder - right.project.config.sequence.groupOrder
       if (cohort !== 0) return cohort
+      const wait = waitPriority(right.moduleId) - waitPriority(left.moduleId)
+      if (wait !== 0) return wait
       if (left.project.name !== right.project.name)
         return left.project.name < right.project.name ? PROJECT_ORDER_BEFORE : 1
-      return waitPriority(right.moduleId) - waitPriority(left.moduleId)
+      return 0
     })
   }
 }

@@ -93,7 +93,8 @@ export default defineConfig({
           name: 'ports',
           include: portTestFiles,
           exclude: [...residentModelTestFiles, ...residentWaitTestFiles],
-          sequence: { groupOrder: 4 },
+          // Reuse CPU while the independently owned resident requests wait on I/O.
+          sequence: { groupOrder: 2 },
           // The oracle adapter registers its guard at import, so it needs a fresh module graph per file.
           isolate: Boolean(process.env.QUINT_ORACLE_URL?.trim()),
         },
