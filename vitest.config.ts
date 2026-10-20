@@ -80,7 +80,7 @@ export default defineConfig({
         test: {
           name: 'ports',
           include: portTestFiles,
-          sequence: { groupOrder: 4 },
+          sequence: { groupOrder: 3 },
           // The oracle adapter registers its guard at import, so it needs a fresh module graph per file.
           isolate: Boolean(process.env.QUINT_ORACLE_URL?.trim()),
         },
@@ -92,8 +92,8 @@ export default defineConfig({
           include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
           exclude: [...portTestFiles, ...residentLaunchTestFiles, ...residentModelTestFiles, ...residentWaitTestFiles, ...processTestFiles],
           isolate: true,
-          // Ordinary tests share workers and overlap process I/O; client fleets run separately.
-          sequence: { groupOrder: 4 },
+          // Finish CPU-heavy transforms before bounded subprocess lifecycle scenarios.
+          sequence: { groupOrder: 3 },
         },
       },
       {
@@ -104,7 +104,7 @@ export default defineConfig({
           isolate: true,
           // Keep intrinsic client fleets independent; their own concurrency remains unchanged.
           maxWorkers: 1,
-          sequence: { groupOrder: 3 },
+          sequence: { groupOrder: 4 },
         },
       },
       {
@@ -114,7 +114,7 @@ export default defineConfig({
           include: processTestFiles,
           exclude: [...residentLaunchTestFiles, ...residentWaitTestFiles, ...residentFleetTestFiles],
           isolate: true,
-          sequence: { groupOrder: 4 },
+          sequence: { groupOrder: 5 },
         },
       },
     ],
