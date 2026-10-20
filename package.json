@@ -11,7 +11,7 @@
     "dist/native/huly-stdio-linux-x64",
     "dist/native/huly-stdio-darwin-arm64",
     "dist/native/huly-stdio-darwin-x64",
-    "dist/native/GO-LICENSE",
+    "dist/native/THIRD-PARTY-NOTICES",
     "dist/application.cjs"
   ],
   "publishConfig": {
@@ -92,8 +92,9 @@
     "update-tool-catalog": "node scripts/run-bundled.mjs scripts/update-tool-catalog.ts",
     "verify-tool-catalog": "node scripts/run-bundled.mjs scripts/update-tool-catalog.ts --check",
     "build:native": "node scripts/build-native-bridge.mjs",
-    "test:native": "go test -C native/stdio -count=1 -timeout=30s ./...",
-    "bench:resident-builds": "node scripts/bench-resident-builds.mjs"
+    "test:native": "bash scripts/test-native.sh",
+    "bench:resident-builds": "node scripts/bench-resident-builds.mjs",
+    "setup:native": "bash scripts/setup-native-toolchain.sh"
   },
   "bin": {
     "huly-mcp": "./dist/index.cjs"

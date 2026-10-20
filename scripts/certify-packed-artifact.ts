@@ -41,7 +41,7 @@ const expected: Parameters<typeof certifyPackedArtifact>[1] =
           "package/dist/native/huly-stdio-linux-x64",
           "package/dist/native/huly-stdio-darwin-arm64",
           "package/dist/native/huly-stdio-darwin-x64",
-          "package/dist/native/GO-LICENSE",
+          "package/dist/native/THIRD-PARTY-NOTICES",
           "package/dist/application.cjs"
         ],
         expectedExternalModules: ["@napi-rs/keyring", "dbus-next", "ws"],

@@ -1204,6 +1204,22 @@ When resolved tool exposure is `proxy`, clients see the built-in tools plus thes
 
 <!-- tools:end -->
 
+## Building from source
+
+Published packages include the native resident bridge; Rust is a build dependency.
+Source builds require Node.js, pnpm, Rustup, Python 3, and Bash. Prepare the pinned
+Rust toolchain, Zig linker, and cross-compilation SDK once:
+
+```bash
+pnpm setup:native
+pnpm build
+pnpm test:native
+```
+
+Build tools are kept in a platform-specific user cache, outside the checkout and
+published package. The bridge is a single Rust I/O loop; MCP protocol processing,
+authorization, and cancellation remain in the shared Node backend.
+
 ## Troubleshooting
 
 ### Password fallback with special characters

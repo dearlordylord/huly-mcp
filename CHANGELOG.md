@@ -4,7 +4,7 @@
 
 ### Patch Changes
 
-- Reduce resident client memory by replacing persistent Node stdio adapters with packaged native bridges for Linux and macOS. Protocol handling, authenticated admission, cancellation and request cleanup remain in the shared backend. Ordinary stdio remains the default.
+- Reduce resident client memory by replacing persistent Node stdio adapters with packaged Rust native bridges for Linux and macOS. Protocol handling, authenticated admission, cancellation and request cleanup remain in the shared backend. Ordinary stdio remains the default.
 
 ## 0.55.0
 

@@ -26,3 +26,6 @@ CLAUDE.local.md
 __pycache__/
 
 .bench
+
+# Rust native bridge build products
+native/stdio/target

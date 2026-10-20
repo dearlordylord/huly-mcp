@@ -19,7 +19,7 @@ const ExecutableCompanion = Schema.Struct({
   mode: Schema.Literal(EXECUTABLE_MODE)
 })
 const LicenseCompanion = Schema.Struct({
-  path: Schema.Literal("native/GO-LICENSE"),
+  path: Schema.Literal("native/THIRD-PARTY-NOTICES"),
   sha256: Sha256,
   mode: Schema.Literal(DATA_MODE)
 })
