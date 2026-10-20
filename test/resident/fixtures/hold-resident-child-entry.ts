@@ -11,7 +11,10 @@ const GATE_ALLOWANCE = 5_000
 class GateError extends Schema.TaggedError<GateError>()("GateError", {}) {}
 
 const main = Effect.gen(function* () {
-  const transport = yield* Config.schema(Schema.Literals(["stdio-resident", "resident-child"]), "MCP_TRANSPORT")
+  const transport = yield* Config.schema(
+    Schema.Literals(["stdio-resident", "resident-bootstrap", "resident-child"]),
+    "MCP_TRANSPORT"
+  )
   if (transport !== "resident-child" || !isMainThread) return
   const directory = yield* Config.schema(ResidentDirectory, "RESIDENT_TEST_GATE_DIRECTORY")
   const disconnected = yield* Deferred.make<void>()

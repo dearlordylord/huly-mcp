@@ -27,6 +27,7 @@ import {
 } from "./compatibility-contract.js"
 import type { StartupBudget } from "./startup-budget.js"
 import { makeCompatibilityProof } from "./compatibility-crypto.js"
+import type { makeResidentAdmissions } from "./admissions.js"
 
 const HTTP_CREATED = 201
 const HTTP_NO_CONTENT = 204
@@ -62,10 +63,8 @@ const control = <A, E, R>(
     })
   ).pipe(withResidentHeaderRedaction, Effect.interruptible, Effect.timeout(CONTROL_ALLOWANCE))
 
-const requestAdmission = (attachment: ResidentAttachment, selection: ResidentSelection | undefined) =>
+export const makeAdapterAdmissionProof = (attachment: ResidentAttachment, selection: ResidentSelection) =>
   Effect.gen(function* () {
-    const request = controlRequest(attachment, "POST", undefined)
-    if (selection === undefined) return request
     const challenge = yield* control(
       attachment,
       controlRequest(attachment, "POST", undefined, RESIDENT_COMPATIBILITY_PATH),
@@ -84,7 +83,14 @@ const requestAdmission = (attachment: ResidentAttachment, selection: ResidentSel
           )
         })
     )
-    const proof = yield* makeCompatibilityProof(selection, challenge, attachment.authorization)
+    return yield* makeCompatibilityProof(selection, challenge, attachment.authorization)
+  })
+
+const requestAdmission = (attachment: ResidentAttachment, selection: ResidentSelection | undefined) =>
+  Effect.gen(function* () {
+    const request = controlRequest(attachment, "POST", undefined)
+    if (selection === undefined) return request
+    const proof = yield* makeAdapterAdmissionProof(attachment, selection)
     const encoded = yield* Schema.encodeEffect(CompatibilityProof)(proof)
     return yield* HttpClientRequest.bodyJson(request, encoded)
   })
@@ -98,6 +104,9 @@ const adapterExchange =
   ) =>
     withResidentExchange(attachment, message, session, use, token)
 export type AdapterExchange = ReturnType<typeof adapterExchange>
+
+// Internal resource capability: the native socket can take over this existing lease.
+export type AdapterAdmissionHandoff = { readonly admitted: AttachmentAdmitted; readonly transfer: Effect.Effect<void> }
 
 const admissionFailure = (error: unknown) =>
   error instanceof ResidentSelectionMismatch
@@ -152,14 +161,20 @@ const releaseAdmission = (attachment: ResidentAttachment, admitted: AttachmentAd
 const runAttached = <A, E, R>(
   attachment: ResidentAttachment,
   admitted: AttachmentAdmitted,
-  use: (exchange: AdapterExchange) => Effect.Effect<A, E, R>
+  use: (exchange: AdapterExchange) => Effect.Effect<A, E, R>,
+  localRenewal?: Effect.Effect<void, unknown>
 ) =>
   Effect.scoped(
     Effect.gen(function* () {
-      const renewal = control(attachment, controlRequest(attachment, "PUT", admitted.token), (response) =>
-        response.status === HTTP_NO_CONTENT
-          ? Effect.void
-          : Effect.fail(new BackendResponseError({ message: "Resident eligibility was lost; no request was replayed" }))
+      const renewal = (
+        localRenewal ??
+        control(attachment, controlRequest(attachment, "PUT", admitted.token), (response) =>
+          response.status === HTTP_NO_CONTENT
+            ? Effect.void
+            : Effect.fail(
+                new BackendResponseError({ message: "Resident eligibility was lost; no request was replayed" })
+              )
+        )
       ).pipe(
         Effect.mapError(
           () =>
@@ -190,10 +205,23 @@ const runAttached = <A, E, R>(
     })
   )
 
+// A socket session owns its admission in the backend; no lease token crosses stdio.
+export const withNativeAdapterAttachment = <A, E, R>(
+  attachment: ResidentAttachment,
+  admissions: Effect.Success<ReturnType<typeof makeResidentAdmissions>>,
+  token: AttachmentToken,
+  use: (exchange: AdapterExchange) => Effect.Effect<A, E, R>
+) =>
+  Effect.acquireUseRelease(
+    Effect.succeed(AttachmentAdmitted.make({ version: 1, token, lease: admissions.leasePolicy })),
+    (admitted) => runAttached(attachment, admitted, use, admissions.renew(admitted.token)),
+    (admitted) => admissions.release(admitted.token)
+  )
+
 export const withAdapterCandidate = <A, E, R>(
   attachment: ResidentAttachment,
   selection: ResidentSelection | undefined,
-  use: (exchange: AdapterExchange) => Effect.Effect<A, E, R>,
+  use: (exchange: AdapterExchange, admission: AdapterAdmissionHandoff) => Effect.Effect<A, E, R>,
   startup?: StartupBudget
 ) =>
   Effect.acquireUseRelease(
@@ -201,24 +229,32 @@ export const withAdapterCandidate = <A, E, R>(
       ? acquireAdmission(attachment, selection)
       : startup.within(acquireAdmission(attachment, selection))
     ).pipe(
-      Effect.map(Option.some),
+      Effect.map((admitted) => Option.some({ admitted, transferred: false })),
       Effect.catchTag("ResidentSelectionMismatch", () => Effect.succeed(Option.none()))
     ),
     (candidate) =>
       Option.match(candidate, {
         onNone: () => Effect.succeed(Option.none<A>()),
-        onSome: (admitted) => runAttached(attachment, admitted, use).pipe(Effect.map(Option.some))
+        onSome: (candidate) =>
+          runAttached(attachment, candidate.admitted, (exchange) =>
+            use(exchange, {
+              admitted: candidate.admitted,
+              transfer: Effect.sync(() => {
+                candidate.transferred = true
+              })
+            })
+          ).pipe(Effect.map(Option.some))
       }),
     (candidate) =>
       Option.match(candidate, {
         onNone: () => Effect.void,
-        onSome: (admitted) => releaseAdmission(attachment, admitted)
+        onSome: (candidate) => (candidate.transferred ? Effect.void : releaseAdmission(attachment, candidate.admitted))
       })
   )
 
 export const withAdapterAttachment = <A, E, R>(
   attachment: ResidentAttachment,
-  use: (exchange: AdapterExchange) => Effect.Effect<A, E, R>,
+  use: (exchange: AdapterExchange, admission: AdapterAdmissionHandoff) => Effect.Effect<A, E, R>,
   selection?: ResidentSelection,
   startup?: StartupBudget
 ) =>

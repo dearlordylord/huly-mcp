@@ -27,11 +27,23 @@ const jsonIndent = 2
 const [archivePath, kind, version, writeFlag] = Schema.decodeUnknownSync(ArgumentsSchema)(
   process.argv.slice(processArgumentOffset)
 )
-const expected =
+const expected: Parameters<typeof certifyPackedArtifact>[1] =
   kind === "mcp"
     ? {
         binName: "huly-mcp",
-        expectedEntries: ["package/LICENSE", "package/README.md", "package/dist/index.cjs", "package/package.json"],
+        runtimeEntry: "package/dist/application.cjs",
+        expectedEntries: [
+          "package/LICENSE",
+          "package/README.md",
+          "package/dist/index.cjs",
+          "package/package.json",
+          "package/dist/native/huly-stdio-linux-arm64",
+          "package/dist/native/huly-stdio-linux-x64",
+          "package/dist/native/huly-stdio-darwin-arm64",
+          "package/dist/native/huly-stdio-darwin-x64",
+          "package/dist/native/GO-LICENSE",
+          "package/dist/application.cjs"
+        ],
         expectedExternalModules: ["@napi-rs/keyring", "dbus-next", "ws"],
         name: "@firfi/huly-mcp",
         version

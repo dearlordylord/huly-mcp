@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process"
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { createRequire } from "node:module"
 import { promisify } from "node:util"
 import { createHash } from "node:crypto"
@@ -32,6 +32,13 @@ export const buildIsolatedStdioServer = async (
       if (createHash("sha256").update(bytes).digest("hex") !== grant.sha256)
         throw new Error("Coverage bundle grant does not match its artifact")
       await writeFile(path, bytes, { flag: "wx", mode: 0o700 })
+      await mkdir(join(directory, "native"))
+      for (const companion of grant.companions) {
+        const content = await readFile(join(dirname(grant.path), companion.path))
+        if (createHash("sha256").update(content).digest("hex") !== companion.sha256)
+          throw new Error("Coverage companion grant does not match its artifact")
+        await writeFile(join(directory, companion.path), content, { flag: "wx", mode: companion.mode })
+      }
     }
     return { path, cleanup }
   } catch (error) {

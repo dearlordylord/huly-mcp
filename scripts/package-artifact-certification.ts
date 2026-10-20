@@ -50,6 +50,7 @@ interface ExpectedPackedArtifact {
   readonly expectedExternalModules: ReadonlyArray<string>
   readonly name: string
   readonly version: string
+  readonly runtimeEntry?: "package/dist/application.cjs"
 }
 
 interface ArchiveEntry {
@@ -104,9 +105,10 @@ export const certifyPackedArtifact = async (
   expected: ExpectedPackedArtifact
 ): Promise<PackedArtifactCertification> => {
   const entries = await readArchive(archivePath)
-  const bundleEntry = entries.find((entry) => entry.name === bundlePath)
+  const bundleEntry = entries.find((entry) => entry.name === (expected.runtimeEntry ?? bundlePath))
+  const launcherEntry = entries.find((entry) => entry.name === bundlePath)
   const manifestEntry = entries.find((entry) => entry.name === manifestPath)
-  if (bundleEntry === undefined || manifestEntry === undefined) {
+  if (bundleEntry === undefined || launcherEntry === undefined || manifestEntry === undefined) {
     throw new Error("Packed artifact must contain package.json and dist/index.cjs.")
   }
   const entryNames = entries.map((entry) => entry.name).sort()
@@ -117,6 +119,10 @@ export const certifyPackedArtifact = async (
     throw new Error("Packed dist/index.cjs must have exact mode 0755.")
   }
 
+  if (launcherEntry.mode !== executableMode) throw new Error("Packed launcher must have exact mode 0755.")
+  const nativeEntries = entries.filter((entry) => entry.name.startsWith("package/dist/native/huly-stdio-"))
+  if (nativeEntries.some((entry) => entry.mode !== executableMode))
+    throw new Error("Packed native bridges must have exact mode 0755.")
   const manifest = parseManifest(manifestEntry.body.toString("utf8"))
   const expectedBin = `./dist/index.cjs`
   if (
@@ -127,6 +133,12 @@ export const certifyPackedArtifact = async (
     throw new Error(`Packed manifest does not match ${expected.name}@${expected.version}.`)
   }
   const bundle = bundleEntry.body.toString("utf8")
+  if (
+    expected.runtimeEntry !== undefined &&
+    (!bundle.includes(JSON.stringify(manifest.version)) ||
+      !launcherEntry.body.toString("utf8").includes(JSON.stringify(manifest.version)))
+  )
+    throw new Error("Packed launcher and application versions must match the manifest.")
   if (!bundle.includes(effectCohortMarker)) {
     throw new Error("Packed bundle does not contain the certified patched Effect 4.0.0 cohort marker.")
   }

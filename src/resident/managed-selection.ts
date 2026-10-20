@@ -2,7 +2,7 @@ import * as fs from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
 import { Cause, Effect, Exit, Fiber, Option, Result, Scope, type Schema } from "effect"
 
-import { withAdapterCandidate, type AdapterExchange } from "./adapter-attachment.js"
+import { withAdapterCandidate, type AdapterExchange, type AdapterAdmissionHandoff } from "./adapter-attachment.js"
 import { readResidentAttachment } from "./attachment-file.js"
 import type { ResidentAttachment } from "./attachment-file.js"
 import { openGenerationRegistry } from "./generation-registry.js"
@@ -82,7 +82,11 @@ type SelectionOwnership = {
 }
 
 // Internal capabilities stay inside the admission brackets; no token is serialized here.
-type SelectedCandidate = { readonly descriptor: ResidentAttachment; readonly exchange: AdapterExchange }
+type SelectedCandidate = {
+  readonly descriptor: ResidentAttachment
+  readonly exchange: AdapterExchange
+  readonly admission: AdapterAdmissionHandoff
+}
 
 const withCompatibleCandidate = <A, E, R>(
   descriptors: ReadonlyArray<ResidentAttachment>,
@@ -111,8 +115,11 @@ const withCompatibleCandidate = <A, E, R>(
       const matched = yield* withAdapterCandidate(
         descriptor,
         capture.selection,
-        (exchange) => {
-          const decision = advanceCandidateSelection(selected, { _tag: "Matched", candidate: { descriptor, exchange } })
+        (exchange, admission) => {
+          const decision = advanceCandidateSelection(selected, {
+            _tag: "Matched",
+            candidate: { descriptor, exchange, admission }
+          })
           if (decision._tag === "Duplicate")
             return Effect.fail(
               new ManagedLaunchError({
@@ -133,7 +140,11 @@ export const withResidentSelection = <A, E, R, B, F, S>(options: {
   readonly directory: ResidentDirectory
   readonly capture: ResidentStartupCapture
   readonly startup: StartupBudget
-  readonly existing: (file: ResidentFilePath, exchange: AdapterExchange) => Effect.Effect<A, E, R>
+  readonly existing: (
+    file: ResidentFilePath,
+    exchange: AdapterExchange,
+    admission: AdapterAdmissionHandoff
+  ) => Effect.Effect<A, E, R>
   readonly absent: (
     ownership: SelectionOwnership & { readonly claim: AcquiredSelectionClaim }
   ) => Effect.Effect<B, F, S>
@@ -161,12 +172,13 @@ export const withResidentSelection = <A, E, R, B, F, S>(options: {
               options.capture,
               options.startup,
               records.length,
-              ({ descriptor, exchange }) =>
+              ({ admission, descriptor, exchange }) =>
                 claim.release.pipe(
                   Effect.andThen(
                     options.existing(
                       ResidentFilePath.make(join(options.directory, `${descriptor.identity.generation}.json`)),
-                      exchange
+                      exchange,
+                      admission
                     )
                   )
                 )

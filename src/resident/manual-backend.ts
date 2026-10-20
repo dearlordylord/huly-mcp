@@ -16,6 +16,7 @@ import type { ResidentSelection } from "./compatibility-contract.js"
 import { withResidentHeaderRedaction } from "./private-http.js"
 import { ResidentLiveStatus } from "./status-contract.js"
 import type { HulyInitializationStatus } from "../runtime/client-initialization.js"
+import { withNativeResidentSocket } from "./native-server.js"
 
 const SECRET_BYTES = 32
 const STARTUP_ALLOWANCE = "5 seconds"
@@ -123,18 +124,26 @@ export const makeManualResidentBackend = Effect.fn("makeManualResidentBackend")(
               identity,
               authorization
             })
-            return yield* withPublishedResidentAttachment(directory, descriptor, (file) =>
-              report(file).pipe(
-                Effect.andThen(
-                  configuration.mode === "configured" && configuration.lifetime === "managed"
-                    ? admissions.awaitIdleAndFence.pipe(
-                        Effect.andThen(server.stop()),
-                        Effect.andThen(Fiber.join(serving))
-                      )
-                    : Fiber.join(serving)
+            const publishDescriptor = (published: ResidentAttachment) =>
+              withPublishedResidentAttachment(directory, published, (file) =>
+                report(file).pipe(
+                  Effect.andThen(
+                    configuration.mode === "configured" && configuration.lifetime === "managed"
+                      ? admissions.awaitIdleAndFence.pipe(
+                          Effect.andThen(server.stop()),
+                          Effect.andThen(Fiber.join(serving))
+                        )
+                      : Fiber.join(serving)
+                  )
                 )
               )
-            )
+            return yield* configuration.mode === "configured" &&
+            configuration.lifetime === "managed" &&
+            authority !== undefined
+              ? withNativeResidentSocket(descriptor, admissions, authority, capacity, (nativeSocket) =>
+                  publishDescriptor({ ...descriptor, nativeSocket })
+                )
+              : publishDescriptor(descriptor)
           })
           yield* Effect.raceFirst(publish, Fiber.join(serving))
         }),

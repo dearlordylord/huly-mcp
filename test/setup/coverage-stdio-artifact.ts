@@ -1,9 +1,7 @@
-import { createHash } from "node:crypto"
-import { readFile } from "node:fs/promises"
-import { Schema } from "effect"
+import { makeStdioBundleGrant } from "../../scripts/stdio-bundle-grant.js"
 import type { TestProject } from "vitest/node"
 
-import { buildIsolatedStdioServer, StdioBundleGrant } from "../helpers/stdio-build.js"
+import { buildIsolatedStdioServer } from "../helpers/stdio-build.js"
 
 const BUILD_BOUND = 30_000
 
@@ -12,11 +10,7 @@ export default async function setup(project: TestProject) {
   const source = await buildIsolatedStdioServer(BUILD_BOUND)
   const previous = project.config.env.HULY_TEST_STDIO_BUNDLE
   try {
-    const bytes = await readFile(source.path)
-    project.config.env.HULY_TEST_STDIO_BUNDLE = Schema.encodeSync(Schema.fromJsonString(StdioBundleGrant))({
-      path: source.path,
-      sha256: createHash("sha256").update(bytes).digest("hex")
-    })
+    project.config.env.HULY_TEST_STDIO_BUNDLE = await makeStdioBundleGrant(source.path)
   } catch (error) {
     await source.cleanup()
     throw error

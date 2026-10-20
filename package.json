@@ -1,12 +1,18 @@
 {
   "name": "@firfi/huly-mcp",
-  "version": "0.55.0",
+  "version": "0.55.1",
   "description": "Huly MCP: feature-complete MCP server for Huly integration",
   "mcpName": "io.github.dearlordylord/huly-mcp",
   "type": "module",
   "main": "./dist/index.cjs",
   "files": [
-    "dist/index.cjs"
+    "dist/index.cjs",
+    "dist/native/huly-stdio-linux-arm64",
+    "dist/native/huly-stdio-linux-x64",
+    "dist/native/huly-stdio-darwin-arm64",
+    "dist/native/huly-stdio-darwin-x64",
+    "dist/native/GO-LICENSE",
+    "dist/application.cjs"
   ],
   "publishConfig": {
     "access": "public"
@@ -23,7 +29,7 @@
     "prepare": "husky",
     "start": "node dist/index.cjs",
     "build": "pnpm build:mcp && pnpm build:cli",
-    "build:mcp": "pnpm verify-tool-catalog && PKG_VERSION=$(node -p \"require('./package.json').version\") NODE_ENGINE_REQUIREMENT=$(node -p \"require('./package.json').engines.node\") && esbuild src/launcher.ts --bundle --platform=node --format=cjs --log-level=warning --outfile=dist/index.cjs --external:ws --external:@napi-rs/keyring --external:dbus-next \"--define:PKG_VERSION=\\\"$PKG_VERSION\\\"\" \"--define:NODE_ENGINE_REQUIREMENT=\\\"$NODE_ENGINE_REQUIREMENT\\\"\"",
+    "build:mcp": "pnpm build:native && pnpm verify-tool-catalog && node scripts/build-mcp.mjs",
     "build:cli": "pnpm --filter @firfi/huly-cli build",
     "typecheck": "pnpm typecheck:tsc && pnpm typecheck:effect",
     "typecheck:tsc": "node node_modules/@typescript/native/bin/tsc -p tsconfig.json --noEmit 2>&1 | grep -v \": suggestion TS\" | { grep -E '^(src/|packages/|scripts/|test/|tsconfig\\.json)' && exit 1 || exit 0; }",
@@ -77,7 +83,10 @@
     "verify:resident-launch-model": "python3 scripts/verify-resident-launch-model.py",
     "verify-completion-evidence": "node scripts/verify-completion-evidence.mjs",
     "update-tool-catalog": "node scripts/run-bundled.mjs scripts/update-tool-catalog.ts",
-    "verify-tool-catalog": "node scripts/run-bundled.mjs scripts/update-tool-catalog.ts --check"
+    "verify-tool-catalog": "node scripts/run-bundled.mjs scripts/update-tool-catalog.ts --check",
+    "build:native": "node scripts/build-native-bridge.mjs",
+    "test:native": "go test -C native/stdio -count=1 -timeout=30s ./...",
+    "bench:resident-builds": "node scripts/bench-resident-builds.mjs"
   },
   "bin": {
     "huly-mcp": "./dist/index.cjs"

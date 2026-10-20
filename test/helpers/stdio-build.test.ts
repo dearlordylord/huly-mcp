@@ -37,11 +37,32 @@ it("copies a verified artifact independently for each suite", async () => {
   }
 })
 
+it("copies the native executable and runtime independently and rejects tampering", async () => {
+  const first = await buildIsolatedStdioServer(BUILD_BOUND, () => grant)
+  const second = await buildIsolatedStdioServer(BUILD_BOUND, () => grant)
+  try {
+    const parsed = Schema.decodeUnknownSync(Schema.fromJsonString(StdioBundleGrant))(grant)
+    for (const companion of parsed.companions) {
+      const original = await readFile(join(dirname(source.path), companion.path))
+      expect((await readFile(join(dirname(second.path), companion.path))).equals(original)).toBe(true)
+      await writeFile(join(dirname(first.path), companion.path), "suite-owned companion change")
+      expect((await readFile(join(dirname(source.path), companion.path))).equals(original)).toBe(true)
+      expect((await readFile(join(dirname(second.path), companion.path))).equals(original)).toBe(true)
+    }
+    const firstGrant = await makeStdioBundleGrant(second.path)
+    await writeFile(join(dirname(second.path), "application.cjs"), "modified after qualification")
+    await expect(buildIsolatedStdioServer(BUILD_BOUND, () => firstGrant)).rejects.toThrow()
+  } finally {
+    await Promise.all([first.cleanup(), second.cleanup()])
+  }
+})
+
 it.each(["malformed", "missing", "mismatched"])("refuses a %s grant without building a replacement", async (mode) => {
   const input =
     mode === "malformed"
       ? "not-json"
       : Schema.encodeSync(Schema.fromJsonString(StdioBundleGrant))({
+          ...Schema.decodeUnknownSync(Schema.fromJsonString(StdioBundleGrant))(grant),
           path: mode === "missing" ? join(dirname(source.path), "missing.cjs") : source.path,
           sha256: "0".repeat(64)
         })

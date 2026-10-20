@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.55.1
+
+### Patch Changes
+
+- Reduce resident client memory by replacing persistent Node stdio adapters with packaged native bridges for Linux and macOS. Protocol handling, authenticated admission, cancellation and request cleanup remain in the shared backend. Ordinary stdio remains the default.
+
 ## 0.55.0
 
 ### Minor Changes

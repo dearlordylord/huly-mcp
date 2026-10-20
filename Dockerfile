@@ -1,4 +1,9 @@
+FROM golang:1.27.2-bookworm AS native-toolchain
+
 FROM node:24.15.0-bookworm-slim AS build
+
+COPY --from=native-toolchain /usr/local/go /usr/local/go
+ENV PATH="/usr/local/go/bin:${PATH}"
 
 WORKDIR /app
 

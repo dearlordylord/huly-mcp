@@ -297,3 +297,39 @@ Stopping locally does not settle earlier unconfirmed Huly mutations. Preserve
 that uncertainty and use operation-specific reconciliation before repeating a
 mutation. Full packaged lifecycle, cleanup-failure, replacement and native
 platform qualification remain pending for this command.
+
+## Native stdio bridge
+
+Managed `stdio-resident` uses a packaged native bridge on Linux and macOS,
+for arm64 and x64. Users do not need Go or a compiler. Ordinary stdio remains
+unchanged and remains the default.
+
+The small Node launcher replaces itself with the native executable. A
+short-lived Node bootstrap selects or creates the compatible generation and
+prepares a one-use compatibility proof over the existing authenticated TLS
+control channel. The native socket takes over that same admission before the
+bootstrap exits; the handoff uses one capacity slot without an idle gap. Local NoConfig discovery and profile startup diagnostics retain their ordinary
+stdio behavior in a local Node child; they do not acquire resident ownership.
+The backend owns the native session's admission, renewal, protocol
+translation, cancellation and cleanup; the bridge forwards bytes without
+reconnecting or replaying requests.
+
+Each generation owns a private temporary directory (0700) and Unix socket
+(0600). The native process checks the endpoint's ownership and permissions.
+The backend verifies the generation's private bearer and consumes the one-use
+configuration proof before acknowledging admission or accepting MCP messages.
+The socket and temporary directory are removed when the generation retires.
+
+Source builds require Go 1.27.2 on PATH; CI and Docker provide it explicitly.
+`pnpm build:native` cross-compiles the four binaries with CGO disabled.
+`pnpm test:native` checks the transport with real pipes and Unix sockets.
+
+### Reproducing the split-build experiment
+
+`pnpm bench:resident-builds` preserves the earlier JavaScript adapter comparison
+under `.bench/resident-builds`: one CommonJS bundle and an ESM build with code
+splitting, with esbuild metadata for each. These are experimental artifacts,
+not an additional transport mode or release build. The JS baseline retains the
+pre-native adapter so the effect of splitting can be measured separately from
+the native bridge. Use equal client counts, credentials, operations and idle
+intervals; record RSS, PSS and swap, and exclude the benchmark host itself.

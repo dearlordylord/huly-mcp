@@ -24,3 +24,5 @@ CLAUDE.local.md
 
 .movement-certification.lock/
 __pycache__/
+
+.bench

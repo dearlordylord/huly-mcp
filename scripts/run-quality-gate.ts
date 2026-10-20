@@ -33,6 +33,7 @@ const gates: ReadonlyArray<QualityGate> = [
   { args: ["test:movement-process"], name: "movement process checks", timeout: MINUTE },
   { args: ["verify:effect-cohort"], name: "Effect dependency cohort", timeout: MINUTE },
   { args: ["build"], name: "build", timeout: TWO_MINUTES },
+  { args: ["test:native"], name: "native stdio bridge", timeout: MINUTE },
   { args: ["typecheck"], name: "TypeScript and Effect diagnostics", timeout: TWO_MINUTES },
   { args: ["verify-schema-boundaries"], name: "schema boundaries", timeout: MINUTE },
   { args: ["circular"], name: "dependency cycles", timeout: MINUTE },

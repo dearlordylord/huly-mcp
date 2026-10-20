@@ -254,5 +254,5 @@ export const makeResidentAdmissions = Effect.fn("makeResidentAdmissions")(functi
       owners
     })
   })
-  return { admit, find, renew, release, fence, drain, awaitIdleAndFence, status }
+  return { admit, find, renew, release, fence, drain, awaitIdleAndFence, status, leasePolicy: policy.lease }
 })
