@@ -80,9 +80,7 @@ export default defineConfig({
         test: {
           name: 'ports',
           include: portTestFiles,
-          // Leave CPU for the client fleet running in the same group.
-          maxWorkers: 1,
-          sequence: { groupOrder: 3 },
+          sequence: { groupOrder: 4 },
           // The oracle adapter registers its guard at import, so it needs a fresh module graph per file.
           isolate: Boolean(process.env.QUINT_ORACLE_URL?.trim()),
         },
@@ -94,8 +92,7 @@ export default defineConfig({
           include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
           exclude: [...portTestFiles, ...residentLaunchTestFiles, ...residentModelTestFiles, ...residentWaitTestFiles, ...processTestFiles],
           isolate: true,
-          // Pure units can overlap process I/O without competing with client fleets.
-          maxWorkers: 1,
+          // Ordinary tests share workers and overlap process I/O; client fleets run separately.
           sequence: { groupOrder: 4 },
         },
       },
@@ -117,7 +114,6 @@ export default defineConfig({
           include: processTestFiles,
           exclude: [...residentLaunchTestFiles, ...residentWaitTestFiles, ...residentFleetTestFiles],
           isolate: true,
-          maxWorkers: 3,
           sequence: { groupOrder: 4 },
         },
       },
