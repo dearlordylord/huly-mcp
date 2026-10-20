@@ -55,9 +55,11 @@ export const decodeNativeFrames = <E, R>(input: Stream.Stream<Uint8Array, E, R>)
 
 export const writeNativeFrame = (output: Writable, data: Uint8Array, diagnostic = false) =>
   Effect.gen(function* () {
-    yield* Schema.decodeUnknownEffect(FrameLength)(data.length).pipe(Effect.mapError(nativeBridgeFailure))
+    const length = yield* Schema.decodeUnknownEffect(FrameLength)(data.length).pipe(
+      Effect.mapError(nativeBridgeFailure)
+    )
     const header = Buffer.alloc(NATIVE_FRAME_HEADER_BYTES)
-    header.writeUInt32BE(data.length + (diagnostic ? NATIVE_DIAGNOSTIC_FLAG : 0))
+    header.writeUInt32BE(length + (diagnostic ? NATIVE_DIAGNOSTIC_FLAG : 0))
     yield* writeNativeControl(output, Buffer.concat([header, data]))
   })
 

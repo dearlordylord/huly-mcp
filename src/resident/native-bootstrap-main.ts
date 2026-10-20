@@ -12,7 +12,9 @@ import { makeAdapterAdmissionProof, withAdapterAttachment, type AdapterAdmission
 import type { ResidentAttachment } from "./attachment-file.js"
 import { readNativeControl } from "./native-control.js"
 import { readResidentAttachment } from "./attachment-file.js"
-import { ManagedExecutable } from "./managed-contract.js"
+import { ProtectedFileError } from "./protected-path.js"
+import { BackendResponseError } from "./response-stream.js"
+import { ManagedExecutable, ManagedLaunchError } from "./managed-contract.js"
 import { launchManagedChild } from "./managed-process.js"
 import { prepareManagedDirectory, withResidentSelection } from "./managed-selection.js"
 import { NativeHello, NATIVE_CONTROL_BYTES, nativeBridgeFailure } from "./native-contract.js"
@@ -95,7 +97,13 @@ const main = Effect.gen(function* () {
     publish(`${NATIVE_LOCAL_HEADER}\n`).pipe(Effect.andThen(runProfileStartupDiagnostic(error, PKG_VERSION)))
   ),
   Effect.mapError((error) =>
-    error instanceof ConfigValidationError || error instanceof McpProcessPolicyError ? error : nativeBridgeFailure()
+    error instanceof ConfigValidationError ||
+    error instanceof McpProcessPolicyError ||
+    error instanceof ManagedLaunchError ||
+    error instanceof ProtectedFileError ||
+    error instanceof BackendResponseError
+      ? error
+      : nativeBridgeFailure()
   ),
   Effect.provide(NodeStdio.layer),
   Effect.tapError((error) => Effect.sync(() => process.stderr.write(`${error.message}\n`)))
