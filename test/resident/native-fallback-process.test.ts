@@ -45,3 +45,34 @@ it.each(["missing", "not-executable", "corrupt"])(
     }
   }
 )
+
+it.skipIf(process.platform === "win32")(
+  "keeps bridge failure terminal after a successful availability probe",
+  { timeout: PROCESS_BOUND },
+  async () => {
+    const bundle = await buildIsolatedStdioServer(PROCESS_BOUND)
+    const executable = join(dirname(bundle.path), "native", `huly-stdio-${process.platform}-${process.arch}`)
+    const transport = new StdioClientTransport({
+      command: process.execPath,
+      args: [bundle.path],
+      stderr: "pipe",
+      env: { ...testStdioEnvironment(), LAZY_ENVS: "true", MCP_TRANSPORT: "stdio-resident" }
+    })
+    const client = new Client(
+      { name: "terminal-native-test", version: "1" },
+      { versionNegotiation: { mode: { pin: "2026-07-28" } } }
+    )
+    const diagnostics: Array<string> = []
+    transport.stderr?.on("data", (bytes: Buffer) => {
+      diagnostics.push(bytes.toString())
+    })
+    try {
+      await writeFile(executable, '#!/bin/sh\nif [ "$1" = "--check" ]; then exit 0; fi\nexit 7\n', { mode: 0o700 })
+      await expect(client.connect(transport, { timeout: REQUEST_BOUND })).rejects.toThrow()
+      expect(diagnostics.join("")).not.toContain("starting ordinary stdio")
+    } finally {
+      await client.close()
+      await bundle.cleanup()
+    }
+  }
+)
