@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises"
 import * as path from "node:path"
 
-import { Clock, ConfigProvider, type Duration, Effect, Ref } from "effect"
+import { Cause, Clock, ConfigProvider, type Duration, Effect, Exit, Option, Ref } from "effect"
 
 import { AttachmentId } from "../../../src/domain/schemas/shared.js"
 import { attachment } from "../../../src/huly/huly-plugins.js"
@@ -10,6 +10,8 @@ import type { ClientBundle } from "../../../src/mcp/server.js"
 import { operationRegistry, resolveAnnotations } from "../../../src/mcp/tools/index.js"
 import { describeOperationFailure, type ToolOperationSuccess } from "../../../src/mcp/tools/registry.js"
 import { buildCombinedClientLayer, buildScopedClientBundle } from "../../../src/runtime/huly-clients.js"
+import { reportTelemetry, type ToolStatus } from "../../../src/telemetry/events.js"
+import { jsonUtf8Bytes, toolFailureStatus, toolResponseStatus } from "../../../src/telemetry/tool-observation.js"
 import { TelemetryService } from "../../../src/telemetry/telemetry.js"
 import type { CliCommandSpec } from "./catalog-types.js"
 import { cliCommandCatalog, type CliToolName } from "./catalog.js"
@@ -24,6 +26,8 @@ import { explicitCliConfirmationMessage } from "./safety-policies.js"
 import { collectFieldSpecs } from "./schema-fields.js"
 
 type CliOperation = ReturnType<typeof operationRegistry.getOperation>
+
+const NANOS_PER_MILLISECOND = 1_000_000
 
 const DEFAULT_CLI_CLIENT_CLOSE_GRACE_PERIOD = "5 seconds"
 
@@ -61,13 +65,7 @@ export interface CliRunnerPorts {
 
 const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error))
 
-const jsonBytes = (value: unknown): number | undefined => {
-  try {
-    return JSON.stringify(value).length
-  } catch {
-    return undefined
-  }
-}
+const jsonBytes = jsonUtf8Bytes
 
 const cliTelemetryErrorTag = (error: CliInputError | CliRuntimeError): string => error._tag
 
@@ -236,28 +234,32 @@ export const runCliToolWithPorts = (
     const spec: CliCommandSpec = cliCommandCatalog[toolName]
     const operation = ports.getOperation(toolName)
     const telemetry = yield* TelemetryService
-    const startedAt = yield* Clock.currentTimeMillis
+    const startedAt = yield* Clock.monotonicTimeNanos
     const measurements = yield* Ref.make<{ readonly inputBytes?: number; readonly outputBytes?: number }>({})
 
-    telemetry.sessionStart({
-      authMethod,
-      toolCount: Object.keys(cliCommandCatalog).length,
-      toolsets: null,
-      transport: "cli"
-    })
+    reportTelemetry(() =>
+      telemetry.sessionStart({
+        authMethod,
+        toolCount: Object.keys(cliCommandCatalog).length,
+        toolsets: null,
+        transport: "cli"
+      })
+    )
 
-    const captureToolCalled = (status: "success" | "error", errorTag?: string): Effect.Effect<void> =>
+    const captureToolCalled = (status: ToolStatus, errorTag?: string): Effect.Effect<void> =>
       Effect.gen(function* () {
-        const finishedAt = yield* Clock.currentTimeMillis
+        const finishedAt = yield* Clock.monotonicTimeNanos
         const { inputBytes, outputBytes } = yield* Ref.get(measurements)
-        telemetry.toolCalled({
-          toolName,
-          status,
-          durationMs: finishedAt - startedAt,
-          ...(errorTag === undefined ? {} : { errorTag }),
-          ...(inputBytes === undefined ? {} : { inputBytes }),
-          ...(outputBytes === undefined ? {} : { outputBytes })
-        })
+        reportTelemetry(() =>
+          telemetry.toolCalled({
+            toolName,
+            status,
+            durationMs: Number(finishedAt - startedAt) / NANOS_PER_MILLISECOND,
+            ...(errorTag === undefined ? {} : { errorTag }),
+            ...(inputBytes === undefined ? {} : { inputBytes }),
+            ...(outputBytes === undefined ? {} : { outputBytes })
+          })
+        )
       })
 
     const command = Effect.gen(function* () {
@@ -273,8 +275,16 @@ export const runCliToolWithPorts = (
     })
 
     yield* command.pipe(
-      Effect.tap(() => captureToolCalled("success")),
-      Effect.tapError((error) => captureToolCalled("error", cliTelemetryErrorTag(error))),
+      Effect.onExit((exit) => {
+        if (Exit.isSuccess(exit)) return captureToolCalled("success")
+        const error = Cause.findErrorOption(exit.cause)
+        if (!Cause.hasDies(exit.cause) && Option.isSome(error)) {
+          const tag = cliTelemetryErrorTag(error.value)
+          return captureToolCalled(toolResponseStatus(true, tag), tag)
+        }
+        const status = toolFailureStatus(exit.cause)
+        return captureToolCalled(status, status === "cancelled" ? "Interrupted" : "UnexpectedError")
+      }),
       Effect.ensuring(Effect.ignore(Effect.tryPromise(() => telemetry.shutdown())))
     )
   })

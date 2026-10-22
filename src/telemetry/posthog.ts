@@ -4,7 +4,13 @@ import { Schema } from "effect"
 import { writeStderrLine } from "../utils/stderr.js"
 import { VERSION } from "../version.js"
 import { mcpTelemetryContext, type TelemetryRuntimeContext } from "./context.js"
-import type { TelemetryOperations } from "./telemetry.js"
+import {
+  AttachmentIdSchema,
+  ResidentAttachmentEventSchema,
+  ResidentFailureEventSchema,
+  ToolStatusSchema
+} from "./events.js"
+import type { TelemetryOperations, ToolCalledProps } from "./telemetry.js"
 
 const POSTHOG_API_KEY = "phc_TGfFqCGdnF0p68wuFzd5WSw1IsBvOJW0YgoMJDyZPjm"
 const SHUTDOWN_TIMEOUT_MS = 2000
@@ -19,7 +25,8 @@ type SessionStartProperties = {
 const ToolCalledPropertiesSchema = Schema.Struct({
   tool_name: Schema.String,
   call_path: Schema.Literals(["direct", "invoke_tool"]),
-  status: Schema.Literals(["success", "error"]),
+  status: ToolStatusSchema,
+  attachment_id: Schema.optionalKey(AttachmentIdSchema),
   duration_ms: Schema.Number,
   client_kind: Schema.optionalKey(Schema.String),
   resolved_mode: Schema.optionalKey(Schema.String),
@@ -30,12 +37,24 @@ const ToolCalledPropertiesSchema = Schema.Struct({
 })
 type ToolCalledProperties = Schema.Schema.Type<typeof ToolCalledPropertiesSchema>
 
+const toolMeasurements = (props: ToolCalledProps) => ({
+  ...(props.inputBytes !== undefined && { input_bytes: props.inputBytes }),
+  ...(props.outputBytes !== undefined && { output_bytes: props.outputBytes }),
+  ...(props.editMode !== undefined && { edit_mode: props.editMode })
+})
+
 type FirstListToolsProperties = { readonly client_kind?: string; readonly resolved_mode?: string }
 
 type TelemetryEvent =
   | { readonly event: "session_start"; readonly properties: SessionStartProperties }
   | { readonly event: "first_list_tools"; readonly properties?: FirstListToolsProperties }
   | { readonly event: "tool_called"; readonly properties: ToolCalledProperties }
+  | {
+      readonly event: "resident_attachment"
+      readonly properties: Schema.Codec.Encoded<typeof ResidentAttachmentEventSchema>
+    }
+  | { readonly event: "resident_failure"; readonly properties: Schema.Schema.Type<typeof ResidentFailureEventSchema> }
+  | { readonly event: "resident_ready"; readonly properties?: undefined }
   | { readonly event: "session_end"; readonly properties?: undefined }
 
 interface PostHogClientPort {
@@ -70,10 +89,16 @@ export const createPostHogTelemetry = (
   const client = dependencies.createClient()
   const sessionId = dependencies.createSessionId()
   let listToolsSent = false
+  let runtimeMode = context.runtimeMode ?? (context.surface === "cli" ? "cli" : "stdio")
+  let shutdown: Promise<void> | undefined
 
   const debugLog = (message: string): void => {
     if (debug) {
-      dependencies.writeDebug(message)
+      try {
+        dependencies.writeDebug(message)
+      } catch {
+        return
+      }
     }
   }
 
@@ -84,6 +109,8 @@ export const createPostHogTelemetry = (
         event,
         properties: {
           session_id: sessionId,
+          telemetry_schema_version: 2,
+          runtime_mode: runtimeMode,
           version: VERSION,
           package_name: context.packageName,
           surface: context.surface,
@@ -98,6 +125,7 @@ export const createPostHogTelemetry = (
 
   return {
     sessionStart: (props) => {
+      runtimeMode = context.runtimeMode ?? props.transport
       debugLog(`[telemetry] session_start: ${JSON.stringify(props)}`)
       capture({
         event: "session_start",
@@ -130,27 +158,36 @@ export const createPostHogTelemetry = (
         event: "tool_called",
         properties: {
           tool_name: props.toolName,
+          ...(props.attachmentId === undefined ? {} : { attachment_id: props.attachmentId }),
           call_path: props.callPath ?? "direct",
           status: props.status,
           duration_ms: props.durationMs,
           ...(props.clientKind !== undefined && { client_kind: props.clientKind }),
           ...(props.resolvedMode !== undefined && { resolved_mode: props.resolvedMode }),
           ...(props.errorTag !== undefined && { error_tag: props.errorTag }),
-          ...(props.inputBytes !== undefined && { input_bytes: props.inputBytes }),
-          ...(props.outputBytes !== undefined && { output_bytes: props.outputBytes }),
-          ...(props.editMode !== undefined && { edit_mode: props.editMode })
+          ...toolMeasurements(props)
         }
       })
     },
 
-    shutdown: async () => {
+    residentReady: () => capture({ event: "resident_ready" }),
+    residentAttachment: (properties) =>
+      capture({
+        event: "resident_attachment",
+        properties: Schema.encodeSync(ResidentAttachmentEventSchema)(properties)
+      }),
+    residentFailure: (properties) =>
+      capture({ event: "resident_failure", properties: Schema.encodeSync(ResidentFailureEventSchema)(properties) }),
+    shutdown: () => {
+      if (shutdown !== undefined) return shutdown
       capture({ event: "session_end" })
       debugLog("[telemetry] shutting down")
-      try {
-        await client.shutdown(SHUTDOWN_TIMEOUT_MS)
-      } catch (e) {
-        debugLog(`[telemetry] shutdown error: ${String(e)}`)
-      }
+      shutdown = Promise.resolve()
+        .then(() => client.shutdown(SHUTDOWN_TIMEOUT_MS))
+        .catch((error: unknown) => {
+          debugLog(`[telemetry] shutdown error: ${String(error)}`)
+        })
+      return shutdown
     }
   }
 }

@@ -30,7 +30,8 @@ export const ResidentAttachment = Schema.Struct({
   endpoint: ResidentEndpoint,
   identity: ResidentTlsIdentity,
   authorization: Schema.RedactedFromValue(Schema.NonEmptyString),
-  nativeSocket: Schema.optionalKey(NativeSocketPath)
+  nativeSocket: Schema.optionalKey(NativeSocketPath),
+  telemetryEnabled: Schema.optionalKey(Schema.Boolean)
 })
 export type ResidentAttachment = Schema.Schema.Type<typeof ResidentAttachment>
 const isCurrentImplementation = (attachment: ResidentAttachment) => attachment.implementation.version === VERSION

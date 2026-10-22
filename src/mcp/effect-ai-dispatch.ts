@@ -58,6 +58,7 @@ export const fetchLatestNpmVersion = async (fetchImpl: typeof fetch = fetch): Pr
 }
 
 export interface EffectMcpDispatchOptions {
+  readonly onInvoke?: (tool: ToolDefinition, args: unknown) => void
   readonly getHulyContext: (toolExposure: ToolExposureContext) => Effect.Effect<GetHulyContextResult>
 }
 
@@ -148,9 +149,11 @@ const callProxyWithClients = (
   name: ToolName,
   args: unknown,
   exposure: ReturnType<typeof resolveProtocolExposure>,
-  resolveClients: ClientResolver
+  resolveClients: ClientResolver,
+  onInvoke?: (tool: ToolDefinition, args: unknown) => void
 ): Effect.Effect<McpToolResponse, never> =>
   handleProxyToolCallEffect({
+    ...(onInvoke === undefined ? {} : { onInvoke }),
     toolName: name,
     args,
     proxyCandidateRegistry: exposure.proxyCandidateRegistry,
@@ -167,10 +170,11 @@ const callProxyTool = (
   name: ToolName,
   args: unknown,
   exposure: ReturnType<typeof resolveProtocolExposure>,
-  resolveClients: ClientResolver
+  resolveClients: ClientResolver,
+  onInvoke?: (tool: ToolDefinition, args: unknown) => void
 ): Effect.Effect<McpToolResponse, never> => {
   if (exposure.context.resolvedMode !== "proxy") return Effect.succeed(createUnknownToolError(name))
-  if (name === "invoke_tool") return callProxyWithClients(name, args, exposure, resolveClients)
+  if (name === "invoke_tool") return callProxyWithClients(name, args, exposure, resolveClients, onInvoke)
   return handleProxyToolCallEffect({ toolName: name, args, proxyCandidateRegistry: exposure.proxyCandidateRegistry })
 }
 
@@ -219,6 +223,6 @@ export const dispatchEffectMcpTool = (
   const name = String(definition.name)
   if (name === VERSION_TOOL_NAME) return callVersionTool(args, fetchLatestVersion)
   if (name === GET_HULY_CONTEXT_TOOL_NAME) return callHulyContextTool(args, options, exposure)
-  if (isProxyToolName(name)) return callProxyTool(name, args, exposure, resolveClients)
+  if (isProxyToolName(name)) return callProxyTool(name, args, exposure, resolveClients, options.onInvoke)
   return callNativeTool(name, args, exposure, resolveClients)
 }

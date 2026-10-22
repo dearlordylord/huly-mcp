@@ -1,3 +1,4 @@
+import { telemetryEnabled } from "../telemetry/configuration.js"
 import { type Cause, Config, Effect, Fiber, FiberMap, Option, Queue, Ref, Result, Schema, Stdio, Stream } from "effect"
 import { McpSchema } from "effect/ai"
 import { Ndjson } from "effect/encoding"
@@ -164,5 +165,10 @@ export const runManualAdapter = Effect.fn("runManualAdapter")(function* (selecti
   const attachment = yield* readResidentAttachment(
     yield* Config.schema(ResidentFilePath, "MCP_RESIDENT_ATTACHMENT_FILE")
   )
+  if (!(yield* telemetryEnabled("mcp")) && attachment.telemetryEnabled !== false)
+    return yield* new BackendResponseError({
+      message:
+        "Telemetry is disabled for this adapter; restart the resident backend with HULY_MCP_TELEMETRY=0 or DO_NOT_TRACK=1."
+    })
   yield* withAdapterAttachment(attachment, runAdapterBridge, selection)
 })

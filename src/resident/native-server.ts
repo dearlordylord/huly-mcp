@@ -1,3 +1,8 @@
+import { createNoopTelemetry } from "../telemetry/noop.js"
+import { reportTelemetry } from "../telemetry/events.js"
+import type { TelemetryOperations } from "../telemetry/telemetry.js"
+import { AdmissionError } from "./admission-contract.js"
+import { CompatibilityError } from "./compatibility-contract.js"
 import * as fs from "node:fs/promises"
 import { createServer, type Server, type Socket } from "node:net"
 import { tmpdir } from "node:os"
@@ -13,7 +18,7 @@ import { PRIVATE_FILE_MODE } from "./protected-path.js"
 import type { AdmissionPolicy } from "./admission-contract.js"
 import { writeNativeFrame } from "./native-framing.js"
 import { BackendResponseError } from "./response-stream.js"
-import { runNativeSession } from "./native-session.js"
+import { NativeAttachmentRetired, runNativeSession } from "./native-session.js"
 
 const CONNECTIONS_PER_ATTACHMENT = 2
 // Internal resource factory; callers can supply an owned listener without patching Node modules.
@@ -26,7 +31,8 @@ export const withNativeResidentSocket = <A, E, R>(
   authority: Effect.Success<ReturnType<typeof makeCompatibilityAuthority>>,
   capacity: AdmissionPolicy["capacity"],
   use: (path: NativeSocketPath) => Effect.Effect<A, E, R>,
-  factory: NativeSocketFactory = makeSocketServer
+  factory: NativeSocketFactory = makeSocketServer,
+  telemetry: TelemetryOperations = createNoopTelemetry()
 ) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -47,6 +53,16 @@ export const withNativeResidentSocket = <A, E, R>(
         sockets.add(socket)
         socket.on("error", () => {})
         const session = runNativeSession(socket, attachment, admissions, authority, claimed).pipe(
+          Effect.tapError((error) =>
+            Effect.sync(() => {
+              if (
+                !(error instanceof AdmissionError) &&
+                !(error instanceof CompatibilityError) &&
+                !(error instanceof NativeAttachmentRetired)
+              )
+                reportTelemetry(() => telemetry.residentFailure({ stage: "native_channel", reason: "failed" }))
+            })
+          ),
           Effect.catch((error) =>
             writeNativeFrame(
               socket,

@@ -1,4 +1,5 @@
-import { Context, Effect, Exit, Layer, Schema } from "effect"
+import { createNoopTelemetry } from "../../src/telemetry/noop.js"
+import { Context, Deferred, Effect, Exit, Fiber, Layer, Schema } from "effect"
 import { McpProtocol } from "effect/ai"
 import { McpServer } from "effect/ai/McpServer"
 import * as McpSchema from "effect/ai/McpSchema"
@@ -530,7 +531,13 @@ describe("Effect AI registered tool handlers", () => {
     const visible = effectMcpFirstListVisibility(
       {
         resolveClients: failedResolver,
-        telemetry: { sessionStart: () => {}, firstListTools: () => {}, toolCalled: () => {}, shutdown: async () => {} },
+        telemetry: {
+          ...createNoopTelemetry(),
+          sessionStart: () => {},
+          firstListTools: () => {},
+          toolCalled: () => {},
+          shutdown: async () => {}
+        },
         registry: toolRegistry,
         getHulyContext: (exposure) => Effect.succeed(contextResult(exposure)),
         onDiscovery: () => {
@@ -552,6 +559,7 @@ describe("Effect AI registered tool handlers", () => {
     const adapter = makeEffectMcpRegistry({
       resolveClients: failedResolver,
       telemetry: {
+        ...createNoopTelemetry(),
         sessionStart: () => {},
         firstListTools: (props) => firstLists.push(props),
         toolCalled: (props) => calls.push(props),
@@ -573,6 +581,7 @@ describe("Effect AI registered tool handlers", () => {
               {
                 resolveClients: failedResolver,
                 telemetry: {
+                  ...createNoopTelemetry(),
                   sessionStart: () => {},
                   firstListTools: (props) => firstLists.push(props),
                   toolCalled: () => {},
@@ -597,7 +606,10 @@ describe("Effect AI registered tool handlers", () => {
           yield* server
             .callTool({
               name: "invoke_tool",
-              arguments: { toolName: "edit_document", arguments: { old_text: "before", new_text: "after" } }
+              arguments: {
+                toolName: "edit_document",
+                arguments: JSON.stringify({ old_text: "before", new_text: "after" })
+              }
             })
             .pipe(Effect.provideService(McpSchema.McpServerClient, clientService("codex-cli")))
           yield* Effect.promise(adapter.quiesce)
@@ -610,18 +622,66 @@ describe("Effect AI registered tool handlers", () => {
     )
 
     expect(assertAt(calls, 0)).toMatchObject({ toolName: "get_version", status: "success", clientKind: "codex" })
-    expect(calls).toContainEqual(expect.objectContaining({ toolName: "invoke_tool", editMode: "search_and_replace" }))
+    expect(calls).toContainEqual(
+      expect.objectContaining({ toolName: "edit_document", callPath: "invoke_tool", editMode: "search_and_replace" })
+    )
     expect(firstLists).toHaveLength(4)
     expect(firstLists).toEqual(
       expect.arrayContaining([expect.objectContaining({ clientKind: "codex", resolvedMode: "proxy" })])
     )
   })
 
+  it("records cancellation once and keeps unknown caller names out of telemetry", async () => {
+    const calls: Array<ToolCalledProps> = []
+    const entered = await Effect.runPromise(Deferred.make<void>())
+    const adapter = makeEffectMcpRegistry({
+      resolveClients: failedResolver,
+      telemetry: {
+        ...createNoopTelemetry(),
+        toolCalled: (event) => {
+          calls.push(event)
+        }
+      },
+      registry: toolRegistry,
+      getHulyContext: () => Deferred.succeed(entered, undefined).pipe(Effect.andThen(Effect.never))
+    })
+    await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          yield* adapter.registration
+          const server = yield* McpServer
+          const work = yield* server
+            .callTool({ name: "get_huly_context", arguments: {} })
+            .pipe(Effect.provideService(McpSchema.McpServerClient, clientService("generic-client")), Effect.forkChild)
+          yield* Deferred.await(entered)
+          yield* Fiber.interrupt(work)
+          yield* server
+            .callTool({ name: "private-user-controlled-name", arguments: {} })
+            .pipe(Effect.provideService(McpSchema.McpServerClient, clientService("generic-client")))
+        }).pipe(Effect.provide(McpServer.layer))
+      )
+    )
+    expect(calls).toHaveLength(2)
+    expect(calls).toContainEqual(
+      expect.objectContaining({ toolName: "get_huly_context", status: "cancelled", errorTag: "Interrupted" })
+    )
+    expect(calls).toContainEqual(
+      expect.objectContaining({ toolName: "unknown", status: "rejected", errorTag: "UnknownTool" })
+    )
+    expect(JSON.stringify(calls)).not.toContain("private-user-controlled-name")
+  })
+
   it("maps handler defects without exposing Effect internals", async () => {
     const defects = [new Error("context defect"), "string context defect"]
     const adapter = makeEffectMcpRegistry({
       resolveClients: failedResolver,
-      telemetry: { sessionStart: () => {}, firstListTools: () => {}, toolCalled: () => {}, shutdown: async () => {} },
+      telemetry: {
+        ...createNoopTelemetry(),
+        sessionStart: () => {},
+        firstListTools: () => {},
+        toolCalled: () => {},
+        shutdown: async () => {}
+      },
       registry: toolRegistry,
       getHulyContext: () => Effect.die(defects.shift() ?? "fallback defect")
     })

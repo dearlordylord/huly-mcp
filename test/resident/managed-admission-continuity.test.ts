@@ -59,6 +59,7 @@ const withOwner = <A, E, R>(
           )
           const registry = yield* openGenerationRegistry(directory)
           const descriptor = ResidentAttachment.make({
+            telemetryEnabled: capture.selection.telemetryEnabled,
             version: 1,
             transport: "tls13-external-psk-v1",
             implementation: { name: "@firfi/huly-mcp", version: VERSION },

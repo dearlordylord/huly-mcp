@@ -1,12 +1,9 @@
-import { Config, Context, Effect, Layer } from "effect"
+import { Context, Effect, Layer } from "effect"
 
 import type { ClientKind, ToolExposureMode } from "../mcp/tool-mode.js"
-import {
-  cliTelemetryContext,
-  mcpTelemetryContext,
-  type TelemetryRuntimeContext,
-  type TelemetrySurface
-} from "./context.js"
+import { cliTelemetryContext, mcpTelemetryContext, type TelemetryRuntimeContext } from "./context.js"
+import { telemetryDebug, telemetryEnabled } from "./configuration.js"
+import type { ResidentAttachmentEvent, ResidentFailureEvent, ToolStatus } from "./events.js"
 import { createNoopTelemetry } from "./noop.js"
 import { createPostHogTelemetryWithContext } from "./posthog.js"
 
@@ -32,10 +29,11 @@ export type ToolCalledProps = {
   // reports the resolved target here, so one dimension covers both call paths.
   readonly toolName: string
   readonly callPath?: ToolCallPath | undefined
-  readonly status: "success" | "error"
+  readonly status: ToolStatus
   readonly clientKind?: ClientKind | undefined
   readonly resolvedMode?: ToolExposureMode | undefined
   readonly errorTag?: string | undefined
+  readonly attachmentId?: string
   readonly durationMs: number
   readonly inputBytes?: number | undefined
   readonly outputBytes?: number | undefined
@@ -48,6 +46,9 @@ export interface TelemetryOperations {
   readonly sessionStart: (props: SessionStartProps) => void
   readonly firstListTools: (props?: FirstListToolsProps) => void
   readonly toolCalled: (props: ToolCalledProps) => void
+  readonly residentReady: () => void
+  readonly residentAttachment: (event: ResidentAttachmentEvent) => void
+  readonly residentFailure: (event: ResidentFailureEvent) => void
   readonly shutdown: () => Promise<void>
 }
 
@@ -60,25 +61,6 @@ const defaultTelemetryFactories: TelemetryFactories = {
   enabled: createPostHogTelemetryWithContext,
   disabled: createNoopTelemetry
 }
-
-const telemetryEnvNames = {
-  cli: { debug: "HULY_CLI_TELEMETRY_DEBUG", enabled: "HULY_CLI_TELEMETRY" },
-  mcp: { debug: "HULY_MCP_TELEMETRY_DEBUG", enabled: "HULY_MCP_TELEMETRY" }
-} satisfies Record<TelemetrySurface, { readonly debug: string; readonly enabled: string }>
-
-// https://consoledonottrack.com: any value other than empty, "0", or "false" opts out.
-const doNotTrack = Config.map(
-  Config.String("DO_NOT_TRACK").pipe(Config.withDefault("")),
-  (v) => !["", "0", "false"].includes(v.trim().toLowerCase())
-)
-
-const telemetryEnabled = (surface: TelemetrySurface) =>
-  Config.all([Config.String(telemetryEnvNames[surface].enabled).pipe(Config.withDefault("1")), doNotTrack]).pipe(
-    Config.map(([v, optOut]) => v !== "0" && !optOut)
-  )
-
-const telemetryDebug = (surface: TelemetrySurface) =>
-  Config.map(Config.String(telemetryEnvNames[surface].debug).pipe(Config.withDefault("0")), (v) => v === "1")
 
 export class TelemetryService extends Context.Service<TelemetryService, TelemetryOperations>()("@hulymcp/Telemetry") {
   static readonly layerForContext = (
@@ -95,6 +77,8 @@ export class TelemetryService extends Context.Service<TelemetryService, Telemetr
     )
 
   static readonly layer: Layer.Layer<TelemetryService> = TelemetryService.layerForContext(mcpTelemetryContext)
+
+  static readonly residentLayer = TelemetryService.layerForContext({ ...mcpTelemetryContext, runtimeMode: "resident" })
 
   static readonly cliLayer: Layer.Layer<TelemetryService> = TelemetryService.layerForContext(cliTelemetryContext)
 

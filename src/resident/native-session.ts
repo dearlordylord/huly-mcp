@@ -1,5 +1,5 @@
 import type { Socket } from "node:net"
-import { Effect, Stdio } from "effect"
+import { Data, Effect, Stdio } from "effect"
 
 import type { makeAttachmentOwner } from "./attachment-owner.js"
 import type { ResidentAttachment } from "./attachment-file.js"
@@ -10,6 +10,9 @@ import { runAdapterBridge } from "./manual-adapter.js"
 import { NATIVE_ACK, parseNativeHello, nativeBridgeFailure } from "./native-contract.js"
 import { readNativeControl, writeNativeControl } from "./native-control.js"
 import { nativeSocketStdio } from "./native-stdio.js"
+
+// Internal control flow: retirement is an expected channel closure.
+export class NativeAttachmentRetired extends Data.TaggedError("NativeAttachmentRetired") {}
 
 export const runNativeSession = Effect.fn("runNativeSession")(function* (
   socket: Socket,
@@ -34,7 +37,7 @@ export const runNativeSession = Effect.fn("runNativeSession")(function* (
           Effect.andThen(
             Effect.raceFirst(
               runAdapterBridge(exchange),
-              owner.closed.pipe(Effect.andThen(Effect.fail(nativeBridgeFailure())))
+              owner.closed.pipe(Effect.andThen(Effect.fail(new NativeAttachmentRetired())))
             )
           ),
           Effect.provideService(Stdio.Stdio, nativeSocketStdio(socket, admissions.renew(hello.attachmentToken)))

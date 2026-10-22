@@ -114,3 +114,37 @@ it.each(["initialize", "duplicate", "capacity"])(
     }
   }
 )
+
+it("refuses an opted-out manual adapter before contacting an enabled telemetry backend", async () => {
+  let requests = 0
+  const fixture = await startResidentFixture(
+    () => {
+      requests++
+    },
+    "private-fixture-auth",
+    undefined,
+    () => {
+      requests++
+    },
+    undefined,
+    true
+  )
+  try {
+    const exit = await Effect.runPromiseExit(
+      runManualAdapter().pipe(
+        Effect.provide(
+          Layer.merge(
+            Stdio.layerTest({ stdin: Stream.empty }),
+            ConfigProvider.layer(
+              ConfigProvider.fromUnknown({ MCP_RESIDENT_ATTACHMENT_FILE: fixture.file, DO_NOT_TRACK: "1" })
+            )
+          )
+        )
+      )
+    )
+    expect(Exit.isFailure(exit)).toBe(true)
+    expect(requests).toBe(0)
+  } finally {
+    await fixture.cleanup()
+  }
+})

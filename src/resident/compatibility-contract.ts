@@ -7,7 +7,8 @@ import { ResidentTlsIdentity } from "./tls-channel.js"
 export const ResidentSelection = Schema.Struct({
   huly: HulyConfigSchema,
   policy: McpProcessPolicy,
-  lazyEnvs: Schema.Boolean
+  lazyEnvs: Schema.Boolean,
+  telemetryEnabled: Schema.Boolean
 })
 export type ResidentSelection = Schema.Schema.Type<typeof ResidentSelection>
 

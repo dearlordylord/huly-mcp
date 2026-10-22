@@ -27,7 +27,8 @@ const selection = (
       ...huly
     },
     policy: { toolsets: [], tools: [], exposure: { configuredMode: "auto", proxyOutputStrict: false }, ...policy },
-    lazyEnvs
+    lazyEnvs,
+    telemetryEnabled: true
   })
 const generation = ResidentTlsIdentity.fields.generation.make("32300000-0000-4000-8000-000000000001")
 const otherGeneration = ResidentTlsIdentity.fields.generation.make("32300000-0000-4000-8000-000000000002")
@@ -65,13 +66,15 @@ it.effect("preserves password bytes and has fixed tuple ordering independent of 
         ["get_issue"],
         "auto",
         false,
-        false
+        false,
+        true
       ])
     )
     const owner = yield* makeCompatibilityAuthority(selected, generation, authorization)
     const challenge = yield* owner.challenge
     const reordered: ResidentSelection = {
       lazyEnvs: selected.lazyEnvs,
+      telemetryEnabled: selected.telemetryEnabled,
       policy: { exposure: selected.policy.exposure, tools: selected.policy.tools, toolsets: selected.policy.toolsets },
       huly: {
         connectionTimeout: selected.huly.connectionTimeout,
@@ -85,6 +88,7 @@ it.effect("preserves password bytes and has fixed tuple ordering independent of 
 )
 
 const incompatible = [
+  { ...selection(), telemetryEnabled: false },
   selection({ url: "https://other.invalid" }),
   selection({ workspace: "second" }),
   selection({ connectionTimeout: 2_000 }),

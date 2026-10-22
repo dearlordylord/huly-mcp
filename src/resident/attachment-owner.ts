@@ -2,6 +2,7 @@ import { Deferred, Effect, Exit, Fiber, Schema } from "effect"
 import type { McpSchema } from "effect/ai"
 
 import { RequestWorkRejected } from "../runtime/request-work.js"
+import type { AttachmentObservation } from "./attachment-observation.js"
 import { MAX_ADAPTER_REQUESTS } from "./adapter-limits.js"
 
 export class AttachmentCleanupFailed extends Schema.TaggedError<AttachmentCleanupFailed>()("AttachmentCleanupFailed", {
@@ -18,7 +19,10 @@ interface Work {
 }
 
 /** One admitted adapter. The caller must put the entire request cleanup inside withWork. */
-export const makeAttachmentOwner = Effect.fn("makeAttachmentOwner")(function* (eligible: Effect.Effect<boolean>) {
+export const makeAttachmentOwner = Effect.fn("makeAttachmentOwner")(function* (
+  eligible: Effect.Effect<boolean>,
+  observation?: AttachmentObservation
+) {
   const work = new Set<Work>()
   const sessions = new Map<string, Session>()
   let accepting = true
@@ -30,10 +34,14 @@ export const makeAttachmentOwner = Effect.fn("makeAttachmentOwner")(function* (e
       status: "running"
     }
     const eligibility = yield* eligible
-    if (!accepting || !eligibility)
+    if (!accepting || !eligibility) {
+      observation?.failure({ stage: "work", reason: "closing" })
       return yield* new RequestWorkRejected({ message: "Resident attachment no longer accepts work" })
-    if (work.size >= MAX_ADAPTER_REQUESTS)
+    }
+    if (work.size >= MAX_ADAPTER_REQUESTS) {
+      observation?.failure({ stage: "work", reason: "capacity" })
       return yield* new RequestWorkRejected({ message: "Resident attachment reached its retained work limit" })
+    }
     work.add(ticket)
     return ticket
   })
@@ -41,6 +49,7 @@ export const makeAttachmentOwner = Effect.fn("makeAttachmentOwner")(function* (e
   const finish = <E>(ticket: Work, exit: Exit.Exit<void, E>) =>
     Effect.gen(function* () {
       if (Exit.isFailure(exit)) {
+        observation?.failure({ stage: "cleanup", reason: "failed" })
         ticket.status = "blocked"
         accepting = false
         yield* Deferred.fail(
@@ -100,6 +109,7 @@ export const makeAttachmentOwner = Effect.fn("makeAttachmentOwner")(function* (e
   )
 
   return {
+    observation,
     withWork,
     close,
     closed: Fiber.join(drain),

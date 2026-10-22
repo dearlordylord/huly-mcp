@@ -65,6 +65,11 @@ const control = <A, E, R>(
 
 export const makeAdapterAdmissionProof = (attachment: ResidentAttachment, selection: ResidentSelection) =>
   Effect.gen(function* () {
+    if ((attachment.telemetryEnabled ?? true) !== selection.telemetryEnabled)
+      return yield* new ResidentSelectionMismatch({
+        message:
+          "Resident telemetry policy differs from this adapter; restart the resident with matching HULY_MCP_TELEMETRY / DO_NOT_TRACK settings."
+      })
     const challenge = yield* control(
       attachment,
       controlRequest(attachment, "POST", undefined, RESIDENT_COMPATIBILITY_PATH),

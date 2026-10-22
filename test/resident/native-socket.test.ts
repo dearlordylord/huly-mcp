@@ -1,3 +1,5 @@
+import { createNoopTelemetry } from "../../src/telemetry/noop.js"
+import type { ResidentFailureEvent } from "../../src/telemetry/events.js"
 import { once } from "node:events"
 import * as fs from "node:fs/promises"
 import { connect, createServer, type Server, type Socket } from "node:net"
@@ -53,6 +55,13 @@ const refused = async (path: NativeSocketPath, hello: string) => {
 }
 
 it("owns a private native channel, authenticates once, forwards a request and releases admission", async () => {
+  const failures: Array<ResidentFailureEvent> = []
+  const telemetry = {
+    ...createNoopTelemetry(),
+    residentFailure: (event: ResidentFailureEvent) => {
+      failures.push(event)
+    }
+  }
   let ownedPath: NativeSocketPath | undefined
   await Effect.runPromise(
     Effect.gen(function* () {
@@ -101,51 +110,61 @@ it("owns a private native channel, authenticates once, forwards a request and re
               proof: duplicateProof,
               attachmentToken: lease.token
             })
-            yield* withNativeResidentSocket(descriptor, admissions, authority, policy.capacity, (path) =>
-              Effect.promise(async () => {
-                ownedPath = path
-                expect((await fs.stat(dirname(path))).mode & 0o777).toBe(0o700)
-                expect((await fs.lstat(path)).mode & 0o777).toBe(0o600)
-                await refused(path, hello.replace("native-session-owner-fixture", "wrong-private-bearer"))
-                const socket = await connection(path)
-                try {
-                  await admitted(socket, hello)
-                  await refused(path, duplicate)
-                  expect((await Effect.runPromise(admissions.status)).attachments).toBe(1)
-                  const stdio = nativeSocketStdio(socket)
-                  await Effect.runPromise(Stream.empty.pipe(Stream.run(stdio.stderr())))
-                  await Effect.runPromise(Stream.empty.pipe(Stream.run(stdio.stdout())))
-                  const reply = Effect.runPromise(
-                    NodeStream.fromReadable({
-                      evaluate: () => socket,
-                      onError: (error) => error,
-                      closeOnDone: false
-                    }).pipe(decodeNativeFrames, Stream.take(1), Stream.runCollect)
-                  )
-                  socket.write(Buffer.alloc(4))
-                  const request = Buffer.from(
-                    '{"jsonrpc":"2.0","id":41,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"first","version":"1.0"}}}}\n'
-                  )
-                  const header = Buffer.alloc(4)
-                  header.writeUInt32BE(request.length)
-                  socket.write(Buffer.concat([header, request]))
-                  const parsed = Schema.decodeUnknownSync(Schema.fromJsonString(BackendMessage))(
-                    Buffer.concat(await reply).toString()
-                  )
-                  expect(parsed).toMatchObject({
-                    jsonrpc: "2.0",
-                    id: 41,
-                    result: {
-                      _meta: {
-                        "io.modelcontextprotocol/serverInfo": { name: "native-session-fixture", version: "1.0" }
+            yield* withNativeResidentSocket(
+              descriptor,
+              admissions,
+              authority,
+              policy.capacity,
+              (path) =>
+                Effect.promise(async () => {
+                  ownedPath = path
+                  expect((await fs.stat(dirname(path))).mode & 0o777).toBe(0o700)
+                  expect((await fs.lstat(path)).mode & 0o777).toBe(0o600)
+                  await refused(path, hello.replace("native-session-owner-fixture", "wrong-private-bearer"))
+                  const socket = await connection(path)
+                  try {
+                    await admitted(socket, hello)
+                    await refused(path, duplicate)
+                    expect((await Effect.runPromise(admissions.status)).attachments).toBe(1)
+                    const stdio = nativeSocketStdio(socket)
+                    await Effect.runPromise(Stream.empty.pipe(Stream.run(stdio.stderr())))
+                    await Effect.runPromise(Stream.empty.pipe(Stream.run(stdio.stdout())))
+                    const reply = Effect.runPromise(
+                      NodeStream.fromReadable({
+                        evaluate: () => socket,
+                        onError: (error) => error,
+                        closeOnDone: false
+                      }).pipe(decodeNativeFrames, Stream.take(1), Stream.runCollect)
+                    )
+                    socket.write(Buffer.alloc(4))
+                    const request = Buffer.from(
+                      '{"jsonrpc":"2.0","id":41,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"first","version":"1.0"}}}}\n'
+                    )
+                    const header = Buffer.alloc(4)
+                    header.writeUInt32BE(request.length)
+                    socket.write(Buffer.concat([header, request]))
+                    const parsed = Schema.decodeUnknownSync(Schema.fromJsonString(BackendMessage))(
+                      Buffer.concat(await reply).toString()
+                    )
+                    expect(parsed).toMatchObject({
+                      jsonrpc: "2.0",
+                      id: 41,
+                      result: {
+                        _meta: {
+                          "io.modelcontextprotocol/serverInfo": { name: "native-session-fixture", version: "1.0" }
+                        }
                       }
-                    }
-                  })
-                  await refused(path, hello)
-                } finally {
-                  socket.destroy()
-                }
-              })
+                    })
+                    await refused(path, hello)
+                    const incidentsBeforeDrain = failures.length
+                    await Effect.runPromise(admissions.drain)
+                    expect(failures).toHaveLength(incidentsBeforeDrain)
+                  } finally {
+                    socket.destroy()
+                  }
+                }),
+              undefined,
+              telemetry
             )
             expect((yield* admissions.status).attachments).toBe(0)
           }),

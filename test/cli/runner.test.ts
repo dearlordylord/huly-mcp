@@ -1,5 +1,5 @@
 import { NodeServices } from "@effect/platform-node"
-import { Effect, Layer, Logger, References, Redacted, Schema } from "effect"
+import { Cause, Deferred, Effect, Exit, Fiber, Layer, Logger, References, Redacted, Schema } from "effect"
 import { describe, expect, it } from "vitest"
 import type { ClientBundle } from "../../src/mcp/server.js"
 
@@ -15,6 +15,7 @@ import {
 import { McpImageContentSchema } from "../../src/domain/schemas/attachments.js"
 import { operationRegistry } from "../../src/mcp/tools/index.js"
 import type { ToolOperationSuccess } from "../../src/mcp/tools/registry.js"
+import type { ToolCalledProps } from "../../src/telemetry/telemetry.js"
 import { TelemetryService } from "../../src/telemetry/telemetry.js"
 
 // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- port fixture is never dereferenced by the fake operation executor.
@@ -186,6 +187,50 @@ describe("CLI runner", () => {
       },
       { event: "shutdown" }
     ])
+  })
+
+  it("records cancelled work before shutdown without exposing defects", async () => {
+    const calls: Array<ToolCalledProps> = []
+    const timeline: Array<string> = []
+    const entered = await Effect.runPromise(Deferred.make<void>())
+    const observation: RunnerObservation = { downloads: [], rendered: [], telemetry: [] }
+    const ports = {
+      ...makePorts({ result: {}, warnings: [] }, observation),
+      useClientBundle: () => Deferred.succeed(entered, undefined).pipe(Effect.andThen(Effect.never))
+    }
+    await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const parsed = yield* parse("list_projects", [])
+          const work = yield* runCliToolWithPorts(ports, "list_projects", parsed, undefined, "password").pipe(
+            Effect.forkChild
+          )
+          yield* Deferred.await(entered)
+          yield* Fiber.interrupt(work)
+          const exit = yield* Fiber.await(work)
+          expect(Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause)).toBe(true)
+        }).pipe(
+          Effect.provide(
+            Layer.merge(
+              NodeServices.layer,
+              TelemetryService.testLayer({
+                toolCalled: (event) => {
+                  calls.push(event)
+                  timeline.push("tool_called")
+                },
+                shutdown: async () => {
+                  timeline.push("shutdown")
+                }
+              })
+            )
+          )
+        )
+      )
+    )
+    expect(calls).toEqual([
+      expect.objectContaining({ toolName: "list_projects", status: "cancelled", errorTag: "Interrupted" })
+    ])
+    expect(timeline).toEqual(["tool_called", "shutdown"])
   })
 
   it("enforces destructive confirmation before opening clients", async () => {
