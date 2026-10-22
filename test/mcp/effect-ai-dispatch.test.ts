@@ -615,6 +615,12 @@ describe("Effect AI registered tool handlers", () => {
           yield* server
             .callTool({ name: "edit_document", arguments: { title: "Private title" } })
             .pipe(Effect.provideService(McpSchema.McpServerClient, clientService("generic-client")))
+          const cyclic: Record<string, Schema.Json> = {}
+          cyclic["self"] = cyclic
+          const invalid = yield* server
+            .callTool({ name: "get_version", arguments: cyclic })
+            .pipe(Effect.provideService(McpSchema.McpServerClient, clientService("generic-client")))
+          expect(invalid.isError).toBe(true)
           yield* Effect.promise(adapter.quiesce)
           const stopped = yield* server
             .callTool({ name: "get_version", arguments: {} })
@@ -636,6 +642,8 @@ describe("Effect AI registered tool handlers", () => {
         status: "error"
       })
     )
+    expect(calls).toContainEqual(expect.objectContaining({ toolName: "get_version", status: "rejected" }))
+    expect(calls.find((event) => event.errorTag === "UnexpectedArguments")).not.toHaveProperty("inputBytes")
     expect(firstLists).toHaveLength(4)
     expect(firstLists).toEqual(
       expect.arrayContaining([expect.objectContaining({ clientKind: "codex", resolvedMode: "proxy" })])
