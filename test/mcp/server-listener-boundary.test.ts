@@ -4,22 +4,25 @@ import type { HttpServer } from "effect/http"
 import { NetAddress } from "effect/net"
 import { expect, it } from "vitest"
 
-import { type HttpServerFactory, HttpServerFactoryService } from "../../src/mcp/http-transport.js"
+import { DEFAULT_HTTP_PORT, type HttpServerFactory, HttpServerFactoryService } from "../../src/mcp/http-transport.js"
 import { McpServerService } from "../../src/mcp/server.js"
 import { TelemetryService } from "../../src/telemetry/telemetry.js"
 import { makeTestHttpServerFactory } from "./http-test-support.js"
 
-it.each(["unix", "zero"])(
+it.each(["unix", "zero", "default-port"])(
   "refuses a %s listener address before application readiness and closes its listener",
   async (mode) => {
     let owned: Server | undefined
+    let requestedPort: number | undefined
+    let discoveries = 0
     const native = makeTestHttpServerFactory((server) => {
       owned = server
     })
     const factory: HttpServerFactory = {
-      make: (port, host, grace) =>
-        native
-          .make(port, host, grace)
+      make: (port, host, grace) => {
+        requestedPort = port
+        return native
+          .make(0, host, grace)
           .pipe(
             Effect.map(
               (listener) =>
@@ -32,6 +35,7 @@ it.each(["unix", "zero"])(
                 }) satisfies HttpServer.HttpServer["Service"]
             )
           )
+      }
     }
     await Effect.runPromise(
       Effect.gen(function* () {
@@ -39,6 +43,8 @@ it.each(["unix", "zero"])(
         const failure = yield* server.run().pipe(Effect.flip)
         expect(failure.message).toContain(mode === "unix" ? "requires a TCP listener" : "invalid bound port")
         expect(owned?.listening).toBe(false)
+        expect(requestedPort).toBe(mode === "default-port" ? DEFAULT_HTTP_PORT : 0)
+        expect(discoveries).toBe(0)
         expect((yield* server.awaitReady().pipe(Effect.exit))._tag).toBe("Failure")
       }).pipe(
         Effect.scoped,
@@ -46,7 +52,10 @@ it.each(["unix", "zero"])(
           McpServerService.layer({
             transport: "http",
             httpHost: "127.0.0.1",
-            httpPort: 0,
+            ...(mode === "default-port" ? {} : { httpPort: 0 }),
+            onDiscovery: () => {
+              discoveries++
+            },
             resolveClients: () => Promise.reject(new Error("Must not acquire Huly before readiness")),
             writeError: () => {}
           }).pipe(Layer.provide(TelemetryService.testLayer()))

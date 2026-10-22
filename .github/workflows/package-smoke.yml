@@ -19,6 +19,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Rust native bridge toolchain
+        run: bash scripts/setup-native-toolchain.sh
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -76,6 +79,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Rust native bridge toolchain
+        run: bash scripts/setup-native-toolchain.sh
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -100,6 +106,16 @@ jobs:
       - name: Verify bundled version
         run: pnpm verify-version
 
+      - name: Verify x64 native bridge and shared backend lifecycles
+        run: |
+          set -euo pipefail
+          pnpm test:native
+          child_cache="$(mktemp -d)"
+          trap 'rm -rf "$child_cache"' EXIT
+          HULY_TEST_SUBPROCESS_COMPILE_CACHE="$child_cache" pnpm exec vitest run \
+            test/resident/managed-backend-process.test.ts \
+            test/resident/native-backend-process.test.ts
+
       - name: Smoke HTTP no-config resource inspection
         run: pnpm smoke:http-no-config
 
@@ -110,6 +126,15 @@ jobs:
           tarball="$(realpath "$(ls .package-smoke/*.tgz | head -n 1)")"
           version="$(node -p "require('./package.json').version")"
           node scripts/run-bundled.mjs scripts/certify-packed-artifact.ts "$tarball" mcp "$version"
+
+      - name: Preserve failed packed-artifact diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: packed-artifact-diagnostics-${{ matrix.node-version }}
+          include-hidden-files: true
+          path: .package-smoke/*.tgz
+          retention-days: 7
 
       - name: Install and discover packed package
         run: |

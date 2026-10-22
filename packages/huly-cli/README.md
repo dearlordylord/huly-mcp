@@ -119,7 +119,7 @@ To share a profile with stdio MCP, run the server under the same OS user and con
     "huly": {
       "command": "npx",
       "args": ["-y", "@firfi/huly-mcp"],
-      "env": { "HULY_PROFILE": "work" }
+      "env": { "MCP_TRANSPORT": "stdio-resident", "HULY_PROFILE": "work" }
     }
   }
 }

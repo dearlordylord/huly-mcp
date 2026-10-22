@@ -39,6 +39,7 @@ import {
   type StdioShutdownReason,
   type StdioShutdownResources
 } from "./stdio-shutdown.js"
+import { reportTelemetry } from "../telemetry/events.js"
 import { TelemetryService, type TelemetryOperations } from "../telemetry/telemetry.js"
 import { writeStderrLine } from "../utils/stderr.js"
 import { loadMcpProcessPolicy, type McpProcessPolicy } from "./process-policy.js"
@@ -331,12 +332,14 @@ export class McpServerService extends Context.Service<McpServerService, McpServe
         const getRuntimeConfigContext =
           config.getRuntimeConfigContext ?? (() => sanitizeHulyRuntimeConfigFromEnv(process.env))
         const toolsets = toolScope.filteringActive ? toolScope.enabledToolsets : null
-        telemetry.sessionStart({
-          transport: config.transport,
-          authMethod: config.authMethod ?? "password",
-          toolCount: scopedNativeRegistry.definitions.length,
-          toolsets
-        })
+        reportTelemetry(() =>
+          telemetry.sessionStart({
+            transport: config.transport,
+            authMethod: config.authMethod ?? "password",
+            toolCount: scopedNativeRegistry.definitions.length,
+            toolsets
+          })
+        )
         const runControlRef = yield* Ref.make<McpServerRunControl | null>(null)
 
         const operations: McpServerOperations = {

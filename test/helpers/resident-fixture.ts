@@ -33,7 +33,8 @@ export const startResidentFixture = async (
   authorization: string,
   implementationVersion = VERSION,
   controlHandler?: RequestListener,
-  leaseControl?: { readonly lease: LeasePolicy; readonly renew: RequestListener }
+  leaseControl?: { readonly lease: LeasePolicy; readonly renew: RequestListener },
+  telemetryEnabled = false
 ) => {
   const directory = await fs.mkdtemp(path.join(await fs.realpath(tmpdir()), "resident-fixture-"))
   const identity = Schema.decodeUnknownSync(ResidentTlsIdentity)({
@@ -89,6 +90,7 @@ export const startResidentFixture = async (
     const address = backend.address()
     if (address === null || typeof address === "string") throw new Error("Expected owned resident TCP listener")
     const descriptor = Schema.decodeUnknownSync(ResidentAttachment)({
+      telemetryEnabled,
       version: 1,
       transport: "tls13-external-psk-v1",
       implementation: { name: "@firfi/huly-mcp", version: implementationVersion },

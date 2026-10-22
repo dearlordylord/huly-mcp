@@ -23,7 +23,8 @@ const selection = Schema.decodeUnknownSync(ResidentSelection)({
     connectionTimeout: 1_000
   },
   policy: { toolsets: [], tools: [], exposure: { configuredMode: "auto", proxyOutputStrict: false } },
-  lazyEnvs: false
+  lazyEnvs: false,
+  telemetryEnabled: true
 })
 
 it.each(["manual", "foreground", "managed"] as const)(

@@ -41,6 +41,7 @@ startCommand:
   commandFunction: |-
     (config) => {
       const env = {
+        MCP_TRANSPORT: "stdio-resident",
         HULY_URL: config.hulyUrl,
         HULY_WORKSPACE: config.hulyWorkspace
       }

@@ -1,10 +1,11 @@
 import { execFile } from "node:child_process"
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
-import { dirname, join } from "node:path"
+import { join } from "node:path"
 import { promisify } from "node:util"
 import { Exit, Option, Schema } from "effect"
 
 import type { ResidentPackagePath } from "../../src/resident/managed-contract.js"
+import { quintNodeArguments, quintSubprocessEnvironment } from "./resident-quint-cli.js"
 
 export const AdmissionObservation = Schema.Struct({
   event: Schema.Literals(["Begin", "Finish", "Fence", "LateOwner", "Closed"]),
@@ -58,12 +59,8 @@ export const replayResidentAdmissions = async (
     // One owned Node process: no package-manager wrapper or Rust evaluator child.
     await runFile(
       process.execPath,
-      [cli, "test", path, "--backend=typescript", "--match", "Test$", "--max-samples=1"],
-      {
-        timeout: 4_000,
-        killSignal: "SIGKILL",
-        env: { ...process.env, NODE_COMPILE_CACHE: join(dirname(cli), "compile-cache") }
-      }
+      quintNodeArguments(cli, ["test", path, "--backend=typescript", "--match", "Test$", "--max-samples=1"]),
+      { timeout: 4_000, killSignal: "SIGKILL", env: quintSubprocessEnvironment(cli) }
     )
   } catch (error) {
     const parsed = Schema.decodeUnknownExit(QuintTestFailure)(error)

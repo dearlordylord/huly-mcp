@@ -58,6 +58,7 @@ it.each(
                   const attachment = join(directory, `${identity.generation}.json`)
                   const implementationVersion = yield* Effect.promise(fixturePackageVersion)
                   const descriptor = Schema.decodeUnknownSync(ResidentAttachment)({
+                    telemetryEnabled: false,
                     version: 1,
                     transport: "tls13-external-psk-v1",
                     endpoint: endpoint.href,

@@ -17,16 +17,28 @@
     "url": "https://github.com/dearlordylord/huly-mcp",
     "source": "github"
   },
-  "version": "0.55.0",
+  "version": "0.55.1",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@firfi/huly-mcp",
-      "version": "0.55.0",
+      "version": "0.55.1",
       "transport": {
         "type": "stdio"
       },
       "environmentVariables": [
+        {
+          "name": "MCP_TRANSPORT",
+          "description": "Local MCP runtime: resident shares a backend across compatible clients; stdio uses a separate backend per client.",
+          "default": "stdio-resident",
+          "choices": [
+            "stdio-resident",
+            "stdio"
+          ],
+          "isRequired": true,
+          "format": "string",
+          "isSecret": false
+        },
         {
           "name": "HULY_URL",
           "description": "Reachable self-hosted or replacement hosted Huly API URL",

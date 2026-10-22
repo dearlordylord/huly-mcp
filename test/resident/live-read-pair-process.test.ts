@@ -1,3 +1,4 @@
+import { createNoopTelemetry } from "../../src/telemetry/noop.js"
 import { execFile } from "node:child_process"
 import { dirname, join } from "node:path"
 import { promisify } from "node:util"
@@ -158,6 +159,7 @@ describe.skipIf(process.platform !== "linux")("supervised live-read wire probe",
               registry: { ...toolRegistry, tools: new Map([[tool.name, tool]]), definitions: [tool] },
               resolveClients: async () => Exit.succeed(clients),
               telemetry: {
+                ...createNoopTelemetry(),
                 sessionStart: () => {},
                 firstListTools: () => {},
                 toolCalled: () => {},
@@ -185,6 +187,7 @@ describe.skipIf(process.platform !== "linux")("supervised live-read wire probe",
                   return yield* withPublishedResidentAttachment(
                     directory,
                     ResidentAttachment.make({
+                      telemetryEnabled: capture.selection.telemetryEnabled,
                       version: 1,
                       transport: "tls13-external-psk-v1",
                       implementation: { name: "@firfi/huly-mcp", version: VERSION },

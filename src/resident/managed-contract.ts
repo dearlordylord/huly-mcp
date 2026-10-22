@@ -6,8 +6,9 @@ import { ResidentSelection } from "./compatibility-contract.js"
 import { ResidentDirectory, ResidentFilePath } from "./protected-path.js"
 import { ResidentTlsIdentity } from "./tls-channel.js"
 import { SelectionClaimTransfer } from "./selection-claim.js"
+import { NATIVE_STARTUP_MILLIS } from "./native-wire.js"
 
-export const MANAGED_SELECTION_MILLIS = 10_000
+export const MANAGED_SELECTION_MILLIS = NATIVE_STARTUP_MILLIS
 export const MANAGED_FAILURE_CLEANUP_MILLIS = 5_000
 export const PREPARED_CHILD_MILLIS = 5_000
 export const CLAIM_RETRY_MILLIS = 25

@@ -1,3 +1,4 @@
+import { createNoopTelemetry } from "../../src/telemetry/noop.js"
 import { describe, it } from "@effect/vitest"
 import { type Doc, toFindResult } from "@hcengineering/core"
 import { Context, Effect, Exit, Layer, Schema } from "effect"
@@ -29,6 +30,7 @@ import { toolRegistry } from "../../src/mcp/tools/index.js"
 import type { TelemetryOperations } from "../../src/telemetry/telemetry.js"
 
 const telemetry: TelemetryOperations = {
+  ...createNoopTelemetry(),
   sessionStart: () => {},
   firstListTools: () => {},
   toolCalled: () => {},

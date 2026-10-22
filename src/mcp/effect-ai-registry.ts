@@ -8,13 +8,20 @@
  * caller's closure while making protocol dispatch Effect-native.
  */
 import type { MovementStageObserver } from "./movement-stage-observer.js"
-import { Clock, Context, Effect, type Exit, Layer } from "effect"
+import { Context, Effect, type Exit, Layer } from "effect"
 import { McpServer } from "effect/ai/McpServer"
 import * as McpSchema from "effect/ai/McpSchema"
 
 import type { GetHulyContextResult } from "../domain/schemas/huly-context.js"
 import { HulyError } from "../huly/errors-base.js"
 import type { ClientBundle, ClientResolver, HulyClientBundleError } from "../runtime/client-resolver.js"
+import {
+  jsonUtf8Bytes,
+  observeToolCall,
+  toolResponseStatus,
+  type ToolObservation
+} from "../telemetry/tool-observation.js"
+import { reportTelemetry } from "../telemetry/events.js"
 import type { TelemetryOperations } from "../telemetry/telemetry.js"
 import {
   type McpToolResponse,
@@ -95,11 +102,11 @@ const clientInfoFromProfile = (profile: McpExposureProfile): McpClientInfoLike |
 
 export { toEffectCallToolResult }
 
-const responseStatus = (response: McpToolResponse): "error" | "success" =>
-  response.isError === true ? "error" : "success"
+const responseStatus = (response: McpToolResponse) =>
+  toolResponseStatus(response.isError === true, response._meta?.errorTag)
 
 const responseOutputBytes = (response: McpToolResponse): number =>
-  response.content.reduce((sum, entry) => sum + entry.text.length, 0)
+  response.content.reduce((sum, entry) => sum + Buffer.byteLength(entry.text, "utf8"), 0)
 
 const toolDefinition = (definition: ToolDefinition): McpSchema.Tool => {
   const listed = toListedHulyTool(definition)
@@ -137,10 +144,12 @@ export const effectMcpFirstListVisibility = (
       options.onDiscovery?.()
     }
     const exposure = initializeExposure(registries, exposureOptions, profile)
-    options.telemetry.firstListTools({
-      clientKind: exposure.context.clientKind,
-      resolvedMode: exposure.context.resolvedMode
-    })
+    reportTelemetry(() =>
+      options.telemetry.firstListTools({
+        clientKind: exposure.context.clientKind,
+        resolvedMode: exposure.context.resolvedMode
+      })
+    )
     return true
   }
 }
@@ -199,50 +208,64 @@ const makeToolHandler = (
   McpSchema.McpRequestContext
 >) => {
   const handler = (args: unknown): Effect.Effect<EffectCallToolResult, never, McpSchema.McpRequestContext> =>
-    Effect.acquireUseRelease(
-      Effect.sync(() => admission.enter()),
-      (lease) => {
-        if (lease === null) return Effect.succeed(toEffectCallToolResult(createServerShuttingDownError()))
-        return withRequestScopedResolver(options.resolveClients, (resolver) =>
-          Effect.gen(function* () {
-            const start = yield* Clock.currentTimeMillis
-            const request = yield* McpSchema.McpRequestContext
-            const exposure = initializeExposure(registries, exposureOptions, request)
-            const call = dispatchEffectMcpTool(options, exposure, definition, args, fetchLatestVersion, resolver)
-            const editMode = effectMcpEditMode(String(definition.name), args)
-            const observedCall =
-              definition.name === "move_issue" && options.observeMovement !== undefined
-                ? options.observeMovement(call)
-                : call
-            const response = yield* observedCall.pipe(
-              Effect.catchDefect((defect) =>
-                Effect.succeed(
-                  mapDomainErrorToMcp(
-                    new HulyError({ message: defect instanceof Error ? defect.message : "Tool execution failed" })
+    Effect.gen(function* () {
+      const request = yield* McpSchema.McpRequestContext
+      const exposure = initializeExposure(registries, exposureOptions, request)
+      const inputBytes = jsonUtf8Bytes(args ?? {})
+      const editMode = definition.name === "invoke_tool" ? undefined : effectMcpEditMode(String(definition.name), args)
+      const metadata = {
+        toolName: definition.name,
+        callPath: definition.name === "invoke_tool" ? "invoke_tool" : "direct",
+        clientKind: exposure.context.clientKind,
+        resolvedMode: exposure.context.resolvedMode,
+        ...(inputBytes === undefined ? {} : { inputBytes }),
+        ...(editMode === undefined ? {} : { editMode })
+      } satisfies ToolObservation
+      const dispatchOptions = {
+        ...options,
+        onInvoke: (tool: ToolDefinition, normalized: unknown) => {
+          metadata.toolName = tool.name
+          const mode = effectMcpEditMode(String(tool.name), normalized)
+          if (mode !== undefined) metadata.editMode = mode
+        }
+      }
+      const call = Effect.acquireUseRelease(
+        Effect.sync(() => admission.enter()),
+        (lease) =>
+          lease === null
+            ? Effect.succeed(createServerShuttingDownError())
+            : withRequestScopedResolver(options.resolveClients, (resolver) => {
+                const dispatched = dispatchEffectMcpTool(
+                  dispatchOptions,
+                  exposure,
+                  definition,
+                  args,
+                  fetchLatestVersion,
+                  resolver
+                )
+                const observed =
+                  definition.name === "move_issue" && options.observeMovement !== undefined
+                    ? options.observeMovement(dispatched)
+                    : dispatched
+                return observed.pipe(
+                  Effect.catchDefect((defect) =>
+                    Effect.succeed(
+                      mapDomainErrorToMcp(
+                        new HulyError({ message: defect instanceof Error ? defect.message : "Tool execution failed" })
+                      )
+                    )
                   )
                 )
-              )
-            )
-            const end = yield* Clock.currentTimeMillis
-            yield* Effect.sync(() => {
-              options.telemetry.toolCalled({
-                toolName: definition.name,
-                status: responseStatus(response),
-                clientKind: exposure.context.clientKind,
-                resolvedMode: exposure.context.resolvedMode,
-                errorTag: response._meta?.errorTag,
-                durationMs: end - start,
-                inputBytes: JSON.stringify(args ?? {}).length,
-                outputBytes: responseOutputBytes(response),
-                ...(editMode === undefined ? {} : { editMode })
-              })
-            })
-            return toEffectCallToolResult(response)
-          })
-        )
-      },
-      (lease) => Effect.sync(() => lease?.release())
-    )
+              }),
+        (lease) => Effect.sync(() => lease?.release())
+      )
+      const response = yield* observeToolCall(options.telemetry, metadata, call, (value) => ({
+        status: responseStatus(value),
+        ...(value._meta?.errorTag === undefined ? {} : { errorTag: value._meta.errorTag }),
+        outputBytes: responseOutputBytes(value)
+      }))
+      return toEffectCallToolResult(response)
+    })
 
   return handler
 }
@@ -285,14 +308,16 @@ const registerAll = (
           admission,
           fetchLatestVersion
         )(call.arguments)
-      return Effect.acquireUseRelease(
+      const response = Effect.acquireUseRelease(
         Effect.sync(() => admission.enter()),
-        (lease) =>
-          Effect.succeed(
-            toEffectCallToolResult(lease === null ? createServerShuttingDownError() : createUnknownToolError(call.name))
-          ),
+        (lease) => Effect.succeed(lease === null ? createServerShuttingDownError() : createUnknownToolError(call.name)),
         (lease) => Effect.sync(() => lease?.release())
       )
+      return observeToolCall(options.telemetry, { toolName: "unknown", callPath: "direct" }, response, (value) => ({
+        status: responseStatus(value),
+        ...(value._meta?.errorTag === undefined ? {} : { errorTag: value._meta.errorTag }),
+        outputBytes: responseOutputBytes(value)
+      })).pipe(Effect.map(toEffectCallToolResult))
     })
     for (const [index, definition] of builtinToolDefinitions.entries()) {
       yield* registerTool(

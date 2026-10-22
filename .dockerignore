@@ -14,3 +14,5 @@ node_modules
 .mcpregistry_*
 CLAUDE.local.md
 COMPARISON.md
+
+native/stdio/target

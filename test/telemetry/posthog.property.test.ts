@@ -176,8 +176,10 @@ describe("createPostHogTelemetry properties", () => {
             const {
               $ip: _ip,
               package_name: _packageName,
+              runtime_mode: _runtimeMode,
               session_id: _sessionId,
               surface: _surface,
+              telemetry_schema_version: _schemaVersion,
               version: _version,
               ...eventProperties
             } = entry.properties
@@ -188,6 +190,8 @@ describe("createPostHogTelemetry properties", () => {
           operations.some((operation) => operation.type === "firstListTools") ? 1 : 0
         )
         for (const entry of captures) {
+          expect(entry.properties.telemetry_schema_version).toBe(2)
+          expect(["stdio", "http", "cli", "resident"]).toContain(entry.properties.runtime_mode)
           expect(entry.distinctId).toBe("00000000-0000-4000-8000-000000000001")
           expect(entry.properties.session_id).toBe("00000000-0000-4000-8000-000000000001")
           expect(entry.properties.version).toBeTypeOf("string")

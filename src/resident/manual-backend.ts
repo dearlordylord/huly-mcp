@@ -3,6 +3,10 @@ import { Config, Deferred, Effect, Fiber, Redacted, Ref, Schema } from "effect"
 
 import { type HttpServerFactory, HttpServerFactoryService, HttpTransportError } from "../mcp/http-transport.js"
 import type { McpServerOperations } from "../mcp/server.js"
+import { telemetryEnabled } from "../telemetry/configuration.js"
+import { reportTelemetry } from "../telemetry/events.js"
+import { createNoopTelemetry } from "../telemetry/noop.js"
+import type { TelemetryOperations } from "../telemetry/telemetry.js"
 import { VERSION } from "../version.js"
 import { ResidentAttachment, withPublishedResidentAttachment } from "./attachment-file.js"
 import { currentPosixOwner, ProtectedFileError, ResidentDirectory, type ResidentFilePath } from "./protected-path.js"
@@ -16,6 +20,7 @@ import type { ResidentSelection } from "./compatibility-contract.js"
 import { withResidentHeaderRedaction } from "./private-http.js"
 import { ResidentLiveStatus } from "./status-contract.js"
 import type { HulyInitializationStatus } from "../runtime/client-initialization.js"
+import { withNativeResidentSocket } from "./native-server.js"
 
 const SECRET_BYTES = 32
 const STARTUP_ALLOWANCE = "5 seconds"
@@ -39,9 +44,11 @@ type ResidentBackendConfiguration =
     }
 
 export const makeManualResidentBackend = Effect.fn("makeManualResidentBackend")(function* (
-  configuration: ResidentBackendConfiguration = { mode: "manual" }
+  configuration: ResidentBackendConfiguration = { mode: "manual" },
+  telemetry: TelemetryOperations = createNoopTelemetry()
 ) {
   const selection = configuration.mode === "manual" ? undefined : configuration.selection
+  const enabled = selection?.telemetryEnabled ?? (yield* telemetryEnabled("mcp"))
   yield* currentPosixOwner
   const directory = yield* Config.schema(ResidentDirectory, "MCP_RESIDENT_STATE_DIRECTORY")
   const identity = yield* Schema.decodeUnknownEffect(ResidentTlsIdentity)({
@@ -52,11 +59,16 @@ export const makeManualResidentBackend = Effect.fn("makeManualResidentBackend")(
   const capacity = yield* Config.schema(AdmissionPolicy.fields.capacity, "MCP_RESIDENT_ATTACHMENT_CAPACITY").pipe(
     Config.withDefault(defaultAdmissionPolicy.capacity)
   )
-  const admissions = yield* makeResidentAdmissions({ ...defaultAdmissionPolicy, capacity })
+  const admissions = yield* makeResidentAdmissions(
+    { ...defaultAdmissionPolicy, capacity },
+    undefined,
+    undefined,
+    telemetry
+  )
   const authority =
     selection === undefined
       ? undefined
-      : yield* makeCompatibilityAuthority(selection, identity.generation, authorization)
+      : yield* makeCompatibilityAuthority(selection, identity.generation, authorization, undefined, telemetry)
   const claimed = yield* Ref.make(false)
   const bound = yield* Deferred.make<ResidentEndpoint>()
   const ready = yield* Deferred.make<void>()
@@ -116,6 +128,7 @@ export const makeManualResidentBackend = Effect.fn("makeManualResidentBackend")(
               ? readiness
               : configuration.startup.within(readiness)
             const descriptor = ResidentAttachment.make({
+              telemetryEnabled: enabled,
               version: 1,
               transport: "tls13-external-psk-v1",
               implementation: { name: "@firfi/huly-mcp", version: VERSION },
@@ -123,18 +136,31 @@ export const makeManualResidentBackend = Effect.fn("makeManualResidentBackend")(
               identity,
               authorization
             })
-            return yield* withPublishedResidentAttachment(directory, descriptor, (file) =>
-              report(file).pipe(
-                Effect.andThen(
-                  configuration.mode === "configured" && configuration.lifetime === "managed"
-                    ? admissions.awaitIdleAndFence.pipe(
-                        Effect.andThen(server.stop()),
-                        Effect.andThen(Fiber.join(serving))
-                      )
-                    : Fiber.join(serving)
+            const publishDescriptor = (published: ResidentAttachment) =>
+              withPublishedResidentAttachment(directory, published, (file) =>
+                report(file).pipe(
+                  Effect.tap(() => Effect.sync(() => reportTelemetry(telemetry.residentReady))),
+                  Effect.andThen(
+                    configuration.mode === "configured" && configuration.lifetime === "managed"
+                      ? admissions.awaitIdleAndFence.pipe(
+                          Effect.andThen(server.stop()),
+                          Effect.andThen(Fiber.join(serving))
+                        )
+                      : Fiber.join(serving)
+                  )
                 )
               )
-            )
+            return yield* configuration.mode === "configured" && authority !== undefined
+              ? withNativeResidentSocket(
+                  descriptor,
+                  admissions,
+                  authority,
+                  capacity,
+                  (nativeSocket) => publishDescriptor({ ...descriptor, nativeSocket }),
+                  undefined,
+                  telemetry
+                )
+              : publishDescriptor(descriptor)
           })
           yield* Effect.raceFirst(publish, Fiber.join(serving))
         }),
@@ -142,6 +168,8 @@ export const makeManualResidentBackend = Effect.fn("makeManualResidentBackend")(
     ).pipe(Effect.scoped)
 
   return {
+    // Server shutdown must not flush before the generation drains attachments.
+    telemetryForServer: { ...telemetry, shutdown: () => Promise.resolve() },
     authorization,
     beforeClientsClose: admissions.drain,
     httpPolicy: (initialization: Effect.Effect<HulyInitializationStatus>) => ({

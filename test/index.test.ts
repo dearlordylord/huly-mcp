@@ -10,6 +10,8 @@ import { WorkspaceClient } from "../src/huly/workspace-client.js"
 import { buildAppLayer, closeProcessClients, getHttpPort, getLazyEnvs, getMcpAuthToken, main } from "../src/index.js"
 import { DEFAULT_HTTP_HOST, DEFAULT_HTTP_PORT, HttpPort, HttpServerFactoryService } from "../src/mcp/http-transport.js"
 import { type ClientBundle, McpServerError, McpServerService } from "../src/mcp/server.js"
+import { createNoopTelemetry } from "../src/telemetry/noop.js"
+import type { SessionStartProps } from "../src/telemetry/telemetry.js"
 import { TelemetryService } from "../src/telemetry/telemetry.js"
 import { makeTestHttpServerFactory } from "./mcp/http-test-support.js"
 
@@ -273,6 +275,41 @@ describe("Main Entry Point", () => {
   })
 
   describe("layer composition", () => {
+    it.effect("preserves ordinary stdio bootstrap and the supplied telemetry owner", () =>
+      Effect.gen(function* () {
+        const starts: Array<SessionStartProps> = []
+        const telemetry = {
+          ...createNoopTelemetry(),
+          sessionStart: (event: SessionStartProps) => {
+            starts.push(event)
+          }
+        }
+        const clients = Layer.mergeAll(
+          HulyClient.testLayer({}),
+          HulyStorageClient.testLayer({}),
+          WorkspaceClient.testLayer({})
+        )
+        const resolveClients = resolveClientsFromLayer(clients)
+        const appLayer = buildAppLayer(
+          "stdio",
+          HttpPort.make(0),
+          DEFAULT_HTTP_HOST,
+          undefined,
+          "token",
+          resolveClients,
+          async () => ({ bundle: await resolveClients(), close: () => {} }),
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          telemetry
+        )
+        yield* Layer.build(appLayer)
+        expect(starts).toEqual([expect.objectContaining({ transport: "stdio", authMethod: "token" })])
+      })
+    )
+
     it.effect("McpServerService layer composes with HulyClient, HulyStorageClient, and WorkspaceClient", () =>
       Effect.gen(function* () {
         const clientLayer = Layer.mergeAll(

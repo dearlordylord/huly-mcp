@@ -5,6 +5,11 @@ on:
   pull_request:
     paths:
       - src/profiles/**
+      - src/resident/**
+      - native/**
+      - scripts/build-mcp.mjs
+      - scripts/build-native-bridge.mjs
+      - package.json
       - packages/huly-cli/**
       - scripts/native-credentials-probe.ts
       - scripts/macos-logout-probe.ts
@@ -20,6 +25,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Setup Rust native bridge toolchain
+        run: bash scripts/setup-native-toolchain.sh
       - uses: pnpm/action-setup@v4
         with:
           version: 10.29.3
@@ -71,4 +78,14 @@ jobs:
           pnpm verify-cli-package-closure
       - name: Run the complete quality gate on macOS
         run: pnpm check-all
+      - name: Retain failed quality diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-quality-diagnostics
+          path: |
+            coverage/coverage-final.json
+            dist/resident-launch-replay-*/failure.json
+          if-no-files-found: ignore
+          retention-days: 7
 

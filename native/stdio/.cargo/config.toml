@@ -1,0 +1,7 @@
+# Strip debug metadata during Mach-O linking, before UUID/signature calculation.
+# Stripping only afterwards leaves UUIDs dependent on temporary object metadata.
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-Wl,-S"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-arg=-Wl,-S"]

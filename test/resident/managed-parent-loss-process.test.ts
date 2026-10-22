@@ -13,10 +13,10 @@ import { ParentLossObservation } from "./parent-loss-observation.js"
 const PROCESS_BOUND = 30_000
 const runFile = promisify(execFile)
 
-it.skipIf(process.platform !== "linux")(
-  "retires the real detached child when its owned parent dies before Start",
+it.skipIf(process.platform !== "linux").each(["bridge", "bootstrap"])(
+  "retires the real detached child when its owned %s dies before Start",
   { timeout: PROCESS_BOUND },
-  async () => {
+  async (target) => {
     const bundle = await buildIsolatedStdioServer(PROCESS_BOUND)
     const directory = await fs.mkdtemp(join(await fs.realpath(tmpdir()), "resident-parent-loss-"))
     const fixture = join(dirname(bundle.path), "managed-parent-loss.cjs")
@@ -48,13 +48,22 @@ it.skipIf(process.platform !== "linux")(
       )
       const { stderr, stdout } = await runFile(
         "python3",
-        ["test/resident/fixtures/reap-descendants.py", process.execPath, fixture, bundle.path, directory, preload],
+        [
+          "test/resident/fixtures/reap-descendants.py",
+          process.execPath,
+          fixture,
+          bundle.path,
+          directory,
+          preload,
+          target
+        ],
         { timeout: PROCESS_BOUND, env: testStdioEnvironment() }
       )
       const observation = Schema.decodeUnknownSync(Schema.fromJsonString(ParentLossObservation))(stdout)
       expect(observation.privateFrames).toBe(0)
       expect(observation.childExited).toBe(true)
-      expect(observation.retainedClaim).toBe(true)
+      expect(observation.retainedClaim).toBe(target === "bootstrap")
+      expect(observation.target).toBe(target)
       expect(observation.publishedRecords).toBe(0)
       await fs.writeFile(
         `${directory}.receipt.json`,

@@ -15,7 +15,8 @@ const Input = Schema.Struct({
   bundle: ResidentPackagePath,
   directory: ResidentDirectory,
   host: HostName,
-  workspace: Schema.NonEmptyString
+  workspace: Schema.NonEmptyString,
+  initialRead: Schema.Literals(["immediate", "command"])
 })
 const Command = Schema.Literals(["read", "close"])
 const Phase = Schema.Struct({
@@ -32,7 +33,8 @@ const main = async () => {
     bundle: process.argv[2],
     directory: process.argv[3],
     host: process.argv[4],
-    workspace: process.argv[5] ?? "fixture"
+    workspace: process.argv[5] ?? "fixture",
+    initialRead: process.argv[6] ?? "immediate"
   })
   const started = await Effect.runPromise(Clock.monotonicTimeNanos)
   const phase = async (state: Schema.Schema.Type<typeof Phase>["phase"]) => {
@@ -102,7 +104,7 @@ const main = async () => {
       adapterPid: transport.pid
     })
     process.stdout.write(`${Schema.encodeSync(Schema.fromJsonString(ManagedParentConnected))(connected)}\n`)
-    await observe()
+    if (input.initialRead === "immediate") await observe()
     for await (const line of incoming) {
       if (Schema.decodeUnknownSync(Command)(line) === "close") break
       await observe()

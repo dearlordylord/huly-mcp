@@ -1,14 +1,26 @@
 import { spawn } from "node:child_process"
 import * as fs from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { join } from "node:path"
 import { createInterface } from "node:readline"
-import { expect, it } from "vitest"
+import { afterAll, beforeAll, expect, it } from "vitest"
+import { buildIsolatedProcessFixture } from "../helpers/process-fixture-build.js"
+import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 
 const PROCESS_BOUND = 30_000
 const CONTENDERS = 10
 const SINGLE_PARENT_BOUND = 5_000
 const CLEANUP_BOUND = 2_000
+let fixture: Awaited<ReturnType<typeof buildIsolatedProcessFixture>>
+let preparation: ReturnType<typeof buildIsolatedProcessFixture> | undefined
+beforeAll(async () => {
+  preparation = buildIsolatedProcessFixture("test/resident/fixtures/selection-claim-child.ts", PROCESS_BOUND)
+  fixture = await preparation
+}, PROCESS_BOUND)
+afterAll(async () => {
+  const owned = await preparation?.catch(() => undefined)
+  await owned?.cleanup()
+})
 
 const within = <A>(pending: Promise<A>, signal: AbortSignal) =>
   new Promise<A>((accept, reject) => {
@@ -28,12 +40,7 @@ const within = <A>(pending: Promise<A>, signal: AbortSignal) =>
   })
 
 const start = (directory: string) => {
-  const child = spawn(process.execPath, [
-    "--import",
-    "tsx",
-    resolve("test/resident/fixtures/selection-claim-child.ts"),
-    directory
-  ])
+  const child = spawn(process.execPath, [fixture.path, directory], { env: testStdioEnvironment() })
   const exited = new Promise<number | null>((accept, reject) => {
     child.once("error", reject)
     child.once("exit", accept)

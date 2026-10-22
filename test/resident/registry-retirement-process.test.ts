@@ -2,23 +2,35 @@ import { spawn } from "node:child_process"
 import { once } from "node:events"
 import * as fs from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { join } from "node:path"
 import { createInterface } from "node:readline"
 import { Effect, Schema } from "effect"
-import { expect, it } from "vitest"
+import { afterAll, beforeAll, expect, it } from "vitest"
 
 import { ResidentAttachment } from "../../src/resident/attachment-file.js"
 import { ResidentDirectory, ResidentFilePath } from "../../src/resident/protected-path.js"
 import { registryAttachment } from "../helpers/resident-registry-fixture.js"
 import { RegistryRetirementReport as Report } from "./registry-retirement-contract.js"
+import { buildIsolatedProcessFixture } from "../helpers/process-fixture-build.js"
+import { testStdioEnvironment } from "../helpers/stdio-environment.js"
+const PREPARATION_BOUND = 30_000
+let fixture: Awaited<ReturnType<typeof buildIsolatedProcessFixture>>
+let preparation: ReturnType<typeof buildIsolatedProcessFixture> | undefined
+beforeAll(async () => {
+  preparation = buildIsolatedProcessFixture("test/resident/fixtures/registry-retirement-child.ts", PREPARATION_BOUND)
+  fixture = await preparation
+}, PREPARATION_BOUND)
+afterAll(async () => {
+  const owned = await preparation?.catch(() => undefined)
+  await owned?.cleanup()
+})
 const observe = <A>(pending: Promise<A>, bound = 5_000) =>
   Effect.runPromise(Effect.promise(() => pending).pipe(Effect.timeout(bound)))
 const start = async (directory: ResidentDirectory, descriptor: ResidentFilePath) => {
-  const child = spawn(
-    process.execPath,
-    ["--import", "tsx", resolve("test/resident/fixtures/registry-retirement-child.ts"), directory, descriptor],
-    { stdio: ["ignore", "pipe", "inherit", "ipc"] }
-  )
+  const child = spawn(process.execPath, [fixture.path, directory, descriptor], {
+    stdio: ["ignore", "pipe", "inherit", "ipc"],
+    env: testStdioEnvironment()
+  })
   const closed = once(child, "close")
   void closed.catch(() => {})
   if (child.stdout === null) {

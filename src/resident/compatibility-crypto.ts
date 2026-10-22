@@ -26,11 +26,12 @@ const CanonicalSelection = Schema.Tuple([
   McpProcessPolicy.fields.tools,
   McpProcessPolicy.fields.exposure.fields.configuredMode,
   McpProcessPolicy.fields.exposure.fields.proxyOutputStrict,
+  Schema.Boolean,
   Schema.Boolean
 ])
 
 export const encodeCompatibilitySelection = (selection: ResidentSelection) => {
-  const { huly, lazyEnvs, policy } = selection
+  const { huly, lazyEnvs, policy, telemetryEnabled } = selection
   const auth: Schema.Schema.Type<typeof CanonicalAuth> =
     huly.auth._tag === "token" ? ["token", huly.auth.token] : ["password", huly.auth.email, huly.auth.password]
   return Schema.encodeEffect(Schema.fromJsonString(CanonicalSelection))([
@@ -42,7 +43,8 @@ export const encodeCompatibilitySelection = (selection: ResidentSelection) => {
     policy.tools,
     policy.exposure.configuredMode,
     policy.exposure.proxyOutputStrict,
-    lazyEnvs
+    lazyEnvs,
+    telemetryEnabled
   ]).pipe(
     Effect.map(Redacted.make),
     Effect.mapError(

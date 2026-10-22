@@ -13,6 +13,7 @@ import { type CredentialStoreSelector, selectCredentialStore } from "../profiles
 import type { CliProfileStore } from "../profiles/file-store.js"
 import { profileRuntimeContext } from "../profiles/runtime-context.js"
 import { defaultProfileStore, resolveStdioProfile } from "../profiles/stdio.js"
+import { telemetryEnabled } from "../telemetry/configuration.js"
 import type { ResidentSelection } from "./compatibility-contract.js"
 
 export const captureResidentSelection = Effect.fn("captureResidentSelection")(function* (
@@ -30,11 +31,16 @@ export const captureResidentSelection = Effect.fn("captureResidentSelection")(fu
   const huly = yield* HulyConfigService.pipe(
     Effect.provide(HulyConfigService.layer.pipe(Layer.provide(ConfigProvider.layer(hulyProvider))))
   )
-  const { lazyEnvs, policy } = yield* Effect.all({
+  const {
+    lazyEnvs,
+    policy,
+    telemetryEnabled: enabled
+  } = yield* Effect.all({
     lazyEnvs: getLazyEnvs(snapshot),
+    telemetryEnabled: telemetryEnabled("mcp"),
     policy: loadMcpProcessPolicy
   }).pipe(Effect.provide(ConfigProvider.layer(provider)))
-  const selection: ResidentSelection = { huly, policy, lazyEnvs }
+  const selection: ResidentSelection = { huly, policy, lazyEnvs, telemetryEnabled: enabled }
   // This projection stays internal; the MCP context output schema owns its serialized form.
   const context =
     profile === undefined ? sanitizeHulyRuntimeConfigFromEnv(snapshot) : profileRuntimeContext(profile, snapshot)

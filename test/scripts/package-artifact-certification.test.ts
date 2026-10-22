@@ -62,6 +62,64 @@ const validEffectCohortMarker =
   "effect@4.0.0_patch_hash=8f77f9bbb337b5fb1f625e1a77aea5eb46cc094c1adb5fe9e657a6b053ec9e7b/node_modules/effect/dist/Effect.js"
 
 describe("packed artifact certification", () => {
+  it.each([
+    { launcherMode: 0o755, nativeMode: 0o755, launcherVersion: "1.2.3", applicationVersion: "1.2.3", error: undefined },
+    {
+      launcherMode: 0o644,
+      nativeMode: 0o755,
+      launcherVersion: "1.2.3",
+      applicationVersion: "1.2.3",
+      error: "launcher must have exact mode"
+    },
+    {
+      launcherMode: 0o755,
+      nativeMode: 0o644,
+      launcherVersion: "1.2.3",
+      applicationVersion: "1.2.3",
+      error: "native bridges must have exact mode"
+    },
+    {
+      launcherMode: 0o755,
+      nativeMode: 0o755,
+      launcherVersion: "9.9.9",
+      applicationVersion: "1.2.3",
+      error: "versions must match"
+    },
+    {
+      launcherMode: 0o755,
+      nativeMode: 0o755,
+      launcherVersion: "1.2.3",
+      applicationVersion: "9.9.9",
+      error: "versions must match"
+    }
+  ])("certifies the native closure or refuses its executable/version drift: %j", async (input) => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "native-artifact-closure-"))
+    const archive = path.join(directory, "package.tgz")
+    const entries = [
+      { body: JSON.stringify(input.launcherVersion), mode: input.launcherMode, name: "package/dist/index.cjs" },
+      {
+        body: `require("ws"); const version = ${JSON.stringify(input.applicationVersion)}; const cohort = "${validEffectCohortMarker}"`,
+        mode: 0o755,
+        name: "package/dist/application.cjs"
+      },
+      { body: "native executable", mode: input.nativeMode, name: "package/dist/native/huly-stdio-linux-x64" },
+      { body: manifest(), mode: 0o644, name: "package/package.json" }
+    ]
+    try {
+      await writeArchiveEntries(archive, entries)
+      const certification = certifyPackedArtifact(archive, {
+        ...expectedArtifact,
+        runtimeEntry: "package/dist/application.cjs",
+        expectedEntries: entries.map((entry) => entry.name)
+      })
+      if (input.error === undefined)
+        await expect(certification).resolves.toMatchObject({ entryCount: 4, executableMode: 0o755, version: "1.2.3" })
+      else await expect(certification).rejects.toThrow(input.error)
+    } finally {
+      await fs.rm(directory, { force: true, recursive: true })
+    }
+  })
+
   it("includes lazy native imports in the exact external dependency closure", async () => {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), "native-artifact-certification-"))
     const archive = path.join(directory, "package.tgz")

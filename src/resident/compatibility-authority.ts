@@ -1,3 +1,6 @@
+import { createNoopTelemetry } from "../telemetry/noop.js"
+import { reportTelemetry } from "../telemetry/events.js"
+import type { TelemetryOperations } from "../telemetry/telemetry.js"
 import { randomBytes } from "node:crypto"
 import { Clock, Effect, Redacted, Schema } from "effect"
 
@@ -35,7 +38,8 @@ export const makeCompatibilityAuthority = Effect.fn("makeCompatibilityAuthority"
   selection: ResidentSelection,
   generation: ResidentTlsIdentity["generation"],
   authorization: Redacted.Redacted<string>,
-  nonces: Effect.Effect<CompatibilityNonce, CompatibilityError> = freshNonce
+  nonces: Effect.Effect<CompatibilityNonce, CompatibilityError> = freshNonce,
+  telemetry: TelemetryOperations = createNoopTelemetry()
 ) {
   const encoded = yield* encodeCompatibilitySelection(selection)
   const pending = new Map<string, bigint>()
@@ -85,5 +89,13 @@ export const makeCompatibilityAuthority = Effect.fn("makeCompatibilityAuthority"
         return compatibilityMacMatches(expected, proof.mac) ? Effect.void : Effect.fail(mismatch())
       })
     )
-  return { challenge, verify }
+  const observe = <A>(effect: Effect.Effect<A, CompatibilityError>) =>
+    effect.pipe(
+      Effect.tapError((error) =>
+        Effect.sync(() =>
+          reportTelemetry(() => telemetry.residentFailure({ stage: "compatibility", reason: error.kind }))
+        )
+      )
+    )
+  return { challenge: observe(challenge), verify: (proof: CompatibilityProof) => observe(verify(proof)) }
 })

@@ -48,7 +48,8 @@ import { preloadToolHandlers } from "../mcp/tools/index.js"
 import { runProfileStartupDiagnostic } from "../profiles/startup-diagnostic.js"
 import type { ClientBundle, ClientResolver, HulyClientBundleError } from "./client-resolver.js"
 import { createHttpClientLeaseResolver } from "./http-client-leases.js"
-import { TelemetryService } from "../telemetry/telemetry.js"
+import { TelemetryService, type TelemetryOperations } from "../telemetry/telemetry.js"
+import { withResidentTelemetry } from "./resident-telemetry.js"
 import { writeStderrLine } from "../utils/stderr.js"
 import { makeManualResidentBackend } from "../resident/manual-backend.js"
 import { type ProtectedFileError, type ResidentDirectory, type ResidentFilePath } from "../resident/protected-path.js"
@@ -164,7 +165,8 @@ export const buildAppLayer = (
     readonly httpMiddleware: HttpMiddleware
     readonly beforeHttpShutdown: Effect.Effect<void>
     readonly processPolicy?: McpProcessPolicy
-  }
+  },
+  telemetry?: TelemetryOperations
 ): Layer.Layer<McpServerService | HttpServerFactoryService, McpServerError, never> => {
   const mcpServerConfig = {
     transport,
@@ -190,7 +192,9 @@ export const buildAppLayer = (
         ? sanitizeHulyRuntimeConfigFromHeaders(webHeadersRecord(req.headers), process.env)
         : runtimeConfigContext()
   }
-  const mcpServerLayer = McpServerService.layer(mcpServerConfig).pipe(Layer.provide(TelemetryService.layer))
+  const mcpServerLayer = McpServerService.layer(mcpServerConfig).pipe(
+    Layer.provide(telemetry === undefined ? TelemetryService.layer : Layer.succeed(TelemetryService, telemetry))
+  )
 
   return Layer.merge(mcpServerLayer, httpServerFactoryLayer)
 }
@@ -274,7 +278,8 @@ const runConfiguredServer = (
             guardedClose,
             runtimeConfigContext,
             observeMovement,
-            resident?.httpPolicy(clientStatus)
+            resident?.httpPolicy(clientStatus),
+            resident?.telemetryForServer
           )
 
           yield* Effect.gen(function* () {
@@ -324,23 +329,28 @@ export const runConfiguredResidentServer = (options: {
   readonly startup: StartupBudget
   readonly report: (file: ResidentFilePath) => Effect.Effect<void, AppError>
 }): Effect.Effect<void, AppError> =>
-  Effect.scoped(
-    Effect.gen(function* () {
-      const backend = yield* makeManualResidentBackend({
-        mode: "configured",
-        selection: options.capture.selection,
-        lifetime: options.lifetime,
-        startup: options.startup
+  withResidentTelemetry((telemetry) =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const backend = yield* makeManualResidentBackend(
+          {
+            mode: "configured",
+            selection: options.capture.selection,
+            lifetime: options.lifetime,
+            startup: options.startup
+          },
+          telemetry
+        )
+        yield* runConfiguredServer(
+          "http",
+          backend,
+          options.environment,
+          options.capture,
+          HttpServerFactoryService.defaultLayer,
+          options.report
+        )
       })
-      yield* runConfiguredServer(
-        "http",
-        backend,
-        options.environment,
-        options.capture,
-        HttpServerFactoryService.defaultLayer,
-        options.report
-      )
-    })
+    )
   ).pipe(
     Effect.provide(
       ConfigProvider.layer(
@@ -379,8 +389,19 @@ export const makeServerStartup = (
       })
       return
     }
-    const resident = launchMode === "resident-http" ? yield* makeManualResidentBackend() : undefined
-    const transport = launchMode === "resident-http" ? "http" : launchMode
+    if (launchMode === "resident-http") {
+      yield* withResidentTelemetry((telemetry) =>
+        Effect.scoped(
+          Effect.gen(function* () {
+            const resident = yield* makeManualResidentBackend({ mode: "manual" }, telemetry)
+            yield* runConfiguredServer("http", resident, environment, captured, httpServerFactoryLayer)
+          })
+        )
+      )
+      return
+    }
+    const resident = undefined
+    const transport = launchMode
     const consoleRedirect = yield* Effect.sync(() => (transport === "stdio" ? redirectConsoleToStderr() : undefined))
     yield* runConfiguredServer(transport, resident, environment, captured, httpServerFactoryLayer).pipe(
       Effect.ensuring(restoreConsoleRedirect(consoleRedirect))

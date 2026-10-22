@@ -1,10 +1,19 @@
 import { defineConfig } from 'vitest/config'
 import { ORACLE_INFRASTRUCTURE_TAG } from './test/helpers/test-tags.js'
+import { DeadlineFirstSequencer } from './test/helpers/deadline-first-sequencer.js'
+
+const DARWIN_WORKERS = 4
+const DEFAULT_WORKERS = 6
 
 const portTestFiles = [
   'test/domain/**/*.test.ts',
   'test/huly/**/*.test.ts',
   'test/config/**/*.test.ts',
+  'test/scripts/**/*.test.ts',
+  // Parent-side CLI tests own their ports; the real terminal and full process campaign stay isolated.
+  'test/cli/**/!(full-integration-adapter|local-cli-terminal).test.ts',
+  // These resident suites keep state in test-owned ports/scopes; entrypoint and process fixtures stay isolated.
+  'test/resident/!(*-process|launch-model-alignment|configured-startup|managed-process|packaged-output-validation).test.ts',
   'test/utils/**/*.test.ts',
   'src/domain/**/*.test.ts',
   'src/huly/operations/**/*.test.ts',
@@ -17,6 +26,12 @@ const portTestFiles = [
 const residentLaunchTestFiles = ['test/resident/managed-backend-process.test.ts']
 const residentModelTestFiles = ['test/resident/launch-model-alignment.test.ts']
 const residentWaitTestFiles = ['test/resident/model-wait-process.test.ts']
+const residentFleetTestFiles = [
+  'test/resident/ten-reader-process.test.ts',
+  'test/resident/config-fault-process.test.ts',
+  'test/resident/managed-version-process.test.ts',
+  'test/resident/mixed-launch-process.test.ts',
+]
 const processTestFiles = [
   'test/resident/*-process.test.ts',
   'test/mcp/stdio-process-lifecycle.test.ts',
@@ -31,9 +46,11 @@ const processTestFiles = [
 export default defineConfig({
   test: {
     globals: true,
+    globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
     environment: 'node',
-    // Bundled CLI subprocesses compete with coverage workers for CPU and memory.
-    maxWorkers: 4,
+    // Keep ordinary I/O overlap bounded; intrinsic client fleets have a separate single-worker cohort.
+    maxWorkers: process.platform === 'darwin' ? DARWIN_WORKERS : DEFAULT_WORKERS,
+    sequence: { sequencer: DeadlineFirstSequencer },
     // Persist transforms locally; every test still executes on each run.
     fsModuleCache: true,
     fsModuleCachePath: '.vitest-cache',
@@ -45,14 +62,13 @@ export default defineConfig({
           name: 'resident-model',
           include: residentModelTestFiles,
           isolate: true,
-          // Keep each four-second Quint replay independent of native process-race CPU load.
+          // Keep bounded Quint replays independent from process startup and filesystem polling.
           sequence: { groupOrder: 0 },
         },
       },
       {
         test: {
           name: 'resident-launch',
-          globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
           include: residentLaunchTestFiles,
           isolate: true,
           // Ten independent parents already compete inside this fixture; keep unrelated suites out of its deadline.
@@ -62,10 +78,9 @@ export default defineConfig({
       {
         test: {
           name: 'resident-model-wait',
-          globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
           include: residentWaitTestFiles,
           isolate: true,
-          // Preserve held-request deadlines while pure port tests run alongside; keep process fleets in the next group.
+          // Keep independent-parent startup and held-request bounds free from unrelated CPU work.
           sequence: { groupOrder: 2 },
         },
       },
@@ -73,7 +88,8 @@ export default defineConfig({
         test: {
           name: 'ports',
           include: portTestFiles,
-          sequence: { groupOrder: 2 },
+          exclude: [...residentModelTestFiles, ...residentWaitTestFiles],
+          sequence: { groupOrder: 4 },
           // The oracle adapter registers its guard at import, so it needs a fresh module graph per file.
           isolate: Boolean(process.env.QUINT_ORACLE_URL?.trim()),
         },
@@ -81,30 +97,42 @@ export default defineConfig({
       {
         test: {
           name: 'units',
-          globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
           include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
           exclude: [...portTestFiles, ...residentLaunchTestFiles, ...residentModelTestFiles, ...residentWaitTestFiles, ...processTestFiles],
           isolate: true,
-          sequence: { groupOrder: 2 },
+          // Ordinary tests share workers and overlap process I/O; client fleets run separately.
+          sequence: { groupOrder: 4 },
+        },
+      },
+      {
+        test: {
+          name: 'resident-fleets',
+          include: residentFleetTestFiles,
+          isolate: true,
+          // Keep intrinsic client fleets independent; their own concurrency remains unchanged.
+          maxWorkers: 1,
+          sequence: { groupOrder: 3 },
         },
       },
       {
         test: {
           name: 'boundaries',
-          globalSetup: ['./test/setup/coverage-stdio-artifact.ts'],
           include: processTestFiles,
-          exclude: [...residentLaunchTestFiles, ...residentWaitTestFiles],
-          isolate: true,
-          sequence: { groupOrder: 3 },
+          exclude: [...residentLaunchTestFiles, ...residentWaitTestFiles, ...residentFleetTestFiles],
+          // Probe state belongs to each file; the observed servers and hosts still start fresh Node processes.
+          isolate: Boolean(process.env.QUINT_ORACLE_URL?.trim()),
+          sequence: { groupOrder: 4 },
         },
       },
     ],
     setupFiles: ['./test/setup/quint-oracle.ts'],
     tags: [{ name: ORACLE_INFRASTRUCTURE_TAG, description: 'Tests the observation channel itself without model forwarding.' }],
-    reporters: ['dot'],
+    // Report failures immediately without expanding successful gate output.
+    reporters: process.env.CI ? ['dot', './test/helpers/ci-failure-reporter.ts'] : ['dot'],
     silent: 'passed-only',
     coverage: {
       provider: 'v8',
+      reportOnFailure: true,
       reporter: ['text-summary', 'json', 'html'],
       skipFull: true,
       exclude: [

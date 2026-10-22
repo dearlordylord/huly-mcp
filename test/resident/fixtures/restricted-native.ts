@@ -71,6 +71,8 @@ const main = async () => {
     {
       env: {
         ...environment,
+        // Keep the private Unix socket within this backend's granted write directory.
+        TMPDIR: state,
         MCP_TRANSPORT: "resident-http",
         RESIDENT_CONTAINMENT_PROBE_FILE: probeFile,
         RESIDENT_CONTAINMENT_OWNERSHIP: ownership

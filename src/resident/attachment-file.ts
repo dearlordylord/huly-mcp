@@ -18,6 +18,7 @@ import {
   ResidentFilePath
 } from "./protected-path.js"
 import { ResidentEndpoint, ResidentTlsIdentity } from "./tls-channel.js"
+import { NativeSocketPath } from "./native-path.js"
 
 const MAX_ATTACHMENT_BYTES = 65_536
 const FILE_FORMAT = 1
@@ -28,7 +29,9 @@ export const ResidentAttachment = Schema.Struct({
   implementation: Schema.Struct({ name: Schema.Literal("@firfi/huly-mcp"), version: Schema.NonEmptyString }),
   endpoint: ResidentEndpoint,
   identity: ResidentTlsIdentity,
-  authorization: Schema.RedactedFromValue(Schema.NonEmptyString)
+  authorization: Schema.RedactedFromValue(Schema.NonEmptyString),
+  nativeSocket: Schema.optionalKey(NativeSocketPath),
+  telemetryEnabled: Schema.optionalKey(Schema.Boolean)
 })
 export type ResidentAttachment = Schema.Schema.Type<typeof ResidentAttachment>
 const isCurrentImplementation = (attachment: ResidentAttachment) => attachment.implementation.version === VERSION

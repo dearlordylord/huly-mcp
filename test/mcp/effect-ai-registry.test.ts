@@ -1,3 +1,4 @@
+import { createNoopTelemetry } from "../../src/telemetry/noop.js"
 import { Effect, Exit, Schema } from "effect"
 import { McpProtocol } from "effect/ai"
 import { McpServer } from "effect/ai/McpServer"
@@ -28,6 +29,7 @@ import { makeToolCategory, makeToolName, type ToolCategory } from "../../src/mcp
 import type { TelemetryOperations } from "../../src/telemetry/telemetry.js"
 
 const telemetry: TelemetryOperations = {
+  ...createNoopTelemetry(),
   sessionStart: () => {},
   firstListTools: () => {},
   toolCalled: () => {},
@@ -112,10 +114,15 @@ describe("Effect AI MCP registry", () => {
       expect(resolutions.count).toBe(
         configuredMode === "native" || proxyOutputStrict ? 0 : configuredMode === "proxy" ? 2 : 1
       )
-      expect(calls.map(({ status, toolName }) => ({ toolName, status }))).toEqual([
-        { toolName: "list_issues", status: "error" },
-        { toolName: "list_issues", status: "error" }
-      ])
+      expect(calls.map(({ status, toolName }) => ({ toolName, status }))).toEqual(
+        ["claude-code", "claude-ai"].map((host) => ({
+          toolName: "list_issues",
+          status:
+            !proxyOutputStrict && (configuredMode === "proxy" || (configuredMode === "auto" && host === "claude-ai"))
+              ? "error"
+              : "rejected"
+        }))
+      )
       yield* Effect.promise(adapter.quiesce)
       const stopped = yield* server
         .callTool({ name: "list_issues", arguments: {} })
@@ -123,7 +130,8 @@ describe("Effect AI MCP registry", () => {
       expect(stopped.content).toEqual([
         { type: "text", text: "Huly MCP is shutting down; start a new connection before retrying" }
       ])
-      expect(calls).toHaveLength(2)
+      expect(calls).toHaveLength(3)
+      expect(calls.at(-1)).toMatchObject({ status: "rejected", errorTag: "ServerShuttingDown" })
     }).pipe(Effect.provide(McpServer.layer))
   )
 

@@ -118,3 +118,14 @@ it("keeps descriptor-only mode explicit and refuses incomplete selected authorit
     expect((await Effect.runPromiseExit(captureManualResidentSelection(input)))._tag).toBe("Failure")
   }
 })
+
+it.each([
+  [{}, true],
+  [{ HULY_MCP_TELEMETRY: "0" }, false],
+  [{ DO_NOT_TRACK: "1" }, false],
+  [{ DO_NOT_TRACK: "false" }, true],
+  [{ DO_NOT_TRACK: " anything " }, false]
+])("captures normalized telemetry reuse policy for %j", async (settings, expected) => {
+  const captured = await Effect.runPromise(captureResidentSelection({ ...environment, ...settings }))
+  expect(captured.selection.telemetryEnabled).toBe(expected)
+})

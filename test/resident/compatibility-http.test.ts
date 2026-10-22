@@ -43,7 +43,8 @@ const selected = Schema.decodeUnknownSync(ResidentSelection)({
     connectionTimeout: 1_000
   },
   policy: { toolsets: [], tools: [], exposure: { configuredMode: "auto", proxyOutputStrict: false } },
-  lazyEnvs: false
+  lazyEnvs: false,
+  telemetryEnabled: true
 })
 const policy = Schema.decodeUnknownSync(AdmissionPolicy)({
   capacity: 1,

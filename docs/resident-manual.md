@@ -297,3 +297,51 @@ Stopping locally does not settle earlier unconfirmed Huly mutations. Preserve
 that uncertainty and use operation-specific reconciliation before repeating a
 mutation. Full packaged lifecycle, cleanup-failure, replacement and native
 platform qualification remain pending for this command.
+
+## Native stdio bridge
+
+Managed `stdio-resident` uses a packaged native bridge on Linux and macOS,
+for arm64 and x64. Users do not need Rust or a compiler. Ordinary stdio remains
+unchanged and remains the package default; the setup examples explicitly select `stdio-resident`.
+
+Before replacing Node, the launcher checks platform support and runs the native executable with `--check`, without reading MCP input or starting a backend. If this bounded probe fails, the executable is missing/non-executable, or `execve` is unavailable, it starts ordinary stdio and writes a fixed diagnostic to stderr. Once the bridge starts, resident failures remain terminal; they never switch transports or replay requests.
+
+The small Node launcher replaces itself with the native executable. A
+short-lived Node bootstrap selects or creates the compatible generation and
+prepares a one-use compatibility proof over the existing authenticated TLS
+control channel. The native socket takes over that same admission before the
+bootstrap exits; the handoff uses one capacity slot without an idle gap. Local NoConfig discovery and profile startup diagnostics retain their ordinary
+stdio behavior in a local Node child; they do not acquire resident ownership.
+The backend owns the native session's admission, renewal, protocol
+translation, cancellation and cleanup. A bounded binary frame carries opaque bytes,
+transport heartbeats and terminal diagnostics; the bridge does not parse MCP JSON.
+Only heartbeats received from the bridge renew its lease. Host stdout writes retain
+the ten-second deadline. The bridge forwards bytes without
+reconnecting or replaying requests.
+
+Each generation owns a private temporary directory (0700) and Unix socket
+(0600). The native process checks the endpoint's ownership and permissions.
+The backend verifies the generation's private bearer and consumes the one-use
+configuration proof before acknowledging admission or accepting MCP messages.
+The socket and temporary directory are removed when the generation retires.
+
+Source builds require Rustup, Python 3 and Bash. Run `pnpm setup:native`
+to install the pinned Rust toolchain, cross-compilation targets, cargo-zigbuild,
+Zig and the macOS SDK; CI and Docker run the same setup explicitly.
+`pnpm build:native` cross-compiles the four binaries; Linux binaries use static musl.
+The Rust bridge uses one nonblocking I/O loop without an async runtime.
+`pnpm test:native` runs formatting, Clippy and real pipe/Unix-socket tests.
+Packed-artifact receipts are exact and scoped to the build host platform and
+architecture: Cargo metadata and Mach-O signatures can differ across compiler
+hosts. `certify-packed-artifact --write` records the current host receipt; a
+missing receipt fails verification rather than falling back to another host.
+
+### Reproducing the split-build experiment
+
+`pnpm bench:resident-builds` preserves the earlier JavaScript adapter comparison
+under `.bench/resident-builds`: one CommonJS bundle and an ESM build with code
+splitting, with esbuild metadata for each. These are experimental artifacts,
+not an additional transport mode or release build. The JS baseline retains the
+pre-native adapter so the effect of splitting can be measured separately from
+the native bridge. Use equal client counts, credentials, operations and idle
+intervals; record RSS, PSS and swap, and exclude the benchmark host itself.

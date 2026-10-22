@@ -1,5 +1,6 @@
-import { createHash, randomBytes } from "node:crypto"
+import { createHash, randomBytes, randomUUID } from "node:crypto"
 import { Clock, Duration, Effect, Exit, Redacted, Schedule, Schema, Scope, Semaphore } from "effect"
+import { Count } from "../domain/schemas/shared.js"
 import { observeHttpAdmission } from "../mcp/http-admission-observations.js"
 
 import { type AdmissionPolicy, AdmissionError, AttachmentAdmitted, AttachmentToken } from "./admission-contract.js"
@@ -20,6 +21,10 @@ import {
   type AdmissionProceed,
   type AdmissionRefusal
 } from "./admissions-state.js"
+import { createNoopTelemetry } from "../telemetry/noop.js"
+import { reportTelemetry } from "../telemetry/events.js"
+import type { TelemetryOperations } from "../telemetry/telemetry.js"
+import { makeAttachmentObservation, type AttachmentObservation } from "./attachment-observation.js"
 import { makeAttachmentOwner } from "./attachment-owner.js"
 import { makeResidentWorkStatus } from "./work-status.js"
 
@@ -54,7 +59,12 @@ const randomToken = Effect.sync(() => randomBytes(TOKEN_BYTES).toString("hex")).
 export const makeResidentAdmissions = Effect.fn("makeResidentAdmissions")(function* (
   policy: AdmissionPolicy,
   tokens: Effect.Effect<AttachmentToken, AdmissionError> = randomToken,
-  createOwner: (eligible: Effect.Effect<boolean>) => ReturnType<typeof makeAttachmentOwner> = makeAttachmentOwner
+  createOwner: (
+    eligible: Effect.Effect<boolean>,
+    observation?: AttachmentObservation
+  ) => ReturnType<typeof makeAttachmentOwner> = makeAttachmentOwner,
+  telemetry: TelemetryOperations = createNoopTelemetry(),
+  makeId: () => string = randomUUID
 ) {
   const generationScope = yield* Effect.scope
   const admission = yield* Semaphore.make(1)
@@ -78,7 +88,10 @@ export const makeResidentAdmissions = Effect.fn("makeResidentAdmissions")(functi
   const forget = (id: AdmissionIdentity) =>
     Clock.clockWith((clock) =>
       Effect.sync(() => {
-        update((current) => advanceMember(current, { _tag: "Closed", id, now: clock.monotonicTimeNanosUnsafe() }))
+        const entry = state.entries.get(id)
+        const now = clock.monotonicTimeNanosUnsafe()
+        update((current) => advanceMember(current, { _tag: "Closed", id, now }))
+        if (entry?._tag === "Owned") entry.owner.observation?.closed(now)
       })
     )
   const closeOwned = (id: AdmissionIdentity, owner: AttachmentOwner) =>
@@ -93,8 +106,9 @@ export const makeResidentAdmissions = Effect.fn("makeResidentAdmissions")(functi
           orElse: () =>
             Effect.fail(new AdmissionError({ kind: "pending", message: "Resident attachment cleanup remains pending" }))
         }),
-        Effect.tapError(() =>
+        Effect.tapError((error) =>
           Effect.sync(() => {
+            owner.observation?.failure({ stage: "cleanup", reason: error.kind === "pending" ? "pending" : "failed" })
             update((current) => advanceMember(current, { _tag: "CleanupBlocked", id }))
           })
         )
@@ -109,13 +123,16 @@ export const makeResidentAdmissions = Effect.fn("makeResidentAdmissions")(functi
         yield* Effect.sleep(Duration.nanos(remaining))
         return false
       }
+      owner.observation?.closing("lease_expired")
       update((current) => advanceMember(current, { _tag: "Retire", target: { _tag: "Identity", id } }))
       yield* owner.close
       return true
     }).pipe(Effect.repeat({ until: (closed) => closed }))
-    return Effect.exit(Effect.raceFirst(expire, owner.closed)).pipe(
-      Effect.flatMap((exit) => (Exit.isSuccess(exit) ? forget(id) : Effect.void))
-    )
+    return Effect.exit(
+      Effect.raceFirst(expire, owner.closed).pipe(
+        Effect.tapError(() => Effect.sync(() => owner.observation?.failure({ stage: "cleanup", reason: "failed" })))
+      )
+    ).pipe(Effect.flatMap((exit) => (Exit.isSuccess(exit) ? forget(id) : Effect.void)))
   }
   const begin = Clock.clockWith((clock) =>
     Effect.suspend(() => {
@@ -150,12 +167,17 @@ export const makeResidentAdmissions = Effect.fn("makeResidentAdmissions")(functi
           const eligible = Clock.clockWith((clock) =>
             Effect.sync(() => admissionIsEligible(state, id, clock.monotonicTimeNanosUnsafe()))
           )
-          const owner = yield* createOwner(eligible).pipe(Scope.provide(generationScope))
+          const startedAt = yield* Clock.monotonicTimeNanos
+          const observation = yield* Effect.sync(() => makeAttachmentObservation(telemetry, makeId(), startedAt)).pipe(
+            Effect.catchCause(() => Effect.succeed(undefined))
+          )
+          const owner = yield* createOwner(eligible, observation).pipe(Scope.provide(generationScope))
           const published = update((current) => advanceAdmission(current, { _tag: "PublishOwner", id, owner }, policy))
           if (published._tag === "Close") {
             yield* closeOwned(published.id, published.owner)
             return yield* generationClosing()
           }
+          observation?.admitted(Count.make(admissionInventory(state).members.length))
           yield* watch(id, owner).pipe(Effect.forkIn(generationScope))
           return AttachmentAdmitted.make({ version: 1, token, lease: policy.lease })
         }).pipe(Effect.uninterruptible)
@@ -169,6 +191,16 @@ export const makeResidentAdmissions = Effect.fn("makeResidentAdmissions")(functi
         })
       )
   )
+  const observeFailure = <A>(operation: Effect.Effect<A, AdmissionError>) =>
+    operation.pipe(
+      Effect.tapError((error) =>
+        Effect.sync(() =>
+          reportTelemetry(() =>
+            telemetry.residentFailure({ stage: "admission", reason: error.kind === "cleanup" ? "failed" : error.kind })
+          )
+        )
+      )
+    )
   const access = (token: AttachmentToken, renew: boolean) =>
     Effect.gen(function* () {
       const key = digest(token)
@@ -192,13 +224,16 @@ export const makeResidentAdmissions = Effect.fn("makeResidentAdmissions")(functi
         })
       )
     })
-  const find = (token: AttachmentToken) => access(token, false)
-  const renew = (token: AttachmentToken) => access(token, true).pipe(Effect.asVoid)
+  const find = (token: AttachmentToken) => observeFailure(access(token, false))
+  const renew = (token: AttachmentToken) => observeFailure(access(token, true)).pipe(Effect.asVoid)
   const release = Effect.fn("ResidentAdmissions.release")(function* (token: AttachmentToken) {
     const retired = update((current) =>
       advanceMember(current, { _tag: "Retire", target: { _tag: "Digest", key: digest(token) } })
     )
-    if (retired._tag === "Close") yield* closeOwned(retired.id, retired.owner)
+    if (retired._tag === "Close") {
+      retired.owner.observation?.closing("release")
+      yield* closeOwned(retired.id, retired.owner)
+    }
   })
   const drain = Effect.gen(function* () {
     yield* fence
@@ -210,10 +245,14 @@ export const makeResidentAdmissions = Effect.fn("makeResidentAdmissions")(functi
     yield* Effect.sync(() => admissionInventory(state).pending === 0).pipe(
       Effect.repeat({ until: (settled) => settled, schedule: Schedule.spaced(DRAIN_POLL_MILLIS) })
     )
-    yield* Effect.forEach(admissionInventory(state).members, ({ id, owner }) => closeOwned(id, owner), {
-      concurrency: "unbounded",
-      discard: true
-    })
+    yield* Effect.forEach(
+      admissionInventory(state).members,
+      ({ id, owner }) => {
+        owner.observation?.closing("backend_shutdown")
+        return closeOwned(id, owner)
+      },
+      { concurrency: "unbounded", discard: true }
+    )
   }).pipe(
     Effect.timeoutOrElse({
       duration: policy.closeAllowanceMillis,
@@ -225,8 +264,11 @@ export const makeResidentAdmissions = Effect.fn("makeResidentAdmissions")(functi
           })
         )
     }),
-    Effect.tapError(() =>
+    Effect.tapError((error) =>
       Effect.sync(() => {
+        reportTelemetry(() =>
+          telemetry.residentFailure({ stage: "cleanup", reason: error.kind === "pending" ? "pending" : "failed" })
+        )
         update((current) => advanceLifetime(current, { _tag: "DrainFailed" }))
       })
     )
@@ -254,5 +296,5 @@ export const makeResidentAdmissions = Effect.fn("makeResidentAdmissions")(functi
       owners
     })
   })
-  return { admit, find, renew, release, fence, drain, awaitIdleAndFence, status }
+  return { admit: observeFailure(admit), find, renew, release, fence, drain, awaitIdleAndFence, status }
 })

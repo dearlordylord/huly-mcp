@@ -27,11 +27,23 @@ const jsonIndent = 2
 const [archivePath, kind, version, writeFlag] = Schema.decodeUnknownSync(ArgumentsSchema)(
   process.argv.slice(processArgumentOffset)
 )
-const expected =
+const expected: Parameters<typeof certifyPackedArtifact>[1] =
   kind === "mcp"
     ? {
         binName: "huly-mcp",
-        expectedEntries: ["package/LICENSE", "package/README.md", "package/dist/index.cjs", "package/package.json"],
+        runtimeEntry: "package/dist/application.cjs",
+        expectedEntries: [
+          "package/LICENSE",
+          "package/README.md",
+          "package/dist/index.cjs",
+          "package/package.json",
+          "package/dist/native/huly-stdio-linux-arm64",
+          "package/dist/native/huly-stdio-linux-x64",
+          "package/dist/native/huly-stdio-darwin-arm64",
+          "package/dist/native/huly-stdio-darwin-x64",
+          "package/dist/native/THIRD-PARTY-NOTICES",
+          "package/dist/application.cjs"
+        ],
         expectedExternalModules: ["@napi-rs/keyring", "dbus-next", "ws"],
         name: "@firfi/huly-mcp",
         version
@@ -55,7 +67,9 @@ const expected =
 const main = async (): Promise<void> => {
   const certification = await certifyPackedArtifact(archivePath, expected)
   if (kind === "mcp") {
-    const evidencePath = "docs/certification/mcp-artifact-certification.json"
+    // Cargo dependency metadata and Mach-O signatures depend on the compiler host.
+    // Compare exact receipts from the same host platform, retaining every payload check.
+    const evidencePath = `docs/certification/mcp-artifact-certification-${process.platform}-${process.arch}.json`
     const parseEvidence = Schema.decodeUnknownSync(Schema.fromJsonString(PackedArtifactCertificationSchema))
     if (writeFlag === "--write") {
       writeFileSync(evidencePath, `${JSON.stringify(certification, undefined, jsonIndent)}\n`)
