@@ -302,7 +302,9 @@ platform qualification remain pending for this command.
 
 Managed `stdio-resident` uses a packaged native bridge on Linux and macOS,
 for arm64 and x64. Users do not need Rust or a compiler. Ordinary stdio remains
-unchanged and remains the default.
+unchanged and remains the package default; the setup examples explicitly select `stdio-resident`.
+
+Before replacing Node, the launcher checks platform support and runs the native executable with `--check`, without reading MCP input or starting a backend. If this bounded probe fails, the executable is missing/non-executable, or `execve` is unavailable, it starts ordinary stdio and writes a fixed diagnostic to stderr. Once the bridge starts, resident failures remain terminal; they never switch transports or replay requests.
 
 The small Node launcher replaces itself with the native executable. A
 short-lived Node bootstrap selects or creates the compatible generation and

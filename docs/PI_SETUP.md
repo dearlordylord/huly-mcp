@@ -34,6 +34,7 @@ files.
         "invoke_tool"
       ],
       "env": {
+        "MCP_TRANSPORT": "stdio-resident",
         "HULY_URL": "https://your-huly-instance.example.com",
         "HULY_TOKEN": "your-api-token",
         "HULY_WORKSPACE": "yourworkspace",
@@ -83,6 +84,7 @@ Pin native Huly operations when a project repeatedly uses the same domains. Chan
       "lifecycle": "lazy",
       "directTools": true,
       "env": {
+        "MCP_TRANSPORT": "stdio-resident",
         "HULY_URL": "https://your-huly-instance.example.com",
         "HULY_TOKEN": "your-api-token",
         "HULY_WORKSPACE": "yourworkspace",

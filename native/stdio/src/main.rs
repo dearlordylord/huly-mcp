@@ -71,6 +71,9 @@ fn run(arguments: &[OsString]) -> Result<()> {
 
 fn main() {
     let arguments: Vec<_> = std::env::args_os().skip(1).collect();
+    if arguments.len() == 1 && arguments[0] == wire::NATIVE_CHECK_ARGUMENT {
+        return;
+    }
     let result = os::install_signals()
         .map_err(BridgeError::from)
         .and_then(|()| run(&arguments));

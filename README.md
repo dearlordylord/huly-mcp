@@ -45,6 +45,7 @@ The standard configuration uses a Huly API token and works with most MCP clients
       "command": "npx",
       "args": ["-y", "@firfi/huly-mcp@latest"],
       "env": {
+        "MCP_TRANSPORT": "stdio-resident",
         "HULY_URL": "https://your-huly-instance.example.com",
         "HULY_TOKEN": "your-huly-api-token",
         "HULY_WORKSPACE": "yourworkspace"
@@ -73,6 +74,7 @@ Use Codex's MCP manager:
 
 ```bash
 codex mcp add huly \
+  --env MCP_TRANSPORT=stdio-resident \
   --env HULY_URL=https://your-huly-instance.example.com \
   --env HULY_TOKEN=your-huly-api-token \
   --env HULY_WORKSPACE=yourworkspace \
@@ -87,6 +89,7 @@ command = "npx"
 args = ["-y", "@firfi/huly-mcp@latest"]
 
 [mcp_servers.huly.env]
+MCP_TRANSPORT = "stdio-resident"
 HULY_URL = "https://your-huly-instance.example.com"
 HULY_TOKEN = "your-huly-api-token"
 HULY_WORKSPACE = "yourworkspace"
@@ -99,6 +102,7 @@ HULY_WORKSPACE = "yourworkspace"
 
 ```bash
 claude mcp add huly \
+  -e MCP_TRANSPORT=stdio-resident \
   -e HULY_URL=https://your-huly-instance.example.com \
   -e HULY_TOKEN=your-huly-api-token \
   -e HULY_WORKSPACE=yourworkspace \
@@ -131,6 +135,7 @@ Add with Command Palette → "MCP: Add Server", or put this in a VS Code MCP con
       "command": "npx",
       "args": ["-y", "@firfi/huly-mcp@latest"],
       "env": {
+        "MCP_TRANSPORT": "stdio-resident",
         "HULY_URL": "https://your-huly-instance.example.com",
         "HULY_TOKEN": "your-huly-api-token",
         "HULY_WORKSPACE": "yourworkspace"
@@ -168,6 +173,7 @@ Open the global configuration file (`~/.config/opencode/opencode.json`) and merg
       "type": "local",
       "command": ["npx", "-y", "@firfi/huly-mcp@latest"],
       "environment": {
+        "MCP_TRANSPORT": "stdio-resident",
         "HULY_URL": "https://your-huly-instance.example.com",
         "HULY_TOKEN": "your-huly-api-token",
         "HULY_WORKSPACE": "yourworkspace"
@@ -206,7 +212,7 @@ The `@latest` tag asks the package runner for the newest version. Some MCP clien
 | **VS Code / Cursor** | Restart the MCP server from the command palette/configured client or reload the window |
 | **OpenCode** | Restart OpenCode or start a new session after config changes |
 | **Pi** | Run `/mcp reconnect huly`, then `/reload` if the registered direct-tool surface changed |
-| **npx (manual)** | `npx -y @firfi/huly-mcp@latest` — the `-y` flag auto-confirms install prompts |
+| **npx (manual)** | `MCP_TRANSPORT=stdio-resident npx -y @firfi/huly-mcp@latest` — the `-y` flag auto-confirms install prompts |
 
 ## Maintainer Production Release
 
@@ -219,6 +225,12 @@ mise exec node@24.15.0 -- pnpm local-release
 Use this exact command even when a newer Node.js version is active on the host. The release build accepts only the
 exact Node.js versions certified by CI; this is intentionally narrower than the package's runtime requirement. See
 the [production release guide](docs/NPM_PRODUCTION_RELEASE.md) for preflight checks, rerun behavior, and verification.
+
+## Shared resident stdio
+
+The setup examples explicitly select `MCP_TRANSPORT=stdio-resident`. MCP clients still use stdio, while compatible clients under the same OS user share a Node backend through small native bridges. Linux and macOS arm64/x64 binaries are included; no Rust installation is needed. If the native bridge cannot run, startup falls back to ordinary stdio before accepting requests. A failed active resident never reconnects or replays requests.
+
+Omitting `MCP_TRANSPORT` still selects ordinary `stdio`, preserving existing installations. Set `MCP_TRANSPORT=stdio` explicitly to keep a separate backend per client. Restart the MCP client after changing the setting.
 
 ## Manual resident backend
 
@@ -270,7 +282,7 @@ Authorization: Bearer <MCP_AUTH_TOKEN>
 
 ### Shared CLI and stdio profiles
 
-Save a profile with `huly auth login --profile work`, then set `HULY_PROFILE=work` in the stdio MCP server's environment. Both processes must run under the same OS user and configuration directory. Stdio never follows the active CLI profile implicitly. Saved tokens are bound to their instance URL and workspace; changes require login again or complete environment credential injection. See the [CLI profile instructions](packages/huly-cli/README.md#authentication-and-profiles). HTTP configuration remains unchanged.
+Save a profile with `huly auth login --profile work`, then set `MCP_TRANSPORT=stdio-resident` and `HULY_PROFILE=work` in the stdio MCP server's environment. Both processes must run under the same OS user and configuration directory. Stdio never follows the active CLI profile implicitly. Saved tokens are bound to their instance URL and workspace; changes require login again or complete environment credential injection. See the [CLI profile instructions](packages/huly-cli/README.md#authentication-and-profiles). HTTP configuration remains unchanged.
 
 ### Hosted HTTP Header Configuration
 
@@ -299,7 +311,7 @@ For a Smithery publish schema example, see [docs/SMITHERY_URL_PUBLISH.md](docs/S
 | `HULY_PASSWORD` | Auth* | Compatibility fallback: account password |
 | `HULY_WORKSPACE` | Yes | Workspace identifier |
 | `HULY_CONNECTION_TIMEOUT` | No | Connection timeout in ms. Omit to use the package default. |
-| `MCP_TRANSPORT` | No | Transport type: `stdio` (default) or `http` |
+| `MCP_TRANSPORT` | No | Transport type: `stdio` (package default), `stdio-resident` (recommended in setup examples), or `http` |
 | `MCP_PRELOAD_TOOLS` | No | Load every tool handler before serving requests. Defaults to `false`; use `true` for smoke tests that check all handler imports. |
 | `MCP_HTTP_PORT` | No | HTTP server port (falls back to `PORT`, then 3000) |
 | `MCP_HTTP_HOST` | No | HTTP server host. Omit to bind to the package default loopback host. |
@@ -1245,6 +1257,7 @@ For Claude JSON config, the shell-sensitive characters above can be written dire
       "command": "npx",
       "args": ["-y", "@firfi/huly-mcp@latest"],
       "env": {
+        "MCP_TRANSPORT": "stdio-resident",
         "HULY_URL": "https://your-huly-instance.com",
         "HULY_EMAIL": "you@example.com",
         "HULY_PASSWORD": "p@ss*w0rd!#%",

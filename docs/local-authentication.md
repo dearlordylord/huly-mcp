@@ -91,7 +91,7 @@ Native mode writes no token or decryption key beside profile metadata. Windows
 continues to support file credentials and environment injection. File-backed and
 environment-only operations do not access Keychain or Secret Service.
 
-Set `HULY_PROFILE=work` in the stdio MCP process environment to select the same
+Set `MCP_TRANSPORT=stdio-resident` and `HULY_PROFILE=work` in the stdio MCP process environment to select the same
 profile. CLI uses `--profile`, then `HULY_PROFILE`, then the active profile. Stdio
 requires explicit profile selection and otherwise preserves environment-only
 configuration. Complete environment credentials and destination override a saved

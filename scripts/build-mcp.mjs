@@ -14,21 +14,22 @@ const outputPath = Schema.decodeUnknownSync(Schema.NonEmptyString)(outputArgs[0]
 const output = resolve(outputPath)
 const application = join(dirname(output), "application.cjs")
 await build({entryPoints:["src/launcher.ts"], bundle:true, platform:"node", format:"cjs", outfile:application, logLevel:"warning", external:["ws","@napi-rs/keyring","dbus-next"], define:{PKG_VERSION:JSON.stringify(packageVersion), NODE_ENGINE_REQUIREMENT:JSON.stringify(manifest.engines.node)}})
-const launcher = `#!/usr/bin/env node
-"use strict";
-if (process.env.MCP_TRANSPORT === "stdio-resident" && typeof process.execve === "function") {
-  const executable = require("node:path").join(__dirname, "native", "huly-stdio-" + process.platform + "-" + process.arch);
-  try {
+const launcher = `
+import { nativeExecutableFor } from "./src/resident/native-availability.js";
+if (process.env.MCP_TRANSPORT === "stdio-resident") {
+  const executable = nativeExecutableFor({ platform: process.platform, architecture: process.arch, packageFile: __filename, execveAvailable: typeof process.execve === "function" });
+  if (executable !== undefined) {
     process.execve(executable, [executable, process.execPath, __filename], { ...process.env, MCP_NATIVE_EXPECTED_VERSION: ${JSON.stringify(packageVersion)} });
-  } catch {
-    process.stderr.write("Native resident executable is unavailable for this platform; use ordinary stdio\\n");
-    process.exitCode = 1;
+  } else {
+    process.stderr.write("Native resident bridge unavailable; starting ordinary stdio\\n");
+    process.env.MCP_TRANSPORT = "stdio";
+    require("./application.cjs");
   }
 } else {
   require("./application.cjs");
 }
 `
-await writeFile(output,launcher)
+await build({stdin:{contents:launcher,resolveDir:process.cwd(),sourcefile:"native-launcher.js"},bundle:true,platform:"node",format:"cjs",outfile:output,logLevel:"warning",external:["./application.cjs"],banner:{js:"#!/usr/bin/env node"}})
 await chmod(output,0o755)
 await chmod(application,0o755)
 

@@ -15,6 +15,37 @@ use std::time::{Duration, Instant};
 const FRAME_BYTES: usize = 65_536;
 static SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
+#[test]
+fn availability_check_exits_without_reading_stdin_or_starting_a_helper() {
+    let mut process = Process(
+        Command::new(env!("CARGO_BIN_EXE_huly-stdio"))
+            .arg("--check")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap(),
+    );
+    assert!(process.wait(Duration::from_secs(1)).success());
+    let mut output = Vec::new();
+    process
+        .0
+        .stdout
+        .take()
+        .unwrap()
+        .read_to_end(&mut output)
+        .unwrap();
+    assert!(output.is_empty());
+    process
+        .0
+        .stderr
+        .take()
+        .unwrap()
+        .read_to_end(&mut output)
+        .unwrap();
+    assert!(output.is_empty());
+}
+
 struct Directory(PathBuf);
 impl Directory {
     fn new() -> Self {
