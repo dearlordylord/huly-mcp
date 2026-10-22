@@ -612,6 +612,9 @@ describe("Effect AI registered tool handlers", () => {
               }
             })
             .pipe(Effect.provideService(McpSchema.McpServerClient, clientService("codex-cli")))
+          yield* server
+            .callTool({ name: "edit_document", arguments: { title: "Private title" } })
+            .pipe(Effect.provideService(McpSchema.McpServerClient, clientService("generic-client")))
           yield* Effect.promise(adapter.quiesce)
           const stopped = yield* server
             .callTool({ name: "get_version", arguments: {} })
@@ -624,6 +627,14 @@ describe("Effect AI registered tool handlers", () => {
     expect(assertAt(calls, 0)).toMatchObject({ toolName: "get_version", status: "success", clientKind: "codex" })
     expect(calls).toContainEqual(
       expect.objectContaining({ toolName: "edit_document", callPath: "invoke_tool", editMode: "search_and_replace" })
+    )
+    expect(calls).toContainEqual(
+      expect.objectContaining({
+        toolName: "edit_document",
+        callPath: "direct",
+        editMode: "title_only",
+        status: "error"
+      })
     )
     expect(firstLists).toHaveLength(4)
     expect(firstLists).toEqual(
