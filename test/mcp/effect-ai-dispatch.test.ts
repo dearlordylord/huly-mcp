@@ -644,7 +644,7 @@ describe("Effect AI registered tool handlers", () => {
     )
     expect(calls).toContainEqual(expect.objectContaining({ toolName: "get_version", status: "rejected" }))
     expect(calls.find((event) => event.errorTag === "UnexpectedArguments")).not.toHaveProperty("inputBytes")
-    expect(firstLists).toHaveLength(4)
+    expect(firstLists).toHaveLength(5)
     expect(firstLists).toEqual(
       expect.arrayContaining([expect.objectContaining({ clientKind: "codex", resolvedMode: "proxy" })])
     )
