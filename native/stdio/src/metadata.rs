@@ -192,13 +192,13 @@ impl Metadata {
         !self.pending.is_empty() || !self.writes.is_empty() || !self.output.is_empty()
     }
 
-    pub fn finish(
+    pub fn ready(
         &mut self,
         input: &mut Input,
         source: &mut File,
         output: &mut File,
         deadline: Instant,
-    ) -> Result<Option<Vec<u8>>> {
+    ) -> Result<()> {
         while self.pending() {
             if crate::os::signal_status().is_some() {
                 return Err(BridgeError::Startup);
@@ -210,6 +210,17 @@ impl Metadata {
             self.progress(output)?;
             crate::os::wait(&[], Duration::from_millis(1))?;
         }
+        Ok(())
+    }
+
+    pub fn finish(
+        &mut self,
+        input: &mut Input,
+        source: &mut File,
+        output: &mut File,
+        deadline: Instant,
+    ) -> Result<Option<Vec<u8>>> {
+        self.ready(input, source, output, deadline)?;
         self.flush_input(input);
         if let Some(notification) = self.initialized_notification.take() {
             let mut prefix = Queue::new();

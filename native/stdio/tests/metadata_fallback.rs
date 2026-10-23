@@ -35,12 +35,15 @@ import json, os, pathlib, sys, time
 root = pathlib.Path(__file__).parent
 if os.environ['MCP_TRANSPORT'] == 'resident-bootstrap':
     (root / 'bootstrap.pid').write_text(str(os.getpid()))
+    (root / 'metadata-first').write_text(str((root / 'initialized').exists()))
     time.sleep(20)
     sys.exit(1)
 for line in sys.stdin:
     request = json.loads(line)
     method = request.get('method')
     if method == 'initialize':
+        time.sleep(0.1)
+        (root / 'initialized').touch()
         result = {'protocolVersion': '2025-06-18', 'capabilities': {'tools': {}}, 'serverInfo': {'name': 'fixture', 'version': '1'}}
     elif method == 'tools/list':
         result = {'tools': [{'name': 'fixture_read', 'inputSchema': {'type': 'object'}}]}
@@ -56,9 +59,11 @@ for line in sys.stdin:
     .unwrap();
     fs::set_permissions(&helper, fs::Permissions::from_mode(0o700)).unwrap();
     let started = Instant::now();
+    let (source, mut input) = std::os::unix::net::UnixStream::pair().unwrap();
+    writeln!(input, r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"protocolVersion":"2025-06-18","capabilities":{{}},"clientInfo":{{"name":"codex","version":"fixture"}}}}}}"#).unwrap();
     let child = Command::new(env!("CARGO_BIN_EXE_huly-stdio"))
         .args([helper.as_os_str(), "unused".as_ref(), "1000".as_ref()])
-        .stdin(Stdio::piped())
+        .stdin(Stdio::from(std::os::fd::OwnedFd::from(source)))
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()
@@ -73,8 +78,6 @@ for line in sys.stdin:
             }
         }
     });
-    let mut input = fixture.child.stdin.take().unwrap();
-    writeln!(input, r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"protocolVersion":"2025-06-18","capabilities":{{}},"clientInfo":{{"name":"codex","version":"fixture"}}}}}}"#).unwrap();
     let initialized = receive
         .recv_timeout(Duration::from_millis(500))
         .expect("initialize must not wait for resident startup");
@@ -96,6 +99,10 @@ for line in sys.stdin:
     assert_eq!(
         fs::read_to_string(fixture.directory.join("calls")).unwrap(),
         "3\n"
+    );
+    assert_eq!(
+        fs::read_to_string(fixture.directory.join("metadata-first")).unwrap(),
+        "True"
     );
     drop(input);
     assert!(fixture.child.wait().unwrap().success());

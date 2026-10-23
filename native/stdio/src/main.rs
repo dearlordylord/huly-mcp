@@ -60,7 +60,11 @@ fn run(arguments: &[OsString]) -> Result<()> {
     let (mut source, mut output) = unsafe { (File::from_raw_fd(0), File::from_raw_fd(1)) };
     let mut input = buffer::Input::new();
     let mut metadata = metadata::Metadata::new(&arguments[0], &arguments[1]);
-    let prepared = bootstrap::Helper::start(&arguments[0], &arguments[1]).and_then(|helper| {
+    let prepared = (|| {
+        // Prioritize already-buffered protocol discovery over another Node startup.
+        metadata.read(&mut source, &mut input)?;
+        metadata.ready(&mut input, &mut source, &mut output, deadline)?;
+        let helper = bootstrap::Helper::start(&arguments[0], &arguments[1])?;
         startup::prepare(
             helper,
             &mut input,
@@ -69,7 +73,7 @@ fn run(arguments: &[OsString]) -> Result<()> {
             &mut metadata,
             deadline,
         )
-    });
+    })();
     match prepared {
         Ok(startup::Launch::Closed) => Ok(()),
         Ok(startup::Launch::Local(helper)) => transport::local(
