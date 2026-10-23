@@ -24,3 +24,8 @@ export const ManagedParentConnected = Schema.Struct({
   parentPid: NativeHostObservation.fields.parentPid,
   adapterPid: NativeHostObservation.fields.adapterPid
 })
+
+export const ManagedParentStarting = Schema.Struct({
+  kind: Schema.Literal("starting"),
+  parentPid: NativeHostObservation.fields.parentPid
+})

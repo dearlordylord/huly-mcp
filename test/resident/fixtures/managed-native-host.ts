@@ -7,7 +7,7 @@ import { GetHulyContextResultSchema } from "../../../src/domain/schemas/huly-con
 import { ResidentDirectory } from "../../../src/resident/protected-path.js"
 import { ResidentPackagePath } from "../../../src/resident/managed-contract.js"
 import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
-import { ManagedParentConnected } from "../managed-observation.js"
+import { ManagedParentConnected, ManagedParentStarting } from "../managed-observation.js"
 import { HostName, ManagedNativeHostObservation } from "../native-host-observation.js"
 
 const RESPONSE_BOUND = 5_000
@@ -16,7 +16,7 @@ const Input = Schema.Struct({
   directory: ResidentDirectory,
   host: HostName,
   workspace: Schema.NonEmptyString,
-  initialRead: Schema.Literals(["immediate", "command"])
+  initialRead: Schema.Literals(["immediate", "command", "synchronized"])
 })
 const Command = Schema.Literals(["read", "close"])
 const Phase = Schema.Struct({
@@ -96,6 +96,13 @@ const main = async () => {
   }
   try {
     await phase("connecting")
+    if (input.initialRead === "synchronized")
+      process.stdout.write(
+        `${Schema.encodeSync(Schema.fromJsonString(ManagedParentStarting))({
+          kind: "starting",
+          parentPid: process.pid
+        })}\n`
+      )
     await client.connect(transport, { timeout: RESPONSE_BOUND })
     await phase("connected")
     const connected = Schema.decodeUnknownSync(ManagedParentConnected)({
