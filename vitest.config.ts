@@ -117,6 +117,8 @@ export default defineConfig({
       {
         test: {
           name: 'boundaries',
+          // Each suite owns concurrent clients; Linux metadata helpers need an uncontended startup budget.
+          maxWorkers: process.platform === 'linux' ? 1 : DARWIN_WORKERS,
           include: processTestFiles,
           exclude: [...residentLaunchTestFiles, ...residentWaitTestFiles, ...residentFleetTestFiles],
           // Probe state belongs to each file; the observed servers and hosts still start fresh Node processes.
