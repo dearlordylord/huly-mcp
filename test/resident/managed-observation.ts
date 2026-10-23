@@ -29,3 +29,8 @@ export const ManagedParentStarting = Schema.Struct({
   kind: Schema.Literal("starting"),
   parentPid: NativeHostObservation.fields.parentPid
 })
+
+export const ManagedParentProgress = Schema.Struct({
+  kind: Schema.Literal("progress"),
+  stage: Schema.Literals(["tools", "resources", "context", "observation"])
+})

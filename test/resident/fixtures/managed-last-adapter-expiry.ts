@@ -68,7 +68,7 @@ const main = async () => {
       })}\n${Schema.encodeSync(Schema.fromJsonString(HostMessage))({
         jsonrpc: "2.0",
         id: ADMISSION_REQUEST_ID,
-        method: "resources/list",
+        method: "resources/templates/list",
         params: {}
       })}\n`
     )
@@ -79,7 +79,7 @@ const main = async () => {
         Schema.Struct({
           jsonrpc: Schema.Literal("2.0"),
           id: Schema.Literal(ADMISSION_REQUEST_ID),
-          result: McpSchema.ListResourcesResult
+          result: McpSchema.ListResourceTemplatesResult
         })
       )
     )(admitted.value)

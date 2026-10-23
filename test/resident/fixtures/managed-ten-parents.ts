@@ -10,7 +10,12 @@ import { ResidentPackagePath, ResidentRegistryEnvelope } from "../../../src/resi
 import { ResidentDirectory } from "../../../src/resident/protected-path.js"
 import { openKernelReapedEvents, ReapedEventsFd } from "../../helpers/kernel-reaped-events.js"
 import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
-import { ManagedParentConnected, ManagedParentObservation, ManagedParentStarting } from "../managed-observation.js"
+import {
+  ManagedParentConnected,
+  ManagedParentObservation,
+  ManagedParentProgress,
+  ManagedParentStarting
+} from "../managed-observation.js"
 import { NativeHostObservation } from "../native-host-observation.js"
 
 const RESPONSE_BOUND = 5_000
@@ -72,7 +77,13 @@ const run = async (input: Schema.Schema.Type<typeof Input>, kernel: ReturnType<t
       Schema.decodeUnknownSync(Schema.fromJsonString(ManagedParentStarting))(await nextLine())
       return Schema.decodeUnknownSync(Schema.fromJsonString(ManagedParentConnected))(await nextLine())
     }
-    const read = async () => Schema.decodeUnknownSync(Schema.fromJsonString(NativeHostObservation))(await nextLine())
+    const read = async () => {
+      for (const stage of ManagedParentProgress.fields.stage.literals) {
+        const progress = Schema.decodeUnknownSync(Schema.fromJsonString(ManagedParentProgress))(await nextLine())
+        assert.equal(progress.stage, stage)
+      }
+      return Schema.decodeUnknownSync(Schema.fromJsonString(NativeHostObservation))(await nextLine())
+    }
     return { child, exited, lines, connected, read }
   })
   let report: Omit<Schema.Schema.Type<typeof ManagedParentObservation>, "backendExit"> | undefined
