@@ -59,7 +59,20 @@ jobs:
         run: pnpm verify:effect-cohort
 
       - name: Run quality gate (build, typecheck, circular, lint, test + coverage)
-        run: pnpm check-all
+        shell: bash
+        run: |
+          pnpm check-all | tee quality-gate.log
+          grep -q '^Quality gate emitted ' quality-gate.log
+          test -s coverage/coverage-final.json
+      - name: Retain completed quality evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-quality-evidence-node-${{ matrix.node-version }}
+          path: |
+            quality-gate.log
+            coverage/coverage-final.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Save Vitest compilation cache
         if: always() && !cancelled() && steps.test-transforms.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -73,6 +86,7 @@ jobs:
         with:
           name: linux-quality-diagnostics-node-${{ matrix.node-version }}
           path: |
+            quality-gate.log
             coverage/coverage-final.json
             dist/resident-launch-replay-*/failure.json
             /tmp/resident-*/failure.log

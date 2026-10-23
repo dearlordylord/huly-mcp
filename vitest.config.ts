@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config'
 import { ORACLE_INFRASTRUCTURE_TAG } from './test/helpers/test-tags.js'
-import { DeadlineFirstSequencer } from './test/helpers/deadline-first-sequencer.js'
+import { DeadlineFirstSequencer, PORT_TEST_PROJECT } from './test/helpers/deadline-first-sequencer.js'
 
 const DARWIN_WORKERS = 4
 const DEFAULT_WORKERS = 6
@@ -87,7 +87,7 @@ export default defineConfig({
       },
       {
         test: {
-          name: 'ports',
+          name: PORT_TEST_PROJECT,
           include: portTestFiles,
           exclude: [...residentModelTestFiles, ...residentWaitTestFiles],
           sequence: { groupOrder: 4 },
@@ -109,7 +109,8 @@ export default defineConfig({
         test: {
           name: 'resident-fleets',
           include: residentFleetTestFiles,
-          isolate: true,
+          // Only the parent graph is shared; every observed host/backend remains a fresh owned process.
+          isolate: Boolean(process.env.QUINT_ORACLE_URL?.trim()),
           // Keep intrinsic client fleets independent; their own concurrency remains unchanged.
           maxWorkers: 1,
           sequence: { groupOrder: 3 },
