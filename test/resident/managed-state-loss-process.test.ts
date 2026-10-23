@@ -11,6 +11,7 @@ import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 import { StateLossObservation } from "./state-loss-observation.js"
 
 const PROCESS_BOUND = 30_000
+const ProcessFailure = Schema.Struct({ stderr: Schema.String })
 const runFile = promisify(execFile)
 let bundle: Awaited<ReturnType<typeof buildIsolatedStdioServer>>
 let fixture: string
@@ -58,7 +59,11 @@ it.skipIf(process.platform !== "linux")(
         root
       ],
       { timeout: PROCESS_BOUND, env: testStdioEnvironment() }
-    )
+    ).catch(async (error: unknown) => {
+      if (Schema.is(ProcessFailure)(error))
+        await fs.writeFile(`${root}.phases.log`, error.stderr, { mode: 0o600, flag: "wx" })
+      throw error
+    })
     await fs.writeFile(`${root}.phases.log`, result.stderr, { mode: 0o600, flag: "wx" })
     const receipt = Schema.decodeUnknownSync(Schema.fromJsonString(StateLossObservation))(result.stdout)
     expect(receipt.backendExit.exitCode).toBe(0)

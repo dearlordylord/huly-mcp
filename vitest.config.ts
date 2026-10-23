@@ -27,6 +27,7 @@ const residentLaunchTestFiles = ['test/resident/managed-backend-process.test.ts'
 const residentModelTestFiles = ['test/resident/launch-model-alignment.test.ts']
 const residentWaitTestFiles = ['test/resident/model-wait-process.test.ts']
 const residentFleetTestFiles = [
+  'test/resident/managed-state-loss-process.test.ts',
   'test/resident/ten-reader-process.test.ts',
   'test/resident/config-fault-process.test.ts',
   'test/resident/managed-version-process.test.ts',
