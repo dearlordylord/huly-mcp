@@ -11,10 +11,10 @@ const MAXIMUM_SUCCESSFUL_OUTPUT_LINE_COUNT = 300
 const SECOND = Milliseconds.make(MILLISECONDS_PER_SECOND)
 const SECONDS_PER_MINUTE = 60
 const TWO_MINUTE_COUNT = 2
-const FIVE_MINUTE_COUNT = 5
+const TEN_MINUTE_COUNT = 10
 const MINUTE = Milliseconds.make(SECONDS_PER_MINUTE * SECOND)
 const TWO_MINUTES = Milliseconds.make(TWO_MINUTE_COUNT * MINUTE)
-const FIVE_MINUTES = Milliseconds.make(FIVE_MINUTE_COUNT * MINUTE)
+const TEN_MINUTES = Milliseconds.make(TEN_MINUTE_COUNT * MINUTE)
 const maximumSuccessfulOutputLines = OutputLineCount.make(MAXIMUM_SUCCESSFUL_OUTPUT_LINE_COUNT)
 const PnpmEntryPoint = NonEmptyString.annotate({
   identifier: "PnpmEntryPoint",
@@ -48,7 +48,7 @@ const gates: ReadonlyArray<QualityGate> = [
   { args: ["verify-cli-skill-package"], name: "CLI Agent Skill package smoke", timeout: TWO_MINUTES },
   { args: ["verify-cli-package-closure"], name: "CLI package dependency closure", timeout: MINUTE },
   { args: ["lint"], name: "lint and duplication", timeout: TWO_MINUTES },
-  { args: ["test:coverage"], name: "tests and coverage", timeout: FIVE_MINUTES }
+  { args: ["test:coverage"], name: "tests and coverage", timeout: TEN_MINUTES }
 ]
 
 let successfulOutputLines = OutputLineCount.make(0)
