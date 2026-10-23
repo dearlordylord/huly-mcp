@@ -48,7 +48,7 @@ it.skipIf(process.platform !== "linux")(
         })
       )
       // The isolated bundle already prepared native assets and catalog verification for both layouts.
-      await Promise.all(
+      const builds = await Promise.allSettled(
         installations.map((installation) =>
           runFile(
             process.execPath,
@@ -61,6 +61,7 @@ it.skipIf(process.platform !== "linux")(
           )
         )
       )
+      for (const result of builds) if (result.status === "rejected") throw result.reason
       const host = join(workspace, "managed-native-host.cjs")
       const fixture = join(workspace, "managed-version-coexistence.cjs")
       for (const [source, destination] of [
