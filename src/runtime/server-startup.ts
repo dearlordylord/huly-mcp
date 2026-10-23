@@ -146,6 +146,15 @@ const restoreConsoleRedirect = (redirect: ConsoleRedirectHandle | undefined): Ef
 
 const webHeadersRecord = (headers: Headers): Record<string, string> => Object.fromEntries(headers.entries())
 
+const discoveryWarmup = (transport: McpTransportType, resolveClients: ClientResolver, enabled: boolean | undefined) =>
+  transport === "stdio" && enabled !== false
+    ? {
+        onDiscovery: () => {
+          void resolveClients()
+        }
+      }
+    : {}
+
 export const buildAppLayer = (
   transport: McpTransportType,
   httpPort: HttpPort,
@@ -166,7 +175,8 @@ export const buildAppLayer = (
     readonly beforeHttpShutdown: Effect.Effect<void>
     readonly processPolicy?: McpProcessPolicy
   },
-  telemetry?: TelemetryOperations
+  telemetry?: TelemetryOperations,
+  warmClientsOnDiscovery?: boolean
 ): Layer.Layer<McpServerService | HttpServerFactoryService, McpServerError, never> => {
   const mcpServerConfig = {
     transport,
@@ -175,13 +185,7 @@ export const buildAppLayer = (
     ...(mcpAuthToken === undefined ? {} : { mcpAuthToken }),
     authMethod,
     resolveClients,
-    ...(transport === "stdio"
-      ? {
-          onDiscovery: () => {
-            void resolveClients()
-          }
-        }
-      : {}),
+    ...discoveryWarmup(transport, resolveClients, warmClientsOnDiscovery),
     ...(observeMovement === undefined ? {} : { observeMovement }),
     ...httpPolicy,
     ...(closeClients === undefined ? {} : { closeClients }),
@@ -245,6 +249,7 @@ const runConfiguredServer = (
       return yield* Effect.fail(configuration.failure)
     }
     const { authMethod, configLayer, runtimeConfigContext } = configuration.success
+    const metadataOnly = yield* Config.Boolean("MCP_NATIVE_METADATA").pipe(Config.withDefault(false))
     const observeMovement = yield* configureMovementObserver()
     if (yield* Config.Boolean("MCP_PRELOAD_TOOLS").pipe(Config.withDefault(false)))
       yield* preloadToolHandlers.pipe(Effect.mapError((error) => new McpServerError({ message: error.message })))
@@ -279,7 +284,8 @@ const runConfiguredServer = (
             runtimeConfigContext,
             observeMovement,
             resident?.httpPolicy(clientStatus),
-            resident?.telemetryForServer
+            resident?.telemetryForServer,
+            !metadataOnly
           )
 
           yield* Effect.gen(function* () {

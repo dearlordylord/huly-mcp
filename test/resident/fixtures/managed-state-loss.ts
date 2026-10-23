@@ -1,3 +1,4 @@
+import { assertStartupFallback, fallbackRequests } from "./startup-fallback.js"
 import { strict as assert } from "node:assert"
 import { spawn } from "node:child_process"
 import { createHash } from "node:crypto"
@@ -9,7 +10,6 @@ import { Effect, Redacted, Schema } from "effect"
 import { ResidentAttachment } from "../../../src/resident/attachment-file.js"
 import { ResidentPackagePath, ResidentRegistryEnvelope } from "../../../src/resident/managed-contract.js"
 import { ResidentDirectory } from "../../../src/resident/protected-path.js"
-import { HostMessage } from "../../../src/resident/request-headers.js"
 import { openKernelReapedEvents, ReapedEventsFd } from "../../helpers/kernel-reaped-events.js"
 import { spawnManagedNativeParent } from "../../helpers/managed-native-parent.js"
 import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
@@ -25,7 +25,6 @@ const Input = Schema.Struct({
 })
 const bounded = <A>(value: Promise<A>) =>
   Effect.runPromise(Effect.promise(() => value).pipe(Effect.timeout(RESPONSE_BOUND)))
-const discovery = Schema.encodeSync(Schema.fromJsonString(HostMessage))({ jsonrpc: "2.0", id: 1, method: "ping" })
 
 const refuse = async (
   input: Schema.Schema.Type<typeof Input>,
@@ -46,9 +45,9 @@ const refuse = async (
   adapter.stderr.on("data", (bytes: Buffer) => errors.push(bytes))
   adapter.stdin.on("error", () => {})
   try {
-    adapter.stdin.end(`${discovery}\n`)
-    assert.deepEqual(await bounded(closed), [1, null])
-    assert.equal(Buffer.concat(output).length, 0)
+    adapter.stdin.end(`${fallbackRequests}\n`)
+    assert.deepEqual(await bounded(closed), [0, null])
+    assertStartupFallback(Buffer.concat(output).toString("utf8"), Buffer.concat(errors).toString("utf8"))
     const diagnostic = Buffer.concat(errors).toString("utf8")
     assert.ok(diagnostic.includes("Resident registry is unresolved"))
     for (const secret of [...secrets, environment.HULY_TOKEN]) assert.equal(diagnostic.includes(secret), false)

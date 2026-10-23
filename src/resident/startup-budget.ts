@@ -6,7 +6,7 @@ const NANOS_PER_MILLISECOND = 1_000_000n
 const expired = () =>
   new ManagedLaunchError({
     reason: "deadline",
-    message: "Resident startup exceeded its ten-second selection budget; no request was replayed"
+    message: "Resident startup exceeded its thirty-second selection budget; no request was replayed"
   })
 
 // Internal runtime port; deadlines are measured by each process's injected clock, never serialized.

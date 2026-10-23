@@ -72,13 +72,16 @@ const main = async () => {
   const first = spawnModelWaitParent(input.host, parentInput)
   const parents = [first]
   const run = async () => {
+    process.stderr.write("Mixed launch: await publication and first reader\n")
     const [file, firstReady] = await Promise.all([
       boundModelWait(announcement),
       first.next().then(Schema.decodeUnknownSync(ModelWaitEvent.cases.ready))
     ])
+    process.stderr.write("Mixed launch: first reader ready; start joiner\n")
     const second = spawnModelWaitParent(input.host, { ...parentInput, role: "joiner" })
     parents.push(second)
     const secondReady = Schema.decodeUnknownSync(ModelWaitEvent.cases.ready)(await second.next())
+    process.stderr.write("Mixed launch: both readers ready\n")
     assert.notEqual(firstReady.parentPid, secondReady.parentPid)
     assert.notEqual(firstReady.adapterPid, secondReady.adapterPid)
     assert.equal(firstReady.port, secondReady.port)

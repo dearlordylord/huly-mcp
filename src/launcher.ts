@@ -27,6 +27,10 @@ if (unsupportedRuntime) {
 } else {
   void import("./runtime/server-startup.js").then(async ({ main }) => {
     const { runMain } = await import("@effect/platform-node/NodeRuntime")
-    runMain(main)
+    const { Cause, Effect } = await import("effect")
+    const { writeStderrLine } = await import("./utils/stderr.js")
+    runMain(main.pipe(Effect.tapCause((cause) => Effect.sync(() => writeStderrLine(Cause.pretty(cause))))), {
+      disableErrorReporting: true
+    })
   })
 }

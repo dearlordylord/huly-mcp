@@ -2,6 +2,8 @@
 
 mod bootstrap;
 mod buffer;
+mod metadata;
+mod metadata_replay;
 mod os;
 mod startup;
 mod transport;
@@ -56,16 +58,44 @@ fn run(arguments: &[OsString]) -> Result<()> {
     os::nonblocking(1)?;
     // SAFETY: this executable exclusively owns stdin/stdout and never constructs other owners.
     let (mut source, mut output) = unsafe { (File::from_raw_fd(0), File::from_raw_fd(1)) };
-    let helper = bootstrap::Helper::start(&arguments[0], &arguments[1])?;
     let mut input = buffer::Input::new();
-    match startup::prepare(helper, &mut input, &mut source, deadline)? {
-        startup::Launch::Closed => Ok(()),
-        startup::Launch::Local(helper) => {
-            transport::local(helper, &mut input, &mut source, &mut output)
-        }
-        startup::Launch::Resident(socket) => {
+    let mut metadata = metadata::Metadata::new(&arguments[0], &arguments[1]);
+    let prepared = bootstrap::Helper::start(&arguments[0], &arguments[1]).and_then(|helper| {
+        startup::prepare(
+            helper,
+            &mut input,
+            &mut source,
+            &mut output,
+            &mut metadata,
+            deadline,
+        )
+    });
+    match prepared {
+        Ok(startup::Launch::Closed) => Ok(()),
+        Ok(startup::Launch::Local(helper)) => transport::local(
+            metadata.local(&mut input, Some(helper))?,
+            &mut input,
+            &mut source,
+            &mut output,
+            metadata.take_output(),
+        ),
+        Ok(startup::Launch::Resident(socket)) => {
+            drop(metadata);
             transport::resident(socket, &mut input, &mut source, &mut output)
         }
+        Err(_) if os::signal_status().is_none() => {
+            // Only protocol metadata has run; application input is still owned by this queue.
+            eprintln!("Native resident startup failed; starting ordinary stdio");
+            let helper = metadata.local(&mut input, None)?;
+            transport::local(
+                helper,
+                &mut input,
+                &mut source,
+                &mut output,
+                metadata.take_output(),
+            )
+        }
+        Err(error) => Err(error),
     }
 }
 

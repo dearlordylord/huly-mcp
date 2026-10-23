@@ -11,7 +11,7 @@ export const IdleFenceEvent = Schema.Union([
 ])
 export const IdleFenceObservation = Schema.Struct({
   retiredGeneration: ResidentTlsIdentity.fields.generation,
-  refusedExitCode: Schema.Literal(1),
+  fallbackExitCode: Schema.Literal(0),
   originalBackendExitCode: Schema.Literal(0),
   replacementGeneration: ResidentTlsIdentity.fields.generation,
   replacement: ManagedNativeHostObservation,

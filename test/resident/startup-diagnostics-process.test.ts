@@ -52,6 +52,7 @@ it.each(
         timeout: RESPONSE_BOUND,
         env: {
           ...environment,
+          LAZY_ENVS: "false",
           MCP_TRANSPORT: transport,
           MCP_RESIDENT_STATE_DIRECTORY: join(root, "state"),
           HULY_PASSWORD: "private-unused-password-marker",

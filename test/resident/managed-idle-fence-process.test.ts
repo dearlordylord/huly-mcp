@@ -70,7 +70,7 @@ it.skipIf(process.platform !== "linux")(
       })
       await fs.writeFile(`${directory}.phases.log`, result.stderr, { flag: "wx", mode: 0o600 })
       const receipt = Schema.decodeUnknownSync(Schema.fromJsonString(IdleFenceObservation))(result.stdout)
-      expect(receipt.refusedExitCode).toBe(1)
+      expect(receipt.fallbackExitCode).toBe(0)
       expect(receipt.originalBackendExitCode).toBe(0)
       expect(receipt.replacement.contextIsError).toBe(false)
       expect(receipt.replacementGeneration).not.toBe(receipt.retiredGeneration)

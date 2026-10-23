@@ -40,6 +40,35 @@ contexts, current TLS identity/authentication and the existing exposure policy.
 We do not introduce MCPorter's universal per-user broker, Chrome-specific state,
 45-second readiness allowance, 15-minute lease policy or third-party dependency.
 Existing Huly startup, cleanup, lease, queue and concurrency bounds remain.
+
+On 2026-10-22, the user changed the resident startup budget to 30 seconds and
+requested automatic ordinary stdio fallback when startup fails. Qualification
+then exposed a concrete Codex consumer requirement: with optional MCP startup,
+Codex can start and finish a model turn without tools before that budget expires.
+A client waiting flag alone does not correct server protocol readiness. A second
+clean-cache `pnpm dlx` qualification exposed the preceding installation boundary:
+optional Codex startup can finish its first turn before the package is available.
+The same real four-read scenario passed with `required=true` and the default
+client timeout. The user subsequently chose optional Huly startup so a Huly
+failure cannot prevent Codex from starting. The setup omits `required=true`;
+the observed cold-cache first-turn availability limitation remains. No server
+code can serve protocol metadata before its package has been downloaded.
+
+Protocol readiness therefore precedes resident readiness. A temporary ordinary
+stdio process serves initialization, discovery, tool listing and protocol
+keepalive through the existing parser, registry and exposure policy. Its client
+resolver is lazy even when resident/application startup is eager: metadata must
+not wait for Huly network access. On local fallback the same resolver acquires
+Huly clients on the first application operation. The native
+bridge retains all application input until transport selection. On successful
+attachment it re-establishes only a successful protocol initialization on the
+resident, suppresses that reply, preserves the initialized notification, and
+retires the temporary process. Tool calls never run in that process before local
+fallback and are never replayed after possible dispatch. Startup fallback keeps
+the same already-initialized stdio process. Every consumed byte must enter an
+owned queue before fallible helper creation. Unresolved resident ownership
+records remain intact. Active channel failure still terminates the attachment.
+Other cleanup, lease, queue, concurrency and output-write limits remain unchanged.
 MCPorter's policy of pinning an idle host on unknown business outcomes is not
 adopted. Once local work and resources are safely retired, uncertainty about a
 remote mutation alone does not retain a backend forever or become resolved by

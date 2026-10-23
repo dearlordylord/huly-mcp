@@ -1,3 +1,4 @@
+import { assertStartupFallback, fallbackRequests } from "./startup-fallback.js"
 import { strict as assert } from "node:assert"
 import { execFile, spawn } from "node:child_process"
 import { once } from "node:events"
@@ -9,7 +10,6 @@ import { Effect, Schema } from "effect"
 
 import { ResidentPackagePath, ResidentRegistryEnvelope } from "../../../src/resident/managed-contract.js"
 import { ResidentDirectory } from "../../../src/resident/protected-path.js"
-import { HostMessage } from "../../../src/resident/request-headers.js"
 import { openKernelReapedEvents, ReapedEventsFd } from "../../helpers/kernel-reaped-events.js"
 import { spawnManagedNativeParent } from "../../helpers/managed-native-parent.js"
 import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
@@ -24,13 +24,6 @@ const Input = Schema.Struct({
   backend: ResidentPackagePath,
   directory: ResidentDirectory,
   reapedFd: ReapedEventsFd
-})
-const RefusedStart = Schema.Struct({
-  code: Schema.Literal(1),
-  killed: Schema.Literal(false),
-  signal: Schema.Null,
-  stdout: Schema.Literal(""),
-  stderr: Schema.String
 })
 const bounded = <A>(pending: Promise<A>, allowance = RESPONSE_BOUND) =>
   Effect.runPromise(Effect.promise(() => pending).pipe(Effect.timeout(allowance)))
@@ -91,17 +84,10 @@ const main = async () => {
     }
     const retry = runFile(process.execPath, [input.bundle], { timeout: RESPONSE_BOUND, env: environment })
     retry.child.stdin?.on("error", () => {})
-    retry.child.stdin?.end(
-      `${Schema.encodeSync(Schema.fromJsonString(HostMessage))({ jsonrpc: "2.0", id: 1, method: "ping" })}\n`
-    )
-    const refused = await retry.then(
-      () => {
-        throw new Error("A retiring generation admitted a fresh adapter")
-      },
-      (error: unknown) => Schema.decodeUnknownSync(RefusedStart)(error)
-    )
-    assert.ok(refused.stderr.includes("no Huly request was dispatched"))
-    assert.equal(refused.stderr.includes(environment.HULY_TOKEN), false)
+    retry.child.stdin?.end(`${fallbackRequests}\n`)
+    const fallback = await retry
+    assertStartupFallback(fallback.stdout, fallback.stderr)
+    assert.equal(fallback.stderr.includes(environment.HULY_TOKEN), false)
     assert.equal(backend.exitCode, null)
     assert.equal(await fs.readFile(original.path, "utf8"), original.bytes)
     assert.deepEqual((await fs.readdir(input.directory)).sort(), inventory)
@@ -123,7 +109,7 @@ const main = async () => {
     process.stdout.write(
       Schema.encodeSync(Schema.fromJsonString(IdleFenceObservation))({
         retiredGeneration: ready.generation,
-        refusedExitCode: 1,
+        fallbackExitCode: 0,
         originalBackendExitCode: 0,
         replacementGeneration: fresh.envelope.generation,
         replacement,

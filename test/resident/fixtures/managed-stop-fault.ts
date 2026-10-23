@@ -1,3 +1,4 @@
+import { assertStartupFallback, fallbackRequests } from "./startup-fallback.js"
 import { strict as assert } from "node:assert"
 import { execFile, spawn } from "node:child_process"
 import { createHash } from "node:crypto"
@@ -13,7 +14,6 @@ import { Deferred, Effect, Schema } from "effect"
 import { GetHulyContextResultSchema } from "../../../src/domain/schemas/huly-context.js"
 import { ResidentPackagePath, ResidentRegistryEnvelope } from "../../../src/resident/managed-contract.js"
 import { ResidentStopReport } from "../../../src/resident/operator-stop.js"
-import { HostMessage } from "../../../src/resident/request-headers.js"
 import { ResidentDirectory, ResidentFilePath } from "../../../src/resident/protected-path.js"
 import { openKernelReapedEvents, ReapedEventsFd } from "../../helpers/kernel-reaped-events.js"
 import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
@@ -86,11 +86,9 @@ const observeRefusedStart = async (input: Schema.Schema.Type<typeof Input>) => {
   child.stderr.on("data", (chunk: Buffer) => diagnostics.push(chunk))
   child.stdin.on("error", () => {})
   try {
-    child.stdin.end(
-      `${Schema.encodeSync(Schema.fromJsonString(HostMessage))(HostMessage.make({ jsonrpc: "2.0", id: 1, method: "ping" }))}\n`
-    )
-    assert.deepEqual(await bounded(closed), [1, null])
-    assert.equal(Buffer.concat(output).length, 0)
+    child.stdin.end(`${fallbackRequests}\n`)
+    assert.deepEqual(await bounded(closed), [0, null])
+    assertStartupFallback(Buffer.concat(output).toString("utf8"), Buffer.concat(diagnostics).toString("utf8"))
     return Buffer.concat(diagnostics)
   } finally {
     if (child.exitCode === null && child.signalCode === null) {
@@ -137,9 +135,13 @@ const main = async () => {
     process.stderr.write(`Managed stop fault: ${input.mode} await ready\n`)
     const ready = await next()
     assert.ok(ready.kind === "ready")
+    process.stderr.write("Managed stop fault: backend ready; connect adapter\n")
     const recordFile = join(input.directory, "generations", `${ready.generation}.json`)
     const originalRecord = await fs.readFile(recordFile, "utf8")
     await original.client.connect(original.transport, { timeout: RESPONSE_BOUND })
+    // This backend has a test-only registry. Cross the admission boundary before inspecting it.
+    await original.client.listResources(undefined, { timeout: RESPONSE_BOUND })
+    process.stderr.write("Managed stop fault: adapter admitted; discover fixture tool\n")
     assert.ok(
       (await original.client.listTools(undefined, { timeout: RESPONSE_BOUND })).tools.some(
         (tool) => tool.name === "fixture_increment"
@@ -179,7 +181,7 @@ const main = async () => {
     assert.deepEqual(await bounded(exited), [backendExitCode, null])
     process.stderr.write("Managed stop fault: joined owned backend exit\n")
     await original.close()
-    const replacementOutcome = input.mode === "normal-cleanup" ? "started" : "refused"
+    const replacementOutcome = input.mode === "normal-cleanup" ? "started" : "stdio"
     if (input.mode === "normal-cleanup") {
       assert.equal(terminal.kind, "retired")
       assert.deepEqual(await fs.readdir(input.directory), [])
@@ -205,15 +207,14 @@ const main = async () => {
     } else {
       assert.equal(terminal.kind, "retained")
       assert.equal(await fs.readFile(recordFile, "utf8"), originalRecord)
-      await assert.rejects(replacement.client.connect(replacement.transport, { timeout: RESPONSE_BOUND }))
+      await replacement.client.connect(replacement.transport, { timeout: RESPONSE_BOUND })
       process.stderr.write("Managed stop fault: replacement connect refused\n")
       await replacement.close()
       assert.equal(await fs.readFile(recordFile, "utf8"), originalRecord)
       const refusal = await observeRefusedStart(input)
       refusedDiagnostics.push(refusal)
       const diagnostic = refusal.toString("utf8")
-      assert.ok(diagnostic.includes("no Huly request was dispatched"))
-      assert.ok(diagnostic.includes("No request was replayed"))
+      assert.ok(diagnostic.includes("Native resident startup failed; starting ordinary stdio"))
       assert.deepEqual(await fs.readdir(join(input.directory, "generations")), [`${ready.generation}.json`])
     }
     const diagnostics = Buffer.concat([

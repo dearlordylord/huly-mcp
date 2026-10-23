@@ -1,5 +1,6 @@
 import * as fs from "node:fs/promises"
 import { ConfigProvider, Deferred, Effect, Exit, Fiber, Layer, Redacted, Result, Schema } from "effect"
+import { TestClock } from "effect/testing"
 import { expect, it } from "vitest"
 
 import { ResidentAttachment, withPublishedResidentAttachment } from "../../src/resident/attachment-file.js"
@@ -100,16 +101,19 @@ it("retains its registry after native transport drain fails", async () =>
 it("bounds claim contention without removing the still-owned claim", { timeout: OWNER_PROCESS_BOUND }, async () =>
   withOwner((ownership, capture) =>
     Effect.gen(function* () {
-      const error = yield* withResidentSelection({
+      const startup = yield* makeStartupBudget
+      const pending = yield* withResidentSelection({
         directory: ownership.directory,
         capture,
-        startup: yield* makeStartupBudget,
+        startup,
         existing: () => Effect.die("Unexpected attachment during contention"),
         absent: () => Effect.die("Owned claim was stolen")
-      }).pipe(Effect.flip)
+      }).pipe(Effect.flip, Effect.forkChild)
+      yield* TestClock.adjust("30 seconds")
+      const error = yield* Fiber.join(pending)
       expect("reason" in error ? error.reason : undefined).toBe("deadline")
       expect(yield* Effect.promise(() => fs.readdir(ownership.directory))).toContain("selection.claim")
-    })
+    }).pipe(Effect.provide(TestClock.layer()))
   )
 )
 

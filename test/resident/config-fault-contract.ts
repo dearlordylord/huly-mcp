@@ -12,13 +12,6 @@ export const ConfigFaultInput = Schema.Struct({
   launch: ConfigFaultLaunch
 })
 
-export const ConfigFaultRefusedStart = Schema.Struct({
-  code: Schema.Literal(1),
-  killed: Schema.Literal(false),
-  signal: Schema.Null,
-  stdout: Schema.Literal(""),
-  stderr: Schema.String
-})
 export const CONFIG_FAULT_READS = 2
 export const OwnedBackendSignal = Schema.Struct({
   processId: KernelOwnedExit.fields.processId,

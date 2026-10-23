@@ -1,3 +1,4 @@
+import { assertStartupFallback, fallbackRequests } from "./startup-fallback.js"
 import { AssertionError, strict as assert } from "node:assert"
 import { spawn } from "node:child_process"
 import { once } from "node:events"
@@ -14,7 +15,6 @@ import { RESIDENT_PUBLICATION_FILENAME } from "../../../src/resident/attachment-
 import { ResidentPackagePath, ResidentRegistryEnvelope } from "../../../src/resident/managed-contract.js"
 import { requestResidentStop } from "../../../src/resident/operator-stop.js"
 import { ResidentDirectory, ResidentFilePath } from "../../../src/resident/protected-path.js"
-import { HostMessage } from "../../../src/resident/request-headers.js"
 import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
 import { DisposableRestProject, startDisposableRestFixture } from "../disposable-rest-fixture.js"
 import {
@@ -216,19 +216,7 @@ const main = async () => {
     replacement.stderr.on("data", (chunk: Buffer) => replacementDiagnostics.push(chunk))
     replacement.stdin.on("error", () => {})
     try {
-      const discovery = Schema.encodeSync(Schema.fromJsonString(HostMessage))({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "server/discover",
-        params: {
-          _meta: {
-            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
-            "io.modelcontextprotocol/clientCapabilities": {},
-            "io.modelcontextprotocol/clientInfo": { name: "loss-refusal", version: "1" }
-          }
-        }
-      })
-      replacement.stdin.end(`${discovery}\n`)
+      replacement.stdin.end(`${fallbackRequests}\n`)
       const replacementExit = await bounded(replacementClosed)
       const diagnosticDirectory = `${input.directory}.diagnostics`
       await fs.mkdir(diagnosticDirectory, { mode: 0o700 })
@@ -240,12 +228,10 @@ const main = async () => {
         mode: 0o600,
         flag: "wx"
       })
-      assert.deepEqual(replacementExit, [1, null], "Fresh adapter did not refuse unresolved ownership")
-      process.stderr.write("Managed loss: replacement refused\n")
-      assert.equal(Buffer.concat(replacementOutput).length, 0, "Refused replacement emitted protocol output")
-      assert.ok(
-        Buffer.concat(replacementDiagnostics).toString("utf8").includes("no Huly request was dispatched"),
-        "Refused replacement omitted the no-dispatch diagnostic"
+      assert.deepEqual(replacementExit, [0, null])
+      assertStartupFallback(
+        Buffer.concat(replacementOutput).toString("utf8"),
+        Buffer.concat(replacementDiagnostics).toString("utf8")
       )
       const afterInventory = (await fs.readdir(input.directory)).sort()
       const locator = `${originalEnvelope.generation}.json`

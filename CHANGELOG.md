@@ -1,5 +1,24 @@
 # @firfi/huly-mcp
 
+## 0.55.4
+
+### Patch Changes
+
+- Recommend shared resident startup with `MCP_TRANSPORT=stdio-resident`: compatible agent sessions share one backend through packaged native bridges for macOS and Linux; no Rust installation is needed. If resident startup fails within its 30-second budget, the connection automatically falls back to ordinary stdio. Existing configurations remain stdio unless changed.
+- Connect using `npx -y @firfi/huly-mcp@next` for this release (`pnpm dlx` is also supported); the package downloads automatically when needed. Keep Huly optional in Codex so an MCP startup failure does not prevent Codex from starting. On a cold download, the first turn may begin without Huly tools; use `/mcp` to check connection status. See the README for configuration.
+
+## 0.55.3
+
+### Patch Changes
+
+- Publish MCP initialization and the tool catalog while resident startup is pending, so MCP discovery does not wait for resident acquisition. Configure Codex to wait for Huly during cold package installation using required=true. Keep application calls queued until resident attachment or ordinary stdio fallback, preserve input on helper-creation failure, and retire temporary metadata processes after attachment.
+
+## 0.55.2
+
+### Patch Changes
+
+- Allow 30 seconds for resident startup and automatically fall back to ordinary stdio if startup fails, preserving buffered MCP input without replaying requests from an active resident session.
+
 ## 0.55.1
 
 ### Patch Changes

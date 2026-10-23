@@ -70,21 +70,13 @@ Exact native tool names still dispatch when a client calls them directly, but ma
 <details>
 <summary>Codex</summary>
 
-Use Codex's MCP manager:
+`npx` automatically downloads and caches Huly MCP; `pnpm dlx @firfi/huly-mcp@latest` is an alternative. Huly is optional, so Codex can start without it and a cold download may leave the first turn without Huly tools. Run `/mcp` to check the connection.
 
-```bash
-codex mcp add huly \
-  --env MCP_TRANSPORT=stdio-resident \
-  --env HULY_URL=https://your-huly-instance.example.com \
-  --env HULY_TOKEN=your-huly-api-token \
-  --env HULY_WORKSPACE=yourworkspace \
-  -- npx -y @firfi/huly-mcp@latest
-```
-
-Or add it directly to `~/.codex/config.toml`:
+Add to `~/.codex/config.toml` (the 120-second startup allowance includes installation):
 
 ```toml
 [mcp_servers.huly]
+startup_timeout_sec = 120
 command = "npx"
 args = ["-y", "@firfi/huly-mcp@latest"]
 
@@ -228,7 +220,7 @@ the [production release guide](docs/NPM_PRODUCTION_RELEASE.md) for preflight che
 
 ## Shared resident stdio
 
-The setup examples explicitly select `MCP_TRANSPORT=stdio-resident`. MCP clients still use stdio, while compatible clients under the same OS user share a Node backend through small native bridges. Linux and macOS arm64/x64 binaries are included; no Rust installation is needed. If the native bridge cannot run, startup falls back to ordinary stdio before accepting requests. A failed active resident never reconnects or replays requests.
+The setup examples explicitly select `MCP_TRANSPORT=stdio-resident`. MCP clients still use stdio, while compatible clients under the same OS user share a Node backend through small native bridges. Linux and macOS arm64/x64 binaries are included; no Rust installation is needed. MCP initialization and the tool catalog are available while the resident starts. A temporary ordinary stdio process serves this protocol metadata through the same registry and exposure rules, without waiting for a Huly connection. Application requests remain buffered during the 30-second resident startup budget. Successful attachment retires the temporary process; startup failure keeps it as ordinary stdio and dispatches the buffered application input once. A failed active resident never reconnects or replays application requests.
 
 Omitting `MCP_TRANSPORT` still selects ordinary `stdio`, preserving existing installations. Set `MCP_TRANSPORT=stdio` explicitly to keep a separate backend per client. Restart the MCP client after changing the setting.
 

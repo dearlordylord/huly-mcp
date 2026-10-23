@@ -67,6 +67,18 @@ it.skipIf(process.platform === "win32")(
   }
 )
 
+it.skipIf(process.platform === "win32")("refuses an executable that fails its startup check", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "native-check-failure-"))
+  const input = { ...runtime, packageFile: join(directory, "index.cjs") }
+  try {
+    await mkdir(join(directory, "native"))
+    await writeFile(join(directory, "native", "huly-stdio-linux-arm64"), "#!/bin/sh\nexit 1\n", { mode: 0o700 })
+    expect(nativeExecutableFor(input)).toBeUndefined()
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
 it("contains a malformed executable path without aborting bootstrap", () => {
   expect(nativeExecutableFor({ ...runtime, packageFile: "/invalid\0/index.cjs" })).toBeUndefined()
 })

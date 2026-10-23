@@ -13,7 +13,7 @@ export const CrashedCommitObservation = Schema.Struct({
   originalOutcomeUnknown: Schema.Literal(true),
   negotiationStdoutBytes: Schema.Int.check(Schema.isGreaterThan(0)),
   originalStdoutBytes: Schema.Literal(0),
-  recoveringExitCodes: Schema.Tuple([Schema.Literal(1), Schema.Literal(1)]),
+  recoveringExitCodes: Schema.Tuple([Schema.Literal(0), Schema.Literal(0)]),
   ownershipBytesRetained: Schema.Literal(true),
   writeDispatches: Schema.Literal(1),
   readDispatches: Schema.Literal(0),

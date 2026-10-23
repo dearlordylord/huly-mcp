@@ -1,3 +1,4 @@
+import { assertStartupFallback, fallbackRequests } from "./startup-fallback.js"
 import { execFile } from "node:child_process"
 import { promisify } from "node:util"
 
@@ -6,7 +7,6 @@ import * as fs from "node:fs/promises"
 import { join } from "node:path"
 import { Deferred, Effect, Result, Schema } from "effect"
 import { retireFunctionalResident } from "../../helpers/resident-retirement.js"
-import { HostMessage } from "../../../src/resident/request-headers.js"
 import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
 
 import { readResidentNamespace } from "../../../src/resident/namespace-inventory.js"
@@ -24,7 +24,6 @@ import {
   CONFIG_FAULT_READS,
   ConfigFaultInput,
   ConfigFaultReceipt,
-  ConfigFaultRefusedStart,
   OwnedBackendSignal
 } from "../config-fault-contract.js"
 
@@ -153,22 +152,10 @@ const main = async () => {
     }
     const retry = runFile(process.execPath, [input.bundle], { timeout: RESPONSE_BOUND, env: environment })
     retry.child.stdin?.on("error", () => process.stderr.write("Refused start input closed\n"))
-    retry.child.stdin?.end(
-      `${Schema.encodeSync(Schema.fromJsonString(HostMessage))({
-        jsonrpc: "2.0",
-        id: ACTIVE_FIRST_ID,
-        method: "tools/call",
-        params: { name: "get_project", arguments: { project: project.identifier } }
-      })}\n`
-    )
-    const refused = await retry.then(
-      () => {
-        throw new Error("Unexpected replacement of unresolved owner")
-      },
-      (error: unknown) => Schema.decodeUnknownSync(ConfigFaultRefusedStart)(error)
-    )
-    assert.ok(refused.stderr.includes("no Huly request was dispatched"))
-    assert.ok(!refused.stderr.includes(environment.HULY_TOKEN))
+    retry.child.stdin?.end(`${fallbackRequests}\n`)
+    const fallback = await retry
+    assertStartupFallback(fallback.stdout, fallback.stderr)
+    assert.ok(!fallback.stderr.includes(environment.HULY_TOKEN))
     assert.equal(await fs.readFile(pathA, "utf8"), originalA)
     assert.deepEqual(
       (await fs.readdir(join(input.directory, "generations"))).sort(),

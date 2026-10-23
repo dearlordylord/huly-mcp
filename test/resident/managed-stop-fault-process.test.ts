@@ -79,7 +79,7 @@ describe.skipIf(process.platform !== "linux")("managed stop during committed fix
       expect(receipt.dispatches).toBe(1)
       expect(receipt.writes).toBe(1)
       expect(receipt.registry).toBe(mode === "normal-cleanup" ? "retired" : "retained")
-      expect(receipt.replacement).toBe(mode === "normal-cleanup" ? "started" : "refused")
+      expect(receipt.replacement).toBe(mode === "normal-cleanup" ? "started" : "stdio")
       await fs.writeFile(
         `${root}.receipt.json`,
         Schema.encodeSync(Schema.fromJsonString(StopFaultObservation))(receipt),

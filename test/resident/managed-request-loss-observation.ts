@@ -13,8 +13,8 @@ const Common = Schema.Struct({
   adapterClosed: Schema.Literal(true),
   unknownOutcome: Schema.Boolean,
   registryRetained: Schema.Boolean,
-  replacementExitCode: Schema.Literal(1),
-  replacementStdoutBytes: Schema.Literal(0)
+  replacementExitCode: Schema.Literal(0),
+  replacementStdoutBytes: Schema.Int.check(Schema.isGreaterThan(0))
 })
 export const ManagedRequestLossObservation = Schema.Union([
   Schema.Struct({

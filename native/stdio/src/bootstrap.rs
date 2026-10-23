@@ -83,17 +83,45 @@ pub struct Helper {
     pub control: File,
 }
 
+enum HelperMode {
+    Bootstrap,
+    Local,
+    Metadata,
+}
+
 impl Helper {
     pub fn start(node: &OsStr, bundle: &OsStr) -> Result<Self> {
+        Self::with_mode(node, bundle, HelperMode::Bootstrap)
+    }
+    pub fn local(node: &OsStr, bundle: &OsStr) -> Result<Self> {
+        Self::with_mode(node, bundle, HelperMode::Local)
+    }
+    pub fn metadata(node: &OsStr, bundle: &OsStr) -> Result<Self> {
+        Self::with_mode(node, bundle, HelperMode::Metadata)
+    }
+    fn with_mode(node: &OsStr, bundle: &OsStr, mode: HelperMode) -> Result<Self> {
         let (reader, writer) = os::control_pipe()?;
         let fd = writer.as_raw_fd();
         let mut command = Command::new(node);
         command
             .arg(bundle)
-            .env("MCP_TRANSPORT", "resident-bootstrap")
+            .env(
+                "MCP_TRANSPORT",
+                match mode {
+                    HelperMode::Bootstrap => "resident-bootstrap",
+                    HelperMode::Local | HelperMode::Metadata => "stdio",
+                },
+            )
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit());
+        if matches!(mode, HelperMode::Metadata) {
+            // Protocol metadata must not acquire Huly clients. On local fallback,
+            // the same resolver acquires them at the first application operation.
+            command
+                .env("LAZY_ENVS", "true")
+                .env("MCP_NATIVE_METADATA", "true");
+        }
         // SAFETY: this closure only duplicates a live descriptor with async-signal-safe calls.
         unsafe {
             command.pre_exec(move || os::inherit_control(fd, NATIVE_CONTROL_FD));

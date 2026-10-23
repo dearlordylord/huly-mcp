@@ -1,3 +1,4 @@
+import { assertStartupFallback, fallbackRequests } from "./startup-fallback.js"
 import { strict as assert } from "node:assert"
 import type { ChildProcessWithoutNullStreams } from "node:child_process"
 import * as fs from "node:fs/promises"
@@ -7,7 +8,6 @@ import { Effect, Schema } from "effect"
 import type { LiveReadProtocol } from "../../../scripts/resident-live-read-contract.js"
 import type { ResidentRegistryEnvelope } from "../../../src/resident/managed-contract.js"
 import type { ResidentDirectory, ResidentFilePath } from "../../../src/resident/protected-path.js"
-import { HostMessage } from "../../../src/resident/request-headers.js"
 import { CrashedCommitObservation } from "../crashed-commit-observation.js"
 import { RetiredCommitState } from "../retired-commit-observation.js"
 import type { startRetiredCommitCounter } from "../retired-commit-remote.js"
@@ -52,18 +52,9 @@ export const qualifyCrashedCommit = async (input: {
   const recover = async () => {
     const { child, closed, diagnostics: errors, output } = input.startRecovering()
     try {
-      child.stdin.end(
-        `${Schema.encodeSync(Schema.fromJsonString(HostMessage))({
-          jsonrpc: "2.0",
-          id: 41,
-          method: "tools/call",
-          params: { name: "fixture_increment", arguments: {} }
-        })}\n`
-      )
-      process.stderr.write("Crashed commit: wait fresh adapter refusal\n")
-      assert.deepEqual(await bounded(closed), [1, null])
-      assert.equal(Buffer.concat(output).length, 0)
-      assert.ok(Buffer.concat(errors).toString("utf8").includes("no Huly request was dispatched"))
+      child.stdin.end(`${fallbackRequests}\n`)
+      assert.deepEqual(await bounded(closed), [0, null])
+      assertStartupFallback(Buffer.concat(output).toString("utf8"), Buffer.concat(errors).toString("utf8"))
       process.stderr.write("Crashed commit: check protected records\n")
       assert.ok((await fs.readFile(registry)).equals(originalBytes))
       assert.deepEqual((await fs.readdir(input.directory)).sort(), inventory)
@@ -97,7 +88,7 @@ export const qualifyCrashedCommit = async (input: {
     originalOutcomeUnknown: true,
     negotiationStdoutBytes: input.negotiationStdoutBytes,
     originalStdoutBytes: 0,
-    recoveringExitCodes: [1, 1],
+    recoveringExitCodes: [0, 0],
     ownershipBytesRetained: true,
     writeDispatches: 1,
     readDispatches: 0,

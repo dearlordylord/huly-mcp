@@ -24,7 +24,7 @@ pub fn frame(bytes: &[u8]) -> Vec<u8> {
     encoded
 }
 
-struct Frames {
+pub(crate) struct Frames {
     header: [u8; NATIVE_FRAME_HEADER_BYTES],
     header_read: usize,
     body: Vec<u8>,
@@ -33,7 +33,7 @@ struct Frames {
 }
 
 impl Frames {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             header: [0; NATIVE_FRAME_HEADER_BYTES],
             header_read: 0,
@@ -42,7 +42,7 @@ impl Frames {
             diagnostic: false,
         }
     }
-    fn read(&mut self, stream: &mut UnixStream, output: &mut Queue) -> Result<()> {
+    pub(crate) fn read(&mut self, stream: &mut UnixStream, output: &mut Queue) -> Result<()> {
         if !output.is_empty() {
             return Ok(());
         }
@@ -100,7 +100,7 @@ impl Frames {
     }
 }
 
-fn drain_output(queue: &mut Queue, output: &mut File) -> Result<()> {
+pub(crate) fn drain_output(queue: &mut Queue, output: &mut File) -> Result<()> {
     queue.check_output_deadline()?;
     queue.write_to(output).map_err(|_| BridgeError::Output)
 }
@@ -169,8 +169,10 @@ pub fn local(
     input: &mut Input,
     source: &mut File,
     output: &mut File,
+    initial_output: Queue,
 ) -> Result<()> {
     let mut replies = Input::new();
+    replies.queue = initial_output;
     loop {
         if os::signal_status().is_some() {
             return Ok(());

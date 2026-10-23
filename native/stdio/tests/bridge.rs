@@ -536,19 +536,174 @@ fn bootstrap_overrides_the_inherited_transport() {
 }
 
 #[test]
-fn startup_deadline_cancels_and_joins_the_helper() {
+fn startup_deadline_joins_the_helper_and_falls_back_without_losing_buffered_input() {
     let directory = Directory::new();
-    let helper = directory.helper("exec sleep 20");
+    let pid_file = directory.0.join("bootstrap.pid");
+    let helper = directory.helper(&format!(
+        "if [ \"$MCP_TRANSPORT\" = stdio ]; then exec cat; fi\nprintf '%s' \"$$\" > '{}'\nexec sleep 20",
+        pid_file.display()
+    ));
     let started = Instant::now();
     let mut process = Process(
         Command::new(env!("CARGO_BIN_EXE_huly-stdio"))
-            .args([helper.as_os_str(), "unused".as_ref(), "100".as_ref()])
+            .args([helper.as_os_str(), "unused".as_ref(), "1000".as_ref()])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
             .unwrap(),
     );
-    assert_eq!(process.wait(Duration::from_secs(2)).code(), Some(1));
+    process
+        .0
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"queued request\n")
+        .unwrap();
+    let mut output = String::new();
+    process
+        .0
+        .stdout
+        .as_mut()
+        .unwrap()
+        .read_to_string(&mut output)
+        .unwrap();
+    assert!(process.wait(Duration::from_secs(2)).success());
+    assert_eq!(output, "queued request\n");
+    let pid: i32 = fs::read_to_string(pid_file).unwrap().parse().unwrap();
+    // SAFETY: signal zero only checks whether this fixture's joined helper still exists.
+    assert_eq!(unsafe { libc::kill(pid, 0) }, -1);
+    assert_eq!(io::Error::last_os_error().raw_os_error(), Some(libc::ESRCH));
     assert!(started.elapsed() < Duration::from_secs(2));
+}
+
+#[test]
+fn thirty_second_startup_allowance_is_accepted() {
+    let directory = Directory::new();
+    let helper = directory.helper("printf 'local\\n' >&3\nexec 3>&-\nexec cat");
+    let mut process = Process(
+        Command::new(env!("CARGO_BIN_EXE_huly-stdio"))
+            .args([helper.as_os_str(), "unused".as_ref(), "30000".as_ref()])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap(),
+    );
+    process
+        .0
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"request\n")
+        .unwrap();
+    let mut output = String::new();
+    process
+        .0
+        .stdout
+        .as_mut()
+        .unwrap()
+        .read_to_string(&mut output)
+        .unwrap();
+    assert!(process.wait(Duration::from_secs(2)).success());
+    assert_eq!(output, "request\n");
+}
+
+#[test]
+fn failed_bootstrap_falls_back_and_preserves_all_input_bytes() {
+    let directory = Directory::new();
+    let helper = directory.helper("if [ \"$MCP_TRANSPORT\" = stdio ]; then exec cat; fi\nexit 7");
+    let mut process = Process::start(&helper);
+    let payload = b"{\"id\":1}\n".repeat(30_000);
+    let expected = payload.clone();
+    let mut input = process.0.stdin.take().unwrap();
+    let sender = thread::spawn(move || input.write_all(&payload).unwrap());
+    let mut output = Vec::new();
+    process
+        .0
+        .stdout
+        .as_mut()
+        .unwrap()
+        .read_to_end(&mut output)
+        .unwrap();
+    sender.join().unwrap();
+    assert!(process.wait(Duration::from_secs(2)).success());
+    assert_eq!(output, expected);
+}
+
+fn fallback_echo(fixture: &Server) {
+    let original = fs::read_to_string(&fixture.helper).unwrap();
+    fs::write(
+        &fixture.helper,
+        format!("#!/bin/sh\nif [ \"$MCP_TRANSPORT\" = stdio ]; then exec cat; fi\n{original}"),
+    )
+    .unwrap();
+}
+
+#[test]
+fn failed_admission_falls_back_before_sending_any_mcp_input() {
+    let mut fixture = Server::new(|mut socket| {
+        let mut hello = String::new();
+        BufReader::new(&mut socket).read_line(&mut hello).unwrap();
+        socket.write_all(&[0]).unwrap();
+        assert_eq!(socket.read(&mut [0]).unwrap(), 0);
+    });
+    fallback_echo(&fixture);
+    let mut process = Process::start(&fixture.helper);
+    process
+        .0
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"queued request\n")
+        .unwrap();
+    let mut output = String::new();
+    process
+        .0
+        .stdout
+        .as_mut()
+        .unwrap()
+        .read_to_string(&mut output)
+        .unwrap();
+    assert!(process.wait(Duration::from_secs(2)).success());
+    assert_eq!(output, "queued request\n");
+    fixture.finish();
+}
+
+#[test]
+fn active_resident_failure_does_not_fall_back_or_replay_input() {
+    let mut fixture = Server::new(|mut socket| {
+        admit(&mut socket);
+        assert_eq!(read_frame(&mut socket).unwrap(), b"request\n");
+        write_frame(&mut socket, b"response\n").unwrap();
+    });
+    fallback_echo(&fixture);
+    let mut process = Process::start(&fixture.helper);
+    process
+        .0
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(b"request\n")
+        .unwrap();
+    let mut output = String::new();
+    process
+        .0
+        .stdout
+        .as_mut()
+        .unwrap()
+        .read_to_string(&mut output)
+        .unwrap();
+    assert_eq!(process.wait(Duration::from_secs(2)).code(), Some(1));
+    assert!(output.is_empty() || output == "response\n");
+    let mut diagnostic = String::new();
+    process
+        .0
+        .stderr
+        .as_mut()
+        .unwrap()
+        .read_to_string(&mut diagnostic)
+        .unwrap();
+    assert!(!diagnostic.contains("starting ordinary stdio"));
+    fixture.finish();
 }

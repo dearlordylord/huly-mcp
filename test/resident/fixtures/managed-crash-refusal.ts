@@ -1,3 +1,4 @@
+import { assertStartupFallback, fallbackRequests } from "./startup-fallback.js"
 import { strict as assert } from "node:assert"
 import { spawn } from "node:child_process"
 import { createHash } from "node:crypto"
@@ -11,7 +12,6 @@ import { Effect, Redacted, Schema } from "effect"
 import { ResidentAttachment } from "../../../src/resident/attachment-file.js"
 import { ResidentPackagePath, ResidentRegistryEnvelope } from "../../../src/resident/managed-contract.js"
 import { ResidentDirectory, ResidentFilePath } from "../../../src/resident/protected-path.js"
-import { HostMessage } from "../../../src/resident/request-headers.js"
 import { makeByteDisclosureDetector } from "../../helpers/byte-disclosure.js"
 import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
 import { CrashRefusalObservation } from "../crash-refusal-observation.js"
@@ -19,18 +19,6 @@ import { CrashRefusalObservation } from "../crash-refusal-observation.js"
 const RESPONSE_BOUND = 5_000
 const ANNOUNCEMENT = "Resident attachment: "
 const Input = Schema.Struct({ bundle: ResidentPackagePath, directory: ResidentDirectory })
-const discovery = Schema.encodeSync(Schema.fromJsonString(HostMessage))({
-  jsonrpc: "2.0",
-  id: 1,
-  method: "server/discover",
-  params: {
-    _meta: {
-      "io.modelcontextprotocol/protocolVersion": "2026-07-28",
-      "io.modelcontextprotocol/clientCapabilities": {},
-      "io.modelcontextprotocol/clientInfo": { name: "crash-refusal-fixture", version: "1" }
-    }
-  }
-})
 const bounded = <A>(promise: Promise<A>) =>
   Effect.runPromise(Effect.promise(() => promise).pipe(Effect.timeout(RESPONSE_BOUND)))
 
@@ -105,15 +93,11 @@ const main = async () => {
       adapter.stderr.on("data", (chunk: Buffer) => diagnostics.push(chunk))
       adapter.stdin.on("error", () => {})
       try {
-        adapter.stdin.end(`${discovery}\n`)
-        assert.deepEqual(await closed, [1, null])
+        adapter.stdin.end(`${fallbackRequests}\n`)
+        assert.deepEqual(await closed, [0, null])
         process.stderr.write("Crash refusal: adapter refusal exit confirmed\n")
         stdoutBytes += Buffer.concat(output).length
-        assert.equal(stdoutBytes, 0)
-        process.stderr.write("Crash refusal: no adapter reply confirmed\n")
-        assert.ok(Buffer.concat(diagnostics).toString("utf8").includes("No request was replayed"))
-        assert.ok(Buffer.concat(diagnostics).toString("utf8").includes("no Huly request was dispatched"))
-        process.stderr.write("Crash refusal: no-replay diagnostic confirmed\n")
+        assertStartupFallback(Buffer.concat(output).toString("utf8"), Buffer.concat(diagnostics).toString("utf8"))
         assert.equal((await fs.readFile(registryFile)).equals(Buffer.from(expectedRecord)), true)
         process.stderr.write("Crash refusal: expected record bytes confirmed\n")
         assert.deepEqual((await fs.readdir(input.directory)).sort(), originalInventory)
@@ -167,7 +151,7 @@ const main = async () => {
         backendPid: backend.pid,
         backendChildrenBeforeKill: 0,
         backendExitSignal: "SIGKILL",
-        recoveringExitCodes: [1, 1, 1, 1],
+        recoveringExitCodes: [0, 0, 0, 0],
         originalRecordRetained: true,
         foreignListenerSurvived: true,
         reusedDiagnosticPid: process.pid,
@@ -175,7 +159,7 @@ const main = async () => {
         unrelatedPidSurvived: true,
         corruptRecordRetained: true,
         credentialDisclosure: false,
-        stdoutBytes: 0
+        stdoutBytes
       })
     )
   } finally {

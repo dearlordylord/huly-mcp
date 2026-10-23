@@ -50,7 +50,7 @@ it.skipIf(process.platform !== "linux")(
           .digest("hex")
       })
       expect(receipt.backendChildrenBeforeKill).toBe(0)
-      expect(receipt.recoveringExitCodes).toEqual([1, 1, 1, 1])
+      expect(receipt.recoveringExitCodes).toEqual([0, 0, 0, 0])
       expect(receipt.originalRecordRetained).toBe(true)
       expect(receipt.foreignListenerSurvived).toBe(true)
       expect(receipt.reusedDiagnosticPid).not.toBe(receipt.backendPid)
@@ -58,7 +58,7 @@ it.skipIf(process.platform !== "linux")(
       expect(receipt.unrelatedPidSurvived).toBe(true)
       expect(receipt.corruptRecordRetained).toBe(true)
       expect(receipt.credentialDisclosure).toBe(false)
-      expect(receipt.stdoutBytes).toBe(0)
+      expect(receipt.stdoutBytes).toBeGreaterThan(0)
       await fs.writeFile(
         `${root}.receipt.json`,
         Schema.encodeSync(Schema.fromJsonString(CrashRefusalObservation))(receipt),

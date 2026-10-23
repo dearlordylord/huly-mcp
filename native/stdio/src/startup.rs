@@ -85,6 +85,8 @@ pub fn prepare(
     mut helper: Helper,
     input: &mut Input,
     source: &mut File,
+    output: &mut File,
+    metadata: &mut crate::metadata::Metadata,
     deadline: Instant,
 ) -> Result<Launch> {
     let mut phase = Phase::Decision(Vec::new());
@@ -96,7 +98,8 @@ pub fn prepare(
         if Instant::now() >= deadline {
             return Err(BridgeError::Startup);
         }
-        input.read(source)?;
+        metadata.read(source, input)?;
+        metadata.progress(output)?;
         let mut control_fd = -1;
         let mut socket_fd = -1;
         let mut helper_write = false;
@@ -114,7 +117,7 @@ pub fn prepare(
                     if line != NATIVE_CONFIGURED_HEADER.as_bytes() {
                         return Err(BridgeError::Control);
                     }
-                    if input.closed && input.queue.is_empty() {
+                    if input.closed && input.queue.is_empty() && !metadata.pending() {
                         return Ok(Launch::Closed);
                     }
                     Phase::Configured {
@@ -226,21 +229,30 @@ pub fn prepare(
                     if !status.success() || helper_write {
                         return Err(BridgeError::Helper);
                     }
+                    let mut socket = socket;
+                    if let Some(initialize) = metadata.finish(input, source, output, deadline)? {
+                        crate::metadata_replay::initialize(&mut socket, &initialize, deadline)?;
+                    }
                     return Ok(Launch::Resident(socket));
                 }
                 Phase::Attached { socket, sent }
             }
         };
-        if !matches!(phase, Phase::Decision(_)) && input.closed && input.queue.is_empty() {
+        if !matches!(phase, Phase::Decision(_))
+            && input.closed
+            && input.queue.is_empty()
+            && !metadata.pending()
+        {
             return Ok(Launch::Closed);
         }
         // Completed transitions need no timer tick; only external I/O should suspend startup.
         if std::mem::discriminant(&phase) != previous {
             continue;
         }
+        let [metadata_read, metadata_write, metadata_output] = metadata.interests(output);
         let interests = [
             Interest::new(
-                if input.closed || !input.queue.has_capacity() {
+                if !metadata.can_read(input) {
                     -1
                 } else {
                     source.as_raw_fd()
@@ -248,6 +260,9 @@ pub fn prepare(
                 true,
                 false,
             ),
+            metadata_read,
+            metadata_write,
+            metadata_output,
             Interest::new(control_fd, true, false),
             Interest::new(
                 if matches!(phase, Phase::Attached { .. }) {

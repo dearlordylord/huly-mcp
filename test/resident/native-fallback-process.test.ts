@@ -10,6 +10,41 @@ import { testStdioEnvironment } from "../helpers/stdio-environment.js"
 const PROCESS_BOUND = 30_000
 const REQUEST_BOUND = 5_000
 
+it(
+  "falls back when application-entry resident selection fails before native execution",
+  { timeout: PROCESS_BOUND },
+  async () => {
+    const bundle = await buildIsolatedStdioServer(PROCESS_BOUND)
+    const transport = new StdioClientTransport({
+      command: process.execPath,
+      args: [join(dirname(bundle.path), "application.cjs")],
+      stderr: "pipe",
+      env: {
+        ...testStdioEnvironment(),
+        LAZY_ENVS: "true",
+        MCP_TRANSPORT: "stdio-resident",
+        HULY_URL: "",
+        HULY_TOKEN: "fixture"
+      }
+    })
+    const client = new Client(
+      { name: "pre-native-fallback-test", version: "1" },
+      { versionNegotiation: { mode: { pin: "2026-07-28" } } }
+    )
+    const diagnostics: Array<string> = []
+    transport.stderr?.on("data", (bytes: Buffer) => diagnostics.push(bytes.toString()))
+    try {
+      await client.connect(transport, { timeout: REQUEST_BOUND })
+      const catalog = await client.listTools(undefined, { timeout: REQUEST_BOUND })
+      expect(catalog.tools.some((tool) => tool.name === "get_huly_context")).toBe(true)
+      expect(diagnostics.join("")).toContain("Native resident startup failed; starting ordinary stdio")
+    } finally {
+      await client.close()
+      await bundle.cleanup()
+    }
+  }
+)
+
 it.each(["missing", "not-executable", "corrupt"])(
   "starts working ordinary stdio when the packaged native bridge is %s",
   { timeout: PROCESS_BOUND },

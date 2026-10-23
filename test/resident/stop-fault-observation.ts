@@ -35,6 +35,6 @@ export const StopFaultObservation = Schema.Union([
     mode: Schema.Literal("failed-cleanup"),
     backendExitCode: Schema.Literal(1),
     registry: Schema.Literal("retained"),
-    replacement: Schema.Literal("refused")
+    replacement: Schema.Literal("stdio")
   })
 ])

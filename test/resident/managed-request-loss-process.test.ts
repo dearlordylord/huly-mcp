@@ -96,8 +96,8 @@ it.skipIf(process.platform !== "linux").each(ManagedRequestLossPoint.literals)(
       expect(receipt.stopAcknowledgment).toBe(point === "drain" ? "admission-fenced" : "not-requested")
       expect(receipt.drainEntry).toBe(point === "drain" ? "observed-with-attachment" : "not-requested")
       expect(receipt.drainPausedBeforeKill).toBe(point === "drain")
-      expect(receipt.replacementExitCode).toBe(1)
-      expect(receipt.replacementStdoutBytes).toBe(0)
+      expect(receipt.replacementExitCode).toBe(0)
+      expect(receipt.replacementStdoutBytes).toBeGreaterThan(0)
       expect(receipt.registryRetained).toBe(true)
       expect(receipt.unknownOutcome).toBe(true)
       passed = true

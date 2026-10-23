@@ -47,7 +47,7 @@ const visitPackage = (entry) => {
 }
 
 const installedProjects = Schema.decodeUnknownSync(Schema.fromJsonString(InstalledProjectsSchema))(
-  execFileSync("pnpm", ["list", "--recursive", "--depth", "Infinity", "--json"], { encoding: "utf8" })
+  execFileSync("pnpm", ["list", "--recursive", "--depth", "Infinity", "--json"], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 })
 )
 
 for (const project of installedProjects) visitPackage(project)
