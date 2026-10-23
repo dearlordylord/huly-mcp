@@ -3,6 +3,7 @@ import { BaseSequencer, type TestSpecification } from "vitest/node"
 
 const LEASE_WAIT_PRIORITY = 2
 const PORT_PROJECT_FIRST = -1
+export const PORT_TEST_PROJECT = "ports"
 const longProcessWaits = new Set([
   "native-backend-process.test.ts",
   "managed-live-read-pair-process.test.ts",
@@ -23,8 +24,9 @@ export class DeadlineFirstSequencer extends BaseSequencer {
       if (cohort !== 0) return cohort
       const waiting = waitPriority(right.moduleId) - waitPriority(left.moduleId)
       if (waiting !== 0) return waiting
-      if (left.project.name === "ports" && right.project.name !== "ports") return PORT_PROJECT_FIRST
-      if (right.project.name === "ports" && left.project.name !== "ports") return -PORT_PROJECT_FIRST
+      if (left.project.name === PORT_TEST_PROJECT && right.project.name !== PORT_TEST_PROJECT) return PORT_PROJECT_FIRST
+      if (right.project.name === PORT_TEST_PROJECT && left.project.name !== PORT_TEST_PROJECT)
+        return -PORT_PROJECT_FIRST
       return 0
     })
   }
