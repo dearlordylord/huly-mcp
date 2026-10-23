@@ -75,5 +75,7 @@ jobs:
           path: |
             coverage/coverage-final.json
             dist/resident-launch-replay-*/failure.json
+            /tmp/resident-*/failure.log
+            /tmp/resident-*.phases.log
           if-no-files-found: ignore
           retention-days: 7
