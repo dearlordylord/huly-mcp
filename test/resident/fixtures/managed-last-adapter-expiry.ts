@@ -16,6 +16,7 @@ import { residentSelectionEnvironment } from "../../helpers/resident-selection-e
 import { ManagedExpiryObservation } from "../managed-expiry-observation.js"
 
 const RESPONSE_BOUND = 5_000
+const ADMISSION_REQUEST_ID = 2
 const Input = Schema.Struct({ bundle: ResidentPackagePath, directory: ResidentDirectory, reapedFd: ReapedEventsFd })
 const InitializeReply = Schema.fromJsonString(
   Schema.Struct({ jsonrpc: Schema.Literal("2.0"), id: Schema.Literal(1), result: McpSchema.InitializeResult })
@@ -59,6 +60,29 @@ const main = async () => {
     const first = await bounded(output.next())
     assert.equal(first.done, false)
     Schema.decodeUnknownSync(InitializeReply)(first.value)
+    // Initialization is protocol readiness; a backend-owned reply proves admission.
+    adapter.stdin.write(
+      `${Schema.encodeSync(Schema.fromJsonString(HostMessage))({
+        jsonrpc: "2.0",
+        method: "notifications/initialized"
+      })}\n${Schema.encodeSync(Schema.fromJsonString(HostMessage))({
+        jsonrpc: "2.0",
+        id: ADMISSION_REQUEST_ID,
+        method: "resources/list",
+        params: {}
+      })}\n`
+    )
+    const admitted = await bounded(output.next())
+    assert.equal(admitted.done, false)
+    Schema.decodeUnknownSync(
+      Schema.fromJsonString(
+        Schema.Struct({
+          jsonrpc: Schema.Literal("2.0"),
+          id: Schema.Literal(ADMISSION_REQUEST_ID),
+          result: McpSchema.ListResourcesResult
+        })
+      )
+    )(admitted.value)
     const records = await fs.readdir(join(input.directory, "generations"))
     assert.equal(records.length, 1)
     const [filename] = records

@@ -188,6 +188,10 @@ impl Metadata {
         Ok(())
     }
 
+    pub fn received(&self, input: &Input) -> bool {
+        input.closed || !input.queue.is_empty() || !self.line.is_empty() || self.pending()
+    }
+
     pub fn pending(&self) -> bool {
         !self.pending.is_empty() || !self.writes.is_empty() || !self.output.is_empty()
     }

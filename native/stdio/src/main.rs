@@ -12,7 +12,7 @@ mod wire;
 use std::ffi::OsString;
 use std::fs::File;
 use std::io;
-use std::os::fd::FromRawFd;
+use std::os::fd::{AsRawFd, FromRawFd};
 use std::time::{Duration, Instant};
 
 #[derive(Debug)]
@@ -61,8 +61,24 @@ fn run(arguments: &[OsString]) -> Result<()> {
     let mut input = buffer::Input::new();
     let mut metadata = metadata::Metadata::new(&arguments[0], &arguments[1]);
     let prepared = (|| {
-        // Prioritize already-buffered protocol discovery over another Node startup.
-        metadata.read(&mut source, &mut input)?;
+        // Give the client's initial write one poll window before another Node startup.
+        let first_input_deadline = Instant::now() + Duration::from_millis(100);
+        loop {
+            metadata.read(&mut source, &mut input)?;
+            if metadata.received(&input) || Instant::now() >= first_input_deadline {
+                break;
+            }
+            if os::signal_status().is_some() {
+                return Ok(startup::Launch::Closed);
+            }
+            if Instant::now() >= deadline {
+                return Err(BridgeError::Startup);
+            }
+            os::wait(
+                &[os::Interest::new(source.as_raw_fd(), true, false)],
+                Duration::from_millis(100).min(deadline.saturating_duration_since(Instant::now())),
+            )?;
+        }
         metadata.ready(&mut input, &mut source, &mut output, deadline)?;
         let helper = bootstrap::Helper::start(&arguments[0], &arguments[1])?;
         startup::prepare(

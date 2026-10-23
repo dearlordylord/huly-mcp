@@ -59,11 +59,9 @@ for line in sys.stdin:
     .unwrap();
     fs::set_permissions(&helper, fs::Permissions::from_mode(0o700)).unwrap();
     let started = Instant::now();
-    let (source, mut input) = std::os::unix::net::UnixStream::pair().unwrap();
-    writeln!(input, r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"protocolVersion":"2025-06-18","capabilities":{{}},"clientInfo":{{"name":"codex","version":"fixture"}}}}}}"#).unwrap();
     let child = Command::new(env!("CARGO_BIN_EXE_huly-stdio"))
         .args([helper.as_os_str(), "unused".as_ref(), "1000".as_ref()])
-        .stdin(Stdio::from(std::os::fd::OwnedFd::from(source)))
+        .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()
@@ -78,6 +76,10 @@ for line in sys.stdin:
             }
         }
     });
+    // A client can send initialization after the native adapter has started.
+    thread::sleep(Duration::from_millis(25));
+    let mut input = fixture.child.stdin.take().unwrap();
+    writeln!(input, r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"protocolVersion":"2025-06-18","capabilities":{{}},"clientInfo":{{"name":"codex","version":"fixture"}}}}}}"#).unwrap();
     let initialized = receive
         .recv_timeout(Duration::from_millis(500))
         .expect("initialize must not wait for resident startup");
