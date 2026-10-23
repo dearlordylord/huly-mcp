@@ -1,6 +1,6 @@
 # Resident Huly MCP behind stdio — draft specification
 
-Status: **draft for prototype and lifecycle discussion**, 2026-10-17. Tracks [#321](https://github.com/dearlordylord/huly-mcp/issues/321). This records requirements and research; it does not approve a production supervisor, locking algorithm, timeout policy or state-machine library. [Pinned research and peer incidents](verification/startup-production-321/RESIDENT-DAEMON-RESEARCH.md) remain the source evidence. Correct this specification as useful findings change; do not append a chronological diary.
+Status: **historical design and prototype specification**, originating 2026-10-17. The production implementation supersedes the interactive prototype. The maintained contract and delivery status are [#322](https://github.com/dearlordylord/huly-mcp/issues/322), [the lifecycle decision](adr/0003-adopt-mcporter-resident-lifecycle.md), [the uncertainty decision](adr/0002-resident-recovery-without-operation-journal.md) and [the launch guide](resident-manual.md). [Pinned research and peer incidents](verification/startup-production-321/RESIDENT-DAEMON-RESEARCH.md) remain source evidence; this historical plan does not establish final production qualification.
 
 ## Problem and scope
 
@@ -128,7 +128,9 @@ All cases below are **required evidence to plan**, not passing results.
 | Windows/Linux/macOS actual process and file behavior | Native evidence, protected local token, owned cleanup; no inferred Windows pass | R17–R18 |
 | Adapter import boundary and ten-adapter memory/startup | Total including adapters measured; no daemon-only memory claim | R18 |
 
-## Open decisions and next prototype stages
+## Historical decisions and prototype stages
+
+The following questions and stages record the original exploration. Current implementation decisions are maintained in the ADRs above; this is not a plan to build or run another prototype.
 
 1. Exact compatibility identity and secret-safe comparison; credential handoff/profile rotation policy.
 2. Locator location and authentication; host launch lock/ownership primitive and recovery rules.
@@ -139,8 +141,10 @@ All cases below are **required evidence to plan**, not passing results.
 Stage A is an isolated interactive logic prototype with visible state and guided failure paths. Stage B, after discussing ownership, uses actual separate processes, loopback HTTP, private scratch state and owned cleanup to test R5–R16. Stage C uses the real packaged MCP read path, all adapters included in memory accounting, and native platform verification. No stage may claim evidence belonging to a later one. Keep executable prototypes on a throwaway branch; the main branch retains this specification and evidence pointers. Retire prototype executables when a production implementation supersedes them.
 
 
-## Stage A prototype evidence
+## Retired Stage A prototype evidence
 
-[Throwaway interactive prototype, commit f8ea68a6](https://github.com/dearlordylord/huly-mcp/blob/f8ea68a6/src/runtime/resident-lifecycle.prototype.html) lives on `prototype/resident-lifecycle-321`, outside master. Download/open its single HTML file; no server or install is needed. It exposes all relevant model state, free-play actions and five guided paths: concurrent attachment, cancellation during model load, unknown write outcome, crash/new generation, and attachment racing drain.
+The retired experiment at commit `f8ea68a60765c8e004b84fd4ceae16828a909e29` consisted solely of a single HTML model, outside master. Its throwaway branch and stale local worktree registration were removed during the authorized prototype cleanup. No executable prototype is part of the production checkout. The maintained [Quint launch model](../quint-specs/resident-launch.md) and ADRs retain the useful ownership, cancellation, generation and drain reasoning.
+
+The prototype's provisional rule that an unknown remote write prevents idle retirement was not adopted. Production retains actual local resources until confirmed cleanup; remote uncertainty alone does not retain a backend forever or authorize replay. See the uncertainty decision above.
 
 Both script blocks parse; all five guided paths preserve the model's ownership/request/drain assertions. A separate scenario check confirms closing A leaves B's dispatched read and the backend alive while A's dispatched write remains unknown. The provisional model can preserve an old unknown write while a new generation serves a read; it does not replay that write. Simulated external reconciliation/retirement events are assumptions, not implemented proofs. No browser was available for visual verification. This validates the model's own examples only: it does not prove distributed singleton correctness, real cancellation, platform cleanup or total memory. No production code was extracted or activated.
