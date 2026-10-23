@@ -10,12 +10,7 @@ import { ResidentPackagePath, ResidentRegistryEnvelope } from "../../../src/resi
 import { ResidentDirectory } from "../../../src/resident/protected-path.js"
 import { openKernelReapedEvents, ReapedEventsFd } from "../../helpers/kernel-reaped-events.js"
 import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
-import {
-  ManagedParentConnected,
-  ManagedParentObservation,
-  ManagedParentProgress,
-  ManagedParentStarting
-} from "../managed-observation.js"
+import { ManagedParentConnected, ManagedParentObservation } from "../managed-observation.js"
 import { NativeHostObservation } from "../native-host-observation.js"
 
 const RESPONSE_BOUND = 5_000
@@ -57,11 +52,9 @@ const awaitAbsent = (pid: number, allowance: number) =>
 const run = async (input: Schema.Schema.Type<typeof Input>, kernel: ReturnType<typeof openKernelReapedEvents>) => {
   const parents = Array.from({ length: PARENTS }, (_, index) => {
     const host = index % ALTERNATION === 0 ? "claude-code" : "codex-mcp-client"
-    const child = spawn(
-      process.execPath,
-      [input.fixture, input.bundle, input.directory, host, "fixture", "synchronized"],
-      { env: residentSelectionEnvironment() }
-    )
+    const child = spawn(process.execPath, [input.fixture, input.bundle, input.directory, host, "fixture", "command"], {
+      env: residentSelectionEnvironment()
+    })
     child.stderr.on("data", (chunk: Buffer) => process.stderr.write(chunk))
     child.stdin.on("error", () => process.stderr.write("Managed race: owned command pipe closed; waiting for exit\n"))
     const exited = once(child, "exit")
@@ -72,18 +65,9 @@ const run = async (input: Schema.Schema.Type<typeof Input>, kernel: ReturnType<t
       if (next.done) throw new Error("Managed parent exited without an observation")
       return next.value
     }
-    const connected = async () => {
-      // Bound parent loading separately; the SDK retains its five-second MCP deadline.
-      Schema.decodeUnknownSync(Schema.fromJsonString(ManagedParentStarting))(await nextLine())
-      return Schema.decodeUnknownSync(Schema.fromJsonString(ManagedParentConnected))(await nextLine())
-    }
-    const read = async () => {
-      for (const stage of ManagedParentProgress.fields.stage.literals) {
-        const progress = Schema.decodeUnknownSync(Schema.fromJsonString(ManagedParentProgress))(await nextLine())
-        assert.equal(progress.stage, stage)
-      }
-      return Schema.decodeUnknownSync(Schema.fromJsonString(NativeHostObservation))(await nextLine())
-    }
+    const connected = async () =>
+      Schema.decodeUnknownSync(Schema.fromJsonString(ManagedParentConnected))(await nextLine())
+    const read = async () => Schema.decodeUnknownSync(Schema.fromJsonString(NativeHostObservation))(await nextLine())
     return { child, exited, lines, connected, read }
   })
   let report: Omit<Schema.Schema.Type<typeof ManagedParentObservation>, "backendExit"> | undefined
@@ -98,7 +82,6 @@ const run = async (input: Schema.Schema.Type<typeof Input>, kernel: ReturnType<t
       })}\n`
     )
     await Promise.all(parents.map((parent) => parent.connected()))
-    const connectedAt = await Effect.runPromise(Clock.monotonicTimeNanos)
     process.stderr.write("Managed race: waiting for ten observations\n")
     for (const parent of parents) parent.child.stdin.write("read\n")
     const observations = await Promise.all(
@@ -135,11 +118,8 @@ const run = async (input: Schema.Schema.Type<typeof Input>, kernel: ReturnType<t
     assert.equal(absent(record.diagnostics.processId), false)
     const survivor = observations.find(({ parent }) => parent !== stopped.parent)
     if (survivor === undefined) throw new Error("No independent survivor")
-    process.stderr.write("Managed race: retaining sessions beyond the original ten-second acquisition deadline\n")
-    // The acquisition timer predates connection; observations already age these sessions.
-    const now = await Effect.runPromise(Clock.monotonicTimeNanos)
-    const elapsed = Number((now - connectedAt) / NANOS_PER_MILLISECOND)
-    await Effect.runPromise(Effect.sleep(Math.max(0, SESSION_HOLD_MILLIS - elapsed)))
+    process.stderr.write("Managed race: retaining sessions beyond the startup acquisition deadline\n")
+    await Effect.runPromise(Effect.sleep(SESSION_HOLD_MILLIS))
     process.stderr.write("Managed race: reading through survivor\n")
     survivor.parent.child.stdin.write("read\n")
     const second = await survivor.parent.read()

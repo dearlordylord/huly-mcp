@@ -7,7 +7,7 @@ import { GetHulyContextResultSchema } from "../../../src/domain/schemas/huly-con
 import { ResidentDirectory } from "../../../src/resident/protected-path.js"
 import { ResidentPackagePath } from "../../../src/resident/managed-contract.js"
 import { residentSelectionEnvironment } from "../../helpers/resident-selection-environment.js"
-import { ManagedParentConnected, ManagedParentProgress, ManagedParentStarting } from "../managed-observation.js"
+import { ManagedParentConnected } from "../managed-observation.js"
 import { HostName, ManagedNativeHostObservation } from "../native-host-observation.js"
 
 const RESPONSE_BOUND = 5_000
@@ -16,7 +16,7 @@ const Input = Schema.Struct({
   directory: ResidentDirectory,
   host: HostName,
   workspace: Schema.NonEmptyString,
-  initialRead: Schema.Literals(["immediate", "command", "synchronized"])
+  initialRead: Schema.Literals(["immediate", "command"])
 })
 const Command = Schema.Literals(["read", "close"])
 const Phase = Schema.Struct({
@@ -69,24 +69,14 @@ const main = async () => {
   client.onclose = () => Effect.runSync(Deferred.succeed(closed, undefined))
   const commands = createInterface({ input: process.stdin })
   const incoming = commands[Symbol.asyncIterator]()
-  const progress = (stage: Schema.Schema.Type<typeof ManagedParentProgress>["stage"]) => {
-    if (input.initialRead === "synchronized")
-      process.stdout.write(
-        `${Schema.encodeSync(Schema.fromJsonString(ManagedParentProgress))({ kind: "progress", stage })}\n`
-      )
-  }
   const observe = async () => {
     await phase("observing")
-    progress("tools")
     const tools = await client.listTools(undefined, { timeout: RESPONSE_BOUND })
-    progress("resources")
     const resources = await client.listResourceTemplates(undefined, { timeout: RESPONSE_BOUND })
     const request = { name: "get_huly_context", arguments: {} }
     const toolDefinition = tools.tools.find((tool) => tool.name === request.name)
     if (toolDefinition === undefined) throw new Error("Context tool is absent from the actual catalog")
-    progress("context")
     const context = await client.callTool(request, { timeout: RESPONSE_BOUND, toolDefinition })
-    progress("observation")
     const result = Schema.decodeUnknownSync(Schema.Struct({ result: GetHulyContextResultSchema }))(
       context.structuredContent
     ).result
@@ -106,13 +96,6 @@ const main = async () => {
   }
   try {
     await phase("connecting")
-    if (input.initialRead === "synchronized")
-      process.stdout.write(
-        `${Schema.encodeSync(Schema.fromJsonString(ManagedParentStarting))({
-          kind: "starting",
-          parentPid: process.pid
-        })}\n`
-      )
     await client.connect(transport, { timeout: RESPONSE_BOUND })
     await phase("connected")
     const connected = Schema.decodeUnknownSync(ManagedParentConnected)({

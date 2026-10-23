@@ -275,7 +275,7 @@ describe("Main Entry Point", () => {
   })
 
   describe("layer composition", () => {
-    it.effect.each([true, false])("preserves stdio bootstrap and telemetry with discovery warmup=%s", (warmup) =>
+    it.effect("preserves ordinary stdio bootstrap and the supplied telemetry owner", () =>
       Effect.gen(function* () {
         const starts: Array<SessionStartProps> = []
         const telemetry = {
@@ -303,8 +303,7 @@ describe("Main Entry Point", () => {
           undefined,
           undefined,
           undefined,
-          telemetry,
-          warmup
+          telemetry
         )
         yield* Layer.build(appLayer)
         expect(starts).toEqual([expect.objectContaining({ transport: "stdio", authMethod: "token" })])

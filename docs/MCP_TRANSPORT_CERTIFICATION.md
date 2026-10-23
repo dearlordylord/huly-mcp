@@ -22,33 +22,15 @@ lifecycle wrapper owns EOF and signal handling, stops new admissions, drains
 in-flight calls, closes the wire and telemetry, and then closes process-scoped
 Huly clients within bounded shutdown deadlines.
 
-Managed resident startup has a shared 30-second acquisition budget. MCP
-initialization, discovery and tool listing are served without waiting for resident acquisition by a temporary
-ordinary stdio process using the existing Effect registry and exposure policy.
-Its Huly client resolver is lazy independently of eager resident startup; local
-fallback acquires clients when an application operation needs them.
-Application input remains owned by the native bridge until resident attachment
-or local fallback. The metadata process cannot receive tool calls during this
-selection. Successful attachment re-establishes only protocol initialization on
-the resident, suppresses its duplicate reply, and retires the metadata process.
-Startup failure retains that process as ordinary stdio and dispatches queued
-application input once. No application request is replayed after possible
-dispatch. Active resident channel failure remains terminal.
+Managed resident startup has a shared 30-second acquisition budget. Initialization,
+discovery and application requests wait for attachment. Startup failure launches
+ordinary stdio and dispatches buffered input once. No temporary discovery process
+is started, and requests from an active failed resident are never replayed.
 
-This separation is required by the observed Codex optional-MCP startup behavior:
-the model can start before a slow server is ready, complete a turn without its
-tools and cancel the still-pending startup. Advertising MCP readiness cannot
-wait for resident acquisition. Separately, a real clean-cache `pnpm dlx` run
-completed with zero MCP calls under optional Codex startup. With `required=true`
-and the unchanged default client timeout, the same four Huly reads succeeded.
-The user subsequently chose optional Huly startup so a Huly failure cannot
-prevent Codex from starting. The configuration omits `required=true`; this
-does not establish first-turn tool availability with an empty cache.
-A clean Linux consumer installation took
-23 seconds before server startup, and the fully emulated x64 consumer took
-60.2 seconds. The documented 120-second client allowance includes installation, independently of the server's 30-second
-resident startup budget. This does not replace server readiness or
-require a Rust compiler or manual native-binary installation.
+Codex keeps Huly optional: a cold package download or slow startup may leave its
+first turn without Huly tools. The documented 120-second client allowance includes
+installation and is independent of the resident budget. Ready-made native binaries
+ship in the package; users do not need Rust.
 
 HTTP runs through Effect's MCP HTTP layer mounted at `/mcp` on an Effect HTTP
 router and Node listener. Middleware enforces the optional endpoint bearer

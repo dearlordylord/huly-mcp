@@ -72,19 +72,6 @@ impl Queue {
         }
         Ok(())
     }
-    pub fn prepend_to(&mut self, target: &mut Self) {
-        let mut combined = Self::new();
-        while let Some(chunk) = self.chunks.pop_front() {
-            combined.push(chunk[self.offset..].to_vec());
-            self.offset = 0;
-        }
-        while let Some(chunk) = target.chunks.pop_front() {
-            combined.push(chunk[target.offset..].to_vec());
-            target.offset = 0;
-        }
-        *target = combined;
-        self.deadline = None;
-    }
     pub fn pop(&mut self) -> Option<Vec<u8>> {
         debug_assert_eq!(self.offset, 0);
         let bytes = self.chunks.pop_front();

@@ -2,8 +2,6 @@
 
 mod bootstrap;
 mod buffer;
-mod metadata;
-mod metadata_replay;
 mod os;
 mod startup;
 mod transport;
@@ -12,7 +10,7 @@ mod wire;
 use std::ffi::OsString;
 use std::fs::File;
 use std::io;
-use std::os::fd::{AsRawFd, FromRawFd};
+use std::os::fd::FromRawFd;
 use std::time::{Duration, Instant};
 
 #[derive(Debug)]
@@ -59,61 +57,21 @@ fn run(arguments: &[OsString]) -> Result<()> {
     // SAFETY: this executable exclusively owns stdin/stdout and never constructs other owners.
     let (mut source, mut output) = unsafe { (File::from_raw_fd(0), File::from_raw_fd(1)) };
     let mut input = buffer::Input::new();
-    let mut metadata = metadata::Metadata::new(&arguments[0], &arguments[1]);
-    let prepared = (|| {
-        // Give the client's initial write one poll window before another Node startup.
-        let first_input_deadline = Instant::now() + Duration::from_millis(100);
-        loop {
-            metadata.read(&mut source, &mut input)?;
-            if metadata.received(&input) || Instant::now() >= first_input_deadline {
-                break;
-            }
-            if os::signal_status().is_some() {
-                return Ok(startup::Launch::Closed);
-            }
-            if Instant::now() >= deadline {
-                return Err(BridgeError::Startup);
-            }
-            os::wait(
-                &[os::Interest::new(source.as_raw_fd(), true, false)],
-                Duration::from_millis(100).min(deadline.saturating_duration_since(Instant::now())),
-            )?;
-        }
-        metadata.ready(&mut input, &mut source, &mut output, deadline)?;
-        let helper = bootstrap::Helper::start(&arguments[0], &arguments[1])?;
-        startup::prepare(
-            helper,
-            &mut input,
-            &mut source,
-            &mut output,
-            &mut metadata,
-            deadline,
-        )
-    })();
+    let prepared = bootstrap::Helper::start(&arguments[0], &arguments[1])
+        .and_then(|helper| startup::prepare(helper, &mut input, &mut source, deadline));
     match prepared {
         Ok(startup::Launch::Closed) => Ok(()),
-        Ok(startup::Launch::Local(helper)) => transport::local(
-            metadata.local(&mut input, Some(helper))?,
-            &mut input,
-            &mut source,
-            &mut output,
-            metadata.take_output(),
-        ),
+        Ok(startup::Launch::Local(helper)) => {
+            transport::local(helper, &mut input, &mut source, &mut output)
+        }
         Ok(startup::Launch::Resident(socket)) => {
-            drop(metadata);
             transport::resident(socket, &mut input, &mut source, &mut output)
         }
         Err(_) if os::signal_status().is_none() => {
-            // Only protocol metadata has run; application input is still owned by this queue.
+            // Startup has not dispatched application input; preserve it for ordinary stdio.
             eprintln!("Native resident startup failed; starting ordinary stdio");
-            let helper = metadata.local(&mut input, None)?;
-            transport::local(
-                helper,
-                &mut input,
-                &mut source,
-                &mut output,
-                metadata.take_output(),
-            )
+            let helper = bootstrap::Helper::local(&arguments[0], &arguments[1])?;
+            transport::local(helper, &mut input, &mut source, &mut output)
         }
         Err(error) => Err(error),
     }

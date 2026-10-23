@@ -4,6 +4,7 @@
 
 ### Patch Changes
 
+- Remove the per-client temporary Node process introduced in 0.55.3 for early MCP discovery. Initialization and tool discovery now wait for resident attachment or ordinary stdio fallback.
 - Recommend shared resident startup with `MCP_TRANSPORT=stdio-resident`: compatible agent sessions share one backend through packaged native bridges for macOS and Linux; no Rust installation is needed. If resident startup fails within its 30-second budget, the connection automatically falls back to ordinary stdio. Existing configurations remain stdio unless changed.
 - Connect using `npx -y @firfi/huly-mcp@next` for this release (`pnpm dlx` is also supported); the package downloads automatically when needed. Keep Huly optional in Codex so an MCP startup failure does not prevent Codex from starting. On a cold download, the first turn may begin without Huly tools; use `/mcp` to check connection status. See the README for configuration.
 

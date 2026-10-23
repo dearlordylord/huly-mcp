@@ -220,7 +220,7 @@ the [production release guide](docs/NPM_PRODUCTION_RELEASE.md) for preflight che
 
 ## Shared resident stdio
 
-The setup examples explicitly select `MCP_TRANSPORT=stdio-resident`. MCP clients still use stdio, while compatible clients under the same OS user share a Node backend through small native bridges. Linux and macOS arm64/x64 binaries are included; no Rust installation is needed. MCP initialization and the tool catalog are available while the resident starts. A temporary ordinary stdio process serves this protocol metadata through the same registry and exposure rules, without waiting for a Huly connection. Application requests remain buffered during the 30-second resident startup budget. Successful attachment retires the temporary process; startup failure keeps it as ordinary stdio and dispatches the buffered application input once. A failed active resident never reconnects or replays application requests.
+The setup examples explicitly select `MCP_TRANSPORT=stdio-resident`. MCP clients still use stdio, while compatible clients under the same OS user share a Node backend through small native bridges. Linux and macOS arm64/x64 binaries are included; no Rust installation is needed. Application requests remain buffered during the 30-second resident startup budget. Startup failure launches ordinary stdio and dispatches the buffered application input once. A failed active resident never reconnects or replays application requests.
 
 Omitting `MCP_TRANSPORT` still selects ordinary `stdio`, preserving existing installations. Set `MCP_TRANSPORT=stdio` explicitly to keep a separate backend per client. Restart the MCP client after changing the setting.
 

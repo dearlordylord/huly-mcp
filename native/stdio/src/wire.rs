@@ -13,5 +13,3 @@ pub const NATIVE_LOCAL_HEADER: &str = "local";
 pub const NATIVE_OUTPUT_MILLIS: u64 = 10000;
 pub const NATIVE_PATH_BYTES: usize = 104;
 pub const NATIVE_STARTUP_MILLIS: u64 = 30000;
-pub const NATIVE_METADATA_REQUESTS: usize = 8;
-pub const NATIVE_METADATA_REPLY_BYTES: usize = 134217728;
