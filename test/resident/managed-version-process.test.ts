@@ -47,16 +47,20 @@ it.skipIf(process.platform !== "linux")(
           return { path: join(directory, "dist", "index.cjs"), version }
         })
       )
-      for (const installation of installations)
-        await runFile(
-          "pnpm",
-          [
-            "build:mcp",
-            `--outfile=${installation.path}`,
-            `--define:PKG_VERSION=${JSON.stringify(installation.version)}`
-          ],
-          { timeout: PROCESS_BOUND }
+      // The isolated bundle already prepared native assets and catalog verification for both layouts.
+      await Promise.all(
+        installations.map((installation) =>
+          runFile(
+            process.execPath,
+            [
+              "scripts/build-mcp.mjs",
+              `--outfile=${installation.path}`,
+              `--define:PKG_VERSION=${JSON.stringify(installation.version)}`
+            ],
+            { timeout: PROCESS_BOUND }
+          )
         )
+      )
       const host = join(workspace, "managed-native-host.cjs")
       const fixture = join(workspace, "managed-version-coexistence.cjs")
       for (const [source, destination] of [

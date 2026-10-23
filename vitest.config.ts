@@ -109,7 +109,8 @@ export default defineConfig({
         test: {
           name: 'resident-fleets',
           include: residentFleetTestFiles,
-          isolate: true,
+          // Only the parent graph is shared; every observed host/backend remains a fresh owned process.
+          isolate: Boolean(process.env.QUINT_ORACLE_URL?.trim()),
           // Keep intrinsic client fleets independent; their own concurrency remains unchanged.
           maxWorkers: 1,
           sequence: { groupOrder: 3 },
