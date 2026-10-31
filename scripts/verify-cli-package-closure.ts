@@ -24,6 +24,7 @@ const externalModules = [...requiredModules].filter((name) => !name.startsWith("
 const undeclared = externalModules.filter((name) => cliPackageJson.dependencies[name] === undefined)
 const EXPECTED_EXTERNAL_MODULES: ReadonlyArray<string> = ["@napi-rs/keyring", "dbus-next", "ws"]
 const EXPECTED_PACKAGE_FILE_COUNT = 2
+const declaredModules = Object.keys(cliPackageJson.dependencies).sort()
 
 const errors = [
   cliPackageJson.files.length === EXPECTED_PACKAGE_FILE_COUNT &&
@@ -32,6 +33,10 @@ const errors = [
     ? undefined
     : "CLI package files must contain dist/index.cjs and the Agent Skill directory.",
   undeclared.length === 0 ? undefined : `CLI bundle has undeclared runtime dependencies: ${undeclared.join(", ")}.`,
+  declaredModules.length === EXPECTED_EXTERNAL_MODULES.length &&
+  declaredModules.every((name, index) => name === EXPECTED_EXTERNAL_MODULES[index])
+    ? undefined
+    : `CLI runtime dependencies must be exactly ${EXPECTED_EXTERNAL_MODULES.join(", ")}; found ${declaredModules.join(", ") || "none"}.`,
   externalModules.length === EXPECTED_EXTERNAL_MODULES.length &&
   externalModules.every((name, index) => name === EXPECTED_EXTERNAL_MODULES[index])
     ? undefined

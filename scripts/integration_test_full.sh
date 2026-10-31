@@ -663,7 +663,7 @@ cleanup_custom_field_date_artifacts() {
     && [ -n "$CUSTOM_FIELD_DATE_CLEANUP_FIELD_NAME" ]; then
     local cleanup_attempt
     for cleanup_attempt in 1 2 3; do
-      if pnpm exec tsx scripts/integration-custom-field-date.ts \
+      if node scripts/run-bundled.mjs scripts/integration-custom-field-date.ts \
         --mode cleanup \
         --issueId "$CUSTOM_FIELD_DATE_CLEANUP_ISSUE_ID" \
         --fieldId "$CUSTOM_FIELD_DATE_CLEANUP_FIELD_ID" \
@@ -698,7 +698,7 @@ cleanup_card_version_artifacts() {
   if [ -n "$CARD_VERSION_CLEANUP_BASE_ID" ]; then
     local version_cleanup_attempt
     for version_cleanup_attempt in 1 2 3; do
-      if pnpm exec tsx scripts/integration-card-version-history.ts \
+      if node scripts/run-bundled.mjs scripts/integration-card-version-history.ts \
         --mode cleanup \
         --cardSpace "Default" \
         --baseId "$CARD_VERSION_CLEANUP_BASE_ID" >/dev/null 2>&1; then
@@ -720,7 +720,7 @@ cleanup_mail_thread_artifacts() {
   fi
   local cleanup_attempt
   for cleanup_attempt in 1 2 3; do
-    if pnpm exec tsx scripts/integration-mail-threads.ts \
+    if node scripts/run-bundled.mjs scripts/integration-mail-threads.ts \
       --mode cleanup \
       --outerId "$MAIL_THREAD_CLEANUP_OUTER_ID" \
       --childId "$MAIL_THREAD_CLEANUP_CHILD_ID" >/dev/null 2>&1; then
@@ -739,7 +739,7 @@ cleanup_telegram_message_artifacts() {
   fi
   local cleanup_attempt
   for cleanup_attempt in 1 2 3; do
-    if pnpm exec tsx scripts/integration-telegram-messages.ts \
+    if node scripts/run-bundled.mjs scripts/integration-telegram-messages.ts \
       --mode cleanup \
       --channelId "$TELEGRAM_CLEANUP_CHANNEL_ID" \
       --messageId "$TELEGRAM_CLEANUP_MESSAGE_ID" >/dev/null 2>&1; then
@@ -821,7 +821,7 @@ cleanup_sequence_administration_artifacts() {
     cleaned=false
     for cleanup_attempt in 1 2 3; do
       if [ "$cleanup_method" = "owned-sdk-delete" ]; then
-        if pnpm tsx scripts/integration-sequence.ts --action delete-owned --sequence "$sequence_id" >/dev/null 2>&1; then
+        if node scripts/run-bundled.mjs scripts/integration-sequence.ts --action delete-owned --sequence "$sequence_id" >/dev/null 2>&1; then
           cleaned=true
           break
         fi
@@ -840,7 +840,7 @@ cleanup_sequence_administration_artifacts() {
 
 cleanup_security_administration_artifacts() {
   if [ -n "$SPACE_ROLE_CREATED_CLEANUP_SPACE_TYPE" ] && [ -n "$SPACE_ROLE_CREATED_CLEANUP_ROLE" ]; then
-    if pnpm tsx scripts/integration-security-role.ts --action delete --spaceType "$SPACE_ROLE_CREATED_CLEANUP_SPACE_TYPE" --role "$SPACE_ROLE_CREATED_CLEANUP_ROLE" >/dev/null 2>&1; then
+    if node scripts/run-bundled.mjs scripts/integration-security-role.ts --action delete --spaceType "$SPACE_ROLE_CREATED_CLEANUP_SPACE_TYPE" --role "$SPACE_ROLE_CREATED_CLEANUP_ROLE" >/dev/null 2>&1; then
       SPACE_ROLE_CREATED_CLEANUP_SPACE_TYPE=""
       SPACE_ROLE_CREATED_CLEANUP_ROLE=""
     fi
@@ -883,7 +883,7 @@ cleanup_issue_agent_assignee_artifacts() {
     fi
   fi
   if [ -z "$ISSUE_AGENT_CLEANUP_ISSUE_ID" ] && [ -n "$ISSUE_AGENT_CLEANUP_PROFILE_ID" ]; then
-    if pnpm exec tsx scripts/integration-issue-agent-profile.ts \
+    if node scripts/run-bundled.mjs scripts/integration-issue-agent-profile.ts \
       --mode cleanup --profileId "$ISSUE_AGENT_CLEANUP_PROFILE_ID" >/dev/null 2>&1; then
       ISSUE_AGENT_CLEANUP_PROFILE_ID=""
     else
@@ -1356,7 +1356,7 @@ cleanup_calendar_settings_artifacts() {
 
   if [ -n "$CALENDAR_SETTINGS_PRIMARY_SNAPSHOT" ]; then
     local primary_restore_result
-    primary_restore_result=$(timeout 120 pnpm exec tsx scripts/integration-calendar-settings.ts \
+    primary_restore_result=$(timeout 120 node scripts/run-bundled.mjs scripts/integration-calendar-settings.ts \
       --mode restore --snapshot "$CALENDAR_SETTINGS_PRIMARY_SNAPSHOT" 2>/dev/null || true)
     if printf '%s\n' "$primary_restore_result" | jq -e \
       '.status == "restored" and .verified == true' >/dev/null 2>&1; then
@@ -1398,7 +1398,7 @@ cleanup_calendar_meeting_room_artifacts() {
   fi
 
   local cleanup_result
-  if cleanup_result=$(timeout 60 pnpm exec tsx scripts/integration-calendar-meeting-rooms.ts \
+  if cleanup_result=$(timeout 60 node scripts/run-bundled.mjs scripts/integration-calendar-meeting-rooms.ts \
     "${cleanup_args[@]}" 2>/dev/null) \
     && printf '%s\n' "$cleanup_result" | jq -e \
       '.eventAbsent == true and .scheduleAbsent == true and .roomsAbsent == true and .floorAbsent == true' \
@@ -1441,7 +1441,7 @@ cleanup_virtual_office_artifacts() {
   fi
 
   local cleanup_result
-  if cleanup_result=$(timeout 45 pnpm exec tsx scripts/integration-virtual-office-administration.ts \
+  if cleanup_result=$(timeout 45 node scripts/run-bundled.mjs scripts/integration-virtual-office-administration.ts \
     "${cleanup_args[@]}" 2>/dev/null) \
     && printf '%s\n' "$cleanup_result" | jq -e \
       'type == "object" and .status == "confirmed" and (.removedRoom | type == "boolean") and (.removedFloor | type == "boolean") and .roomAbsent == true and .floorAbsent == true' \
@@ -1555,7 +1555,7 @@ cleanup_workflow_artifacts() {
     if [ -n "$TM_STATUS_NAME" ]; then
       cleanup_args+=("--status-name" "$TM_STATUS_NAME")
     fi
-    if pnpm exec tsx scripts/cleanup-workflow-artifacts.ts "${cleanup_args[@]}" >&2; then
+    if node scripts/run-bundled.mjs scripts/cleanup-workflow-artifacts.ts "${cleanup_args[@]}" >&2; then
       WORKFLOW_CLEANED=true
       return 0
     fi
@@ -3074,7 +3074,7 @@ if [ -n "$SEQUENCE_CUSTOM_CLEANUP_ID" ] && [ "$SEQUENCE_CUSTOM_CREATED" = "true"
   sleep 2
   SEQUENCE_CUSTOM_ID_JSON=$(json_string "$SEQUENCE_CUSTOM_CLEANUP_ID")
   run_shell_test "increment owned custom sequence fixture" \
-    pnpm tsx scripts/integration-sequence.ts --action increment --sequence "$SEQUENCE_CUSTOM_CLEANUP_ID"
+    node scripts/run-bundled.mjs scripts/integration-sequence.ts --action increment --sequence "$SEQUENCE_CUSTOM_CLEANUP_ID"
   sleep 2
   run_capture_to_var SEQUENCE_CUSTOM_AFTER_INCREMENT_TEXT "list_huly_sequences(after semantic increment)" \
     '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_huly_sequences","arguments":{}},"id":2}'
@@ -3100,7 +3100,7 @@ if [ -n "$SEQUENCE_CUSTOM_CLEANUP_ID" ] && [ "$SEQUENCE_CUSTOM_CREATED" = "true"
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"delete_huly_sequence\",\"arguments\":{\"sequence\":$SEQUENCE_CUSTOM_ID_JSON,\"expectedCurrentValue\":0,\"confirm\":true}},\"id\":2}" \
     "not expected value"
   if run_shell_test "delete owned custom sequence fixture" \
-    pnpm tsx scripts/integration-sequence.ts --action delete-owned --sequence "$SEQUENCE_CUSTOM_CLEANUP_ID"; then
+    node scripts/run-bundled.mjs scripts/integration-sequence.ts --action delete-owned --sequence "$SEQUENCE_CUSTOM_CLEANUP_ID"; then
     SEQUENCE_CLEANUP_ENTRIES=$(printf '%s' "$SEQUENCE_CLEANUP_ENTRIES" | jq -c --arg id "$SEQUENCE_CUSTOM_CLEANUP_ID" 'select(.sequenceId != $id)' || true)
     sleep 2
     run_capture_to_var SEQUENCE_CUSTOM_AFTER_DELETE_TEXT "list_huly_sequences(after owned fixture rollback)" \
@@ -3230,12 +3230,12 @@ if [ -n "$TRAINING_SPACE_TYPE_ID" ] && [ -n "$TRAINING_ROLE_NAME" ] && [ -n "$TR
     SPACE_ROLE_CREATED_CLEANUP_ROLE="$SECURITY_ROLE_ID"
     sleep 2
     run_shell_test "create_space_role persists Role and assignment Attribute" \
-      pnpm tsx scripts/integration-security-role.ts --action verify --spaceType "$TRAINING_SPACE_TYPE_ID" --role "$SECURITY_ROLE_ID"
+      node scripts/run-bundled.mjs scripts/integration-security-role.ts --action verify --spaceType "$TRAINING_SPACE_TYPE_ID" --role "$SECURITY_ROLE_ID"
     if run_shell_test "cleanup create_space_role fixture" \
-      pnpm tsx scripts/integration-security-role.ts --action delete --spaceType "$TRAINING_SPACE_TYPE_ID" --role "$SECURITY_ROLE_ID"; then
+      node scripts/run-bundled.mjs scripts/integration-security-role.ts --action delete --spaceType "$TRAINING_SPACE_TYPE_ID" --role "$SECURITY_ROLE_ID"; then
       sleep 2
       if run_shell_test "create_space_role cleanup is persistent" \
-        pnpm tsx scripts/integration-security-role.ts --action verify-absent --spaceType "$TRAINING_SPACE_TYPE_ID" --role "$SECURITY_ROLE_ID"; then
+        node scripts/run-bundled.mjs scripts/integration-security-role.ts --action verify-absent --spaceType "$TRAINING_SPACE_TYPE_ID" --role "$SECURITY_ROLE_ID"; then
         SPACE_ROLE_CREATED_CLEANUP_SPACE_TYPE=""
         SPACE_ROLE_CREATED_CLEANUP_ROLE=""
       fi
@@ -4396,7 +4396,7 @@ if [ $? -eq 0 ]; then
       "get_issue did not return creator id, name, and email for the authenticated issue author"
   fi
 
-  if ISSUE_PARENT_STATE=$(pnpm exec tsx scripts/integration-issue-parent-semantics.ts \
+  if ISSUE_PARENT_STATE=$(node scripts/run-bundled.mjs scripts/integration-issue-parent-semantics.ts \
     --project "$PROJECT" --issue "$ISSUE_ID" --mode top-level --expectedIssueChildren 0); then
     echo "PASS: create_issue uses native NoParent top-level shape"
     PASSED=$((PASSED + 1))
@@ -4406,7 +4406,7 @@ if [ $? -eq 0 ]; then
   fi
 
   if [ "$INTEGRATION_TRANSPORT" = "stdio" ] \
-    && CUSTOM_FIELD_DATE_FIXTURE=$(pnpm exec tsx scripts/integration-custom-field-date.ts \
+    && CUSTOM_FIELD_DATE_FIXTURE=$(node scripts/run-bundled.mjs scripts/integration-custom-field-date.ts \
       --mode setup --issueId "$ISSUE_OBJ_ID"); then
     CUSTOM_FIELD_DATE_CLEANUP_ISSUE_ID="$ISSUE_OBJ_ID"
     CUSTOM_FIELD_DATE_CLEANUP_FIELD_ID=$(printf '%s\n' "$CUSTOM_FIELD_DATE_FIXTURE" | jq -r '.fieldId')
@@ -4414,7 +4414,7 @@ if [ $? -eq 0 ]; then
     CUSTOM_FIELD_DATE_FIELD_ID_JSON=$(json_string "$CUSTOM_FIELD_DATE_CLEANUP_FIELD_ID")
     sleep 1
 
-    CUSTOM_FIELD_DATE_INITIAL_RESULT=$(pnpm exec tsx scripts/integration-custom-field-date.ts \
+    CUSTOM_FIELD_DATE_INITIAL_RESULT=$(node scripts/run-bundled.mjs scripts/integration-custom-field-date.ts \
       --mode read \
       --issueId "$ISSUE_OBJ_ID" \
       --fieldName "$CUSTOM_FIELD_DATE_CLEANUP_FIELD_NAME")
@@ -4430,7 +4430,7 @@ if [ $? -eq 0 ]; then
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"set_custom_field\",\"arguments\":{\"objectId\":\"$ISSUE_OBJ_ID\",\"objectClass\":\"tracker:class:Issue\",\"fieldId\":$CUSTOM_FIELD_DATE_FIELD_ID_JSON,\"value\":\"2026-07-25T00:00:00Z\"}},\"id\":2}" \
       "Invalid date custom-field value"
 
-    CUSTOM_FIELD_DATE_READ_RESULT=$(pnpm exec tsx scripts/integration-custom-field-date.ts \
+    CUSTOM_FIELD_DATE_READ_RESULT=$(node scripts/run-bundled.mjs scripts/integration-custom-field-date.ts \
       --mode read \
       --issueId "$ISSUE_OBJ_ID" \
       --fieldName "$CUSTOM_FIELD_DATE_CLEANUP_FIELD_NAME")
@@ -4498,7 +4498,7 @@ if [ $? -eq 0 ]; then
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"create_person\",\"arguments\":{\"firstName\":\"Issue Agent\",\"lastName\":\"$RUN_ID\",\"email\":$AGENT_ASSIGNEE_EMAIL_JSON}},\"id\":2}"
   if [ $? -eq 0 ]; then
     ISSUE_AGENT_CLEANUP_PERSON_ID=$(printf '%s\n' "$AGENT_ASSIGNEE_PERSON_TEXT" | jq -r '.id // empty')
-    if AGENT_ASSIGNEE_PROFILE_FIXTURE=$(pnpm exec tsx scripts/integration-issue-agent-profile.ts \
+    if AGENT_ASSIGNEE_PROFILE_FIXTURE=$(node scripts/run-bundled.mjs scripts/integration-issue-agent-profile.ts \
       --mode setup --personId "$ISSUE_AGENT_CLEANUP_PERSON_ID" --title "$AGENT_ASSIGNEE_TITLE"); then
       ISSUE_AGENT_CLEANUP_PROFILE_ID=$(printf '%s\n' "$AGENT_ASSIGNEE_PROFILE_FIXTURE" | jq -r '.profileId // empty')
       sleep 2
@@ -4566,7 +4566,7 @@ if [ $? -eq 0 ]; then
   if [ $? -eq 0 ]; then
     SUB_ID=$(echo "$SUB_TEXT" | jq -r '.identifier' 2>/dev/null)
     echo "  => sub: $SUB_ID"
-    if CHILD_PARENT_STATE=$(pnpm exec tsx scripts/integration-issue-parent-semantics.ts \
+    if CHILD_PARENT_STATE=$(node scripts/run-bundled.mjs scripts/integration-issue-parent-semantics.ts \
       --project "$PROJECT" --issue "$SUB_ID" --mode child --parent "$ISSUE_ID" \
       --expectedIssueChildren 0 --expectedParentChildren 1); then
       echo "PASS: create_issue(sub) attaches natively and increments parent count once"
@@ -4584,7 +4584,7 @@ if [ $? -eq 0 ]; then
       "$TOP_LEVEL_BEFORE_DETACH_TEXT" "map(.identifier)" "$SUB_ID"
     run_test "move_issue($SUB_ID)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"move_issue\",\"arguments\":{\"issue\":\"$SUB_ID\",\"destination\":{\"parent\":null}}},\"id\":2}"
-    if DETACHED_PARENT_STATE=$(pnpm exec tsx scripts/integration-issue-parent-semantics.ts \
+    if DETACHED_PARENT_STATE=$(node scripts/run-bundled.mjs scripts/integration-issue-parent-semantics.ts \
       --project "$PROJECT" --issue "$SUB_ID" --mode top-level --parent "$ISSUE_ID" \
       --expectedIssueChildren 0 --expectedParentChildren 0); then
       echo "PASS: move_issue(null) restores NoParent and decrements parent count once"
@@ -4596,7 +4596,7 @@ if [ $? -eq 0 ]; then
     wait_for_json_array_contains_to_var TOP_LEVEL_AFTER_DETACH_TEXT "list_issues(isTopLevel) includes detached child" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"list_issues\",\"arguments\":{\"project\":\"$PROJECT\",\"isTopLevel\":true,\"limit\":200}},\"id\":2}" \
       "map(.identifier)" "$SUB_ID"
-    if LEGACY_PARENT_STATE=$(pnpm exec tsx scripts/integration-issue-parent-semantics.ts \
+    if LEGACY_PARENT_STATE=$(node scripts/run-bundled.mjs scripts/integration-issue-parent-semantics.ts \
       --project "$PROJECT" --issue "$SUB_ID" --mode make-legacy --parent "$ISSUE_ID" \
       --expectedIssueChildren 0 --expectedParentChildren 0); then
       echo "PASS: integration fixture creates legacy project-attached issue without changing parent count"
@@ -4688,7 +4688,7 @@ if [ $? -eq 0 ]; then
     "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"log_time\",\"arguments\":{\"project\":\"$PROJECT\",\"identifier\":\"$ISSUE_ID\",\"value\":$TIME_REPORT_HOURS}},\"id\":2}"
   if [ $? -eq 0 ]; then
     TIME_REPORT_ID=$(echo "$TIME_REPORT_TEXT" | jq -r '.reportId' 2>/dev/null)
-    if TIME_TRIGGER_RESULT=$(pnpm exec tsx scripts/integration-time-report-trigger.ts \
+    if TIME_TRIGGER_RESULT=$(node scripts/run-bundled.mjs scripts/integration-time-report-trigger.ts \
       --project "$PROJECT" --issue "$ISSUE_ID" --report "$TIME_REPORT_ID" \
       --estimateHours "$TIME_ESTIMATE_HOURS" --reportHours "$TIME_REPORT_HOURS"); then
       echo "PASS: log_time create/delete uses one native aggregate change and authenticated employee"
@@ -4851,7 +4851,7 @@ if [ $? -eq 0 ]; then
         "map(.title)" "Child Task"
       TMPL_CHILD_ISSUE_ID=$(echo "$TMPL_CHILD_ISSUES_TEXT" | jq -r '.[] | select(.title == "Child Task") | .identifier' 2>/dev/null | head -1)
       if [ -n "$TMPL_CHILD_ISSUE_ID" ]; then
-        if TMPL_PARENT_STATE=$(pnpm exec tsx scripts/integration-issue-parent-semantics.ts \
+        if TMPL_PARENT_STATE=$(node scripts/run-bundled.mjs scripts/integration-issue-parent-semantics.ts \
           --project "$PROJECT" --issue "$TMPL_CHILD_ISSUE_ID" --mode child --parent "$TMPL_ISSUE_ID" \
           --expectedIssueChildren 0 --expectedParentChildren 1); then
           echo "PASS: create_issue_from_template attaches child and increments parent count once"
@@ -5075,7 +5075,7 @@ if [ -n "$TS_NAME" ]; then
       echo "  => corrupt_doc: $CORRUPT_DOC_ID"
     fi
 
-    if [ -n "${CORRUPT_DOC_ID:-}" ] && pnpm exec tsx scripts/corrupt-document-content.ts --document "$CORRUPT_DOC_ID" --content "$DOC_CORRUPT_CONTENT" >/dev/null; then
+    if [ -n "${CORRUPT_DOC_ID:-}" ] && node scripts/run-bundled.mjs scripts/corrupt-document-content.ts --document "$CORRUPT_DOC_ID" --content "$DOC_CORRUPT_CONTENT" >/dev/null; then
       sleep 2
       run_expect_error_contains "get_document($CORRUPT_DOC_ID) corrupted content error" \
         "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_document\",\"arguments\":{\"teamspace\":\"$TS_NAME\",\"document\":\"$CORRUPT_DOC_ID\"}},\"id\":2}" \
@@ -5759,7 +5759,7 @@ if [ -n "$EMPLOYEE_LIFECYCLE_TARGET" ]; then
 else
   skip_test "deactivate_employee(preview and stale guard)" "no unique active non-self employee fixture"
 fi
-HR_STAFF_FIXTURE=$(pnpm exec tsx scripts/integration-hr-staff-fixture.ts 2>/dev/null)
+HR_STAFF_FIXTURE=$(node scripts/run-bundled.mjs scripts/integration-hr-staff-fixture.ts 2>/dev/null)
 HR_STAFF_EMPLOYEE=$(echo "$HR_STAFF_FIXTURE" | jq -r '.employeeId // empty' 2>/dev/null)
 HR_STAFF_ORIGINAL_DEPARTMENT=$(echo "$HR_STAFF_FIXTURE" | jq -r '.departmentId // empty' 2>/dev/null)
 if [ -n "$HR_STAFF_EMPLOYEE" ]; then
@@ -6437,7 +6437,7 @@ fi
 
 # Caller-scoped Calendar settings. Arm the exact native preference snapshot
 # before any mutation; cleanup restores it with fresh SDK clients.
-CALENDAR_SETTINGS_PRIMARY_SNAPSHOT=$(timeout 60 pnpm exec tsx scripts/integration-calendar-settings.ts \
+CALENDAR_SETTINGS_PRIMARY_SNAPSHOT=$(timeout 60 node scripts/run-bundled.mjs scripts/integration-calendar-settings.ts \
   --mode snapshot 2>/dev/null || true)
 if [ -z "$CALENDAR_SETTINGS_PRIMARY_SNAPSHOT" ]; then
   fail_test "calendar settings PrimaryCalendar snapshot" "typed SDK snapshot could not be armed before mutation"
@@ -6545,7 +6545,7 @@ else
         # Clear only the preference, if one existed, so the public tool must
         # deliberately create it. The original exact row remains the cleanup marker.
         if printf '%s\n' "$CALENDAR_SETTINGS_PRIMARY_SNAPSHOT" | jq -e '.status == "present"' >/dev/null 2>&1; then
-          CALENDAR_SETTINGS_CLEAR_RESULT=$(timeout 120 pnpm exec tsx scripts/integration-calendar-settings.ts \
+          CALENDAR_SETTINGS_CLEAR_RESULT=$(timeout 120 node scripts/run-bundled.mjs scripts/integration-calendar-settings.ts \
             --mode restore --snapshot '{"status":"absent"}' 2>/dev/null || true)
           if ! printf '%s\n' "$CALENDAR_SETTINGS_CLEAR_RESULT" | jq -e '.status == "restored" and .verified == true' >/dev/null 2>&1; then
             fail_test "set_primary_calendar deliberate creation setup" "existing preference could not be cleared and verified"
@@ -6562,12 +6562,12 @@ else
               ".[] | select(.calendarId == \"$CALENDAR_SETTINGS_VISIBLE_TARGET_ID\") | .isPrimary" true
           fi
 
-          CALENDAR_SETTINGS_PROVIDER_DEFAULT_RESULT=$(timeout 60 pnpm exec tsx scripts/integration-calendar-settings.ts \
+          CALENDAR_SETTINGS_PROVIDER_DEFAULT_RESULT=$(timeout 60 node scripts/run-bundled.mjs scripts/integration-calendar-settings.ts \
             --mode provider-default 2>/dev/null || true)
           CALENDAR_SETTINGS_PROVIDER_DEFAULT_ID=$(printf '%s\n' "$CALENDAR_SETTINGS_PROVIDER_DEFAULT_RESULT" | jq -r \
             'select(.status == "found") | .calendarId // empty' 2>/dev/null)
           CALENDAR_SETTINGS_STALE_ID="calendar-settings-stale-$RUN_ID"
-          CALENDAR_SETTINGS_STALE_RESULT=$(timeout 120 pnpm exec tsx scripts/integration-calendar-settings.ts \
+          CALENDAR_SETTINGS_STALE_RESULT=$(timeout 120 node scripts/run-bundled.mjs scripts/integration-calendar-settings.ts \
             --mode set-attached --attachedTo "$CALENDAR_SETTINGS_STALE_ID" 2>/dev/null || true)
           if printf '%s\n' "$CALENDAR_SETTINGS_STALE_RESULT" | jq -e '.status == "updated" and .verified == true' >/dev/null 2>&1; then
             run_capture_to_var_fresh CALENDAR_SETTINGS_STALE_READ_TEXT "list_calendar_settings(stale preference fallback)" \
@@ -6679,7 +6679,7 @@ CALENDAR_MEETING_CLEANUP_EVENT_TITLE="MCP Meeting Event $RUN_ID"
 CALENDAR_MEETING_CLEANUP_SCHEDULE_TITLE="MCP Meeting Schedule $RUN_ID"
 CALENDAR_MEETING_LOCATION="Physical location $RUN_ID"
 
-if CALENDAR_MEETING_FIXTURE=$(timeout 45 pnpm exec tsx scripts/integration-calendar-meeting-rooms.ts \
+if CALENDAR_MEETING_FIXTURE=$(timeout 45 node scripts/run-bundled.mjs scripts/integration-calendar-meeting-rooms.ts \
   --mode setup --fixture "$RUN_ID"); then
   CALENDAR_MEETING_CLEANUP_FLOOR_ID=$(printf '%s\n' "$CALENDAR_MEETING_FIXTURE" | jq -r '.floorId // empty')
   CALENDAR_MEETING_CLEANUP_ROOM_ONE_ID=$(printf '%s\n' "$CALENDAR_MEETING_FIXTURE" | jq -r '.roomOneId // empty')
@@ -6729,7 +6729,7 @@ if [ -n "$CALENDAR_MEETING_CLEANUP_ROOM_ONE_ID" ] && [ -n "$CALENDAR_MEETING_CLE
     if [ "$CALENDAR_MEETING_EXPECT_SIBLING" = true ]; then
       CALENDAR_MEETING_EVENT_INSPECT_ARGS+=(--expectSibling)
     fi
-    if CALENDAR_MEETING_EVENT_STATE=$(timeout 45 pnpm exec tsx \
+    if CALENDAR_MEETING_EVENT_STATE=$(timeout 45 node scripts/run-bundled.mjs \
       scripts/integration-calendar-meeting-rooms.ts "${CALENDAR_MEETING_EVENT_INSPECT_ARGS[@]}"); then
       echo "PASS: create_event creates native Meeting on every eventId sibling and preserves location"
       PASSED=$((PASSED + 1))
@@ -6769,7 +6769,7 @@ if [ -n "$CALENDAR_MEETING_CLEANUP_ROOM_ONE_ID" ] && [ -n "$CALENDAR_MEETING_CLE
       if [ "$CALENDAR_MEETING_EXPECT_SIBLING" = true ]; then
         CALENDAR_MEETING_EVENT_UPDATED_INSPECT_ARGS+=(--expectSibling)
       fi
-      if CALENDAR_MEETING_EVENT_UPDATED_STATE=$(timeout 45 pnpm exec tsx \
+      if CALENDAR_MEETING_EVENT_UPDATED_STATE=$(timeout 45 node scripts/run-bundled.mjs \
         scripts/integration-calendar-meeting-rooms.ts \
         "${CALENDAR_MEETING_EVENT_UPDATED_INSPECT_ARGS[@]}"); then
         echo "PASS: update_event changes every sibling Meeting and preserves location"
@@ -6804,7 +6804,7 @@ if [ -n "$CALENDAR_MEETING_CLEANUP_ROOM_ONE_ID" ] && [ -n "$CALENDAR_MEETING_CLE
   fi
 
   if [ -n "$CALENDAR_MEETING_CLEANUP_SCHEDULE_ID" ]; then
-    if CALENDAR_MEETING_SCHEDULE_STATE=$(timeout 45 pnpm exec tsx \
+    if CALENDAR_MEETING_SCHEDULE_STATE=$(timeout 45 node scripts/run-bundled.mjs \
       scripts/integration-calendar-meeting-rooms.ts \
       --mode inspect-schedule \
       --scheduleId "$CALENDAR_MEETING_CLEANUP_SCHEDULE_ID" \
@@ -6827,7 +6827,7 @@ if [ -n "$CALENDAR_MEETING_CLEANUP_ROOM_ONE_ID" ] && [ -n "$CALENDAR_MEETING_CLE
       "update_schedule(native MeetingSchedule:$CALENDAR_MEETING_CLEANUP_SCHEDULE_ID)" \
       "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"update_schedule\",\"arguments\":{\"scheduleId\":\"$CALENDAR_MEETING_CLEANUP_SCHEDULE_ID\",\"meetingRoom\":{\"room\":\"$CALENDAR_MEETING_CLEANUP_ROOM_TWO_ID\"}}},\"id\":2}"
     if [ $? -eq 0 ]; then
-      if CALENDAR_MEETING_SCHEDULE_UPDATED_STATE=$(timeout 45 pnpm exec tsx \
+      if CALENDAR_MEETING_SCHEDULE_UPDATED_STATE=$(timeout 45 node scripts/run-bundled.mjs \
         scripts/integration-calendar-meeting-rooms.ts \
         --mode inspect-schedule \
         --scheduleId "$CALENDAR_MEETING_CLEANUP_SCHEDULE_ID" \
@@ -6937,7 +6937,7 @@ if [ $? -eq 0 ]; then
         1777020000000 1777023600000 "$TODO_TITLE" 20 0.5 run_capture_only_fresh || true
     fi
     if [ -n "$SCHEDULE_SLOT_ID" ]; then
-      if PLANNER_SLOT_RESULT=$(pnpm exec tsx scripts/integration-planner-work-slot.ts \
+      if PLANNER_SLOT_RESULT=$(node scripts/run-bundled.mjs scripts/integration-planner-work-slot.ts \
         --slot "$SCHEDULE_SLOT_ID" --todo "$TODO_ID" --calendar "$CALENDAR_ID" \
         --date "1777020000000" --dueDate "1777023600000"); then
         echo "PASS: schedule_todo creates a Planner-visible authenticated calendar slot"
@@ -7074,7 +7074,7 @@ if [ -n "$PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID" ] && [ -n "$PLANNER_DOCUMENT_CL
       if [ -n "$PLANNER_DOCUMENT_CLEANUP_TODO_ID" ]; then
         PLANNER_DOCUMENT_TODO_RAW_READ_PAYLOAD="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"todoId\":\"$PLANNER_DOCUMENT_CLEANUP_TODO_ID\"}}},\"id\":2}"
         PLANNER_DOCUMENT_TODO_HUMAN_LOCATOR_PAYLOAD="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_todo\",\"arguments\":{\"locator\":{\"title\":$PLANNER_DOCUMENT_TODO_TITLE_JSON,\"attachedTo\":$PLANNER_DOCUMENT_ATTACHMENT_JSON}}},\"id\":2}"
-        if PLANNER_DOCUMENT_TODO_STATE=$(pnpm exec tsx scripts/integration-planner-document-todo.ts \
+        if PLANNER_DOCUMENT_TODO_STATE=$(node scripts/run-bundled.mjs scripts/integration-planner-document-todo.ts \
           --teamspace "$PLANNER_DOCUMENT_CLEANUP_TEAMSPACE_ID" \
           --document "$PLANNER_DOCUMENT_CLEANUP_DOCUMENT_ID" \
           --todo "$PLANNER_DOCUMENT_CLEANUP_TODO_ID"); then
@@ -7292,7 +7292,7 @@ if [ -n "$VIRTUAL_OFFICE_CLEANUP_FLOOR_ID" ]; then
       VIRTUAL_OFFICE_ROOM_READ_PAYLOAD="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_office_room\",\"arguments\":{\"roomId\":$VIRTUAL_OFFICE_ROOM_ID_JSON}},\"id\":2}"
       if wait_for_tool_field_quiet "$VIRTUAL_OFFICE_ROOM_READ_PAYLOAD" '.roomId' \
         "$VIRTUAL_OFFICE_CLEANUP_ROOM_ID" 20; then
-        if VIRTUAL_OFFICE_NATIVE_STATE=$(timeout 45 pnpm exec tsx \
+        if VIRTUAL_OFFICE_NATIVE_STATE=$(timeout 45 node scripts/run-bundled.mjs \
           scripts/integration-virtual-office-administration.ts \
           --mode inspect \
           --floorId "$VIRTUAL_OFFICE_CLEANUP_FLOOR_ID" \
@@ -8454,7 +8454,7 @@ if [ -n "$DERIVED_CARD_TYPE_ID" ]; then
   CARD_UNVERSIONED_CLEANUP_ID="$CARD_UNVERSIONED_ID"
   if [ -n "$CARD_UNVERSIONED_ID" ]; then
     CARD_UNVERSIONED_ID_JSON=$(json_string "$CARD_UNVERSIONED_ID")
-    if pnpm exec tsx scripts/integration-card-version-history.ts \
+    if node scripts/run-bundled.mjs scripts/integration-card-version-history.ts \
       --mode strip \
       --cardSpace "Default" \
       --card "$CARD_UNVERSIONED_ID" >/dev/null 2>&1; then
@@ -8493,7 +8493,7 @@ if [ -n "$DERIVED_CARD_TYPE_ID" ]; then
   CARD_VERSION_CLEANUP_BASE_ID="$CARD_VERSION_BASE_ID"
   if [ -n "$CARD_VERSION_BASE_ID" ]; then
     CARD_VERSION_BASE_ID_JSON=$(json_string "$CARD_VERSION_BASE_ID")
-    CARD_VERSION_SETUP_TEXT=$(pnpm exec tsx scripts/integration-card-version-history.ts \
+    CARD_VERSION_SETUP_TEXT=$(node scripts/run-bundled.mjs scripts/integration-card-version-history.ts \
       --mode setup \
       --cardSpace "Default" \
       --card "$CARD_VERSION_BASE_ID" \
@@ -8552,7 +8552,7 @@ if [ -n "$DERIVED_CARD_TYPE_ID" ]; then
     CARD_COMMENT_ID=$(printf '%s\n' "$CARD_COMMENT_ADD_TEXT" | jq -r '.commentId // empty' 2>/dev/null)
     CARD_COMMENT_ID_JSON=$(json_string "$CARD_COMMENT_ID")
 
-    CARD_NATIVE_COMMENT_TEXT=$(pnpm exec tsx scripts/integration-card-native-comment.ts \
+    CARD_NATIVE_COMMENT_TEXT=$(node scripts/run-bundled.mjs scripts/integration-card-native-comment.ts \
       --cardSpace "Default" \
       --card "$DERIVED_CARD_LABEL_ID" \
       --body "$CARD_NATIVE_COMMENT_BODY" 2>/dev/null)
@@ -8911,7 +8911,7 @@ echo ""
 # 14B. MAIL THREAD METADATA
 ##############################
 echo "=== 14B. Mail thread metadata ==="
-MAIL_THREAD_SETUP_TEXT=$(pnpm exec tsx scripts/integration-mail-threads.ts --mode setup --runId "$RUN_ID" 2>/dev/null)
+MAIL_THREAD_SETUP_TEXT=$(node scripts/run-bundled.mjs scripts/integration-mail-threads.ts --mode setup --runId "$RUN_ID" 2>/dev/null)
 if [ $? -eq 0 ]; then
   MAIL_THREAD_CLEANUP_OUTER_ID=$(printf '%s\n' "$MAIL_THREAD_SETUP_TEXT" | jq -r '.outerId // empty' 2>/dev/null)
   MAIL_THREAD_CLEANUP_CHILD_ID=$(printf '%s\n' "$MAIL_THREAD_SETUP_TEXT" | jq -r '.childId // empty' 2>/dev/null)
@@ -8948,7 +8948,7 @@ echo ""
 # 14C. TELEGRAM STORED MESSAGES
 ##############################
 echo "=== 14C. Telegram stored messages ==="
-TELEGRAM_SETUP_TEXT=$(pnpm exec tsx scripts/integration-telegram-messages.ts --mode setup --runId "$RUN_ID" 2>/dev/null)
+TELEGRAM_SETUP_TEXT=$(node scripts/run-bundled.mjs scripts/integration-telegram-messages.ts --mode setup --runId "$RUN_ID" 2>/dev/null)
 if [ $? -eq 0 ]; then
   TELEGRAM_CLEANUP_CHANNEL_ID=$(printf '%s\n' "$TELEGRAM_SETUP_TEXT" | jq -r '.channelId // empty' 2>/dev/null)
   TELEGRAM_CLEANUP_MESSAGE_ID=$(printf '%s\n' "$TELEGRAM_SETUP_TEXT" | jq -r '.messageId // empty' 2>/dev/null)

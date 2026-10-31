@@ -60,7 +60,7 @@ interface RestReadClient {
 }
 
 const usage = `Usage:
-  pnpm exec tsx scripts/cleanup-workflow-artifacts.ts [options]
+  node scripts/run-bundled.mjs scripts/cleanup-workflow-artifacts.ts [options]
 
 Options:
   --task-type-name <name>       Exact task type name to remove

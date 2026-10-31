@@ -18,7 +18,7 @@ interface Args {
 const NODE_ARGUMENT_OFFSET = 2
 
 const usage = `Usage:
-  pnpm exec tsx scripts/corrupt-document-content.ts --document <document-id> --content <raw-markdown>
+  node scripts/run-bundled.mjs scripts/corrupt-document-content.ts --document <document-id> --content <raw-markdown>
 
 This integration-test helper deliberately writes raw markdown into Document.content.
 Do not use it outside disposable test documents.

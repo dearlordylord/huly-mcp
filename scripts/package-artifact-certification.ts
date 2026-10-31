@@ -149,6 +149,12 @@ export const certifyPackedArtifact = async (
   if (!sameStrings(external, [...expected.expectedExternalModules].sort())) {
     throw new Error(`Unexpected packed external modules: ${external.join(", ") || "none"}.`)
   }
+  const dependencies = Object.keys(manifest.dependencies).sort()
+  if (!sameStrings(dependencies, external)) {
+    throw new Error(
+      `Packed runtime dependencies must match external modules; found ${dependencies.join(", ") || "none"}.`
+    )
+  }
 
   return Schema.decodeUnknownSync(PackedArtifactCertificationSchema)({
     archiveBytes: (await stat(archivePath)).size,

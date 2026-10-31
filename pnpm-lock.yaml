@@ -23,9 +23,40 @@ importers:
 
   .:
     dependencies:
+      '@napi-rs/keyring':
+        specifier: 2.1.1
+        version: 2.1.1
+      dbus-next:
+        specifier: 0.10.2
+        version: 0.10.2
+      ws:
+        specifier: ^8.18.0
+        version: 8.19.0
+    devDependencies:
+      '@changesets/cli':
+        specifier: ^2.30.0
+        version: 2.30.0(@types/node@25.2.0)
+      '@effect/platform-node':
+        specifier: 4.0.0
+        version: 4.0.0(effect@4.0.0(patch_hash=8f77f9bbb337b5fb1f625e1a77aea5eb46cc094c1adb5fe9e657a6b053ec9e7b))(redis@6.2.1)
+      '@effect/tsgo':
+        specifier: 0.36.4
+        version: 0.36.4
+      '@effect/vitest':
+        specifier: 4.0.0
+        version: 4.0.0(effect@4.0.0(patch_hash=8f77f9bbb337b5fb1f625e1a77aea5eb46cc094c1adb5fe9e657a6b053ec9e7b))(vitest@5.0.1)
+      '@hcengineering/account-client':
+        specifier: 0.7.25
+        version: 0.7.25
       '@hcengineering/activity':
         specifier: 0.7.0
         version: 0.7.0
+      '@hcengineering/analytics':
+        specifier: 0.7.3
+        version: 0.7.3
+      '@hcengineering/api-client':
+        specifier: 0.7.19
+        version: 0.7.19(patch_hash=6448e9bb0f5199b362ab285ce912e132868029db2e5eda9873e20fc233314c09)(prosemirror-inputrules@1.5.1)(prosemirror-model@1.25.4)(prosemirror-state@1.4.4)(prosemirror-view@1.41.6)
       '@hcengineering/attachment':
         specifier: 0.7.0
         version: 0.7.0
@@ -41,6 +72,9 @@ importers:
       '@hcengineering/chunter':
         specifier: 0.7.0
         version: 0.7.0
+      '@hcengineering/collaborator-client':
+        specifier: 0.7.18
+        version: 0.7.18
       '@hcengineering/contact':
         specifier: 0.7.0
         version: 0.7.0
@@ -68,12 +102,21 @@ importers:
       '@hcengineering/notification':
         specifier: 0.7.0
         version: 0.7.0
+      '@hcengineering/platform':
+        specifier: 0.7.20
+        version: 0.7.20
       '@hcengineering/preference':
         specifier: 0.7.0
         version: 0.7.0
+      '@hcengineering/rank':
+        specifier: 0.7.18
+        version: 0.7.18
       '@hcengineering/request':
         specifier: 0.7.0
         version: 0.7.0
+      '@hcengineering/setting':
+        specifier: 0.7.382
+        version: 0.7.382
       '@hcengineering/support':
         specifier: 0.7.0
         version: 0.7.0
@@ -89,61 +132,6 @@ importers:
       '@hcengineering/templates':
         specifier: 0.7.0
         version: 0.7.0
-      '@hcengineering/time':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/tracker':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/view':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/workbench':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@napi-rs/keyring':
-        specifier: 2.1.1
-        version: 2.1.1
-      dbus-next:
-        specifier: 0.10.2
-        version: 0.10.2
-      ws:
-        specifier: ^8.18.0
-        version: 8.19.0
-    devDependencies:
-      '@changesets/cli':
-        specifier: ^2.30.0
-        version: 2.30.0(@types/node@25.2.0)
-      '@effect/platform-node':
-        specifier: 4.0.0
-        version: 4.0.0(effect@4.0.0(patch_hash=8f77f9bbb337b5fb1f625e1a77aea5eb46cc094c1adb5fe9e657a6b053ec9e7b))(redis@6.2.1)
-      '@effect/tsgo':
-        specifier: 0.36.4
-        version: 0.36.4
-      '@effect/vitest':
-        specifier: 4.0.0
-        version: 4.0.0(effect@4.0.0(patch_hash=8f77f9bbb337b5fb1f625e1a77aea5eb46cc094c1adb5fe9e657a6b053ec9e7b))(vitest@5.0.1)
-      '@hcengineering/account-client':
-        specifier: 0.7.25
-        version: 0.7.25
-      '@hcengineering/analytics':
-        specifier: 0.7.3
-        version: 0.7.3
-      '@hcengineering/api-client':
-        specifier: 0.7.19
-        version: 0.7.19(patch_hash=6448e9bb0f5199b362ab285ce912e132868029db2e5eda9873e20fc233314c09)(prosemirror-inputrules@1.5.1)(prosemirror-model@1.25.4)(prosemirror-state@1.4.4)(prosemirror-view@1.41.6)
-      '@hcengineering/collaborator-client':
-        specifier: 0.7.18
-        version: 0.7.18
-      '@hcengineering/platform':
-        specifier: 0.7.20
-        version: 0.7.20
-      '@hcengineering/rank':
-        specifier: 0.7.18
-        version: 0.7.18
-      '@hcengineering/setting':
-        specifier: 0.7.382
-        version: 0.7.382
       '@hcengineering/text':
         specifier: 0.7.19
         version: 0.7.19(prosemirror-inputrules@1.5.1)(prosemirror-model@1.25.4)(prosemirror-state@1.4.4)(prosemirror-view@1.41.6)
@@ -153,7 +141,19 @@ importers:
       '@hcengineering/theme':
         specifier: 0.7.0
         version: 0.7.0
+      '@hcengineering/time':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/tracker':
+        specifier: 0.7.0
+        version: 0.7.0
       '@hcengineering/ui':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/view':
+        specifier: 0.7.0
+        version: 0.7.0
+      '@hcengineering/workbench':
         specifier: 0.7.0
         version: 0.7.0
       '@informalsystems/quint':
@@ -237,84 +237,6 @@ importers:
 
   packages/huly-cli:
     dependencies:
-      '@hcengineering/activity':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/attachment':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/board':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/calendar':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/card':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/chunter':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/contact':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/core':
-        specifier: 0.7.26
-        version: 0.7.26
-      '@hcengineering/document':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/gmail':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/hr':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/inventory':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/love':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/mail':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/notification':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/preference':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/request':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/support':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/tags':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/task':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/telegram':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/templates':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/time':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/tracker':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/view':
-        specifier: 0.7.0
-        version: 0.7.0
-      '@hcengineering/workbench':
-        specifier: 0.7.0
-        version: 0.7.0
       '@napi-rs/keyring':
         specifier: 2.1.1
         version: 2.1.1

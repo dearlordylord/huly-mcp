@@ -19,6 +19,7 @@ const DiscoverResultSchema = Schema.Struct({
     })
   })
 })
+const ToolListResultSchema = Schema.Struct({ tools: Schema.Array(Schema.Struct({ name: Schema.NonEmptyString })) })
 const parseResponse = Schema.decodeUnknownSync(Schema.fromJsonString(JsonRpcResponseSchema))
 const processArgumentOffset = 2
 const [command, expectedVersion] = Schema.decodeUnknownSync(
@@ -29,6 +30,7 @@ const interruptedExitCode = 130
 const discoveryRequestId = 1
 const successfulCallRequestId = 2
 const invalidCallRequestId = 3
+const toolListRequestId = 4
 const meta = {
   "io.modelcontextprotocol/clientCapabilities": {},
   "io.modelcontextprotocol/clientInfo": { name: "packed-artifact-certification", version: "1.0.0" },
@@ -38,7 +40,10 @@ const request = (id: number, method: string, params: Readonly<Record<string, unk
   JSON.stringify({ id, jsonrpc: "2.0", method, params: { ...params, _meta: meta } })
 
 const runEofExchange = async (): Promise<void> => {
-  const child = spawn(command, [], { env: { ...process.env, LAZY_ENVS: "true" }, stdio: ["pipe", "pipe", "pipe"] })
+  const child = spawn(command, [], {
+    env: { ...process.env, LAZY_ENVS: "true", HULY_TOOL_MODE: "native" },
+    stdio: ["pipe", "pipe", "pipe"]
+  })
   let stdout = ""
   let stderr = ""
   child.stdout.setEncoding("utf8")
@@ -59,7 +64,7 @@ const runEofExchange = async (): Promise<void> => {
     `${request(discoveryRequestId, "server/discover", {})}\n${request(successfulCallRequestId, "tools/call", {
       arguments: {},
       name: "get_huly_context"
-    })}\n${request(invalidCallRequestId, "tools/call", { arguments: {}, name: "get_issue" })}\n`
+    })}\n${request(invalidCallRequestId, "tools/call", { arguments: {}, name: "get_issue" })}\n${request(toolListRequestId, "tools/list", {})}\n`
   )
   const exit = await exited
   const responses = stdout
@@ -70,6 +75,10 @@ const runEofExchange = async (): Promise<void> => {
   const discovery = Schema.decodeUnknownSync(DiscoverResultSchema)(byId.get(discoveryRequestId)?.result)
   const successfulCall = Schema.decodeUnknownSync(ToolCallResultSchema)(byId.get(successfulCallRequestId)?.result)
   const invalidCall = Schema.decodeUnknownSync(ToolCallResultSchema)(byId.get(invalidCallRequestId)?.result)
+  const toolList = Schema.decodeUnknownSync(ToolListResultSchema)(byId.get(toolListRequestId)?.result)
+  if (!toolList.tools.some((tool) => tool.name === "list_projects")) {
+    throw new Error("Packed MCP tools/list did not include list_projects.")
+  }
   if (exit.code !== 0 || exit.signal !== null) throw new Error(`Packed MCP EOF exit was ${JSON.stringify(exit)}.`)
   if (
     byId.get(discoveryRequestId)?.result === undefined ||
@@ -89,7 +98,10 @@ const runEofExchange = async (): Promise<void> => {
 }
 
 const runSignalShutdown = async (): Promise<void> => {
-  const child = spawn(command, [], { env: { ...process.env, LAZY_ENVS: "true" }, stdio: ["pipe", "pipe", "pipe"] })
+  const child = spawn(command, [], {
+    env: { ...process.env, LAZY_ENVS: "true", HULY_TOOL_MODE: "native" },
+    stdio: ["pipe", "pipe", "pipe"]
+  })
   let stderr = ""
   let stdout = ""
   const discovered = new Promise<void>((resolve) => {
@@ -122,7 +134,7 @@ const runSignalShutdown = async (): Promise<void> => {
 const main = async (): Promise<void> => {
   await runEofExchange()
   await runSignalShutdown()
-  process.stdout.write("Packed MCP discovery, calls, EOF, and signal shutdown verified.\n")
+  process.stdout.write("Packed MCP discovery, tools/list, calls, EOF, and signal shutdown verified.\n")
 }
 
 main().catch(async (error: unknown) => {

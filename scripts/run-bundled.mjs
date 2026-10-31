@@ -3,6 +3,7 @@
 import { spawn } from "node:child_process"
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
+import { pathToFileURL } from "node:url"
 
 import { build } from "esbuild"
 import { Schema } from "effect"
@@ -48,6 +49,7 @@ const outcome = await (async () => {
   try {
     const result = await build({
       bundle: true,
+      define: { "import.meta.url": JSON.stringify(pathToFileURL(entryPath).href) },
       entryPoints: [entryPath],
       external: ["ws", "@napi-rs/keyring", "dbus-next"],
       format: "cjs",

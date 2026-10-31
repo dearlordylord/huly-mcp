@@ -476,7 +476,7 @@ if [[ -z "$HR_DEPARTMENT_ID" ]]; then
 fi
 cover_cli_json "update_department" "HR department update" \
   hr departments update "$HR_DEPARTMENT_ID" --description "Updated CLI integration fixture"
-HR_STAFF_FIXTURE="$(pnpm exec tsx scripts/integration-hr-staff-fixture.ts)"
+HR_STAFF_FIXTURE="$(node scripts/run-bundled.mjs scripts/integration-hr-staff-fixture.ts)"
 HR_STAFF_EMPLOYEE="$(json_value "$HR_STAFF_FIXTURE" '.employeeId // empty')"
 HR_STAFF_ORIGINAL_DEPARTMENT="$(json_value "$HR_STAFF_FIXTURE" '.departmentId // empty')"
 if [[ -z "$HR_STAFF_EMPLOYEE" ]]; then

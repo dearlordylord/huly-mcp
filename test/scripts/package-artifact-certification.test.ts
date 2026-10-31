@@ -44,10 +44,15 @@ const writeArchiveEntries = async (archive: string, entries: ReadonlyArray<TestA
   await finished
 }
 
-const writeArchive = async (archive: string, bundleMode: number, bundle: string): Promise<void> =>
+const writeArchive = async (
+  archive: string,
+  bundleMode: number,
+  bundle: string,
+  dependencies: Readonly<Record<string, string>> = { ws: "1.0.0" }
+): Promise<void> =>
   writeArchiveEntries(archive, [
     { body: bundle, mode: bundleMode, name: "package/dist/index.cjs" },
-    { body: manifest(), mode: 0o644, name: "package/package.json" }
+    { body: manifest({ dependencies }), mode: 0o644, name: "package/package.json" }
   ])
 
 const expectedArtifact = {
@@ -127,7 +132,8 @@ describe("packed artifact certification", () => {
       await writeArchive(
         archive,
         0o755,
-        `require("ws"); import("dbus-next"); import("@napi-rs/keyring"); const cohort = "${validEffectCohortMarker}"`
+        `require("ws"); import("dbus-next"); import("@napi-rs/keyring"); const cohort = "${validEffectCohortMarker}"`,
+        { "@napi-rs/keyring": "2.1.1", "dbus-next": "0.10.2", ws: "1.0.0" }
       )
       await expect(certifyPackedArtifact(archive, expectedArtifact)).rejects.toThrow(
         "Unexpected packed external modules"
@@ -256,7 +262,7 @@ describe("packed artifact certification", () => {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), "packed-artifact-certification-"))
     const archive = path.join(directory, "package.tgz")
     try {
-      await writeArchive(archive, 0o755, `const cohort = "${validEffectCohortMarker}";`)
+      await writeArchive(archive, 0o755, `const cohort = "${validEffectCohortMarker}";`, {})
       await expect(
         certifyPackedArtifact(archive, { ...expectedArtifact, expectedExternalModules: [] })
       ).resolves.toMatchObject({ externalModules: [] })
@@ -265,4 +271,20 @@ describe("packed artifact certification", () => {
       await fs.rm(directory, { force: true, recursive: true })
     }
   })
+
+  it.each([{ ws: "1.0.0", "@hcengineering/tracker": "0.7.0" }, {}])(
+    "rejects runtime dependency declarations outside the bundle closure: %j",
+    async (dependencies) => {
+      const directory = await fs.mkdtemp(path.join(os.tmpdir(), "packed-dependency-closure-"))
+      const archive = path.join(directory, "package.tgz")
+      try {
+        await writeArchive(archive, 0o755, `require("ws"); const cohort = "${validEffectCohortMarker}";`, dependencies)
+        await expect(certifyPackedArtifact(archive, expectedArtifact)).rejects.toThrow(
+          "Packed runtime dependencies must match external modules"
+        )
+      } finally {
+        await fs.rm(directory, { force: true, recursive: true })
+      }
+    }
+  )
 })

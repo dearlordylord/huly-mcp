@@ -21,7 +21,7 @@ create() {
 snapshot() {
   local ids
   ids=$(printf '%s\n' "${ISSUES[@]}" | jq -R . | jq -s .)
-  pnpm exec tsx scripts/integration-issue-movement-state.ts "$(jq -nc --arg project "$PROJECT" --argjson issues "$ids" '{project:$project,issues:$issues}')"
+  node scripts/run-bundled.mjs scripts/integration-issue-movement-state.ts "$(jq -nc --arg project "$PROJECT" --argjson issues "$ids" '{project:$project,issues:$issues}')"
 }
 assert_result() {
   if ! jq -e --arg outcome "$2" '.outcome == $outcome' >/dev/null <<<"$1"; then
