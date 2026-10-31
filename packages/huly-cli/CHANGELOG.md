@@ -1,5 +1,11 @@
 # @firfi/huly-cli
 
+## 0.53.1
+
+### Patch Changes
+
+- 2eb1f04: Bundle Huly plugins so package installation no longer downloads unused Huly web UI dependencies.
+
 ## 0.53.1-next.0
 
 ### Patch Changes

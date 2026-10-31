@@ -1,5 +1,11 @@
 # @firfi/huly-mcp
 
+## 0.55.5
+
+### Patch Changes
+
+- 2eb1f04: Bundle Huly plugins so package installation no longer downloads unused Huly web UI dependencies.
+
 ## 0.55.5-next.0
 
 ### Patch Changes
