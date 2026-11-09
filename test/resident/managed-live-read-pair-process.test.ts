@@ -20,7 +20,7 @@ import { DisposableRestProject, startDisposableRestFixture } from "./disposable-
 const PROCESS_BOUND = 30_000
 const READERS = 2
 const PROJECT_READS = 4
-const FULL_NATIVE_CATALOG_SIZE = 606
+const FULL_NATIVE_CATALOG_SIZE = 607
 const runFile = promisify(execFile)
 const targets = Schema.decodeUnknownSync(LiveReadTargets)([
   { project: "ONE", name: "First managed fixture project" },

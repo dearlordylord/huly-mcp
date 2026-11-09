@@ -126,6 +126,7 @@ export * from "./employee-lifecycle.js"
 export * from "./calendar-meeting-rooms.js"
 export * from "./virtual-office-administration.js"
 export * from "./lead-collaboration.js"
+export * from "./document-move.js"
 
 export { optionalOutput } from "./output-helpers.js"
 

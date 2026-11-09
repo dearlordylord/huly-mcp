@@ -33,6 +33,11 @@ import {
   ListTeamspacesResultSchema,
   UpdateTeamspaceResultSchema
 } from "../../domain/schemas/documents.js"
+import {
+  MoveDocumentResultSchema,
+  moveDocumentParamsJsonSchema,
+  parseMoveDocumentParams
+} from "../../domain/schemas/document-move.js"
 import { DOCUMENT_NATIVE_REFERENCE_TOOL_USAGE } from "../../domain/schemas/document-native-references.js"
 import {
   createDocument,
@@ -45,6 +50,7 @@ import {
   listDocuments,
   listInlineComments,
   listTeamspaces,
+  moveDocument,
   updateTeamspace
 } from "../../huly/operations/documents.js"
 import { defineTool, type RegisteredTool } from "./registry.js"
@@ -162,6 +168,18 @@ export const documentTools = [
     },
     parseEditDocumentParams,
     editDocument
+  ),
+  defineTool(
+    {
+      name: "move_document",
+      description:
+        "Move a Huly document, with its child documents, under another parent document in the same teamspace, or to the teamspace root when parent is null. The document is placed last among its new siblings. Idempotent when the document already has that parent. Rejects moving a document under itself or one of its descendants. Returns the document id, new parent id (null for root), whether it moved, and a 'url' field pointing to the document in the Huly web app.",
+      category: CATEGORY,
+      inputSchema: moveDocumentParamsJsonSchema,
+      resultSchema: MoveDocumentResultSchema
+    },
+    parseMoveDocumentParams,
+    moveDocument
   ),
   defineTool(
     {

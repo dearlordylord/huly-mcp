@@ -107,6 +107,7 @@ import {
   TelegramChannelIdentifierAmbiguousError,
   DocumentContentCorruptedError,
   DocumentEditModeError,
+  DocumentMoveCycleError,
   DocumentNotFoundError,
   DocumentReferenceError,
   DrawingNotFoundError,
@@ -1338,6 +1339,8 @@ describe("Huly Errors", () => {
               return `doccorrupt:${error.identifier}:${error.causeMessage ?? ""}`
             case "DocumentEditModeError":
               return `doceditmode:${error.reason}`
+            case "DocumentMoveCycleError":
+              return `docmovecycle:${error.identifier}:${error.parent}`
             case "DocumentReferenceError":
               return `docreference:${error.reason}`
             case "CommentNotFoundError":
@@ -2317,6 +2320,9 @@ describe("Huly Errors", () => {
           matchError(new DocumentContentCorruptedError({ identifier: "doc-1", causeMessage: "missing markup blob" }))
         ).toBe("doccorrupt:doc-1:missing markup blob")
         expect(matchError(new DocumentEditModeError({ reason: "bad mode" }))).toBe("doceditmode:bad mode")
+        expect(
+          matchError(new DocumentMoveCycleError({ identifier: "Parent", parent: "Child", teamspace: "Docs" }))
+        ).toBe("docmovecycle:Parent:Child")
         expect(matchError(new DocumentReferenceError({ reason: "bad reference" }))).toBe("docreference:bad reference")
         expect(matchError(new CommentNotFoundError({ commentId: "c-1", issueIdentifier: "H-1", project: "P" }))).toBe(
           "comment:c-1"

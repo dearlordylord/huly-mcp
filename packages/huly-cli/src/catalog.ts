@@ -163,6 +163,7 @@ export const cliCommandCatalog = {
     description: "Edit a document",
     behavior: { fileInput: { fields: ["content", "old_text", "new_text"] } }
   },
+  move_document: { path: ["documents", "move"], positional: [], description: "Move a document to another parent" },
   list_inline_comments: {
     path: ["documents", "comments"],
     positional: [],

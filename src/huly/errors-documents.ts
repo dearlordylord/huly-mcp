@@ -95,6 +95,19 @@ export class DocumentEditModeError extends Schema.TaggedError<DocumentEditModeEr
 }
 
 /**
+ * move_document target parent is the document itself or one of its descendants.
+ */
+export class DocumentMoveCycleError extends Schema.TaggedError<DocumentMoveCycleError>()("DocumentMoveCycleError", {
+  identifier: Schema.String,
+  parent: Schema.String,
+  teamspace: Schema.String
+}) {
+  override get message(): string {
+    return `Cannot move document '${this.identifier}' under '${this.parent}' in teamspace '${this.teamspace}': a document cannot be moved under itself or one of its descendants`
+  }
+}
+
+/**
  * Native document reference links are invalid.
  */
 export class DocumentReferenceError extends Schema.TaggedError<DocumentReferenceError>()("DocumentReferenceError", {

@@ -86,6 +86,7 @@ const DOMAIN_FAILURE_KIND_BY_TAG = {
   DocumentContentCorruptedError: "input",
   DocumentEditModeError: "input",
   DocumentEmptyContentError: "input",
+  DocumentMoveCycleError: "input",
   DocumentNotFoundError: "lookup",
   DocumentReferenceError: "input",
   TodoDocumentTargetAmbiguousError: "ambiguity",
