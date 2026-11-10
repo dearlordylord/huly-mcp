@@ -31,6 +31,7 @@ import {
   sanitizeHulyRuntimeConfigFromHeaders
 } from "../config/config.js"
 import type { CliProfileStoreError } from "../profiles/model.js"
+import { makeDocumentMoveGate } from "../huly/document-move-gate.js"
 import type { HulyClientError } from "../huly/client.js"
 import type { StorageClientError } from "../huly/storage.js"
 import {
@@ -248,12 +249,13 @@ const runConfiguredServer = (
     const observeMovement = yield* configureMovementObserver()
     if (yield* Config.Boolean("MCP_PRELOAD_TOOLS").pipe(Config.withDefault(false)))
       yield* preloadToolHandlers.pipe(Effect.mapError((error) => new McpServerError({ message: error.message })))
-    const combinedClientLayer = buildCombinedClientLayer(configLayer)
+    const documentMoveGate = makeDocumentMoveGate()
+    const combinedClientLayer = buildCombinedClientLayer(configLayer, "background", documentMoveGate)
     yield* Effect.acquireUseRelease(
       Effect.sync(() => createClientResolver(combinedClientLayer)),
       ({ close: closeClients, resolve: resolveClients, status: clientStatus }) => {
         const resolveHttpClientLease = createHttpClientLeaseResolver(
-          buildCombinedClientLayer(configLayer, "on-demand"),
+          buildCombinedClientLayer(configLayer, "on-demand", documentMoveGate),
           resolveClients
         )
         return Effect.gen(function* () {

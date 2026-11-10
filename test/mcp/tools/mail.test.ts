@@ -86,6 +86,7 @@ const makeClient = (spaces: ReadonlyArray<GenericSpace>): HulyClientOperations =
       : Effect.succeed(undefined)
 
   return {
+    commitDocumentMove: () => Effect.die(new Error("Unexpected document move")),
     getAccountUuid: () => account,
     getPrimarySocialId: () => person,
     markupUrlConfig: testMarkupUrlConfig,

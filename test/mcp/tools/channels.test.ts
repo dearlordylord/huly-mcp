@@ -99,6 +99,7 @@ const docsForClass = (classRef: Ref<Class<Doc>>): ReadonlyArray<Doc> =>
         : []
 
 const hulyClient: HulyClientOperations = {
+  commitDocumentMove: () => Effect.die(new Error("Unexpected document move")),
   getAccountUuid: () => account,
   getPrimarySocialId: () => person,
   markupUrlConfig: testMarkupUrlConfig,

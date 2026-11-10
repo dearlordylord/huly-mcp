@@ -173,7 +173,7 @@ export const documentTools = [
     {
       name: "move_document",
       description:
-        "Move a Huly document, with its child documents, under another parent document in the same teamspace, or to the teamspace root when parent is null. The document is placed last among its new siblings. Idempotent when the document already has that parent. Rejects moving a document under itself or one of its descendants. Returns the document id, new parent id (null for root), whether it moved, and a 'url' field pointing to the document in the Huly web app.",
+        "Move a Huly document, with its child documents, under another parent document in the same teamspace, or to the teamspace root when parent is null. The document is placed last among its new siblings. Exact IDs take precedence over names. Ambiguous names require an ID. If the document already has that parent, it returns moved: false. Rejects moving a document under itself or one of its descendants. Returns the document id, new parent id (null for root), whether it moved, and a 'url' field pointing to the document in the Huly web app.",
       category: CATEGORY,
       inputSchema: moveDocumentParamsJsonSchema,
       resultSchema: MoveDocumentResultSchema

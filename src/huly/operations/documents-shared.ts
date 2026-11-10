@@ -15,7 +15,7 @@ import { Effect } from "effect"
 import { Count, type DocumentIdentifier, type TeamspaceIdentifier } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { DocumentContentCorruptedError, DocumentNotFoundError, TeamspaceNotFoundError } from "../errors.js"
-import { findByNameOrId, findByNameOrIdOrFail, hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
+import { findByNameOrId, hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 
 import { core, documentPlugin } from "../huly-plugins.js"
@@ -64,17 +64,20 @@ export interface FindTeamspaceAndDocumentOptions<AmbiguityError> {
    * the one-argument overload preserves the historical first-match behavior.
    */
   readonly onAmbiguous: (target: TeamspaceDocumentAmbiguousTarget, matches: Count) => AmbiguityError
+  readonly preferId?: true
 }
 
 const findUniqueByNameOrId = Effect.fn("Documents.findUniqueByNameOrId")(function* <T extends Doc, E>(
   client: HulyClient["Service"],
   objectClass: Ref<Class<T>>,
-  primaryQuery: StrictDocumentQuery<T>,
-  fallbackQuery: StrictDocumentQuery<T>,
-  onAmbiguous: (matches: Count) => E
+  byName: StrictDocumentQuery<T>,
+  byId: StrictDocumentQuery<T>,
+  onAmbiguous: (matches: Count) => E,
+  preferId = false
 ): Effect.fn.Return<T | undefined, HulyClientError | E> {
-  const primary = yield* client.findAll<T>(objectClass, hulyQuery(primaryQuery))
-  const candidates = primary.length > 0 ? primary : yield* client.findAll<T>(objectClass, hulyQuery(fallbackQuery))
+  const [first, second] = preferId ? [byId, byName] : [byName, byId]
+  const primary = yield* client.findAll<T>(objectClass, hulyQuery(first))
+  const candidates = primary.length > 0 ? primary : yield* client.findAll<T>(objectClass, hulyQuery(second))
   if (candidates.length > 1) {
     return yield* Effect.fail(onAmbiguous(Count.make(candidates.length)))
   }
@@ -115,54 +118,54 @@ export function findTeamspaceAndDocument<AmbiguityError>(
             documentPlugin.class.Teamspace,
             { name: params.teamspace, archived: false },
             { _id: toRef<HulyTeamspace>(params.teamspace), archived: false },
-            (matches) => options.onAmbiguous({ type: "teamspace", identifier: params.teamspace }, matches)
+            (matches) => options.onAmbiguous({ type: "teamspace", identifier: params.teamspace }, matches),
+            options.preferId
           )
 
     if (teamspace === undefined) {
       return yield* new TeamspaceNotFoundError({ identifier: params.teamspace })
     }
 
-    const doc =
+    const doc = yield* findDocumentInTeamspace(
+      client,
+      teamspace,
+      params.teamspace,
+      params.document,
       options === undefined
-        ? yield* findByNameOrId(
-            client,
-            documentPlugin.class.Document,
-            { space: teamspace._id, title: params.document },
-            { space: teamspace._id, _id: toRef<HulyDocument>(params.document) }
-          )
-        : yield* findUniqueByNameOrId(
-            client,
-            documentPlugin.class.Document,
-            { space: teamspace._id, title: params.document },
-            { space: teamspace._id, _id: toRef<HulyDocument>(params.document) },
-            (matches) =>
+        ? undefined
+        : {
+            preferId: options.preferId === true,
+            onAmbiguous: (matches) =>
               options.onAmbiguous(
                 { type: "document", identifier: params.document, teamspace: params.teamspace },
                 matches
               )
-          )
-
-    if (doc === undefined) {
-      return yield* new DocumentNotFoundError({ identifier: params.document, teamspace: params.teamspace })
-    }
+          }
+    )
 
     return { client, teamspace, doc }
   })
 }
 
-export const findDocumentInTeamspace = (
+export const findDocumentInTeamspace = Effect.fn("Documents.findDocumentInTeamspace")(function* <E = never>(
   client: HulyClient["Service"],
   teamspace: HulyTeamspace,
   teamspaceIdentifier: TeamspaceIdentifier,
-  document: DocumentIdentifier
-): Effect.Effect<HulyDocument, DocumentNotFoundError | HulyClientError> =>
-  findByNameOrIdOrFail(
-    client,
-    documentPlugin.class.Document,
-    { space: teamspace._id, title: document },
-    { space: teamspace._id, _id: toRef<HulyDocument>(document) },
-    () => new DocumentNotFoundError({ identifier: document, teamspace: teamspaceIdentifier })
-  )
+  document: DocumentIdentifier,
+  options?: { readonly preferId: boolean; readonly onAmbiguous: (matches: Count) => E }
+): Effect.fn.Return<HulyDocument, DocumentNotFoundError | HulyClientError | E> {
+  const byTitle = { space: teamspace._id, title: document }
+  const byId = { space: teamspace._id, _id: toRef<HulyDocument>(document) }
+  const objectClass = documentPlugin.class.Document
+  const found =
+    options === undefined
+      ? yield* findByNameOrId(client, objectClass, byTitle, byId)
+      : yield* findUniqueByNameOrId(client, objectClass, byTitle, byId, options.onAmbiguous, options.preferId)
+  if (found === undefined) {
+    return yield* new DocumentNotFoundError({ identifier: document, teamspace: teamspaceIdentifier })
+  }
+  return found
+})
 
 const documentContentAttr = "content"
 const documentContentCorrupted = (

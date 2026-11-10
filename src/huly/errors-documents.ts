@@ -5,7 +5,7 @@
  */
 import { Schema } from "effect"
 
-import { Count } from "../domain/schemas/shared.js"
+import { Count, DocumentIdentifier, TeamspaceIdentifier } from "../domain/schemas/shared.js"
 
 /**
  * Teamspace not found in the workspace.
@@ -98,12 +98,36 @@ export class DocumentEditModeError extends Schema.TaggedError<DocumentEditModeEr
  * move_document target parent is the document itself or one of its descendants.
  */
 export class DocumentMoveCycleError extends Schema.TaggedError<DocumentMoveCycleError>()("DocumentMoveCycleError", {
-  identifier: Schema.String,
-  parent: Schema.String,
-  teamspace: Schema.String
+  identifier: DocumentIdentifier,
+  parent: DocumentIdentifier,
+  teamspace: TeamspaceIdentifier
 }) {
   override get message(): string {
     return `Cannot move document '${this.identifier}' under '${this.parent}' in teamspace '${this.teamspace}': a document cannot be moved under itself or one of its descendants`
+  }
+}
+
+export class DocumentMoveTargetAmbiguousError extends Schema.TaggedError<DocumentMoveTargetAmbiguousError>()(
+  "DocumentMoveTargetAmbiguousError",
+  {
+    target: Schema.Union([
+      Schema.Struct({ type: Schema.Literal("teamspace"), identifier: TeamspaceIdentifier }),
+      Schema.Struct({ type: Schema.Literals(["document", "parent"]), identifier: DocumentIdentifier })
+    ]),
+    matches: Count
+  }
+) {
+  override get message(): string {
+    return `Found ${this.matches} matches for ${this.target.type} '${this.target.identifier}'. Pass the exact ${this.target.type} ID.`
+  }
+}
+
+export class DocumentMoveConflictError extends Schema.TaggedError<DocumentMoveConflictError>()(
+  "DocumentMoveConflictError",
+  { identifier: DocumentIdentifier, teamspace: TeamspaceIdentifier }
+) {
+  override get message(): string {
+    return `The document tree changed while moving '${this.identifier}' in teamspace '${this.teamspace}'. Refresh the tree and retry the move.`
   }
 }
 

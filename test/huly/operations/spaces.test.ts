@@ -375,6 +375,7 @@ const createTestLayer = (config: MockConfig) => {
     findAll(_class, query).pipe(Effect.map((result) => result.at(0)))
 
   const client: HulyClientOperations = {
+    commitDocumentMove: () => Effect.die(new Error("Unexpected document move")),
     getAccountUuid: () => accountA,
     getPrimarySocialId: () => personId,
     markupUrlConfig: testMarkupUrlConfig,

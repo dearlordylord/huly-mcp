@@ -24,6 +24,7 @@ const categorySet = (...categories: ReadonlyArray<string>) => new Set(categories
 const toolName = makeToolName
 
 const noopHulyClient: HulyClientOperations = {
+  commitDocumentMove: () => Effect.die(new Error("Unexpected document move")),
   getAccountUuid: () => "00000000-0000-4000-8000-000000000000" as AccountUuid,
   getPrimarySocialId: () => "test-primary-social-id" as PersonId,
   markupUrlConfig: testMarkupUrlConfig,

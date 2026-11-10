@@ -27,6 +27,7 @@ const emptyFindOne: HulyClientOperations["findOne"] = (() =>
   Effect.succeed(undefined)) as HulyClientOperations["findOne"]
 
 const hulyClient: HulyClientOperations = {
+  commitDocumentMove: () => Effect.die(new Error("Unexpected document move")),
   getAccountUuid: () => accountUuid("00000000-0000-4000-8000-000000000000"),
   getPrimarySocialId: () => corePersonId("test-primary-social-id"),
   markupUrlConfig: testMarkupUrlConfig,

@@ -108,6 +108,7 @@ const docsForSdkClass = <T extends Doc>(classId: Ref<Class<T>>): Array<T> => {
 const addCaptures: Array<{ readonly classId: string; readonly collection: string }> = []
 
 const hulyClient: HulyClientOperations = {
+  commitDocumentMove: () => Effect.die(new Error("Unexpected document move")),
   getAccountUuid: () => accountUuid,
   getPrimarySocialId: () => actor,
   markupUrlConfig: testMarkupUrlConfig,

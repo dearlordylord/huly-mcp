@@ -2,6 +2,7 @@ import { makeSharedResource } from "../runtime/shared-resource.js"
 import { tracker } from "./huly-plugins.js"
 import { makeOperationConnectionError } from "./errors-base.js"
 
+import type { DocumentMoveGate } from "./document-move-gate.js"
 import { makeClientOperations } from "./client-operations.js"
 
 import { type Doc, type FindResult, toFindResult, type WithLookup } from "@hcengineering/core"
@@ -78,7 +79,8 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
     )
 
   private static makeLazyLayer(
-    modelLoading: "background" | "on-demand"
+    modelLoading: "background" | "on-demand",
+    documentMoveGate?: DocumentMoveGate
   ): Layer.Layer<HulyClient, HulyClientError, HulyConfigService | HulySdk> {
     return Layer.effect(
       HulyClient,
@@ -123,16 +125,23 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
                 })
             },
             sdk,
-            config
+            config,
+            documentMoveGate
           ),
           initializationStatus: Ref.get(initialization)
         }
       })
     )
   }
+  static layerForRuntime(
+    modelLoading: "background" | "on-demand",
+    documentMoveGate: DocumentMoveGate
+  ): Layer.Layer<HulyClient, HulyClientError, HulyConfigService> {
+    return HulyClient.makeLazyLayer(modelLoading, documentMoveGate).pipe(Layer.provide(HulySdk.defaultLayer))
+  }
+
   static readonly lazyLayerWithDependencies = HulyClient.makeLazyLayer("background")
   static readonly onDemandLayerWithDependencies = HulyClient.makeLazyLayer("on-demand")
-  static readonly onDemandLayer = HulyClient.onDemandLayerWithDependencies.pipe(Layer.provide(HulySdk.defaultLayer))
 
   static readonly layer: Layer.Layer<HulyClient, HulyClientError, HulyConfigService> =
     HulyClient.lazyLayerWithDependencies.pipe(Layer.provide(HulySdk.defaultLayer))
@@ -161,6 +170,7 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
       createDoc: notImplemented("createDoc"),
       createDocIfNotMatched: notImplemented("createDocIfNotMatched"),
       updateDoc: notImplemented("updateDoc"),
+      commitDocumentMove: notImplemented("commitDocumentMove"),
       updateDocIfMatched: notImplemented("updateDocIfMatched"),
       addCollection: notImplemented("addCollection"),
       removeDoc: notImplemented("removeDoc"),

@@ -21,6 +21,8 @@ import { type HulyTransactionScope, UrlString } from "../domain/schemas/shared.j
 
 import { type HulyConnectionOperation, makeOperationConnectionError } from "./errors-base.js"
 
+import { makeDocumentMoveGate } from "./document-move-gate.js"
+import { commitDocumentMove } from "./document-move-adapter.js"
 import { executeEmployeePreparation } from "./employee-preparation.js"
 
 import { type MarkupUrlConfig } from "./operations/markup.js"
@@ -56,7 +58,8 @@ export interface ClientOperationsConnection extends Omit<RestConnection, "client
 export const makeClientOperations = (
   connection: ClientOperationsConnection,
   sdk: HulySdkDependencies,
-  config: { readonly url: string }
+  config: { readonly url: string },
+  documentMoveGate = makeDocumentMoveGate()
 ): HulyClientOperations => {
   const { accountUuid, client, imageUrl, primarySocialId, refUrl, socialIds, workspaceUrlSlug } = connection
   const markupUrlConfig: MarkupUrlConfig = { refUrl: UrlString.make(refUrl), imageUrl: UrlString.make(imageUrl) }
@@ -74,6 +77,20 @@ export const makeClientOperations = (
 
   const fullConnection = connection.resolveFullConnection ?? Effect.map(client, (client) => ({ ...connection, client }))
   const operations: HulyClientOperations = {
+    commitDocumentMove: (write) =>
+      Effect.flatMap(fullConnection, ({ client: value, movementTransportConfig }) =>
+        documentMoveGate(
+          movementTransportConfig.workspace,
+          write.space,
+          withMovementWriteClient(
+            value,
+            movementTransportConfig,
+            sdk.movementHttp,
+            "conditionalUpdateDoc",
+            (movement) => commitDocumentMove(movement, write)
+          )
+        )
+      ),
     ...(connection.findProjectDocuments === undefined ? {} : { findProjectDocuments: connection.findProjectDocuments }),
     inspectMovementTransactions: (queued) =>
       Effect.flatMap(client, (value) => inspectMovementTransactions(value, queued)),

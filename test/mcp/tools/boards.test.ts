@@ -68,6 +68,7 @@ interface ClientFixture {
 }
 
 const makeClient = (fixture: ClientFixture): HulyClientOperations => ({
+  commitDocumentMove: () => Effect.die(new Error("Unexpected document move")),
   getAccountUuid: () => accountUuid("00000000-0000-4000-8000-000000000000"),
   getPrimarySocialId: () => personId("test-primary-social-id"),
   markupUrlConfig: testMarkupUrlConfig,
