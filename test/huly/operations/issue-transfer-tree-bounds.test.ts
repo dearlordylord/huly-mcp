@@ -46,7 +46,7 @@ it.effect("allocation timeout is indeterminate with every known task ID and send
     const f = transferTreeFixture()
     const reached = yield* Deferred.make<void>()
     const original = assertExists(f.operations.allocateMovementNumber)
-    const allocateMovementNumber: NonNullable<HulyClientOperations["allocateMovementNumber"]> = (id) =>
+    const allocateMovementNumber: HulyClientOperations["allocateMovementNumber"] = (id) =>
       original(id).pipe(Effect.andThen(Deferred.succeed(reached, undefined)), Effect.andThen(Effect.never))
     const layer = HulyClient.testLayer({ ...f.operations, allocateMovementNumber })
     const fiber = yield* parseMoveIssueParams(f.input).pipe(

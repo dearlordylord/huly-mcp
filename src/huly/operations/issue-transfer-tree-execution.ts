@@ -103,7 +103,7 @@ const executeWithinBudget = Effect.fn("transfer.executeWithinBudget")(function* 
     admission.mode === "same-project"
       ? { status: "allocated" as const, numbers: planned.tasks.map((task) => task.protectedIssue.number) }
       : yield* allocateTransferTree(
-          admission.allocate,
+          client.allocateMovementNumber,
           destination,
           prepared.tasks.map((task) => task.issue._id),
           progress.execution
@@ -170,11 +170,7 @@ type ReadyAdmission = {
   readonly commit: NonNullable<HulyClient["Service"]["commitTransferTree"]>
 } & (
   | { readonly mode: "same-project"; readonly lastRank: undefined; readonly inspected: TransferPlan }
-  | {
-      readonly mode: "cross-project"
-      readonly lastRank: string | undefined
-      readonly allocate: NonNullable<HulyClient["Service"]["allocateMovementNumber"]>
-    }
+  | { readonly mode: "cross-project"; readonly lastRank: string | undefined }
 )
 // The same-project proof remains current through pure planning; allocation expires the cross-project proof.
 const admittedPlan = (admission: ReadyAdmission, prepared: TransferPlan): TransferPlan =>
@@ -210,12 +206,6 @@ const inspectAdmission = Effect.fn("transfer.inspectAdmission")(function* (
     }
   if (destination._id === prepared.plan.source._id)
     return { status: "ready", mode: "same-project", lastRank: undefined, inspected: admission.success, commit }
-  const allocate = client.allocateMovementNumber
-  if (allocate === undefined)
-    return {
-      status: "blocked",
-      reason: "Single-send sequence adapter is unavailable; no allocation or task writes performed."
-    }
   const last = yield* Effect.result(
     client.findOne<Issue>(tracker.class.Issue, hulyQuery<Issue>({ space: toRef<Project>(destination._id) }), {
       sort: { rank: SortingOrder.Descending }
@@ -223,7 +213,7 @@ const inspectAdmission = Effect.fn("transfer.inspectAdmission")(function* (
   )
   return last._tag === "Failure"
     ? { status: "blocked", reason: "Destination ordering inspection failed before writes." }
-    : { status: "ready", mode: "cross-project", lastRank: last.success?.rank, commit, allocate }
+    : { status: "ready", mode: "cross-project", lastRank: last.success?.rank, commit }
 })
 
 const commitAndVerify = Effect.fn("transfer.commitAndVerify")(function* (

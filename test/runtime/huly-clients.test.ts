@@ -47,8 +47,9 @@ describe("shared Huly client runtime", () => {
   )
   it.effect("rejects missing configuration before network acquisition in background and on-demand modes", () =>
     Effect.gen(function* () {
-      for (const mode of ["background", "on-demand"] as const) {
-        const layer = mode === "background" ? buildCombinedClientLayer() : buildCombinedClientLayer(undefined, mode)
+      const { processClient, requestClient } = HulyClient.makeRuntimeLayers()
+      for (const clientLayer of [processClient, requestClient]) {
+        const layer = buildCombinedClientLayer(undefined, clientLayer)
         const error = yield* buildScopedClientBundle(layer).pipe(
           Effect.provide(ConfigProvider.layer(ConfigProvider.fromUnknown({}))),
           Effect.flip

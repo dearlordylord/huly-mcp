@@ -299,7 +299,6 @@ describe("HulyClient Service", () => {
     )
     return Effect.gen(function* () {
       const client = yield* HulyClient
-      const commitTransfer = assertExists(client.commitTransfer)
       const write = Schema.decodeUnknownSync(TransferWriteSchema)({
         issueId: "root",
         sourceId: "source",
@@ -313,12 +312,12 @@ describe("HulyClient Service", () => {
         records: [],
         recordClasses: []
       })
-      expect(yield* commitTransfer(write)).toBe("applied")
+      expect(yield* client.commitTransfer(write)).toBe("applied")
       expect(requests).toHaveLength(1)
       expect(requests[0]).toMatchObject({ scope: "issue-transfer:root", _class: "core:class:TxApplyIf" })
       expect(mockApply.mock.calls).toHaveLength(0)
       state.success = false
-      expect(yield* commitTransfer(write)).toBe("condition-not-met")
+      expect(yield* client.commitTransfer(write)).toBe("condition-not-met")
       expect(requests).toHaveLength(2)
     }).pipe(Effect.provide(layer), Effect.scoped)
   })
@@ -395,7 +394,7 @@ describe("HulyClient Service", () => {
     )
     return Effect.gen(function* () {
       const client = yield* HulyClient
-      expect(yield* assertExists(client.allocateMovementNumber)(DocId.make("destination"))).toMatchObject({
+      expect(yield* client.allocateMovementNumber(DocId.make("destination"))).toMatchObject({
         object: { sequence: 12 }
       })
       expect(requests).toHaveLength(1)
@@ -2845,7 +2844,7 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
           records: [],
           recordClasses: []
         })
-        const pending = yield* assertExists(client.commitTransfer)(write).pipe(Effect.forkChild)
+        const pending = yield* client.commitTransfer(write).pipe(Effect.forkChild)
         yield* TestClock.adjust("500 millis")
         expect(yield* Fiber.join(pending)).toBe("applied")
         expect(sent).toHaveLength(1)

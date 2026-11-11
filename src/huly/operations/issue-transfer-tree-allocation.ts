@@ -19,7 +19,7 @@ export type TransferTreeAllocation =
 const parseSequence = (input: unknown) => Schema.decodeUnknownOption(TransferSequenceSchema)(input)
 
 export const allocateTransferTree = Effect.fn("transfer.allocateTree")(function* (
-  allocate: NonNullable<HulyClient["Service"]["allocateMovementNumber"]>,
+  allocate: HulyClient["Service"]["allocateMovementNumber"],
   destination: MovementProject,
   issueIds: ReadonlyArray<IssueId>,
   execution: MovementExecutionProgress

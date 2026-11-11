@@ -2,7 +2,7 @@ import { makeSharedResource } from "../runtime/shared-resource.js"
 import { tracker } from "./huly-plugins.js"
 import { makeOperationConnectionError } from "./errors-base.js"
 
-import type { DocumentMoveGate } from "./document-move-gate.js"
+import { makeDocumentMoveGate, type DocumentMoveGate } from "./document-move-gate.js"
 import { makeClientOperations } from "./client-operations.js"
 
 import { type Doc, type FindResult, toFindResult, type WithLookup } from "@hcengineering/core"
@@ -34,6 +34,11 @@ import {
 export type { HulyClientOperations, HulyClientError } from "./client-ports.js"
 export { authToOptions, connectWithRetry } from "./client-connection.js"
 export type { ConnectionConfig, ConnectionError } from "./client-connection.js"
+
+const ModelLoadingMode = { Background: "background", OnDemand: "on-demand" } as const
+
+type ModelLoadingMode = (typeof ModelLoadingMode)[keyof typeof ModelLoadingMode]
+
 export class HulyClient extends Context.Service<HulyClient, HulyClientOperations>()("@hulymcp/HulyClient") {
   static readonly layerWithDependencies: Layer.Layer<HulyClient, HulyClientError, HulyConfigService | HulySdk> =
     Layer.effect(
@@ -79,7 +84,7 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
     )
 
   private static makeLazyLayer(
-    modelLoading: "background" | "on-demand",
+    modelLoading: ModelLoadingMode,
     documentMoveGate?: DocumentMoveGate
   ): Layer.Layer<HulyClient, HulyClientError, HulyConfigService | HulySdk> {
     return Layer.effect(
@@ -111,7 +116,7 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
           )
         )
         const client = Effect.map(fullConnection, (connection) => connection.client)
-        if (modelLoading === "background") yield* client.pipe(Effect.ignore, Effect.forkScoped)
+        if (modelLoading === ModelLoadingMode.Background) yield* client.pipe(Effect.ignore, Effect.forkScoped)
         return {
           ...makeClientOperations(
             {
@@ -133,15 +138,21 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
       })
     )
   }
-  static layerForRuntime(
-    modelLoading: "background" | "on-demand",
-    documentMoveGate: DocumentMoveGate
-  ): Layer.Layer<HulyClient, HulyClientError, HulyConfigService> {
-    return HulyClient.makeLazyLayer(modelLoading, documentMoveGate).pipe(Layer.provide(HulySdk.defaultLayer))
+  static makeRuntimeLayers() {
+    const documentMoveGate = makeDocumentMoveGate()
+    return {
+      processClient: HulyClient.makeLazyLayer(ModelLoadingMode.Background, documentMoveGate).pipe(
+        Layer.provide(HulySdk.defaultLayer)
+      ),
+      requestClient: HulyClient.makeLazyLayer(ModelLoadingMode.OnDemand, documentMoveGate).pipe(
+        Layer.provide(HulySdk.defaultLayer)
+      )
+    }
   }
 
-  static readonly lazyLayerWithDependencies = HulyClient.makeLazyLayer("background")
-  static readonly onDemandLayerWithDependencies = HulyClient.makeLazyLayer("on-demand")
+  static readonly lazyLayerWithDependencies = HulyClient.makeLazyLayer(ModelLoadingMode.Background)
+  static readonly onDemandLayerWithDependencies = HulyClient.makeLazyLayer(ModelLoadingMode.OnDemand)
+  static readonly onDemandLayer = HulyClient.onDemandLayerWithDependencies.pipe(Layer.provide(HulySdk.defaultLayer))
 
   static readonly layer: Layer.Layer<HulyClient, HulyClientError, HulyConfigService> =
     HulyClient.lazyLayerWithDependencies.pipe(Layer.provide(HulySdk.defaultLayer))
@@ -171,6 +182,8 @@ export class HulyClient extends Context.Service<HulyClient, HulyClientOperations
       createDocIfNotMatched: notImplemented("createDocIfNotMatched"),
       updateDoc: notImplemented("updateDoc"),
       commitDocumentMove: notImplemented("commitDocumentMove"),
+      commitTransfer: notImplemented("commitTransfer"),
+      allocateMovementNumber: notImplemented("allocateMovementNumber"),
       updateDocIfMatched: notImplemented("updateDocIfMatched"),
       addCollection: notImplemented("addCollection"),
       removeDoc: notImplemented("removeDoc"),

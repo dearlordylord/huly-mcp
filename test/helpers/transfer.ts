@@ -1,4 +1,3 @@
-import { assertExists } from "../../src/utils/assertions.js"
 import { toRef } from "../../src/huly/operations/sdk-boundary.js"
 import type { Doc, DocumentQuery, FindOptions } from "@hcengineering/core"
 import { IssuePriority, type Issue } from "@hcengineering/tracker"
@@ -117,7 +116,7 @@ export const transferFixture = () => {
     return Effect.succeed(documentForTestClass<T>(found))
   }
   const attributeRows: Array<Doc> = []
-  const baseOperations: Partial<HulyClientOperations> = {
+  const baseOperations = {
     ...fixture.operations,
     findOne,
     findAll: <T extends Doc>(cls: unknown, query: DocumentQuery<T>, options?: FindOptions<T>) => {
@@ -175,11 +174,11 @@ export const transferFixture = () => {
       if (state.failCommit) return unavailable()
       return Effect.succeed("applied")
     }
-  }
+  } satisfies Partial<HulyClientOperations>
   const operations: Partial<HulyClientOperations> = {
     ...baseOperations,
     allocateMovementNumber: (destinationId) =>
-      assertExists(baseOperations.updateDoc)(
+      baseOperations.updateDoc(
         tracker.class.Project,
         core.space.Space,
         toRef(destinationId),
@@ -188,10 +187,9 @@ export const transferFixture = () => {
       ),
     commitTransferTree: (write) => {
       const rootWrite = write.tasks.find((task) => task.issueId === write.rootId)
-      const commit = baseOperations.commitTransfer
-      return write.tasks.length !== 1 || rootWrite === undefined || commit === undefined
+      return write.tasks.length !== 1 || rootWrite === undefined
         ? Effect.succeed("condition-not-met")
-        : commit(rootWrite)
+        : baseOperations.commitTransfer(rootWrite)
     }
   }
   return {

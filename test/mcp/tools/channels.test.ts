@@ -100,6 +100,8 @@ const docsForClass = (classRef: Ref<Class<Doc>>): ReadonlyArray<Doc> =>
 
 const hulyClient: HulyClientOperations = {
   commitDocumentMove: () => Effect.die(new Error("Unexpected document move")),
+  commitTransfer: () => Effect.die(new Error("Unexpected issue transfer")),
+  allocateMovementNumber: () => Effect.die(new Error("Unexpected movement number allocation")),
   getAccountUuid: () => account,
   getPrimarySocialId: () => person,
   markupUrlConfig: testMarkupUrlConfig,

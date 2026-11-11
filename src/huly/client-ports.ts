@@ -92,8 +92,8 @@ export interface HulyClientOperations extends HulyClientContext {
   readonly commitDocumentMove: (
     write: DocumentMoveWrite
   ) => Effect.Effect<HulyConditionalWriteResult, MovementWriteError>
-  readonly commitTransfer?: (write: TransferWrite) => Effect.Effect<HulyConditionalWriteResult, MovementWriteError>
-  readonly allocateMovementNumber?: (destinationId: DocId) => Effect.Effect<TxResult, MovementWriteError>
+  readonly commitTransfer: (write: TransferWrite) => Effect.Effect<HulyConditionalWriteResult, MovementWriteError>
+  readonly allocateMovementNumber: (destinationId: DocId) => Effect.Effect<TxResult, MovementWriteError>
   readonly getAccountUuid: () => AccountUuid
   readonly getPrimarySocialId: () => PersonId
   readonly getSocialIds?: () => ReadonlyArray<PersonId>

@@ -66,6 +66,8 @@ const expectedRecruitingToolNames = [
 
 const noopHulyClient: HulyClientOperations = {
   commitDocumentMove: () => Effect.die(new Error("Unexpected document move")),
+  commitTransfer: () => Effect.die(new Error("Unexpected issue transfer")),
+  allocateMovementNumber: () => Effect.die(new Error("Unexpected movement number allocation")),
   getAccountUuid: () => "00000000-0000-4000-8000-000000000000" as AccountUuid,
 
   getPrimarySocialId: () => "test-primary-social-id" as PersonId,
