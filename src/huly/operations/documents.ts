@@ -44,7 +44,7 @@ import { DocumentId, TeamspaceId } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import {
   type DocumentContentCorruptedError,
-  DocumentNotFoundError,
+  type DocumentNotFoundError,
   type DocumentReferenceError,
   type IssueNotFoundError,
   type NoUpdateFieldsError,
@@ -56,20 +56,19 @@ import {
 import { buildDocumentUrlFromConfig } from "../url-builders.js"
 import { listTotal } from "./counts.js"
 import { renderDocumentContentForWrite } from "./document-native-references.js"
-import { fetchReadableDocumentContent, findTeamspace, findTeamspaceAndDocument } from "./documents-shared.js"
 import {
-  clampLimit,
-  escapeLikeWildcards,
-  findByNameOrId,
-  hulyQuery,
-  type StrictDocumentQuery
-} from "./query-helpers.js"
-import { toRef } from "./sdk-boundary.js"
+  fetchReadableDocumentContent,
+  findDocumentInTeamspace,
+  findTeamspace,
+  findTeamspaceAndDocument
+} from "./documents-shared.js"
+import { clampLimit, escapeLikeWildcards, hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
 import { type DirectUpdateEntry, mergeUpdateEntries, requireUpdateFields } from "./update-guards.js"
 
 import { core, documentPlugin } from "../huly-plugins.js"
 
 export { editDocument } from "./documents-edit.js"
+export { moveDocument } from "./documents-move.js"
 export { listInlineComments } from "./documents-inline-comments.js"
 
 type ListTeamspacesError = HulyClientError
@@ -338,22 +337,10 @@ export const createDocument = (
 
     const documentId: Ref<HulyDocument> = generateId()
 
-    const parent = params.parent
     const parentRef: Ref<HulyDocument> =
-      parent === undefined
+      params.parent === undefined
         ? documentPlugin.ids.NoParent
-        : yield* Effect.gen(function* () {
-            const parentDoc = yield* findByNameOrId(
-              client,
-              documentPlugin.class.Document,
-              { space: teamspace._id, title: parent },
-              { space: teamspace._id, _id: toRef<HulyDocument>(parent) }
-            )
-            if (parentDoc === undefined) {
-              return yield* new DocumentNotFoundError({ identifier: parent, teamspace: params.teamspace })
-            }
-            return parentDoc._id
-          })
+        : (yield* findDocumentInTeamspace(client, teamspace, params.teamspace, params.parent))._id
 
     // Fetch rank of the last document to insert after
     const lastDoc = yield* client.findOne<HulyDocument>(

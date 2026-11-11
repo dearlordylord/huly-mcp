@@ -121,6 +121,7 @@ const INVALID_PARAMS_TAGS: ReadonlySet<HulyDomainError["_tag"]> = new Set<HulyDo
   "DocumentEmptyContentError",
   "DocumentContentCorruptedError",
   "DocumentEditModeError",
+  "DocumentMoveCycleError",
   "DocumentReferenceError",
   "TodoDocumentTargetAmbiguousError",
   "TodoDocumentTargetNotWritableError",

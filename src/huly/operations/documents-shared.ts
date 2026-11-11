@@ -15,7 +15,7 @@ import { Effect } from "effect"
 import { Count, type DocumentIdentifier, type TeamspaceIdentifier } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { DocumentContentCorruptedError, DocumentNotFoundError, TeamspaceNotFoundError } from "../errors.js"
-import { findByNameOrId, hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
+import { findByNameOrId, findByNameOrIdOrFail, hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 
 import { core, documentPlugin } from "../huly-plugins.js"
@@ -149,6 +149,20 @@ export function findTeamspaceAndDocument<AmbiguityError>(
     return { client, teamspace, doc }
   })
 }
+
+export const findDocumentInTeamspace = (
+  client: HulyClient["Service"],
+  teamspace: HulyTeamspace,
+  teamspaceIdentifier: TeamspaceIdentifier,
+  document: DocumentIdentifier
+): Effect.Effect<HulyDocument, DocumentNotFoundError | HulyClientError> =>
+  findByNameOrIdOrFail(
+    client,
+    documentPlugin.class.Document,
+    { space: teamspace._id, title: document },
+    { space: teamspace._id, _id: toRef<HulyDocument>(document) },
+    () => new DocumentNotFoundError({ identifier: document, teamspace: teamspaceIdentifier })
+  )
 
 const documentContentAttr = "content"
 const documentContentCorrupted = (
