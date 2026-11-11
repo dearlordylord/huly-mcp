@@ -107,7 +107,9 @@ import {
   TelegramChannelIdentifierAmbiguousError,
   DocumentContentCorruptedError,
   DocumentEditModeError,
+  DocumentMoveConflictError,
   DocumentMoveCycleError,
+  DocumentMoveTargetAmbiguousError,
   DocumentNotFoundError,
   DocumentReferenceError,
   DrawingNotFoundError,
@@ -265,7 +267,9 @@ import {
   milestoneId,
   milestoneIdentifier,
   milestoneLabel,
-  projectIdentifier
+  projectIdentifier,
+  documentIdentifier,
+  teamspaceIdentifier
 } from "../helpers/brands.js"
 
 describe("Huly Errors", () => {
@@ -1341,6 +1345,10 @@ describe("Huly Errors", () => {
               return `doceditmode:${error.reason}`
             case "DocumentMoveCycleError":
               return `docmovecycle:${error.identifier}:${error.parent}`
+            case "DocumentMoveConflictError":
+              return error.message
+            case "DocumentMoveTargetAmbiguousError":
+              return error.message
             case "DocumentReferenceError":
               return `docreference:${error.reason}`
             case "CommentNotFoundError":
@@ -2321,8 +2329,30 @@ describe("Huly Errors", () => {
         ).toBe("doccorrupt:doc-1:missing markup blob")
         expect(matchError(new DocumentEditModeError({ reason: "bad mode" }))).toBe("doceditmode:bad mode")
         expect(
-          matchError(new DocumentMoveCycleError({ identifier: "Parent", parent: "Child", teamspace: "Docs" }))
+          matchError(
+            new DocumentMoveCycleError({
+              identifier: documentIdentifier("Parent"),
+              parent: documentIdentifier("Child"),
+              teamspace: teamspaceIdentifier("Docs")
+            })
+          )
         ).toBe("docmovecycle:Parent:Child")
+        expect(
+          matchError(
+            new DocumentMoveConflictError({
+              identifier: documentIdentifier("Parent"),
+              teamspace: teamspaceIdentifier("Docs")
+            })
+          )
+        ).toContain("Refresh the tree and retry")
+        expect(
+          matchError(
+            new DocumentMoveTargetAmbiguousError({
+              target: { type: "parent", identifier: documentIdentifier("Child") },
+              matches: Count.make(2)
+            })
+          )
+        ).toContain("Pass the exact parent ID")
         expect(matchError(new DocumentReferenceError({ reason: "bad reference" }))).toBe("docreference:bad reference")
         expect(matchError(new CommentNotFoundError({ commentId: "c-1", issueIdentifier: "H-1", project: "P" }))).toBe(
           "comment:c-1"

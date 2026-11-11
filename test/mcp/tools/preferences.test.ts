@@ -76,6 +76,9 @@ const findOne: HulyClientOperations["findOne"] = <T extends Doc>(classId: Ref<Cl
 }
 
 const hulyClient: HulyClientOperations = {
+  commitDocumentMove: () => Effect.die(new Error("Unexpected document move")),
+  commitTransfer: () => Effect.die(new Error("Unexpected issue transfer")),
+  allocateMovementNumber: () => Effect.die(new Error("Unexpected movement number allocation")),
   getAccountUuid: (): AccountUuid => accountUuid,
   getPrimarySocialId: () => personId,
   markupUrlConfig: testMarkupUrlConfig,

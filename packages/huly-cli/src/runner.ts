@@ -9,6 +9,7 @@ import { findAttachmentForScope } from "../../../src/huly/operations/attachments
 import type { ClientBundle } from "../../../src/mcp/server.js"
 import { operationRegistry, resolveAnnotations } from "../../../src/mcp/tools/index.js"
 import { describeOperationFailure, type ToolOperationSuccess } from "../../../src/mcp/tools/registry.js"
+import { HulyClient } from "../../../src/huly/client.js"
 import { buildCombinedClientLayer, buildScopedClientBundle } from "../../../src/runtime/huly-clients.js"
 import { reportTelemetry, type ToolStatus } from "../../../src/telemetry/events.js"
 import { jsonUtf8Bytes, toolFailureStatus, toolResponseStatus } from "../../../src/telemetry/tool-observation.js"
@@ -133,7 +134,7 @@ const defaultRunnerPorts: CliRunnerPorts = {
   writeImage: writeImageToFile,
   useClientBundle: (use) =>
     Effect.acquireUseRelease(
-      buildScopedClientBundle(buildCombinedClientLayer(undefined, "on-demand")).pipe(
+      buildScopedClientBundle(buildCombinedClientLayer(undefined, HulyClient.onDemandLayer)).pipe(
         Effect.mapError((error) => new CliRuntimeError({ message: errorMessage(error) }))
       ),
       ({ bundle }) => use(bundle),

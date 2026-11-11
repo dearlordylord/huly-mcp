@@ -36,6 +36,7 @@ import {
   type PersonId as DomainPersonId
 } from "../domain/schemas/shared.js"
 
+import type { DocumentMoveWrite } from "./document-move-adapter.js"
 import { type HulyDataInvalidError } from "./errors-base.js"
 import type { PersonMergeSnapshotStaleError } from "./errors-person-administration.js"
 import { type EmployeePreparationPlan } from "./employee-preparation.js"
@@ -88,8 +89,11 @@ export interface HulyClientOperations extends HulyClientContext {
     write: TransferTreeWrite,
     publishTransactions?: MovementTransactionProgress
   ) => Effect.Effect<HulyConditionalWriteResult, MovementWriteError>
-  readonly commitTransfer?: (write: TransferWrite) => Effect.Effect<HulyConditionalWriteResult, MovementWriteError>
-  readonly allocateMovementNumber?: (destinationId: DocId) => Effect.Effect<TxResult, MovementWriteError>
+  readonly commitDocumentMove: (
+    write: DocumentMoveWrite
+  ) => Effect.Effect<HulyConditionalWriteResult, MovementWriteError>
+  readonly commitTransfer: (write: TransferWrite) => Effect.Effect<HulyConditionalWriteResult, MovementWriteError>
+  readonly allocateMovementNumber: (destinationId: DocId) => Effect.Effect<TxResult, MovementWriteError>
   readonly getAccountUuid: () => AccountUuid
   readonly getPrimarySocialId: () => PersonId
   readonly getSocialIds?: () => ReadonlyArray<PersonId>

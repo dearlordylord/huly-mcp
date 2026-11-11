@@ -146,6 +146,9 @@ const documentsForClass = (state: DriveToolState, classRef: Ref<Class<Doc>>): Re
               : []
 
 const makeHulyClient = (state: DriveToolState): HulyClientOperations => ({
+  commitDocumentMove: () => Effect.die(new Error("Unexpected document move")),
+  commitTransfer: () => Effect.die(new Error("Unexpected issue transfer")),
+  allocateMovementNumber: () => Effect.die(new Error("Unexpected movement number allocation")),
   getAccountUuid: () => accountA,
   getPrimarySocialId: () => personId,
   markupUrlConfig: testMarkupUrlConfig,

@@ -108,6 +108,9 @@ const docsForSdkClass = <T extends Doc>(classId: Ref<Class<T>>): Array<T> => {
 const addCaptures: Array<{ readonly classId: string; readonly collection: string }> = []
 
 const hulyClient: HulyClientOperations = {
+  commitDocumentMove: () => Effect.die(new Error("Unexpected document move")),
+  commitTransfer: () => Effect.die(new Error("Unexpected issue transfer")),
+  allocateMovementNumber: () => Effect.die(new Error("Unexpected movement number allocation")),
   getAccountUuid: () => accountUuid,
   getPrimarySocialId: () => actor,
   markupUrlConfig: testMarkupUrlConfig,

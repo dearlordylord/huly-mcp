@@ -86,6 +86,9 @@ const makeClient = (spaces: ReadonlyArray<GenericSpace>): HulyClientOperations =
       : Effect.succeed(undefined)
 
   return {
+    commitDocumentMove: () => Effect.die(new Error("Unexpected document move")),
+    commitTransfer: () => Effect.die(new Error("Unexpected issue transfer")),
+    allocateMovementNumber: () => Effect.die(new Error("Unexpected movement number allocation")),
     getAccountUuid: () => account,
     getPrimarySocialId: () => person,
     markupUrlConfig: testMarkupUrlConfig,
