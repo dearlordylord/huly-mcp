@@ -8,7 +8,7 @@
   "current": {
     "bundleGzipBytes": 1509191,
     "bundleRawBytes": 6727919,
-    "packageBytes": 1562706,
+    "packageBytes": 1562707,
     "packageUnpackedBytes": 7093396
   },
   "delta": {
@@ -21,8 +21,8 @@
       "percent": -17.1857717337653
     },
     "packageBytes": {
-      "bytes": 20061,
-      "percent": 1.3004288089612321
+      "bytes": 20062,
+      "percent": 1.3004936326893095
     },
     "packageUnpackedBytes": {
       "bytes": -1289553,
