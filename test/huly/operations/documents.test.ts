@@ -440,6 +440,35 @@ describe("listDocuments", () => {
         expect(assertAt(result.documents, 0).teamspace).toBe("My Docs")
       })
     )
+    it.effect("returns parent IDs, with null for root documents", () =>
+      Effect.gen(function* () {
+        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+        const documents = [
+          makeDocument({
+            _id: "child-1" as Ref<HulyDocument>,
+            title: "Child",
+            space: "ts-1" as Ref<HulyTeamspace>,
+            parent: "root-1" as Ref<HulyDocument>,
+            modifiedOn: 2000
+          }),
+          makeDocument({
+            _id: "root-1" as Ref<HulyDocument>,
+            title: "Root",
+            space: "ts-1" as Ref<HulyTeamspace>,
+            modifiedOn: 1000
+          })
+        ]
+
+        const testLayer = createTestLayerWithMocks({ teamspaces: [teamspace], documents })
+
+        const result = yield* listDocuments({ teamspace: teamspaceIdentifier("My Docs") }).pipe(
+          Effect.provide(testLayer)
+        )
+
+        expect(assertAt(result.documents, 0).parent).toBe("root-1")
+        expect(assertAt(result.documents, 1).parent).toBeNull()
+      })
+    )
   })
 
   describe("limit handling", () => {
@@ -526,6 +555,28 @@ describe("getDocument", () => {
         expect(result.title).toBe("Test Doc")
         expect(result.content).toBe("# Hello World")
         expect(result.teamspace).toBe("My Docs")
+        expect(result.parent).toBeNull()
+      })
+    )
+
+    it.effect("returns the parent ID of a nested document", () =>
+      Effect.gen(function* () {
+        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+        const doc = makeDocument({
+          _id: "child-1" as Ref<HulyDocument>,
+          title: "Child",
+          space: "ts-1" as Ref<HulyTeamspace>,
+          parent: "root-1" as Ref<HulyDocument>
+        })
+
+        const testLayer = createTestLayerWithMocks({ teamspaces: [teamspace], documents: [doc] })
+
+        const result = yield* getDocument({
+          teamspace: teamspaceIdentifier("My Docs"),
+          document: documentIdentifier("child-1")
+        }).pipe(Effect.provide(testLayer))
+
+        expect(result.parent).toBe("root-1")
       })
     )
 

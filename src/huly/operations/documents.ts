@@ -57,6 +57,7 @@ import { buildDocumentUrlFromConfig } from "../url-builders.js"
 import { listTotal } from "./counts.js"
 import { renderDocumentContentForWrite } from "./document-native-references.js"
 import {
+  documentParentId,
   fetchReadableDocumentContent,
   findDocumentInTeamspace,
   findTeamspace,
@@ -275,6 +276,7 @@ export const listDocuments = (
       id: DocumentId.make(doc._id),
       title: doc.title,
       teamspace: teamspace.name,
+      parent: documentParentId(doc),
       url: buildDocumentUrlFromConfig(client.workbenchUrlConfig, doc.title, DocumentId.make(doc._id)),
       modifiedOn: doc.modifiedOn
     }))
@@ -308,6 +310,7 @@ export const getDocument = (params: GetDocumentParams): Effect.Effect<Document, 
       title: doc.title,
       content,
       teamspace: teamspace.name,
+      parent: documentParentId(doc),
       url: buildDocumentUrlFromConfig(client.workbenchUrlConfig, doc.title, DocumentId.make(doc._id)),
       modifiedOn: doc.modifiedOn,
       createdOn: doc.createdOn

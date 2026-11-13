@@ -121,7 +121,7 @@ export const documentTools = [
     {
       name: "list_documents",
       description:
-        "List documents in a Huly teamspace. Returns documents sorted by modification date (newest first). Each result includes a 'url' field pointing to the document in the Huly web app. Supports searching by title substring (titleSearch) and content (contentSearch).",
+        "List documents in a Huly teamspace. Returns documents sorted by modification date (newest first). Each result includes a 'parent' field (parent document ID, or null at the teamspace root) so the document tree can be rebuilt, and a 'url' field pointing to the document in the Huly web app. Supports searching by title substring (titleSearch) and content (contentSearch).",
       category: CATEGORY,
       inputSchema: listDocumentsParamsJsonSchema,
       resultSchema: ListDocumentsResultSchema
@@ -133,7 +133,7 @@ export const documentTools = [
     {
       name: "get_document",
       description:
-        "Retrieve full details for a Huly document including markdown content and a 'url' field pointing to the document in the Huly web app. Use this to view document content and metadata.",
+        "Retrieve full details for a Huly document including markdown content, its 'parent' document ID (null at the teamspace root), and a 'url' field pointing to the document in the Huly web app. Use this to view document content and metadata.",
       category: CATEGORY,
       inputSchema: getDocumentParamsJsonSchema,
       resultSchema: GetDocumentResultSchema
