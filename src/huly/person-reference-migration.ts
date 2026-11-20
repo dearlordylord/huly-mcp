@@ -3,13 +3,7 @@ import { updateAttribute } from "@hcengineering/core"
 import { Effect, Schema } from "effect"
 
 import { type PersonMergeReferenceCategory, type PersonMergeReferenceImpact } from "../domain/schemas/person-merge.js"
-import {
-  DocId,
-  type NonEmptyString,
-  ObjectClassName,
-  type PersonId,
-  PositiveInteger
-} from "../domain/schemas/shared.js"
+import { DocId, NonEmptyString, ObjectClassName, type PersonId, PositiveInteger } from "../domain/schemas/shared.js"
 import { type HulyConnectionError, type HulyDataInvalidError, PersonMergeSnapshotStaleError } from "./errors.js"
 import { attachment, chunter, contact, core } from "./huly-plugins.js"
 import { toClassRef } from "./operations/sdk-boundary.js"
@@ -55,16 +49,21 @@ const referenceCategory = (client: TxOperations, concreteClass: Ref<Class<Doc>>)
 
 const candidateClasses = (client: TxOperations, ownerClass: ObjectClassName) => {
   const hierarchy = client.getHierarchy()
+  const owner = toClassRef<Doc>(ownerClass)
   return hierarchy
-    .getDescendants(toClassRef<Doc>(ownerClass))
+    .getDescendants(hierarchy.isMixin(owner) ? hierarchy.getBaseClass(owner) : owner)
     .map((candidate) => toClassRef<Doc>(String(candidate)))
     .filter(
       (candidate) =>
+        !hierarchy.isMixin(candidate) &&
         !hierarchy.isDerived(candidate, toClassRef<Doc>(String(core.class.Tx))) &&
         !hierarchy.isDerived(candidate, toClassRef<Doc>(String(core.class.BenchmarkDoc))) &&
         hierarchy.findDomain(candidate) !== undefined
     )
 }
+
+const referenceFieldPath = (client: TxOperations, ownerClass: ObjectClassName, field: NonEmptyString): NonEmptyString =>
+  NonEmptyString.make(client.getHierarchy().isMixin(toClassRef<Doc>(ownerClass)) ? `${ownerClass}.${field}` : field)
 
 interface ReferenceInspectionPlan {
   readonly attribute: ParsedReferenceAttribute
@@ -92,11 +91,9 @@ const inspectReferencePlan = Effect.fn("PersonReferenceMigration.inspectReferenc
   source: PersonId
 ): Effect.fn.Return<PersonMergeReferenceImpact | undefined, HulyConnectionError | HulyDataInvalidError> {
   const { attribute, concreteClass, descriptor } = plan
+  const field = referenceFieldPath(client, attribute.parsed.attributeOf, attribute.parsed.name)
   const documents = yield* sdkEffect("inspectPersonReferences", () =>
-    client.findAll(concreteClass, exactPersonReferenceQuery(concreteClass, attribute.parsed.name, source), {
-      limit: 1,
-      total: true
-    })
+    client.findAll(concreteClass, exactPersonReferenceQuery(concreteClass, field, source), { limit: 1, total: true })
   )
   if (documents.total < 0) {
     return yield* invalidReferenceData(
@@ -121,7 +118,7 @@ const inspectReferencePlan = Effect.fn("PersonReferenceMigration.inspectReferenc
           descriptor.kind,
           routeKind,
           concreteClassName,
-          attribute.parsed.name,
+          field,
           source,
           "inspectPersonReferences"
         )
@@ -129,7 +126,7 @@ const inspectReferencePlan = Effect.fn("PersonReferenceMigration.inspectReferenc
           client,
           metadata,
           concreteClassName,
-          attribute.parsed.name,
+          field,
           descriptor.kind,
           routeKind,
           source,
@@ -169,7 +166,11 @@ export const inspectNativePersonReferences = Effect.fn("PersonReferenceMigration
         : 0
   const deduplicated = new Map<string, PersonMergeReferenceImpact>()
   for (const impact of impacts) {
-    const key = JSON.stringify([impact.concreteClass, impact.field, impact.kind])
+    const key = JSON.stringify([
+      impact.concreteClass,
+      referenceFieldPath(client, impact.ownerClass, impact.field),
+      impact.kind
+    ])
     const current = deduplicated.get(key)
     if (current === undefined || specificity(impact) > specificity(current)) deduplicated.set(key, impact)
   }
@@ -220,7 +221,7 @@ const loadImpactDocuments = Effect.fn("PersonReferenceMigration.loadImpactDocume
     client,
     metadata,
     impact.concreteClass,
-    impact.field,
+    referenceFieldPath(client, parsedAttribute.attributeOf, parsedAttribute.name),
     impact.kind,
     routeKind,
     source,
@@ -239,7 +240,9 @@ const loadImpactDocuments = Effect.fn("PersonReferenceMigration.loadImpactDocume
     concreteClass: impact.concreteClass,
     field: impact.field,
     attribute: rawAttribute,
-    document: document.raw,
+    document: client.getHierarchy().isMixin(toClassRef<Doc>(parsedAttribute.attributeOf))
+      ? client.getHierarchy().as(document.raw, toClassRef<Doc>(parsedAttribute.attributeOf))
+      : document.raw,
     replacement: document.kind === "single" ? survivor : replacementArray(document.value, source, survivor)
   }))
 })

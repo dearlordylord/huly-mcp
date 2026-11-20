@@ -1532,14 +1532,16 @@ describe("HulyClient.layer (live layer with mocked externals)", () => {
           value === "test:class:NoDomain" ? undefined : "test-domain"
         )
         mockHierarchyIsMixin.mockImplementation((value: string) => value === "test:mixin:PersonRef")
-        mockFindAll.mockImplementation(() => Promise.resolve(findResult([sourceComment])))
+        mockFindAll.mockImplementation(() =>
+          Promise.resolve(findResult([{ ...sourceComment, "test:mixin:PersonRef": { createdByPerson: sourceId } }]))
+        )
 
         const client = yield* HulyClient.pipe(Effect.provide(liveClientLayer))
         if (client.inspectPersonReferences === undefined) {
           return yield* Effect.die(new Error("live HulyClient omitted person-reference inspection"))
         }
         const impacts = yield* client.inspectPersonReferences(sourceId)
-        expect(impacts).toHaveLength(1)
+        expect(impacts).toHaveLength(2)
         expect(impacts[0]).toMatchObject({ attributeId: "attribute-created-by", ownerClass: commentClass })
 
         mockFindAllInModel.mockReturnValue([singleAttribute])
