@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto"
 
 import type { Class, Doc, DocumentQuery, Ref, TxOperations } from "@hcengineering/core"
+import { getObjectValue } from "@hcengineering/core"
 import { Effect, Schema } from "effect"
 
 import { type PersonMergeReferenceKind, PersonMergeSnapshotDigest } from "../domain/schemas/person-merge.js"
@@ -104,7 +105,7 @@ const prepareReferenceDocument = Effect.fn("PersonReferenceSnapshot.prepareDocum
   if (route.document._class !== concreteClass) {
     return yield* invalidReferenceData(operation, `${concreteClass}.${field} document class correlation`)
   }
-  const valueInput = Reflect.get(raw, field)
+  const valueInput: unknown = getObjectValue(field, raw)
   if (kind === "single") {
     const value = yield* Schema.decodeUnknownEffect(PersonId)(valueInput).pipe(
       Effect.mapError((cause) => invalidReferenceData(operation, `${concreteClass}.${field} reference value`, cause))
