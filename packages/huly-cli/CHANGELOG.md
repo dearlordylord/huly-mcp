@@ -1,5 +1,11 @@
 # @firfi/huly-cli
 
+## 0.54.1
+
+### Patch Changes
+
+- 0a76d53: Fix person merge preview failures on GitHub issues by distinguishing stored document classes from mixins. Preserve separate mixin-owned references during impact counting, snapshot checks, and migration.
+
 ## 0.54.0
 
 ### Minor Changes
