@@ -42,16 +42,6 @@ const hasBlockedByRelatedDocQuery = (query: unknown, id: string): boolean => {
 
 const hasBlockedByDotQuery = (query: unknown, id: string): boolean => recordValue(query, "blockedBy._id") === id
 
-const hasBlockingIssueProjection = (options: unknown): boolean => {
-  const projection = recordValue(options, "projection")
-  return (
-    recordValue(projection, "_id") === 1 &&
-    recordValue(projection, "_class") === 1 &&
-    recordValue(projection, "identifier") === 1 &&
-    recordValue(projection, "blockedBy") === 1
-  )
-}
-
 const makeProject = (overrides?: Partial<HulyProject>): HulyProject => {
   const base = {
     _id: "project-1" as Ref<HulyProject>,
@@ -852,7 +842,7 @@ describe("listIssueRelations", () => {
       expect(capturedFindAllQueries.some(({ query }) => hasBlockedByDotQuery(query, "issue-1"))).toBe(false)
       expect(
         capturedFindAllQueries.some(
-          ({ options, query }) => hasBlockedByRelatedDocQuery(query, "issue-1") && hasBlockingIssueProjection(options)
+          ({ options, query }) => hasBlockedByRelatedDocQuery(query, "issue-1") && options === undefined
         )
       ).toBe(true)
     })
