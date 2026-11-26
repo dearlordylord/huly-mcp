@@ -1,5 +1,11 @@
 # @firfi/huly-cli
 
+## 0.55.0
+
+### Minor Changes
+
+- 1eb4e92: `list_documents` and `get_document` (CLI `documents list` and `documents get`) now return `parent`: the parent document ID, or `null` for a document at the teamspace root. Agents can see the document tree without extra calls, and pass the ID straight to `move_document`.
+
 ## 0.54.1
 
 ### Patch Changes
