@@ -38,6 +38,7 @@ import {
   updateTeamspace
 } from "../../../src/huly/operations/documents.js"
 import { documentIdentifier, teamspaceIdentifier } from "../../helpers/brands.js"
+import { docRef } from "../../helpers/huly-sdk.js"
 import { editDocumentParams } from "../../helpers/parsed-params.js"
 
 import { contact, core, documentPlugin, tracker } from "../../../src/huly/huly-plugins.js"
@@ -442,19 +443,19 @@ describe("listDocuments", () => {
     )
     it.effect("returns parent IDs, with null for root documents", () =>
       Effect.gen(function* () {
-        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+        const teamspace = makeTeamspace({ _id: docRef<HulyTeamspace>("ts-1"), name: "My Docs" })
         const documents = [
           makeDocument({
-            _id: "child-1" as Ref<HulyDocument>,
+            _id: docRef<HulyDocument>("child-1"),
             title: "Child",
-            space: "ts-1" as Ref<HulyTeamspace>,
-            parent: "root-1" as Ref<HulyDocument>,
+            space: docRef<HulyTeamspace>("ts-1"),
+            parent: docRef<HulyDocument>("root-1"),
             modifiedOn: 2000
           }),
           makeDocument({
-            _id: "root-1" as Ref<HulyDocument>,
+            _id: docRef<HulyDocument>("root-1"),
             title: "Root",
-            space: "ts-1" as Ref<HulyTeamspace>,
+            space: docRef<HulyTeamspace>("ts-1"),
             modifiedOn: 1000
           })
         ]
@@ -561,12 +562,12 @@ describe("getDocument", () => {
 
     it.effect("returns the parent ID of a nested document", () =>
       Effect.gen(function* () {
-        const teamspace = makeTeamspace({ _id: "ts-1" as Ref<HulyTeamspace>, name: "My Docs" })
+        const teamspace = makeTeamspace({ _id: docRef<HulyTeamspace>("ts-1"), name: "My Docs" })
         const doc = makeDocument({
-          _id: "child-1" as Ref<HulyDocument>,
+          _id: docRef<HulyDocument>("child-1"),
           title: "Child",
-          space: "ts-1" as Ref<HulyTeamspace>,
-          parent: "root-1" as Ref<HulyDocument>
+          space: docRef<HulyTeamspace>("ts-1"),
+          parent: docRef<HulyDocument>("root-1")
         })
 
         const testLayer = createTestLayerWithMocks({ teamspaces: [teamspace], documents: [doc] })
