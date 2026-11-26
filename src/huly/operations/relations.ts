@@ -1,4 +1,4 @@
-import type { Class, Doc, DocumentUpdate, FindOptions, Ref, RelatedDocument } from "@hcengineering/core"
+import type { Class, Doc, DocumentUpdate, Ref, RelatedDocument } from "@hcengineering/core"
 import type { Document as HulyDocument, Teamspace as HulyTeamspace } from "@hcengineering/document"
 import type { Issue as HulyIssue, Project as HulyProject } from "@hcengineering/tracker"
 import { Effect } from "effect"
@@ -43,10 +43,6 @@ type RelationError = HulyClientError | ProjectNotFoundError | IssueNotFoundError
 const toIssueIdentifier = (value: string): IssueIdentifier => IssueIdentifier.make(value)
 const toIssueId = (value: string): IssueId => IssueId.make(value)
 const toTeamspaceIdentifier = (value: string): TeamspaceIdentifier => TeamspaceIdentifier.make(value)
-
-const blockingIssueFindOptions = {
-  projection: { _id: 1, _class: 1, identifier: 1, blockedBy: 1 }
-} satisfies FindOptions<HulyIssue>
 
 const resolveTargetIssue = (
   client: HulyClientOperations,
@@ -343,10 +339,10 @@ export const listIssueRelations = (
     // in `blockedBy`. Live local-Huly verification for PR #48 showed that querying
     // `{ "blockedBy._id": issue._id }` returns no rows, so the implementation uses
     // the stored shape directly and keeps the exact-id filter below as a guard.
+    // The REST backend returns no matches when this RelatedDocument predicate has an inclusion projection.
     const blockingIssueCandidates = yield* client.findAll<HulyIssue>(
       tracker.class.Issue,
-      hulyQuery<HulyIssue>({ blockedBy: makeRelatedDoc(issue) }),
-      blockingIssueFindOptions
+      hulyQuery<HulyIssue>({ blockedBy: makeRelatedDoc(issue) })
     )
     const blocks = yield* Effect.forEach(
       blockingIssueCandidates.filter(
