@@ -48,10 +48,15 @@ export const ListTeamspacesResultSchema = Schema.Struct({
   total: ListTotal
 })
 export type ListTeamspacesResult = Schema.Schema.Type<typeof ListTeamspacesResultSchema>
+const DocumentParentField = Schema.NullOr(DocumentId).annotate({
+  description: "ID of the parent document, or null when the document is at the teamspace root."
+})
+
 export const DocumentSummarySchema = Schema.Struct({
   id: DocumentId,
   title: Schema.String,
   teamspace: Schema.String,
+  parent: DocumentParentField,
   url: UrlString,
   modifiedOn: Schema.optional(Schema.Number)
 })
@@ -100,6 +105,7 @@ export const DocumentSchema = Schema.Struct({
   title: Schema.String,
   content: Schema.optional(Schema.String),
   teamspace: Schema.String,
+  parent: DocumentParentField,
   url: UrlString,
   modifiedOn: Schema.optional(Schema.Number),
   createdOn: Schema.optional(Schema.Number)

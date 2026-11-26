@@ -12,13 +12,16 @@ import type { Blob, Class, Doc, Ref } from "@hcengineering/core"
 import type { Document as HulyDocument, Teamspace as HulyTeamspace } from "@hcengineering/document"
 import { Effect } from "effect"
 
-import { Count, type DocumentIdentifier, type TeamspaceIdentifier } from "../../domain/schemas/shared.js"
+import { Count, DocumentId, type DocumentIdentifier, type TeamspaceIdentifier } from "../../domain/schemas/shared.js"
 import { HulyClient, type HulyClientError } from "../client.js"
 import { DocumentContentCorruptedError, DocumentNotFoundError, TeamspaceNotFoundError } from "../errors.js"
 import { findByNameOrId, hulyQuery, type StrictDocumentQuery } from "./query-helpers.js"
 import { toRef } from "./sdk-boundary.js"
 
 import { core, documentPlugin } from "../huly-plugins.js"
+
+export const documentParentId = (doc: Pick<HulyDocument, "parent">): DocumentId | null =>
+  doc.parent === documentPlugin.ids.NoParent ? null : DocumentId.make(doc.parent)
 
 export const findTeamspace = (
   identifier: TeamspaceIdentifier,
