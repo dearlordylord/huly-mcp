@@ -1,5 +1,15 @@
 # @firfi/huly-cli
 
+## 0.55.0
+
+### Minor Changes
+
+- 1eb4e92: `list_documents` and `get_document` (CLI `documents list` and `documents get`) now return `parent`: the parent document ID, or `null` for a document at the teamspace root. Agents can see the document tree without extra calls, and pass the ID straight to `move_document`.
+
+### Patch Changes
+
+- 55e860b: Restore inverse issue dependency results from `list_issue_relations` and `issues relations list` on Huly REST backends by querying RelatedDocument predicates without an inclusion projection.
+
 ## 0.54.1
 
 ### Patch Changes
